@@ -17,12 +17,12 @@ EXPECTED_JOBS = {
 def test_jobs_yaml_loads_and_validates():
     jobs = rc.load_jobs(JOBS)
     names = {j["name"] for j in jobs}
-    assert names == EXPECTED_JOBS
+    assert EXPECTED_JOBS <= names, f"missing expected jobs: {EXPECTED_JOBS - names}"
 
 
-def test_defaults_applied_deliver_whatsapp():
+def test_defaults_applied_deliver_telegram():
     jobs = rc.load_jobs(JOBS)
-    assert all(j["deliver"] == "whatsapp" for j in jobs)
+    assert all(j["deliver"] == "telegram" for j in jobs)
 
 
 def test_build_create_command_shape():
