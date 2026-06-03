@@ -31,7 +31,7 @@ set -euo pipefail
 
 MODEL_TYPE="${1:-qwen}"
 PORT="${HERMES_VLLM_PORT:-8003}"
-MTP_TOKENS="${MTP_TOKENS:-1}"   # set to 0 to disable Multi-Token Prediction
+MTP_TOKENS="${MTP_TOKENS:-0}"   # MTP requires built-in draft heads; Qwen3.5 AWQ loads full model twice without them
 
 # ── Per-model defaults ────────────────────────────────────────────────────────
 case "${MODEL_TYPE}" in
