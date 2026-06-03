@@ -60,7 +60,11 @@ case "${MODEL_TYPE}" in
     TOOL_CALL_PARSER="qwen3_xml"
     QUANTIZATION=""                        # AutoRound uses compressed-tensors; vLLM auto-detects
     KV_CACHE_DTYPE="fp8"
+    # AutoRound tokenizer_config.json references TokenizersBackend which is
+    # unavailable here — reuse the tokenizer from the AWQ model (same base).
+    TOKENIZER="${HERMES_VLLM_TOKENIZER:-./models/Qwen/Qwen3.5-122B-A10B-AWQ}"
     EXTRA_FLAGS=(
+      --tokenizer "${TOKENIZER}"
       --enable-prefix-caching
       --max-num-batched-tokens 8192
     )
