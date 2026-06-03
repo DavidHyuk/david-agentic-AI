@@ -52,7 +52,7 @@ metadata:
 ## Output Format
 - Lead with a one-line "today's signal" takeaway.
 - Then the digest list (title · upvotes · date · 1-line why-it-matters · link).
-- Keep it skimmable for WhatsApp. Put long analysis behind a follow-up, not in the
+- Keep it skimmable for Telegram. Put long analysis behind a follow-up, not in the
   scheduled push.
 
 ## Pitfalls

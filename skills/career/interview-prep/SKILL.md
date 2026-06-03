@@ -59,7 +59,7 @@ resource is worth his time.
 
 ## Output Format
 - One pillar, one item per scheduled push. Lead with the drill, then the rubric.
-- WhatsApp-friendly: short, links inline.
+- Telegram-friendly: short, links inline.
 
 ## Pitfalls
 - Don't fire-hose. Staff prep is about depth + signal, not volume.

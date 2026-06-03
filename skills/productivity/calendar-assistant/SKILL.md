@@ -54,7 +54,7 @@ his interview prep, research reading, and English practice.
 
 ## Output Format
 - Morning brief: agenda first (from `agenda.py`), then a short "suggested plan"
-  with 2–3 concrete actions tied to his goals. WhatsApp-friendly.
+  with 2–3 concrete actions tied to his goals. Telegram-friendly.
 
 ## Pitfalls
 - Never invent or guess events — if the calendar can't be read, say so.
