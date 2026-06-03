@@ -3,6 +3,39 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v0.2.0 — 2026-06-03 (minor: live interview-trend ingestion)
+
+### Added
+- `scripts/interview_trends.py` — a deterministic data layer that pulls *current*
+  interview signal so drills reflect what Staff/Senior MLE candidates are actually
+  asked now, instead of recycling the static `question-bank.md` seed. Sources are all
+  free / no-auth: **Hacker News** (Algolia API, discourse), **GitHub search** (trending
+  interview-prep repos + hot ML tooling), and the **Subscribe-Papers DB** (frontier
+  grounding, reusing `papers_digest`). Per-pillar query plans feed a source-diverse
+  ranking that round-robins sources so GitHub's huge star counts don't bury fresh HN/
+  paper signal. Network fetches are isolated and degrade gracefully (a failed source
+  yields an empty list, never a broken drill); results cache to
+  `~/.hermes/data/interview/trends.json`. Full brief runs in ~7s.
+- `tests/test_interview_trends.py` — 12 cases (normalization, source-diverse ranking,
+  cache roundtrip, pillar orchestration with the network stubbed, graceful failure).
+
+### Changed
+- `skills/career/interview-prep/SKILL.md` — drills now lead with the live trend brief
+  (`interview_trends.py --pillar <pillar>`) and fall back to the seed bank only when the
+  fetch is thin. Added `interview.trends_cache` config key; updated procedure, resources,
+  and verification to require current, real resources (repo/thread/paper) over evergreen
+  guesses.
+- `cron/jobs.yaml` — the `interview-prep` job prompt now instructs running
+  `interview_trends.py` for the chosen pillar before composing the drill.
+
+### Why
+The biggest weakness of the prep loop was staleness: a fixed seed bank can't track
+shifting interview expectations (e.g. LLM-serving system design, agent eval, current
+behavioral bar). Grounding each drill in live, ranked, multi-source signal keeps prep
+aligned with the present-day Silicon Valley MLE bar with zero manual curation.
+
+---
+
 ## v0.1.1 — 2026-06-02 (patch: switch model backend to vLLM + Qwen3.5)
 
 ### Changed
