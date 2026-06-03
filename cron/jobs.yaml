@@ -1,14 +1,14 @@
-# Scheduled WhatsApp notifications for David's Hermes agent.
+# Scheduled telegram notifications for David's Hermes agent.
 #
 # Registered by bootstrap/register_cron.py via `hermes cron create`. Schedules are
 # cron expressions evaluated in the gateway host's local timezone
-# (set the host to America/Los_Angeles). All jobs deliver to WhatsApp.
+# (set the host to America/Los_Angeles). All jobs deliver to telegram.
 #
 # Cron jobs run in a FRESH session, so every prompt is self-contained and names the
 # skill(s) it relies on. Keep prompts skimmable — these are push notifications.
 
 defaults:
-  deliver: whatsapp
+  deliver: telegram
 
 jobs:
   - name: morning-brief
