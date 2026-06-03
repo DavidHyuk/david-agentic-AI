@@ -7,9 +7,10 @@
 #   bash local-model/download_model.sh [MODEL]
 #
 # MODEL choices:
-#   qwen36    Qwen3.6-35B-A3B-AWQ   (~18GB)   — recommended for agents
-#   minimax   MiniMax-M2.7-AWQ-4bit (~100GB)  — alternative MoE
-#   qwen      Qwen3.5-122B-A10B-AWQ — already on disk (skip or re-download)
+#   qwen36       Qwen3.6-35B-A3B-AWQ          (~18GB)  — recommended for agents
+#   qwen-hybrid  Qwen3.5-122B AR-INT4+FP8     (~65GB)  — ~51 tok/s on DGX Spark
+#   minimax      MiniMax-M2.7-AWQ-4bit        (~100GB) — alternative MoE
+#   qwen         Qwen3.5-122B-A10B-AWQ        — already on disk (skip or re-download)
 #
 # Environment overrides:
 #   HERMES_MODEL_DIR   base directory for model weights (default: ./models)
@@ -27,6 +28,13 @@ fi
 
 # ── Per-model config ──────────────────────────────────────────────────────────
 case "${MODEL_TYPE}" in
+
+  qwen-hybrid)
+    HF_REPO="${HF_REPO:-albond/DGX_Spark_Qwen3.5-122B-A10B-AR-INT4}"
+    DEST="${MODEL_BASE_DIR}/Qwen/Qwen3.5-122B-A10B-AR-INT4"
+    SIZE="~65GB"
+    NEXT_STEP="bash local-model/run_model.sh qwen-hybrid"
+    ;;
 
   qwen36)
     HF_REPO="${HF_REPO:-Qwen/Qwen3.6-35B-A3B-AWQ}"
@@ -51,7 +59,7 @@ case "${MODEL_TYPE}" in
 
   *)
     echo "ERROR: Unknown model '${MODEL_TYPE}'" >&2
-    echo "Usage: $0 [qwen36|minimax|qwen]" >&2
+    echo "Usage: $0 [qwen-hybrid|qwen36|minimax|qwen]" >&2
     exit 1
     ;;
 esac

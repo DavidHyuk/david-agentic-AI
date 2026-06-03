@@ -8,9 +8,13 @@
 #   nohup bash local-model/run_model.sh [MODEL] &  # background
 #
 # MODEL choices:
-#   qwen      Qwen3.5-122B-A10B-AWQ  (default) — high quality, ~60GB, ~51 tok/s
-#   qwen36    Qwen3.6-35B-A3B-AWQ   — agent-optimised, ~18GB, ~150 tok/s
-#   minimax   MiniMax-M2.7-AWQ-4bit — alternative MoE, ~100GB
+#   qwen           Qwen3.5-122B-A10B-AWQ    (default) — ~14 tok/s baseline
+#   qwen-hybrid    Qwen3.5-122B AR-INT4+FP8 — ~51 tok/s (requires re-download)
+#   qwen36         Qwen3.6-35B-A3B-AWQ      — agent-optimised, ~18GB, fast
+#   minimax        MiniMax-M2.7-AWQ-4bit    — alternative MoE, ~100GB
+#
+# MTP (Multi-Token Prediction) is enabled by default for qwen/qwen-hybrid/qwen36.
+# Disable with: MTP_TOKENS=0 bash local-model/run_model.sh qwen
 #
 # After switching models, point Hermes at the right provider:
 #   cp config/config.fragment.<model>.yaml config/config.fragment.yaml
@@ -27,6 +31,7 @@ set -euo pipefail
 
 MODEL_TYPE="${1:-qwen}"
 PORT="${HERMES_VLLM_PORT:-8003}"
+MTP_TOKENS="${MTP_TOKENS:-1}"   # set to 0 to disable Multi-Token Prediction
 
 # ── Per-model defaults ────────────────────────────────────────────────────────
 case "${MODEL_TYPE}" in
@@ -38,6 +43,23 @@ case "${MODEL_TYPE}" in
     MAX_MODEL_LEN="${HERMES_VLLM_MAX_MODEL_LEN:-65536}"
     TOOL_CALL_PARSER="qwen3_xml"
     QUANTIZATION="awq"
+    KV_CACHE_DTYPE="fp8"
+    EXTRA_FLAGS=(
+      --enable-prefix-caching
+      --max-num-batched-tokens 8192
+    )
+    ;;
+
+  qwen-hybrid)
+    # Hybrid INT4+FP8: routing experts in INT4, shared experts in FP8.
+    # ~51 tok/s on DGX Spark vs ~14 tok/s for pure AWQ.
+    # Download: bash local-model/download_model.sh qwen-hybrid
+    MODEL_PATH="${HERMES_MODEL_PATH:-./models/Qwen/Qwen3.5-122B-A10B-AR-INT4}"
+    SERVED_NAME="Qwen3.5-122B-A10B-AWQ"   # same name so Hermes config needs no change
+    GPU_UTIL="${HERMES_VLLM_GPU_UTIL:-0.85}"
+    MAX_MODEL_LEN="${HERMES_VLLM_MAX_MODEL_LEN:-65536}"
+    TOOL_CALL_PARSER="qwen3_xml"
+    QUANTIZATION=""                        # AR-INT4 uses compressed-tensors
     KV_CACHE_DTYPE="fp8"
     EXTRA_FLAGS=(
       --enable-prefix-caching
@@ -76,7 +98,7 @@ case "${MODEL_TYPE}" in
 
   *)
     echo "ERROR: Unknown model '${MODEL_TYPE}'" >&2
-    echo "Usage: $0 [qwen|qwen36|minimax]" >&2
+    echo "Usage: $0 [qwen|qwen-hybrid|qwen36|minimax]" >&2
     exit 1
     ;;
 esac
@@ -96,6 +118,7 @@ echo "  port    : ${PORT}"
 echo "  gpu_util: ${GPU_UTIL}"
 echo "  max_len : ${MAX_MODEL_LEN}"
 echo "  tool_call_parser: ${TOOL_CALL_PARSER}"
+echo "  mtp_tokens: ${MTP_TOKENS} (multi-token prediction)"
 echo "  sampling penalties: via Hermes providers.extra_body (not CLI)"
 echo
 
@@ -117,6 +140,11 @@ VLLM_ARGS=(
 
 if [ -n "${QUANTIZATION}" ]; then
   VLLM_ARGS+=(--quantization "${QUANTIZATION}")
+fi
+
+# MTP: enabled for all Qwen models; skip for minimax (unsupported)
+if [ "${MTP_TOKENS}" -gt 0 ] && [ "${MODEL_TYPE}" != "minimax" ]; then
+  VLLM_ARGS+=(--speculative-config "{\"method\": \"mtp\", \"num_speculative_tokens\": ${MTP_TOKENS}}")
 fi
 
 VLLM_ARGS+=("${EXTRA_FLAGS[@]}")
