@@ -1,0 +1,7 @@
+# Runtime + tooling dependencies for the david-agentic-ai config package.
+# The Hermes Agent runtime itself is installed separately by bootstrap/install.sh
+# (pip install hermes-agent). These are only needed for the helper scripts,
+# the bootstrap tooling, and the test suite.
+
+PyYAML>=6.0          # parse cron/jobs.yaml + config fragments, SKILL.md frontmatter
+pytest>=7.4          # unit tests

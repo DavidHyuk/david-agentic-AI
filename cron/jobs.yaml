@@ -1,0 +1,69 @@
+# Scheduled WhatsApp notifications for David's Hermes agent.
+#
+# Registered by bootstrap/register_cron.py via `hermes cron create`. Schedules are
+# cron expressions evaluated in the gateway host's local timezone
+# (set the host to America/Los_Angeles). All jobs deliver to WhatsApp.
+#
+# Cron jobs run in a FRESH session, so every prompt is self-contained and names the
+# skill(s) it relies on. Keep prompts skimmable — these are push notifications.
+
+defaults:
+  deliver: whatsapp
+
+jobs:
+  - name: morning-brief
+    schedule: "30 7 * * *"          # 07:30 every day
+    skills: [calendar-assistant]
+    prompt: >
+      Build today's brief. Read my Google Calendar for today via the
+      google-calendar MCP server, format it with the agenda.py helper, then add a
+      short "suggested plan" of 2-3 concrete actions tied to my goals (interview
+      prep, a papers read, an English drill). Flag any priority events, overlaps,
+      and free focus slots. If the calendar can't be read, say so plainly.
+
+  - name: papers-digest
+    schedule: "30 8 * * 1-5"        # 08:30 weekdays, after Subscribe-Papers 08:00 scrape
+    skills: [papers-digest]
+    prompt: >
+      Send my daily LLM/LVM research signal. Use the papers-digest skill: pull
+      trending + recent papers from the Subscribe-Papers DB, lead with a one-line
+      takeaway, then list the top items with a one-line why-it-matters and an
+      interview-relevance angle for Staff/Senior MLE. Keep it skimmable.
+
+  - name: interview-prep
+    schedule: "0 12 * * 1,3,5"      # 12:00 Mon/Wed/Fri
+    skills: [interview-prep]
+    prompt: >
+      Deliver today's Staff/Senior MLE interview drill. Use the interview-prep
+      skill: read my progress log, pick ONE under-covered pillar + one concrete
+      item, and send the drill plus a what-good-looks-like rubric and 1-2 curated
+      resources. Append what you covered to the progress log.
+
+  - name: english-intake
+    schedule: "0 20 * * *"          # 20:00 every day (lessons are 4x/week)
+    skills: [english-practice]
+    prompt: >
+      Check for new English lessons. Use the english-practice skill (intake branch):
+      run english_intake.py to find new sessions, transcribe recordings, mine the
+      tutor's corrections into atomic SRS cards, mark sessions processed, and send a
+      short summary with the top recurring error patterns. If there are no new
+      lessons, reply with only [SILENT].
+
+  - name: english-drill
+    schedule: "0 21 * * *"          # 21:00 every day
+    skills: [english-practice]
+    prompt: >
+      Send tonight's English drill. Use the english-practice skill (drill branch):
+      run english_srs.py due and deliver the due cards as a rewrite quiz. Invite me
+      to reply with my attempts so you can grade and record results. If nothing is
+      due, reply with only [SILENT].
+
+  - name: weekly-review
+    schedule: "0 18 * * 0"          # 18:00 Sunday
+    skills: [papers-digest, interview-prep, english-practice]
+    prompt: >
+      Write my weekly review. Summarize: (1) the most important LLM/LVM papers this
+      week and one I should deep-read, (2) interview-prep pillars covered vs
+      neglected from the progress log with next week's focus, and (3) English
+      progress from the SRS deck stats (cards added, due, mastery by box). End with
+      3 concrete goals for next week tied to landing a Staff/Senior MLE role.

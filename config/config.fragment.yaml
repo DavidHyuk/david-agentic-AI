@@ -1,0 +1,29 @@
+# Non-secret Hermes config merged into ~/.hermes/config.yaml by stage.py.
+# Secrets (the local endpoint API key) go in ~/.hermes/.env instead.
+
+# --- Model: David's local DGX Spark llama.cpp endpoint ---------------------
+# IMPORTANT: Hermes requires >= 64K context. The default Subscribe-Papers
+# run_model.sh uses -c 8192, which is too small for the agent. Launch the model
+# with at least -c 65536 (see local-model/run_hermes_model.sh).
+model:
+  provider: custom
+  base_url: http://localhost:8080/v1
+  default: gpt-oss-120b          # confirm with: curl -s localhost:8080/v1/models
+  context_length: 65536
+
+# --- Persistent memory ------------------------------------------------------
+memory:
+  memory_enabled: true
+  user_profile_enabled: true
+  memory_char_limit: 2200
+  user_char_limit: 1375
+
+# --- Cron delivery ----------------------------------------------------------
+cron:
+  wrap_response: true
+
+# --- Skills: scan this repo's skills dir as an external source so edits in the
+# repo show up without re-staging (stage.py also copies them into ~/.hermes).
+skills:
+  external_dirs:
+    - /home/david/workspace/david-agentic-ai/skills
