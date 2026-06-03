@@ -36,7 +36,8 @@ def test_config_merge_preserves_existing(tmp_path):
     assert cfg["existing_key"] == 123                              # preserved
     assert cfg["model"]["provider"] == "custom:qwen-hermes"        # merged from fragment
     assert cfg["model"]["foo"] == "bar"                            # preserved alongside merge
-    # sampling penalties must be present so Hermes forwards them on every call
+    assert "qwen-hermes" in cfg["providers"]
+    assert cfg["providers"]["qwen-hermes"]["base_url"] == "http://localhost:8003/v1"
     eb = cfg["providers"]["qwen-hermes"]["extra_body"]
     assert eb["presence_penalty"] == 0.6
     assert eb["repetition_penalty"] == 1.05
