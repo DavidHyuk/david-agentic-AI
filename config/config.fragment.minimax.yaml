@@ -1,0 +1,37 @@
+# Hermes config for MiniMax-M2.7 via local vLLM (:8003).
+# Apply by replacing config.fragment.yaml or merging manually, then:
+#   python3 bootstrap/stage.py
+#   hermes config set model.provider custom:minimax-hermes
+#
+# Start model first:
+#   bash local-model/download_minimax_m27.sh
+#   bash local-model/run_hermes_model_minimax.sh
+
+providers:
+  minimax-hermes:
+    base_url: http://localhost:8003/v1
+    model: MiniMax-M2.7-AWQ-4bit
+    context_length: 65536
+    extra_body:
+      presence_penalty: 0.6
+      repetition_penalty: 1.05
+      temperature: 1.0
+      top_p: 0.95
+
+model:
+  provider: custom:minimax-hermes
+  default: MiniMax-M2.7-AWQ-4bit
+  context_length: 65536
+
+memory:
+  memory_enabled: true
+  user_profile_enabled: true
+  memory_char_limit: 2200
+  user_char_limit: 1375
+
+cron:
+  wrap_response: true
+
+skills:
+  external_dirs:
+    - /home/david/workspace/david-agentic-ai/skills
