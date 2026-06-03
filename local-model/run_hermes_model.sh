@@ -51,6 +51,7 @@ exec vllm serve "${MODEL_PATH}" \
     --enable-auto-tool-choice \
     --tool-call-parser qwen3_xml \
     --enable-prefix-caching \
+    --max-num-batched-tokens 8192 \
     --host 0.0.0.0 \
     --port "${PORT}" \
     --uvicorn-log-level warning
