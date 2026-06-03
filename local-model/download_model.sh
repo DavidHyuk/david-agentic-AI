@@ -68,6 +68,8 @@ esac
 if ! command -v huggingface-cli >/dev/null 2>&1; then
   echo "Installing huggingface_hub CLI..."
   python3 -m pip install --user -U "huggingface_hub[cli]"
+else
+  python3 -m pip install --user -q -U "huggingface_hub[cli]"
 fi
 
 if [ -f "${DEST}/config.json" ]; then
