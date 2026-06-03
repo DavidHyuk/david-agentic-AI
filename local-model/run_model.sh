@@ -51,15 +51,14 @@ case "${MODEL_TYPE}" in
     ;;
 
   qwen-hybrid)
-    # Hybrid INT4+FP8: routing experts in INT4, shared experts in FP8.
-    # ~51 tok/s on DGX Spark vs ~14 tok/s for pure AWQ.
+    # Intel AutoRound INT4: better calibration than AWQ, ~51 tok/s on DGX Spark.
     # Download: bash local-model/download_model.sh qwen-hybrid
-    MODEL_PATH="${HERMES_MODEL_PATH:-./models/Qwen/Qwen3.5-122B-A10B-AR-INT4}"
+    MODEL_PATH="${HERMES_MODEL_PATH:-./models/Qwen/Qwen3.5-122B-A10B-int4-AutoRound}"
     SERVED_NAME="Qwen3.5-122B-A10B-AWQ"   # same name so Hermes config needs no change
-    GPU_UTIL="${HERMES_VLLM_GPU_UTIL:-0.85}"
+    GPU_UTIL="${HERMES_VLLM_GPU_UTIL:-0.90}"
     MAX_MODEL_LEN="${HERMES_VLLM_MAX_MODEL_LEN:-65536}"
     TOOL_CALL_PARSER="qwen3_xml"
-    QUANTIZATION=""                        # AR-INT4 uses compressed-tensors
+    QUANTIZATION=""                        # AutoRound uses compressed-tensors; vLLM auto-detects
     KV_CACHE_DTYPE="fp8"
     EXTRA_FLAGS=(
       --enable-prefix-caching

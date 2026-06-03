@@ -30,9 +30,9 @@ fi
 case "${MODEL_TYPE}" in
 
   qwen-hybrid)
-    HF_REPO="${HF_REPO:-albond/DGX_Spark_Qwen3.5-122B-A10B-AR-INT4}"
-    DEST="${MODEL_BASE_DIR}/Qwen/Qwen3.5-122B-A10B-AR-INT4"
-    SIZE="~65GB"
+    HF_REPO="${HF_REPO:-Intel/Qwen3.5-122B-A10B-int4-AutoRound}"
+    DEST="${MODEL_BASE_DIR}/Qwen/Qwen3.5-122B-A10B-int4-AutoRound"
+    SIZE="~77GB"
     NEXT_STEP="bash local-model/run_model.sh qwen-hybrid"
     ;;
 
