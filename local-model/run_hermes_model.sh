@@ -50,6 +50,7 @@ exec vllm serve "${MODEL_PATH}" \
     --trust-remote-code \
     --enable-auto-tool-choice \
     --tool-call-parser qwen3_xml \
+    --enable-prefix-caching \
     --host 0.0.0.0 \
     --port "${PORT}" \
     --uvicorn-log-level warning
