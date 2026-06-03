@@ -33,9 +33,13 @@ def test_config_merge_preserves_existing(tmp_path):
     stage.stage_config(home)
     import yaml
     cfg = yaml.safe_load((home / "config.yaml").read_text())
-    assert cfg["existing_key"] == 123            # preserved
-    assert cfg["model"]["provider"] == "custom"  # merged from fragment
-    assert cfg["model"]["foo"] == "bar"          # preserved alongside merge
+    assert cfg["existing_key"] == 123                              # preserved
+    assert cfg["model"]["provider"] == "custom:qwen-hermes"        # merged from fragment
+    assert cfg["model"]["foo"] == "bar"                            # preserved alongside merge
+    # sampling penalties must be present so Hermes forwards them on every call
+    eb = cfg["providers"]["qwen-hermes"]["extra_body"]
+    assert eb["presence_penalty"] == 0.6
+    assert eb["repetition_penalty"] == 1.05
 
 
 def test_memory_not_clobbered_when_present(tmp_path):

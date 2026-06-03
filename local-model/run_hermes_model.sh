@@ -24,7 +24,7 @@
 
 set -euo pipefail
 
-MODEL_PATH="${HERMES_MODEL_PATH:-/home/david/workspace/ClawGram/models/Qwen/Qwen3.5-122B-A10B-AWQ}"
+MODEL_PATH="${HERMES_MODEL_PATH:-./models/Qwen/Qwen3.5-122B-A10B-AWQ}"
 PORT="${HERMES_VLLM_PORT:-8003}"
 GPU_UTIL="${HERMES_VLLM_GPU_UTIL:-0.85}"
 
@@ -45,7 +45,5 @@ exec vllm serve "${MODEL_PATH}" \
     --max-model-len 65536 \
     --kv-cache-dtype fp8 \
     --trust-remote-code \
-    --presence-penalty 0.6 \
-    --repetition-penalty 1.05 \
     --host 0.0.0.0 \
     --port "${PORT}"
