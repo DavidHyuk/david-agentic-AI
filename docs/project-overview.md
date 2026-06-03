@@ -58,7 +58,8 @@ david-agentic-ai/
 │
 ├── scripts/                   # 스킬이 호출하는 Python 헬퍼 (→ ~/.hermes/scripts/)
 │   ├── papers_digest.py       # Subscribe-Papers DB 쿼리
-│   ├── english_intake.py      # 새 레슨 탐지 + 처리 상태 관리
+│   ├── interview_trends.py    # HN·GitHub·논문 실시간 인터뷰 트렌드 수집
+│   ├── english_intake.py      # 새 레슨 탐지 + 처리 상태 관리 + Telegram 파일 저장
 │   ├── english_srs.py         # Leitner SRS 덱 (추가/리뷰/통계)
 │   └── agenda.py              # 캘린더 이벤트 포맷팅 + 충돌 감지
 │
@@ -78,9 +79,10 @@ david-agentic-ai/
 │   ├── Qwen/                  # Qwen 계열 모델
 │   └── MiniMax/               # MiniMax-M2.7 모델
 │
-├── tests/                     # pytest 테스트 (45개)
+├── tests/                     # pytest 테스트 (58개)
 │   ├── conftest.py
 │   ├── test_papers_digest.py
+│   ├── test_interview_trends.py  # 트렌드 수집 (normalization, ranking, cache, network stub)
 │   ├── test_english_intake.py
 │   ├── test_english_srs.py
 │   ├── test_agenda.py
@@ -122,15 +124,23 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 스킬이 직접 DB 쿼리나 파일 파싱을 하지 않고, 헬퍼 스크립트를 CLI로 호출합니다.
 스크립트는 repo-relative import 없이 standalone으로 유지돼 `~/.hermes/scripts/`에서 독립 실행됩니다.
 
+| 스크립트 | 역할 |
+|----------|------|
+| `papers_digest.py` | Subscribe-Papers SQLite DB 쿼리 → 논문 digest |
+| `interview_trends.py` | HN·GitHub·논문 DB에서 실시간 인터뷰 트렌드 수집·캐시 |
+| `english_intake.py` | 새 레슨 탐지, Telegram 파일 저장, 처리 상태 관리 |
+| `english_srs.py` | Leitner SRS 덱 (카드 추가/리뷰/통계) |
+| `agenda.py` | 캘린더 이벤트 포맷팅 + 충돌·여유 슬롯 감지 |
+
 ### 5. `cron/jobs.yaml` — 선언형 스케줄
 6개의 Telegram 알림 잡이 YAML로 선언되어 있습니다.
 
 | 잡 | 시간 | 내용 |
 |----|------|------|
 | `morning-brief` | 07:30 매일 | 캘린더 + 오늘의 행동 제안 |
-| `papers-digest` | 08:30 평일 | LLM/LVM 연구 시그널 |
-| `interview-prep` | 12:00 월/수/금 | Staff 레벨 드릴 1개 |
-| `english-intake` | 20:00 매일 | 새 레슨 수집 → SRS 카드 생성 |
+| `papers-digest` | 08:30 매일 | LLM/LVM 연구 시그널 |
+| `interview-prep` | 12:00 월/수/금 | 실시간 트렌드 기반 Staff 레벨 드릴 1개 |
+| `english-intake` | 20:00 월/화/수 | 새 레슨 수집 → SRS 카드 생성 |
 | `english-drill` | 21:00 매일 | SRS 드릴 전달 |
 | `weekly-review` | 18:00 일요일 | 논문 + 인터뷰 + 영어 주간 요약 |
 
@@ -194,6 +204,13 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
 - `english_srs.py`의 Leitner 박스 알고리즘 → 맞힌 카드는 나중에, 틀린 카드는 다음날 재등장
 - 영어 교정 데이터를 단순 저장이 아닌 **점진적 장기 학습**으로 전환
 
+### 실시간 트렌드 수집 (interview_trends.py)
+- **HN Algolia API**: 포인트 임계값 + 최신 윈도우로 고품질 ML 인터뷰 담론 수집
+- **GitHub Search API**: stars·recency 기준 뜨는 인터뷰 준비 레포 + ML 툴링
+- **Subscribe-Papers DB**: frontier 필러 grounding (매일 갱신되는 arXiv/HF 논문)
+- **소스 라운드로빈 랭킹**: GitHub 별점이 HN/논문 신호를 압도하지 않도록 소스별 인터리브
+- 네트워크 실패 시 graceful degradation — 드릴이 절대 깨지지 않음, ~7초 소요
+
 ### 멱등 부트스트랩 (재현 가능한 설정)
 - `stage.py`의 deep-merge + backup 방식 → 리포지토리가 항상 런타임의 진실 원천
 - 실험적 설정을 시도 후 재설치해도 기억과 기존 설정이 보존됨
@@ -206,3 +223,4 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
 
 1. **하드웨어/엔진 트랙** — 같은 128GB GPU에서 더 빠르고 품질 좋은 추론을 얻기 위해 vLLM + 양자화 기술을 지속 업그레이드합니다.
 2. **소프트웨어/기억 트랙** — Hermes의 장기 기억과 스킬 선언형 구조를 활용해, 대화가 쌓일수록 David의 목표(Staff MLE 취업, 연구 동향, 영어 향상)에 더 맞춤화된 파트너로 성장합니다.
+3. **실시간 데이터 트랙** — 정적 시드 데이터(question-bank.md 등)를 라이브 신호(HN, GitHub, arXiv)로 대체해, 에이전트의 지식이 항상 현재 시점을 반영하도록 합니다.

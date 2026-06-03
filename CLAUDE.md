@@ -29,6 +29,19 @@ Examples:
 - `fix(gateway): resolve skill ambiguity caused by duplicate external_dirs`
 - `refactor(stage): replace shutil.copy with symlinks for skills`
 
+## Living Documentation
+
+After any change that affects structure, capabilities, or usage, update the docs:
+
+- **`docs/dev-history.md`** — every version bump (already required above).
+- **`docs/project-overview.md`** — keep in sync with the current state whenever any of
+  these change: directory structure, scripts list, test count, cron schedule table,
+  skill capabilities, model/engine options, or "발전을 이끄는 핵심 기술" section.
+
+The goal is that a reader of `project-overview.md` can understand the system *today*
+without reading git history. If a change makes the doc stale, fix the doc in the same
+commit.
+
 ## Maintainability
 
 Write code for the next person, not just the current task:
