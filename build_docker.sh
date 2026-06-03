@@ -1,0 +1,1 @@
+sudo docker build -t vllm-custom . && sudo docker image prune -f
