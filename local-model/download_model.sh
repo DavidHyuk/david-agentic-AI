@@ -65,12 +65,7 @@ case "${MODEL_TYPE}" in
 esac
 
 # ── Pre-flight ────────────────────────────────────────────────────────────────
-if ! command -v huggingface-cli >/dev/null 2>&1; then
-  echo "Installing huggingface_hub CLI..."
-  python3 -m pip install --user -U "huggingface_hub[cli]"
-else
-  python3 -m pip install --user -q -U "huggingface_hub[cli]"
-fi
+python3 -m pip install -q -U "huggingface_hub" "hf_transfer" 2>/dev/null || true
 
 if [ -f "${DEST}/config.json" ]; then
   echo "Model already present at ${DEST}"
@@ -85,9 +80,16 @@ echo "  -> ${DEST}"
 echo "  size: ${SIZE} (may take a while)"
 echo
 
-huggingface-cli download "${HF_REPO}" \
-  --local-dir "${DEST}" \
-  --local-dir-use-symlinks False
+# Use Python API directly — avoids huggingface-cli binary version mismatches.
+# hf_transfer accelerates large downloads when available.
+HF_HUB_ENABLE_HF_TRANSFER=1 python3 - <<PYEOF
+from huggingface_hub import snapshot_download
+snapshot_download(
+    repo_id="${HF_REPO}",
+    local_dir="${DEST}",
+    local_dir_use_symlinks=False,
+)
+PYEOF
 
 echo
 echo "Done. Weights at: ${DEST}"
