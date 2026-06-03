@@ -22,7 +22,7 @@ jobs:
       and free focus slots. If the calendar can't be read, say so plainly.
 
   - name: papers-digest
-    schedule: "30 8 * * 1-5"        # 08:30 weekdays, after Subscribe-Papers 08:00 scrape
+    schedule: "30 8 * * *"           # 08:30 every day, after Subscribe-Papers 08:00 scrape
     skills: [papers-digest]
     prompt: >
       Send my daily LLM/LVM research signal. Use the papers-digest skill: pull
