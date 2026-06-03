@@ -17,4 +17,4 @@ runtime/
 
 # OS
 .DS_Store
-./models
+models/
