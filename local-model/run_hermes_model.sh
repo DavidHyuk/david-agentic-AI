@@ -8,9 +8,12 @@
 # ClawGram's inference (:8001) and openai-compat (:8002) servers.
 #
 # Key differences from ClawGram's run_inference.sh:
-#   --max-model-len 65536   Hermes Agent requires >= 64K context window.
-#   --presence-penalty 0.6  Default presence penalty (0.25-1.1 range).
-#   --repetition-penalty 1.05  Default repetition penalty.
+#   --max-model-len 65536          Hermes Agent requires >= 64K context window.
+#   --enable-auto-tool-choice      Hermes sends tools on every turn (required).
+#   --tool-call-parser qwen3_xml   Same parser as ClawGram (CLAWGRAM_TOOL_CALL_PARSER).
+#
+# presence_penalty / repetition_penalty are NOT vllm serve CLI flags (they error).
+# Set them per request via providers.qwen-hermes.extra_body in config.fragment.yaml.
 #
 # NOTE: Loading the 122B model into a second vLLM process requires ~60GB
 # additional VRAM (AWQ 4-bit). On DGX Spark (128GB HBM3e), this is feasible
@@ -33,8 +36,8 @@ echo "  model   : ${MODEL_PATH}"
 echo "  port    : ${PORT}"
 echo "  gpu_util: ${GPU_UTIL}"
 echo "  context : 65536 tokens"
-echo "  presence_penalty  : 0.6"
-echo "  repetition_penalty: 1.05"
+echo "  tool_call_parser  : qwen3_xml"
+echo "  sampling penalties: via Hermes providers.qwen-hermes.extra_body (not CLI)"
 echo
 
 exec vllm serve "${MODEL_PATH}" \
@@ -45,5 +48,8 @@ exec vllm serve "${MODEL_PATH}" \
     --max-model-len 65536 \
     --kv-cache-dtype fp8 \
     --trust-remote-code \
+    --enable-auto-tool-choice \
+    --tool-call-parser qwen3_xml \
     --host 0.0.0.0 \
-    --port "${PORT}"
+    --port "${PORT}" \
+    --uvicorn-log-level warning
