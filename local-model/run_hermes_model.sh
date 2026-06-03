@@ -1,16 +1,51 @@
-#!/bin/sh
+#!/usr/bin/env bash
 # __author__ = 'David Choi (bestshoot21@gmail.com)'
-# Launch the local gpt-oss-120b model for the Hermes agent on the DGX Spark.
 #
-# This mirrors Subscribe-Papers/run_model.sh but raises the context window to 65536,
-# because Hermes Agent rejects models with < 64K context. Serving on the same
-# :8080 OpenAI-compatible endpoint means both Subscribe-Papers and Hermes can share
-# the model. Adjust -ngl to your VRAM and -c upward if you have headroom.
+# Start a dedicated vLLM OpenAI-compatible server for the Hermes agent.
+#
+# Uses the same Qwen3.5-122B-A10B-AWQ weights already on disk from ClawGram
+# (no extra download required). Serves on :8003 to avoid conflicts with
+# ClawGram's inference (:8001) and openai-compat (:8002) servers.
+#
+# Key differences from ClawGram's run_inference.sh:
+#   --max-model-len 65536   Hermes Agent requires >= 64K context window.
+#   --presence-penalty 0.6  Default presence penalty (0.25-1.1 range).
+#   --repetition-penalty 1.05  Default repetition penalty.
+#
+# NOTE: Loading the 122B model into a second vLLM process requires ~60GB
+# additional VRAM (AWQ 4-bit). On DGX Spark (128GB HBM3e), this is feasible
+# when ClawGram also runs (ClawGram: gpu_memory_utilization=0.85 ≈ 109GB on its
+# allocation vs 128GB total). To share VRAM, stop ClawGram's inference server
+# first, or run with --gpu-memory-utilization tuned down if needed.
+#
+# Usage:
+#   bash local-model/run_hermes_model.sh          # foreground
+#   nohup bash local-model/run_hermes_model.sh &  # background
 
-/home/david/workspace/llama.cpp/build/bin/llama-server \
-  -m /home/david/workspace/llama.cpp/models/gpt-oss-120b-Q4_K_M-00001-of-00002.gguf \
-  --host 0.0.0.0 \
-  --port 8080 \
-  -ngl 60 \
-  -c 65536 \
-  --alias gpt-oss-120b
+set -euo pipefail
+
+MODEL_PATH="${HERMES_MODEL_PATH:-/home/david/workspace/ClawGram/models/Qwen/Qwen3.5-122B-A10B-AWQ}"
+PORT="${HERMES_VLLM_PORT:-8003}"
+GPU_UTIL="${HERMES_VLLM_GPU_UTIL:-0.85}"
+
+echo "Starting Hermes vLLM server"
+echo "  model   : ${MODEL_PATH}"
+echo "  port    : ${PORT}"
+echo "  gpu_util: ${GPU_UTIL}"
+echo "  context : 65536 tokens"
+echo "  presence_penalty  : 0.6"
+echo "  repetition_penalty: 1.05"
+echo
+
+exec vllm serve "${MODEL_PATH}" \
+    --served-model-name "Qwen3.5-122B-A10B-AWQ" \
+    --quantization awq \
+    --tensor-parallel-size 1 \
+    --gpu-memory-utilization "${GPU_UTIL}" \
+    --max-model-len 65536 \
+    --kv-cache-dtype fp8 \
+    --trust-remote-code \
+    --presence-penalty 0.6 \
+    --repetition-penalty 1.05 \
+    --host 0.0.0.0 \
+    --port "${PORT}"
