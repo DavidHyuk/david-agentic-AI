@@ -10,8 +10,8 @@ semantic versioning (major.minor.patch).
   pointing at the same `Qwen3.5-122B-A10B-AWQ` weights already on disk in ClawGram
   (`/home/david/workspace/ClawGram/models/Qwen/Qwen3.5-122B-A10B-AWQ`). Serves on
   `:8003` (separate from ClawGram's `:8001`/`:8002`) with `--max-model-len 65536`
-  (satisfying Hermes's ≥64K requirement), `--presence-penalty 0.6` (within the
-  required 0.25–1.1 range), and `--repetition-penalty 1.05`.
+  (satisfying Hermes's ≥64K requirement). Sampling penalties moved to
+  `providers.qwen-hermes.extra_body` (vLLM has no `--presence-penalty` CLI).
 - `config/config.fragment.yaml` — updated `model.base_url` to `http://localhost:8003/v1`
   and `model.default` to `Qwen3.5-122B-A10B-AWQ` (matching `--served-model-name`).
 - `config/memory/MEMORY.md` — reflects new engine and both endpoints (vLLM on `:8003`

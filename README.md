@@ -46,7 +46,10 @@ Local DGX Spark (llama.cpp @ :8080, >=64K ctx)
 | `bootstrap/install.sh` | One-shot installer + orchestrator |
 | `bootstrap/stage.py` | Idempotently stage repo → `~/.hermes` |
 | `bootstrap/register_cron.py` | Register `jobs.yaml` with `hermes cron` |
-| `local-model/run_hermes_model.sh` | Launch local gpt-oss-120b at ≥64K context |
+| `local-model/run_hermes_model.sh` | Launch Qwen3.5-122B (vLLM) for Hermes |
+| `local-model/download_minimax_m27.sh` | Download MiniMax-M2.7 AWQ 4-bit |
+| `local-model/run_hermes_model_minimax.sh` | Launch MiniMax-M2.7 for Hermes |
+| `config/config.fragment.minimax.yaml` | Hermes provider config for MiniMax |
 | `tests/` | Pytest suite |
 
 ## Quick start
@@ -84,7 +87,28 @@ Then complete the **interactive, one-time** steps `install.sh` prints:
 ## Local model note
 Hermes requires a model with **≥64K context**. The Subscribe-Papers `run_model.sh`
 serves at `-c 8192`, which Hermes rejects. Use `local-model/run_hermes_model.sh`
-(`-c 65536`) for the agent. Both projects can share the `:8080` endpoint.
+(Qwen3.5 on `:8003`) or `local-model/run_hermes_model_minimax.sh` (MiniMax-M2.7).
+Only one large model should run at a time on 128GB VRAM.
+
+### Switching to MiniMax-M2.7 (DGX Spark)
+```bash
+# 1. Download (~100GB+, inside Docker /app or repo root)
+bash local-model/download_minimax_m27.sh
+
+# 2. Stop Qwen vLLM, start MiniMax
+bash local-model/run_hermes_model_minimax.sh
+
+# 3. Point Hermes at MiniMax (copy fragment or stage minimax yaml)
+cp config/config.fragment.minimax.yaml config/config.fragment.yaml
+python3 bootstrap/stage.py
+
+# 4. Test
+curl -s http://localhost:8003/v1/models | python3 -m json.tool
+hermes -z "hello"
+```
+Use **cyankiwi/MiniMax-M2.7-AWQ-4bit** on a single 128GB GPU. The official
+`MiniMaxAI/MiniMax-M2.7` BF16 checkpoint needs ~220GB and 4–8 GPUs.
+Review the [MiniMax-M2.7 license](https://github.com/MiniMax-AI/MiniMax-M2.7/blob/main/LICENSE) for commercial-use limits.
 
 ## Development
 ```bash
