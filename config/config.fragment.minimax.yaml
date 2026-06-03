@@ -4,8 +4,8 @@
 #   hermes config set model.provider custom:minimax-hermes
 #
 # Start model first:
-#   bash local-model/download_minimax_m27.sh
-#   bash local-model/run_hermes_model_minimax.sh
+#   bash local-model/download_model.sh minimax
+#   bash local-model/run_model.sh minimax
 
 providers:
   minimax-hermes:
@@ -32,6 +32,4 @@ memory:
 cron:
   wrap_response: true
 
-skills:
-  external_dirs:
-    - /home/david/workspace/david-agentic-ai/skills
+skills: {}
