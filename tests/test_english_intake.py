@@ -53,3 +53,15 @@ def test_state_roundtrip(tmp_path):
 
 def test_missing_dir_returns_empty(tmp_path):
     assert ei.scan_sessions(str(tmp_path / "nope")) == []
+
+
+def test_save_from_telegram_copies_file(tmp_path):
+    src = tmp_path / "rec.mp4"
+    src.write_bytes(b"video")
+    lessons_dir = tmp_path / "lessons"
+    dest = ei.save_from_telegram(str(src), str(lessons_dir))
+    assert dest.endswith("rec.mp4")
+    assert open(dest, "rb").read() == b"video"
+    # saved under a YYYY-MM-DD subfolder
+    import re, os
+    assert re.match(r"\d{4}-\d{2}-\d{2}", os.path.basename(os.path.dirname(dest)))

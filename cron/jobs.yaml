@@ -40,7 +40,7 @@ jobs:
       resources. Append what you covered to the progress log.
 
   - name: english-intake
-    schedule: "0 20 * * *"          # 20:00 every day (lessons are 4x/week)
+    schedule: "0 20 * * 1-3"        # 20:00 Mon/Tue/Wed (lesson days)
     skills: [english-practice]
     prompt: >
       Check for new English lessons. Use the english-practice skill (intake branch):

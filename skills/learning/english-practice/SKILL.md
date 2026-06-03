@@ -1,6 +1,6 @@
 ---
 name: english-practice
-description: Turn David's English tutor recordings and sentence corrections into transcripts, error analysis, and spaced-repetition drills delivered on WhatsApp.
+description: Turn David's English tutor recordings and sentence corrections into transcripts, error analysis, and spaced-repetition drills delivered on Telegram.
 version: 1.0.0
 platforms: [linux, macos]
 metadata:
@@ -20,22 +20,32 @@ metadata:
 
 # English Practice
 
-David takes online English lessons 4x/week. After each lesson the tutor drops a
-recording plus written sentence corrections into `english.lessons_dir`. This skill
-ingests that material and builds a durable practice routine.
+David takes online English lessons on Mon/Tue/Wed. After each lesson the tutor sends
+a recording (video) and written sentence corrections via KakaoTalk. David forwards
+these files to Hermes via Telegram. This skill saves the files, ingests the material,
+and builds a durable practice routine.
 
 ## When to Use
-- The scheduled "check for new lessons" job fires (default daily 20:00).
-- The scheduled "daily drill" job fires (default 21:00) — see step 5.
+- David sends a lesson file (video or text) via Telegram → trigger **Procedure C**.
+- The scheduled "check for new lessons" job fires (Mon/Tue/Wed 20:00) → trigger **Procedure A**.
+- The scheduled "daily drill" job fires (21:00) → trigger **Procedure B**.
 - David asks to review English, do a drill, or analyze a specific lesson.
 
 ## Procedure
+### C. Receiving files via Telegram (triggered immediately when David sends a file)
+1. **Save the file** to `~/english-lessons/` using the helper:
+   `python ~/.hermes/scripts/english_intake.py --save-file <file_path> --lessons-dir <dir>`
+   This saves the file and prints the destination path.
+2. Confirm to David: "저장했어. 오늘 수업 파일 다 보냈어? 영상이랑 교정 텍스트 둘 다 있으면 바로 분석할게."
+3. Once David confirms all files for the session are sent, proceed with **Procedure A**
+   on the newly saved files.
+
 ### A. Intake & analysis (new lessons)
 1. Find new sessions:
    `python ~/.hermes/scripts/english_intake.py --lessons-dir <dir>`
    (add `--mark` only after you have successfully processed them).
 2. For each new session:
-   - **Transcribe** each audio file with the transcription tool (or `video_analyze`
+   - **Transcribe** each audio/video file with the transcription tool (or `video_analyze`
      for video). Save the transcript next to the source.
    - **Read the correction file(s)** (txt/md/docx/pdf).
 3. **Mine correction pairs.** Extract each "❌ what David said → ✅ better form"

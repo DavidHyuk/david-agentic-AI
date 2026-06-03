@@ -130,16 +130,40 @@ def mark_processed(state: dict, sessions: Sequence[dict]) -> dict:
     return state
 
 
+def save_from_telegram(file_path: str, lessons_dir: str) -> str:
+    """Copy a file received via Telegram into lessons_dir and return the destination path.
+
+    The file is placed under a subfolder named by today's date (YYYY-MM-DD) so
+    english_intake.py groups it correctly as a session.
+    """
+    today = datetime.now().strftime("%Y-%m-%d")
+    dest_dir = os.path.join(os.path.expanduser(lessons_dir), today)
+    os.makedirs(dest_dir, exist_ok=True)
+    filename = os.path.basename(file_path)
+    dest = os.path.join(dest_dir, filename)
+    import shutil
+    shutil.copy2(file_path, dest)
+    return dest
+
+
 def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--lessons-dir", default=os.environ.get("ENGLISH_LESSONS_DIR", DEFAULT_LESSONS_DIR))
     parser.add_argument("--state", default=os.environ.get("ENGLISH_STATE_PATH", DEFAULT_STATE_PATH))
     parser.add_argument("--mark", action="store_true", help="mark the new sessions as processed")
+    parser.add_argument("--save-file", default=None, metavar="FILE",
+                        help="save a file received via Telegram into lessons_dir and exit")
     return parser.parse_args(argv)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parse_args(argv)
+
+    if args.save_file:
+        dest = save_from_telegram(args.save_file, args.lessons_dir)
+        print(json.dumps({"saved": dest}))
+        return 0
+
     sessions = scan_sessions(args.lessons_dir)
     state = load_state(args.state)
     fresh = new_sessions(sessions, state)
