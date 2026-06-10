@@ -33,8 +33,11 @@ memory:
   user_char_limit: 1375
 
 # --- Cron delivery -----------------------------------------------------------
+# max_parallel_jobs: 1 runs jobs sequentially so one hung agent call cannot
+# block the entire scheduler behind a stuck tick lock.
 cron:
   wrap_response: true
+  max_parallel_jobs: 1
 
 # --- Skills: skills are staged into ~/.hermes/skills/ by stage.py.
 # No external_dirs needed — adding it alongside the staged copies causes

@@ -61,7 +61,12 @@ david-agentic-ai/
 │   ├── interview_trends.py    # HN·GitHub·논문 실시간 인터뷰 트렌드 수집
 │   ├── english_intake.py      # 새 레슨 탐지 + 처리 상태 관리 + Telegram 파일 저장
 │   ├── english_srs.py         # Leitner SRS 덱 (추가/리뷰/통계)
-│   └── agenda.py              # 캘린더 이벤트 포맷팅 + 충돌 감지
+│   ├── agenda.py              # 캘린더 이벤트 포맷팅 + 충돌 감지
+│   └── cron_health.py         # cron tick lock / jobs.json 건강 검사 (+ 선택적 gateway restart)
+│
+├── .cursor/                   # Cursor IDE 훅 (에이전트 세션 후 자동 git commit/push)
+│   ├── hooks.json
+│   └── hooks/auto_git_commit.py
 │
 ├── cron/
 │   └── jobs.yaml              # 6개의 Telegram 알림 스케줄 정의
@@ -79,7 +84,7 @@ david-agentic-ai/
 │   ├── Qwen/                  # Qwen 계열 모델
 │   └── MiniMax/               # MiniMax-M2.7 모델
 │
-├── tests/                     # pytest 테스트 (58개)
+├── tests/                     # pytest 테스트 (69개)
 │   ├── conftest.py
 │   ├── test_papers_digest.py
 │   ├── test_interview_trends.py  # 트렌드 수집 (normalization, ranking, cache, network stub)
@@ -88,6 +93,8 @@ david-agentic-ai/
 │   ├── test_agenda.py
 │   ├── test_skills.py         # 스킬 frontmatter 스키마 검증
 │   ├── test_cron_jobs.py      # cron 스키마 검증
+│   ├── test_cron_health.py    # cron tick lock / jobs.json 건강 검사
+│   ├── test_auto_git_commit.py # stop 훅 커밋 메시지 생성
 │   └── test_stage.py          # stage.py 멱등성 검증
 │
 └── docs/
@@ -131,6 +138,7 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 | `english_intake.py` | 새 레슨 탐지, Telegram 파일 저장, 처리 상태 관리 |
 | `english_srs.py` | Leitner SRS 덱 (카드 추가/리뷰/통계) |
 | `agenda.py` | 캘린더 이벤트 포맷팅 + 충돌·여유 슬롯 감지 |
+| `cron_health.py` | cron tick lock 점유·`jobs.json` stale 감지, `--restart`로 gateway 복구 |
 
 ### 5. `cron/jobs.yaml` — 선언형 스케줄
 6개의 Telegram 알림 잡이 YAML로 선언되어 있습니다.

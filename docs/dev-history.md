@@ -3,6 +3,34 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v0.2.1 — 2026-06-10 (patch: cron hardening + auto-commit hook)
+
+### Added
+- `scripts/cron_health.py` — detects a stuck `~/.hermes/cron/.tick.lock` or stale
+  `jobs.json` `last_run_at` timestamps; optional `--restart` runs
+  `hermes gateway restart`.
+- `tests/test_cron_health.py` — 6 cases (lock age, overdue jobs, disabled jobs,
+  assess/report, CLI exit codes).
+- `.cursor/hooks.json` + `.cursor/hooks/auto_git_commit.py` — `stop` hook that
+  commits and pushes repo changes after an agent session using Conventional
+  Commits messages derived from the diff (no Cursor branding).
+- `tests/test_auto_git_commit.py` — 3 cases (message format, docs scope, secret
+  path filtering).
+
+### Changed
+- `config/config.fragment.yaml` (+ qwen36/minimax variants) — `cron.max_parallel_jobs: 1`
+  so cron jobs run sequentially and a single hung agent call cannot wedge the
+  scheduler behind a stuck tick lock.
+- `config/env.example` — documents optional `HERMES_CRON_MAX_PARALLEL` and
+  `HERMES_CRON_TIMEOUT` overrides.
+
+### Why
+After a five-day cron outage caused by a stuck tick lock, we needed operational
+guardrails (health check + sequential jobs) and a low-friction way to keep the
+version-controlled repo in sync when iterating in Cursor.
+
+---
+
 ## v0.2.0 — 2026-06-03 (minor: live interview-trend ingestion)
 
 ### Added
