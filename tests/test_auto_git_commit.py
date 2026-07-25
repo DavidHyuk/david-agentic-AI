@@ -125,6 +125,39 @@ def test_large_cross_cutting_change_uses_compact_release_message():
     )
 
 
+def test_list_changed_keeps_both_sides_of_rename(monkeypatch, tmp_path):
+    result = subprocess.CompletedProcess(
+        ["git", "status", "--porcelain"],
+        0,
+        "R  .cursor/hooks/old.py -> .codex/hooks/new.py\n",
+        "",
+    )
+    monkeypatch.setattr(hook, "_run", lambda cmd, *, cwd: result)
+
+    assert hook._list_changed(tmp_path) == [
+        ".cursor/hooks/old.py",
+        ".codex/hooks/new.py",
+    ]
+
+
+def test_commit_aborts_when_git_index_is_not_clean(monkeypatch, tmp_path):
+    monkeypatch.setattr(hook, "_list_changed", lambda repo: ["AGENTS.md"])
+    calls: list[list[str]] = []
+
+    def fake_run(cmd, *, cwd):
+        calls.append(cmd)
+        if cmd == ["git", "diff", "--cached", "--name-only"]:
+            return subprocess.CompletedProcess(cmd, 0, "user-staged.txt\n", "")
+        raise AssertionError(cmd)
+
+    monkeypatch.setattr(hook, "_run", fake_run)
+    ok, detail = hook.commit_and_push(tmp_path)
+
+    assert ok is False
+    assert "already contains staged changes" in detail
+    assert not any("pytest" in part for cmd in calls for part in cmd)
+
+
 def test_record_result_writes_local_git_diagnostic(tmp_path, capsys):
     (tmp_path / ".git").mkdir()
 

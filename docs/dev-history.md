@@ -11,6 +11,11 @@ semantic versioning (major.minor.patch).
 - `.codex/hooks.json` now resolves the implementation from the Git root, as
   recommended for sessions started from repository subdirectories.
 - Cursor's stop configuration delegates to the Codex-owned implementation.
+- Automatic commits now preserve both sides of renames, stage deletions with
+  `git add -A`, and use a normal commit so moved/deleted files are not left in
+  the index.
+- The hook refuses to mix pre-existing user-staged changes into its commit and
+  removes any newly staged path that fails the secret/binary allowlist.
 
 ### Changed
 - Hook tests, README, `AGENTS.md`, and hook-specific documentation now identify
@@ -18,7 +23,7 @@ semantic versioning (major.minor.patch).
 
 ### Verified
 - The repository is already trusted in `~/.codex/config.toml`.
-- Full suite: `131 passed`.
+- Full suite: `133 passed`.
 
 ## v0.6.3 — 2026-07-25 (patch: consolidate Codex instructions)
 

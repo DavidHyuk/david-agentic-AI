@@ -101,8 +101,10 @@ def _list_changed(repo: Path) -> list[str]:
             continue
         path = line[3:].strip()
         if " -> " in path:
-            path = path.split(" -> ", 1)[1].strip()
-        paths.append(path)
+            source, destination = path.split(" -> ", 1)
+            paths.extend((source.strip(), destination.strip()))
+        else:
+            paths.append(path)
     return paths
 
 
@@ -235,12 +237,19 @@ def commit_and_push(repo: Path) -> tuple[bool, str]:
         ok, detail = _push_if_needed(repo)
         return ok, f"no commit-worthy changes; {detail}"
 
+    existing_index = _run(["git", "diff", "--cached", "--name-only"], cwd=repo)
+    if existing_index.returncode != 0:
+        detail = (existing_index.stderr or existing_index.stdout or "").strip()
+        return False, detail or "could not inspect existing Git index"
+    if existing_index.stdout.strip():
+        return False, "Git index already contains staged changes; skipped auto-commit"
+
     tests = _run([sys.executable, "-m", "pytest", "-q"], cwd=repo)
     if tests.returncode != 0:
         detail = (tests.stderr or tests.stdout or "pytest failed").strip()
         return False, f"tests failed; skipped commit: {detail}"
 
-    add = _run(["git", "add", "--"] + commit_paths, cwd=repo)
+    add = _run(["git", "add", "-A", "--"] + commit_paths, cwd=repo)
     if add.returncode != 0:
         detail = (add.stderr or add.stdout or "").strip()
         return False, detail or "git add failed"
@@ -249,16 +258,25 @@ def commit_and_push(repo: Path) -> tuple[bool, str]:
     if staged.returncode != 0 or not staged.stdout.strip():
         return True, "nothing staged after filtering"
 
-    staged_paths = [
-        path for path in staged.stdout.strip().splitlines() if not _should_skip(path)
-    ]
+    all_staged_paths = staged.stdout.strip().splitlines()
+    unsafe_staged_paths = [path for path in all_staged_paths if _should_skip(path)]
+    if unsafe_staged_paths:
+        restore = _run(
+            ["git", "restore", "--staged", "--"] + unsafe_staged_paths,
+            cwd=repo,
+        )
+        if restore.returncode != 0:
+            detail = (restore.stderr or restore.stdout or "").strip()
+            return False, detail or "could not unstage excluded paths"
+    staged_paths = [path for path in all_staged_paths if not _should_skip(path)]
     if not staged_paths:
         return True, "nothing staged after filtering"
 
     message = build_commit_message(staged_paths)
-    # --only prevents unrelated files already present in the user's index from
-    # being pulled into the automatic commit.
-    commit = _run(["git", "commit", "--only", "-m", message, "--"] + staged_paths, cwd=repo)
+    # The index was required to be clean before this hook staged anything, so a
+    # normal commit includes only the verified allowlisted changes and handles
+    # deletions/renames correctly.
+    commit = _run(["git", "commit", "-m", message], cwd=repo)
     if commit.returncode != 0:
         detail = (commit.stderr or commit.stdout or "").strip()
         return False, detail or "git commit failed"
