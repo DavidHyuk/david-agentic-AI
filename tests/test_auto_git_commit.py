@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-HOOK_PATH = REPO / ".cursor" / "hooks" / "auto_git_commit.py"
+HOOK_PATH = REPO / ".codex" / "hooks" / "auto_git_commit.py"
 
 
 def _load_hook():
@@ -24,7 +24,7 @@ hook = _load_hook()
 
 V021_PATHS = [
     ".cursor/hooks.json",
-    ".cursor/hooks/auto_git_commit.py",
+    ".codex/hooks/auto_git_commit.py",
     "config/config.fragment.yaml",
     "config/env.example",
     "docs/dev-history.md",
@@ -80,8 +80,8 @@ def test_codex_hook_uses_stop_command():
     config = json.loads((REPO / ".codex" / "hooks.json").read_text())
     command = config["hooks"]["Stop"][0]["hooks"][0]
     assert command["type"] == "command"
-    assert "auto_git_commit.py" in command["command"]
-    assert "$(" not in command["command"]
+    assert ".codex/hooks/auto_git_commit.py" in command["command"]
+    assert "git rev-parse --show-toplevel" in command["command"]
 
 
 def test_push_if_needed_retries_existing_local_commits(monkeypatch, tmp_path):

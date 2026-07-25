@@ -75,8 +75,10 @@ Examples:
 ## Automatic Commit Hook
 
 `AGENTS.md` is the single source of truth for both project instructions and
-automatic commit rules. On a trusted Codex `Stop` or Cursor `stop` event, the
-shared hook must:
+automatic commit rules. Codex owns the shared implementation at
+`.codex/hooks/auto_git_commit.py`; Cursor may delegate to it but Codex must not
+depend on a Cursor-owned script. On a trusted Codex `Stop` or Cursor `stop`
+event, the hook must:
 
 1. stage only allowlisted project source, configuration, test, and documentation
    paths;

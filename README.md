@@ -107,18 +107,19 @@ Then complete the **interactive, one-time** steps `install.sh` prints:
 
 ## Automatic verified commit and push
 
-Codex and Cursor share `.cursor/hooks/auto_git_commit.py`. On a trusted Stop
-event it stages only allowlisted project files, excludes secrets/runtime
-data/binary assets, requires `pytest -q` to pass, creates a Conventional Commit,
-and pushes the current upstream branch. A push failure is retried at the next
-Stop event even if there are no new changes.
+Codex owns `.codex/hooks/auto_git_commit.py`; Cursor delegates to that same
+implementation through `.cursor/hooks.json`. On a trusted Stop event it stages
+only allowlisted project files, excludes secrets/runtime data/binary assets,
+requires `pytest -q` to pass, creates a Conventional Commit, and pushes the
+current upstream branch. A push failure is retried at the next Stop event even
+if there are no new changes.
 
 After changing `.codex/hooks.json` or the hook implementation, open Codex
 `/hooks` and review/trust the command. Diagnostics are printed and stored only
 in `.git/codex-auto-commit.log`. To run the same flow manually:
 
 ```bash
-python3 .cursor/hooks/auto_git_commit.py </dev/null
+python3 .codex/hooks/auto_git_commit.py </dev/null
 ```
 
 See [AGENTS.md](AGENTS.md) for the commit and safety rules.

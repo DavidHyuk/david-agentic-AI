@@ -90,10 +90,10 @@ david-agentic-ai/
 │
 ├── .codex/                    # Codex 훅 (Stop 후 테스트·자동 git commit/push)
 │   ├── hooks.json
+│   ├── hooks/auto_git_commit.py # Codex-owned 구현 (Cursor도 재사용)
 │   └── hooks/README.md
 ├── .cursor/                   # Cursor IDE 훅 (동일 구현 공유)
-│   ├── hooks.json
-│   └── hooks/auto_git_commit.py
+│   └── hooks.json             # `.codex/hooks/auto_git_commit.py` 위임
 │
 ├── cron/
 │   └── jobs.yaml              # 6개의 Telegram 알림 스케줄 정의

@@ -3,6 +3,23 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v0.6.4 — 2026-07-25 (patch: make the Stop hook Codex-owned)
+
+### Fixed
+- Moved the shared auto-commit implementation from `.cursor/hooks/` to
+  `.codex/hooks/`; Codex no longer depends on a Cursor-owned path.
+- `.codex/hooks.json` now resolves the implementation from the Git root, as
+  recommended for sessions started from repository subdirectories.
+- Cursor's stop configuration delegates to the Codex-owned implementation.
+
+### Changed
+- Hook tests, README, `AGENTS.md`, and hook-specific documentation now identify
+  `.codex/hooks/auto_git_commit.py` as the canonical implementation.
+
+### Verified
+- The repository is already trusted in `~/.codex/config.toml`.
+- Full suite: `131 passed`.
+
 ## v0.6.3 — 2026-07-25 (patch: consolidate Codex instructions)
 
 ### Changed

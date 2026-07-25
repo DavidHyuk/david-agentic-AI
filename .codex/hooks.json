@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/usr/bin/python3 .cursor/hooks/auto_git_commit.py",
+            "command": "/usr/bin/python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/auto_git_commit.py\"",
             "timeout": 120,
             "statusMessage": "Running tests, then committing and pushing safe changes"
           }

@@ -3,7 +3,7 @@
   "hooks": {
     "stop": [
       {
-        "command": ".cursor/hooks/auto_git_commit.py",
+        "command": ".codex/hooks/auto_git_commit.py",
         "timeout": 120
       }
     ]
