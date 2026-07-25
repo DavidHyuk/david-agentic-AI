@@ -211,10 +211,10 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 준비될 때까지 대기합니다.
 `journalctl --user -u hermes-vllm.service -f`로 로그를 확인합니다.
 
-Qwen3.6 기본 GPU 예약 비율은 70%이며, 개인용 단일 Hermes 작업에는 service override의
-`HERMES_VLLM_GPU_UTIL=0.50`이 균형 잡힌 선택이다. 이는 vLLM의 공유 KV-cache pool
-크기를 바꾸는 설정이며, Hermes의 영구 기억과는 별개다. 새 논문 메타데이터 수집에는
-LLM이 필요 없습니다. 모델 가중치의 다운로드·저장 관리는 이 설정 repo 밖의
+`restart_service.sh`는 기본 GPU 예약 비율 50%를 service override에 저장하며, 첫 번째
+인자로 이를 바꿀 수 있다(예: `restart_service.sh 0.60 --wait`). 이 값은 vLLM의
+모델·workspace·공유 KV-cache pool 전체의 상한이며 Hermes의 영구 기억과는 별개다.
+새 논문 메타데이터 수집에는 LLM이 필요 없습니다. 모델 가중치의 다운로드·저장 관리는 이 설정 repo 밖의
 `/home/david/workspace/models/download_model.py`가 담당하며, `run_model.sh`는 해당
 경로의 체크포인트를 vLLM service에 전달하는 실행 계층으로 유지됩니다.
 

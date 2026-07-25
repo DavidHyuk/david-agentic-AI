@@ -121,37 +121,26 @@ systemctl --user status hermes-vllm.service
 journalctl --user -u hermes-vllm.service -f
 ```
 
-Use the restart helper for a normal restart, or wait until the model endpoint is
-ready before continuing an operational task:
+Use the restart helper to set a persistent GPU reservation and restart the
+service. It defaults to `0.50`; add `--wait` when an operational task must wait
+for model loading to finish:
 
 ```bash
+# Reserve 50% of usable GPU memory for vLLM (default)
 bash local-model/restart_service.sh
-bash local-model/restart_service.sh --wait
+
+# Reserve 60% and wait for the API to become ready
+bash local-model/restart_service.sh 0.60 --wait
+
+# Equivalent explicit option
+bash local-model/restart_service.sh --gpu-util 0.60 --wait
 ```
 
-The Qwen3.6 launcher reserves 70% of available GPU memory by default for model
-execution and the KV-cache pool. To persistently use a different fraction (for
-example, 50% for a single-user Hermes deployment), create a systemd override:
-
-```bash
-systemctl --user edit hermes-vllm.service
-```
-
-Add the following, then reload and restart the service:
-
-```ini
-[Service]
-Environment=HERMES_VLLM_GPU_UTIL=0.50
-```
-
-```bash
-systemctl --user daemon-reload
-bash local-model/restart_service.sh --wait
-nvidia-smi
-```
-
-This override leaves the tracked launcher default unchanged. `--gpu-memory-utilization`
-sets the size of vLLM's shared KV-cache pool; it does not create persistent Hermes memory.
+The helper writes a service-specific systemd override at
+`~/.config/systemd/user/hermes-vllm.service.d/gpu-memory.conf`, so the selected
+value survives reboots. `--gpu-memory-utilization` is an upper bound for all
+vLLM allocations (weights, CUDA workspaces, and KV cache); it does not make the
+KV cache exactly that percentage or create persistent Hermes memory.
 
 ## Automatic verified commit and push
 

@@ -3,6 +3,15 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v0.8.0 — 2026-07-25 (minor: parameterize vLLM GPU reservation)
+
+### Added
+- `restart_service.sh` now accepts a positional GPU reservation fraction or
+  `--gpu-util`, defaults to 0.50, writes the service-specific persistent
+  override, reloads systemd, and restarts vLLM.
+- Added validation coverage for invalid GPU reservation values and documented
+  the positional restart workflow.
+
 ## v0.7.1 — 2026-07-25 (patch: centralize checkpoint management)
 
 ### Changed
