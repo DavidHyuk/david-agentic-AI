@@ -63,6 +63,7 @@ Local DGX Spark (vLLM @ :8003, Qwen3.6 FP8, 128K ctx)
 | `docs/next-steps.md` | Agreed paper/job questions and Kakao English E2E checklist |
 | `local-model/setup_vllm.sh` | Create an isolated CUDA-compatible vLLM runtime |
 | `local-model/run_model.sh` | Launch Qwen3.6 FP8 or an alternative local model |
+| `local-model/restart_service.sh` | Restart the always-on vLLM service and optionally wait for API readiness |
 | `local-model/model_preflight.py` | Validate checkpoint quantization and context |
 | `local-model/download_model.sh` | Download a supported model checkpoint |
 | `config/config.fragment.minimax.yaml` | Hermes provider config for MiniMax |
@@ -111,14 +112,21 @@ Then complete the **interactive, one-time** steps `install.sh` prints:
 `hermes-vllm.service`. Manage the Qwen3.6 endpoint with:
 
 ```bash
-# Start, stop, restart, and inspect the service
+# Start, stop, and inspect the service
 systemctl --user start hermes-vllm.service
 systemctl --user stop hermes-vllm.service
-systemctl --user restart hermes-vllm.service
 systemctl --user status hermes-vllm.service
 
 # Follow startup and runtime logs (initial model loading takes a few minutes)
 journalctl --user -u hermes-vllm.service -f
+```
+
+Use the restart helper for a normal restart, or wait until the model endpoint is
+ready before continuing an operational task:
+
+```bash
+bash local-model/restart_service.sh
+bash local-model/restart_service.sh --wait
 ```
 
 The Qwen3.6 launcher reserves 70% of available GPU memory by default for model
@@ -138,7 +146,7 @@ Environment=HERMES_VLLM_GPU_UTIL=0.50
 
 ```bash
 systemctl --user daemon-reload
-systemctl --user restart hermes-vllm.service
+bash local-model/restart_service.sh --wait
 nvidia-smi
 ```
 

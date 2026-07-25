@@ -3,6 +3,15 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v0.7.0 — 2026-07-25 (minor: add vLLM service restart helper)
+
+### Added
+- Added `local-model/restart_service.sh` to restart `hermes-vllm.service`,
+  verify that systemd activated it, and optionally wait for the OpenAI-compatible
+  `/v1/models` endpoint after model loading.
+- Added README and project-overview usage guidance plus regression coverage for
+  the helper's safe command interface.
+
 ## v0.6.6 — 2026-07-25 (patch: document vLLM service operation)
 
 ### Changed

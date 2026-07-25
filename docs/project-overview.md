@@ -110,6 +110,7 @@ david-agentic-ai/
 │   ├── model_preflight.py     # 체크포인트 양자화·컨텍스트 사전검사
 │   ├── run_model.sh           # vLLM 서버 실행 (qwen/qwen-hybrid/qwen36/minimax)
 │   ├── install_service.sh     # Qwen3.6 vLLM user systemd 서비스 설치
+│   ├── restart_service.sh     # vLLM 서비스 재시작 및 API 준비 대기
 │   └── download_model.sh      # Hugging Face에서 모델 가중치 다운로드
 │
 ├── browser/                   # Hermes Built-in Browser 런타임
@@ -207,7 +208,8 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 기본 운영 모델로 사용합니다. Hermes는 ≥64K 컨텍스트가 필요해 포트
 `:8003`에서 128K로 실행됩니다. `install_service.sh`는 이를 로그인·재부팅 후에도
 유지하는 `hermes-vllm.service` user service를 설치합니다. 서비스는
-`systemctl --user restart hermes-vllm.service`로 재시작하고,
+`bash local-model/restart_service.sh`로 재시작하며, `--wait`을 붙이면 모델 API가
+준비될 때까지 대기합니다.
 `journalctl --user -u hermes-vllm.service -f`로 로그를 확인합니다.
 
 Qwen3.6 기본 GPU 예약 비율은 70%이며, 개인용 단일 Hermes 작업에는 service override의
