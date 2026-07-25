@@ -109,7 +109,10 @@ Then complete the **interactive, one-time** steps `install.sh` prints:
 ### Always-on vLLM service
 
 `local-model/install_service.sh` installs and enables the user-level
-`hermes-vllm.service`. Manage the Qwen3.6 endpoint with:
+`hermes-vllm.service`. It also installs a gateway systemd drop-in that requires
+the model service and runs `wait_for_vllm.py` before Hermes starts. This prevents
+fresh cron jobs from racing the several-minute model load after a reboot.
+Manage the Qwen3.6 endpoint with:
 
 ```bash
 # Start, stop, and inspect the service
@@ -425,6 +428,23 @@ cat ~/.hermes/data/english/kakao-skill-url.txt
 | `english-intake` | 20:00 daily | Ingest new lessons → SRS cards |
 | `english-drill` | 21:00 daily | Tonight's spaced-repetition drill |
 | `weekly-review` | 18:00 Sunday | Papers + prep + English weekly summary |
+
+Check the scheduler and run a Telegram E2E without exposing its token:
+
+```bash
+systemctl --user is-active hermes-vllm.service hermes-gateway.service
+python3 scripts/cron_health.py
+hermes send --to telegram "[Hermes E2E] Telegram 연결 테스트"
+hermes cron list
+hermes cron run <JOB_ID_FROM_LIST>
+hermes cron tick
+hermes cron list
+```
+
+The gateway only starts after `/v1/models` contains
+`Qwen3.6-35B-A3B-FP8`. A Calendar brief never falls back to Browser or Terminal
+when the `google-calendar` MCP is missing; it reports the unavailable
+integration instead.
 
 ## Local model note
 Hermes requires a model with **≥64K context**. Qwen3.6 is served at 128K on

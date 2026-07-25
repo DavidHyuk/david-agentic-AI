@@ -60,12 +60,42 @@ scopes. Tokens are stored under `~/.hermes/mcp-tokens/`.
 
 ```bash
 python3 mcp/setup_google_calendar.py --check
+hermes mcp list
 python3 mcp/calendar_smoke.py
 ```
 
 The second command verifies MCP connection/tool discovery, then asks Qwen3.6 to
 call `list_calendars` without printing calendar names or IDs. Success ends with
 `HERMES_CALENDAR_OK`.
+
+After authorization, restart the long-running gateway so its fresh cron
+sessions discover the server, then refresh the declarative schedule:
+
+```bash
+systemctl --user restart hermes-gateway.service
+python3 bootstrap/register_cron.py
+```
+
+For a real cron-to-Telegram check, copy the current `morning-brief` ID from
+`hermes cron list` and run:
+
+```bash
+hermes cron run <MORNING_BRIEF_JOB_ID>
+hermes cron tick
+hermes cron list
+```
+
+The final status must be `ok` with no delivery error. If the MCP has not been
+authorized, the brief reports that plainly and must not use Browser or Terminal
+to inspect calendar data or authentication files.
+
+### `No MCP servers configured`
+
+This means OAuth setup has not been completed; restarting the gateway or
+re-registering cron cannot create the missing Google authorization. Create the
+Web OAuth client described above, save the downloaded JSON outside the repo,
+and run the setup command with its private path. Do not paste the client JSON,
+client secret, or resulting token into chat.
 
 ## Security policy
 

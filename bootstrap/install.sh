@@ -71,8 +71,8 @@ cat <<'STEPS'
   c) Install the independent daily paper-ingestion timer:
        bash /home/david/workspace/david-agentic-ai/bootstrap/install_papers_service.sh
 
-  d) Connect WhatsApp (QR device-link, one-time):
-       hermes gateway setup        # choose WhatsApp, scan the QR
+  d) Connect Telegram (bot token + David's private chat, one-time):
+       hermes gateway setup        # choose Telegram
        hermes gateway install      # run the gateway as a service (needed for cron)
 
   e) Authorize Google Calendar (one-time OAuth) so the calendar skill can read it:
@@ -81,7 +81,7 @@ cat <<'STEPS'
          --credentials ~/.config/google/hermes-calendar-client.json
        python3 /home/david/workspace/david-agentic-ai/mcp/calendar_smoke.py
 
-  f) Register the scheduled WhatsApp briefs (after the gateway is up):
+  f) Register the scheduled Telegram briefs (after the gateway is up):
        python3 /home/david/workspace/david-agentic-ai/bootstrap/register_cron.py --dry-run
        python3 /home/david/workspace/david-agentic-ai/bootstrap/register_cron.py
 

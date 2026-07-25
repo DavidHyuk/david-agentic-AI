@@ -86,7 +86,8 @@ david-agentic-ai/
 │   ├── english_intake.py      # 새 레슨 탐지 + 처리 상태 관리 + Telegram 파일 저장
 │   ├── english_srs.py         # Leitner SRS 덱 (추가/리뷰/통계)
 │   ├── agenda.py              # 캘린더 이벤트 포맷팅 + 충돌 감지
-│   └── cron_health.py         # cron tick lock / jobs.json 건강 검사 (+ 선택적 gateway restart)
+│   ├── cron_health.py         # cron tick lock / jobs.json 건강 검사 (+ 선택적 gateway restart)
+│   └── wait_for_vllm.py       # gateway 시작 전 /v1/models readiness gate
 │
 ├── .codex/                    # Codex 훅 (Stop 후 테스트·자동 git commit/push)
 │   ├── hooks.json
@@ -110,6 +111,7 @@ david-agentic-ai/
 │   ├── model_preflight.py     # 체크포인트 양자화·컨텍스트 사전검사
 │   ├── run_model.sh           # vLLM 서버 실행 (qwen/qwen-hybrid/qwen36/minimax)
 │   ├── install_service.sh     # Qwen3.6 vLLM user systemd 서비스 설치
+│   ├── hermes-gateway-vllm.conf # gateway → vLLM 의존성/readiness drop-in
 │   ├── restart_service.sh     # vLLM 서비스 재시작 및 API 준비 대기
 │
 ├── browser/                   # Hermes Built-in Browser 런타임
@@ -126,7 +128,7 @@ david-agentic-ai/
 │   ├── Qwen/                  # Qwen 계열 모델
 │   └── MiniMax/               # MiniMax-M2.7 모델
 │
-├── tests/                     # pytest 테스트 (138개)
+├── tests/                     # pytest 테스트 (145개)
 │   ├── conftest.py
 │   ├── test_papers_ingest.py
 │   ├── test_papers_digest.py
@@ -184,6 +186,7 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 | `english_srs.py` | Leitner SRS 덱 (카드 추가/리뷰/통계) |
 | `agenda.py` | 캘린더 이벤트 포맷팅 + 충돌·여유 슬롯 감지 |
 | `cron_health.py` | cron tick lock 점유·`jobs.json` stale 감지, `--restart`로 gateway 복구 |
+| `wait_for_vllm.py` | 지정한 served model이 `/v1/models`에 나타날 때까지 gateway 시작 대기 |
 
 ### 5. `cron/jobs.yaml` — 선언형 스케줄
 6개의 Telegram 알림 잡이 YAML로 선언되어 있습니다.
@@ -209,6 +212,10 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 유지하는 `hermes-vllm.service` user service를 설치합니다. 서비스는
 `bash local-model/restart_service.sh`로 재시작하며, `--wait`을 붙이면 모델 API가
 준비될 때까지 대기합니다.
+설치기는 `hermes-gateway.service`에 systemd drop-in도 배치합니다. Gateway는
+`hermes-vllm.service`를 요구하고 `wait_for_vllm.py`가
+`Qwen3.6-35B-A3B-FP8`을 확인한 뒤에만 시작하므로, 재부팅 직후 cron이 모델
+로딩보다 먼저 실행되는 경합을 방지합니다.
 `journalctl --user -u hermes-vllm.service -f`로 로그를 확인합니다.
 
 `restart_service.sh`는 기본 GPU 예약 비율 50%를 service override에 저장하며, 첫 번째

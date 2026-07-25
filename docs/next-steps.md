@@ -36,3 +36,22 @@ On 2026-07-25 David completed the full real-device path:
 The bot-test identity and real KakaoTalk identities differ. Each real teacher
 must send one harmless enrollment message, be approved immediately with
 `--approve-latest-sender`, and then re-send the actual feedback.
+
+## 4. Google Calendar MCP authorization — user OAuth step pending
+
+The Hermes cron runtime now initializes configured MCP servers, and
+`morning-brief` is prohibited from falling back to Browser or Terminal when the
+Calendar tools are absent. The current host still reports
+`No MCP servers configured` because no private Google Web OAuth client JSON or
+Calendar token exists.
+
+David must create/download the Web OAuth client described in
+`docs/google-calendar-mcp.md`, then run:
+
+```bash
+python3 mcp/setup_google_calendar.py \
+  --credentials ~/.config/google/hermes-calendar-client.json
+python3 mcp/calendar_smoke.py
+```
+
+After `HERMES_CALENDAR_OK`, restart the gateway and re-register cron.

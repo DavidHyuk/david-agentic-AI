@@ -3,6 +3,37 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v0.8.1 — 2026-07-25 (patch: gate cron startup on model readiness)
+
+### Added
+- `scripts/wait_for_vllm.py`, a standalone OpenAI-compatible model-discovery
+  readiness probe used before the Hermes gateway starts.
+- A tracked `hermes-gateway.service` drop-in that requires
+  `hermes-vllm.service`, waits up to 15 minutes for the expected Qwen3.6 served
+  model, and extends the gateway startup timeout accordingly.
+- Unit coverage for readiness response validation, retry/timeout behavior,
+  systemd dependency wiring, installer deployment, and the Calendar fallback
+  policy.
+
+### Changed
+- `local-model/install_service.sh` now deploys the readiness helper and gateway
+  drop-in, then restarts an active gateway so the dependency takes effect.
+- `morning-brief` and `calendar-assistant` now prohibit Browser or Terminal
+  fallback when Google Calendar MCP tools are absent. Missing OAuth is reported
+  plainly without generating headless approval requests.
+- Bootstrap and operator documentation now describe Telegram, cron E2E
+  diagnostics, Calendar OAuth recovery, and the gateway readiness contract.
+
+### Verified
+- Runtime systemd `ExecStartPre` found `Qwen3.6-35B-A3B-FP8` and the gateway
+  started successfully behind the readiness gate.
+- A fresh `morning-brief` cron run completed with `last_status=ok`, no delivery
+  error, and no Browser/Terminal approval attempts while Calendar MCP was
+  unconfigured.
+- Google Calendar MCP authorization remains pending because this host has no
+  private Web OAuth client JSON or cached Calendar token.
+- Full suite: `145 passed`.
+
 ## v0.8.0 — 2026-07-25 (minor: parameterize vLLM GPU reservation)
 
 ### Added
