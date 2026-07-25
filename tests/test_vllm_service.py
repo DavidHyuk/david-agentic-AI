@@ -8,6 +8,8 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 RESTARTER = REPO / "local-model" / "restart_service.sh"
+INSTALLER = REPO / "local-model" / "install_service.sh"
+GATEWAY_DROPIN = REPO / "local-model" / "hermes-gateway-vllm.conf"
 
 
 def test_restart_helper_exposes_safe_service_controls():
@@ -38,6 +40,24 @@ def test_restart_helper_help_is_available_without_restarting_service():
     assert result.returncode == 0
     assert "Usage: bash local-model/restart_service.sh" in result.stdout
     assert result.stderr == ""
+
+
+def test_gateway_dropin_waits_for_expected_vllm_model():
+    text = GATEWAY_DROPIN.read_text()
+
+    assert "Requires=hermes-vllm.service" in text
+    assert "After=hermes-vllm.service" in text
+    assert "wait_for_vllm.py" in text
+    assert "--expected-model Qwen3.6-35B-A3B-FP8" in text
+    assert "TimeoutStartSec=930" in text
+
+
+def test_vllm_installer_deploys_gateway_readiness_assets():
+    text = INSTALLER.read_text()
+
+    assert "20-vllm-readiness.conf" in text
+    assert "scripts/wait_for_vllm.py" in text
+    assert "systemctl --user restart hermes-gateway.service" in text
 
 
 def test_restart_helper_rejects_an_invalid_gpu_util_before_touching_service():

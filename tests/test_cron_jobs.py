@@ -25,6 +25,13 @@ def test_defaults_applied_deliver_telegram():
     assert all(j["deliver"] == "telegram" for j in jobs)
 
 
+def test_morning_brief_does_not_fallback_from_calendar_mcp():
+    jobs = rc.load_jobs(JOBS)
+    morning = next(job for job in jobs if job["name"] == "morning-brief")
+
+    assert "never use Browser or Terminal" in morning["prompt"]
+
+
 def test_build_create_command_shape():
     job = {
         "name": "papers-digest",
