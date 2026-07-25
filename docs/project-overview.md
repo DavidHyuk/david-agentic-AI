@@ -218,8 +218,9 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 로딩보다 먼저 실행되는 경합을 방지합니다.
 `journalctl --user -u hermes-vllm.service -f`로 로그를 확인합니다.
 
-`restart_service.sh`는 기본 GPU 예약 비율 50%를 service override에 저장하며, 첫 번째
-인자로 이를 바꿀 수 있다(예: `restart_service.sh 0.60 --wait`). 이 값은 vLLM의
+Qwen3.6 launcher와 `restart_service.sh`는 기본 GPU 예약 비율 50%를 사용한다.
+재시작 helper는 이를 service override에 저장하며, 첫 번째 인자로 바꿀 수 있다
+(예: `restart_service.sh 0.60 --wait`). 이 값은 vLLM의
 모델·workspace·공유 KV-cache pool 전체의 상한이며 Hermes의 영구 기억과는 별개다.
 새 논문 메타데이터 수집에는 LLM이 필요 없습니다. 모델 가중치의 다운로드·저장 관리는 이 설정 repo 밖의
 `/home/david/workspace/models/download_model.py`가 담당하며, `run_model.sh`는 해당

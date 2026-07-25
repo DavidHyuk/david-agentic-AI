@@ -124,9 +124,10 @@ systemctl --user status hermes-vllm.service
 journalctl --user -u hermes-vllm.service -f
 ```
 
-Use the restart helper to set a persistent GPU reservation and restart the
-service. It defaults to `0.50`; add `--wait` when an operational task must wait
-for model loading to finish:
+The Qwen3.6 launcher and restart helper both default to a `0.50` GPU
+reservation. Use the helper to persist a different reservation and restart the
+service; add `--wait` when an operational task must wait for model loading to
+finish:
 
 ```bash
 # Reserve 50% of usable GPU memory for vLLM (default)

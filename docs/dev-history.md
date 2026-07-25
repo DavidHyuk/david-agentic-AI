@@ -3,6 +3,14 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v0.8.2 — 2026-07-25 (patch: align Qwen3.6 GPU reservation default)
+
+### Changed
+- Changed the Qwen3.6 `run_model.sh` default `gpu-memory-utilization` from
+  0.70 to 0.50, matching the persistent restart-helper default.
+- Added launcher regression coverage and clarified that both entry points use
+  the same 50% default unless an explicit environment or service override wins.
+
 ## v0.8.1 — 2026-07-25 (patch: gate cron startup on model readiness)
 
 ### Added

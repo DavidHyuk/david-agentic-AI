@@ -52,6 +52,7 @@ def test_qwen36_uses_fp8_compatible_vllm_flags(tmp_path):
     result = _run(_checkpoint(tmp_path))
     assert result.returncode == 0, result.stderr
     assert "--served-model-name Qwen3.6-35B-A3B-FP8" in result.stdout
+    assert "--gpu-memory-utilization 0.50" in result.stdout
     assert "--max-model-len 131072" in result.stdout
     assert "--kv-cache-dtype auto" in result.stdout
     assert "--reasoning-parser qwen3" in result.stdout
