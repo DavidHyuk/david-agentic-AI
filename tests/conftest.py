@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-for sub in ("scripts", "bootstrap"):
+for sub in ("scripts", "bootstrap", "local-model", "browser", "mcp"):
     p = str(REPO_ROOT / sub)
     if p not in sys.path:
         sys.path.insert(0, p)

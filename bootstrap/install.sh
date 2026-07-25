@@ -3,8 +3,8 @@
 #
 # One-shot bootstrap for David's personalized Hermes agent.
 # Installs the Hermes runtime (if missing), stages this repo's config into
-# ~/.hermes, points the agent at the local DGX Spark llama.cpp endpoint, and prints
-# the remaining interactive steps (WhatsApp link, Google Calendar MCP OAuth, cron).
+# ~/.hermes, points the agent at the local DGX Spark vLLM endpoint, and prints
+# the remaining interactive steps (paper timer, gateway link, Calendar OAuth, cron).
 #
 # Safe to re-run: staging is idempotent and backs up anything it overwrites.
 set -euo pipefail
@@ -15,11 +15,11 @@ HERMES_HOME="${HERMES_HOME:-$HOME/.hermes}"
 say() { printf '\n\033[1;36m== %s\033[0m\n' "$*"; }
 warn() { printf '\033[1;33m[!] %s\033[0m\n' "$*"; }
 
-say "1/5  Ensuring Python deps for the config tooling"
+say "1/6  Ensuring Python deps for the config tooling"
 python3 -m pip install --quiet --user -r "$REPO_ROOT/requirements.txt" || \
   warn "Could not pip install deps; ensure PyYAML + pytest are available."
 
-say "2/5  Installing the Hermes Agent runtime"
+say "2/6  Installing the Hermes Agent runtime"
 if command -v hermes >/dev/null 2>&1; then
   echo "hermes already installed: $(command -v hermes)"
 else
@@ -33,7 +33,7 @@ else
   fi
 fi
 
-say "3/5  Staging skills, memory, SOUL, scripts, and config into $HERMES_HOME"
+say "3/6  Staging skills, memory, SOUL, scripts, and config into $HERMES_HOME"
 HERMES_HOME="$HERMES_HOME" python3 "$REPO_ROOT/bootstrap/stage.py" --home "$HERMES_HOME"
 
 # Seed the local-endpoint API key into .env if not already present.
@@ -44,37 +44,44 @@ if [ ! -f "$ENV_FILE" ] || ! grep -q '^OPENAI_API_KEY=' "$ENV_FILE" 2>/dev/null;
   echo "Seeded local endpoint key into $ENV_FILE"
 fi
 
-say "4/5  Pointing Hermes at the local DGX Spark endpoint (config.fragment already merged)"
+say "4/6  Installing the Hermes Built-in Browser runtime"
+bash "$REPO_ROOT/browser/setup_browser.sh"
+
+say "5/6  Verifying the staged Qwen3.6 FP8 provider configuration"
 if command -v hermes >/dev/null 2>&1; then
-  hermes config set model.provider custom              2>/dev/null || true
-  hermes config set model.base_url http://localhost:8080/v1 2>/dev/null || true
-  hermes config set model.context_length 65536         2>/dev/null || true
-  echo "Confirm the served model name with: curl -s localhost:8080/v1/models"
+  hermes config check 2>/dev/null || true
+  echo "Confirm the served model name with: curl -s localhost:8003/v1/models"
 else
   warn "hermes CLI not found; the model settings are already in config.yaml via stage.py."
 fi
 
-say "5/5  Next — interactive steps you must run yourself"
+say "6/6  Next — service and interactive setup"
 cat <<'STEPS'
   a) Start the local model with >=64K context (NOT the 8K Subscribe-Papers script):
-       sh /home/david/workspace/david-agentic-ai/local-model/run_hermes_model.sh
+       bash /home/david/workspace/david-agentic-ai/local-model/setup_vllm.sh
+       bash /home/david/workspace/david-agentic-ai/local-model/run_model.sh qwen36
 
   b) Verify a plain chat works:
-       hermes -q "Say hi and tell me which model you are."
+       hermes -z "Say hi and tell me which model you are."
 
-  c) Connect WhatsApp (QR device-link, one-time):
+  c) Install the independent daily paper-ingestion timer:
+       bash /home/david/workspace/david-agentic-ai/bootstrap/install_papers_service.sh
+
+  d) Connect WhatsApp (QR device-link, one-time):
        hermes gateway setup        # choose WhatsApp, scan the QR
        hermes gateway install      # run the gateway as a service (needed for cron)
 
-  d) Authorize Google Calendar (one-time OAuth) so the calendar skill can read it:
-       hermes mcp add google-calendar     # follow the OAuth prompt
-       hermes mcp list
+  e) Authorize Google Calendar (one-time OAuth) so the calendar skill can read it:
+       # First follow docs/google-calendar-mcp.md to download a Web OAuth client.
+       python3 /home/david/workspace/david-agentic-ai/mcp/setup_google_calendar.py \
+         --credentials ~/.config/google/hermes-calendar-client.json
+       python3 /home/david/workspace/david-agentic-ai/mcp/calendar_smoke.py
 
-  e) Register the scheduled WhatsApp briefs (after the gateway is up):
+  f) Register the scheduled WhatsApp briefs (after the gateway is up):
        python3 /home/david/workspace/david-agentic-ai/bootstrap/register_cron.py --dry-run
        python3 /home/david/workspace/david-agentic-ai/bootstrap/register_cron.py
 
-  f) Drop English lessons (audio + corrections) into ~/english-lessons/
+  g) Drop English lessons (audio + corrections) into ~/english-lessons/
 STEPS
 echo
 echo "Done. Repo is the source of truth — edit, then re-run stage.py to re-sync."

@@ -44,6 +44,38 @@ def test_new_sessions_and_marking(tmp_path):
     assert ei.new_sessions(sessions, state) == []
 
 
+def test_new_file_in_processed_date_is_returned_exactly_once(tmp_path):
+    lesson = tmp_path / "2026-07-25"
+    lesson.mkdir()
+    first = lesson / "kakaotalk-feedback-100000.txt"
+    first.write_text("First correction")
+    sessions = ei.scan_sessions(str(tmp_path))
+    state = ei.mark_processed({"processed": []}, sessions)
+
+    second = lesson / "kakaotalk-feedback-110000.txt"
+    second.write_text("Second correction")
+    fresh = ei.new_sessions(ei.scan_sessions(str(tmp_path)), state)
+    assert len(fresh) == 1
+    assert fresh[0]["corrections"] == [str(second)]
+
+    ei.mark_processed(state, fresh)
+    assert ei.new_sessions(ei.scan_sessions(str(tmp_path)), state) == []
+
+
+def test_legacy_state_migration_snapshots_old_files(tmp_path):
+    lesson = tmp_path / "2026-07-25"
+    lesson.mkdir()
+    old = lesson / "old.txt"
+    old.write_text("Already processed")
+    sessions = ei.scan_sessions(str(tmp_path))
+    state = {"processed": ["2026-07-25"]}
+
+    assert ei.migrate_legacy_state(state, sessions) is True
+    assert state["processed_files"]
+    assert ei.new_sessions(sessions, state) == []
+    assert ei.migrate_legacy_state(state, sessions) is False
+
+
 def test_state_roundtrip(tmp_path):
     state_path = tmp_path / "state.json"
     ei.save_state(str(state_path), {"processed": ["2026-06-02"]})
@@ -65,3 +97,21 @@ def test_save_from_telegram_copies_file(tmp_path):
     # saved under a YYYY-MM-DD subfolder
     import re, os
     assert re.match(r"\d{4}-\d{2}-\d{2}", os.path.basename(os.path.dirname(dest)))
+
+
+def test_save_text_feedback_creates_scannable_correction(tmp_path):
+    dest = ei.save_text_feedback(
+        "You said: I am agree. Better: I agree.", str(tmp_path), "2026-07-25", "kakaotalk"
+    )
+    assert open(dest, encoding="utf-8").read().strip().endswith("I agree.")
+    sessions = ei.scan_sessions(str(tmp_path))
+    assert sessions[0]["session_id"] == "2026-07-25"
+    assert sessions[0]["corrections"] == [dest]
+
+
+def test_save_text_feedback_rejects_empty_or_unsafe_session(tmp_path):
+    import pytest
+    with pytest.raises(ValueError):
+        ei.save_text_feedback("   ", str(tmp_path))
+    with pytest.raises(ValueError):
+        ei.save_text_feedback("feedback", str(tmp_path), "../outside")

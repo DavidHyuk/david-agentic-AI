@@ -1,0 +1,19 @@
+# Purpose: keep the Hermes Qwen3.6 FP8 vLLM endpoint alive across logouts/reboots.
+[Unit]
+Description=Hermes Qwen3.6 FP8 vLLM Server
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/workspace/david-agentic-ai
+ExecStartPre=/usr/bin/test -x %h/workspace/david-agentic-ai/local-model/.venv/bin/vllm
+ExecStart=/usr/bin/bash %h/workspace/david-agentic-ai/local-model/run_model.sh qwen36
+Restart=on-failure
+RestartSec=10
+KillSignal=SIGINT
+TimeoutStartSec=900
+TimeoutStopSec=90
+LimitNOFILE=1048576
+
+[Install]
+WantedBy=default.target

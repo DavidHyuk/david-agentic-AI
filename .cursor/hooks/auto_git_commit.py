@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 # __author__ = 'David Choi (bestshoot21@gmail.com)'
-"""Cursor stop hook: commit and push repo changes after an agent session.
+"""Agent stop hook: commit and push safe repo changes after an agent turn.
 
 Purpose
 -------
-Runs on the ``stop`` hook event. When the working tree has staged-worthy
-changes, creates a Conventional Commits message from the diff (no Cursor
-branding) and pushes to the current branch's upstream.
+Runs on a ``Stop`` hook event. Before committing, the repository test suite
+must pass. Only known source/documentation paths are staged; secrets, local
+runtime files, and binary assets are always ignored. The commit message uses
+the Conventional Commits rules documented in ``AGENTS.md``.
 
 Fails open: hook errors never block the agent from finishing.
 """
@@ -17,12 +18,13 @@ import re
 import subprocess
 import sys
 from collections import Counter
+from datetime import datetime, timezone
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 SKIP_PATH_RE = re.compile(
-    r"(^|/)(\.env($|\.)|.*\.pem$|.*credentials.*|.*secret.*|auth\.json$|\.cursor/debug.*\.log$)",
+    r"(^|/)(\.env($|\.)|.*\.pem$|.*credentials.*|.*secret.*|auth\.json$|\.cursor/debug.*\.log$|.*\.(png|jpe?g|gif|webp|sqlite3?|db|bin|safetensors)$)",
     re.IGNORECASE,
 )
 CURSOR_BRANDING_RE = re.compile(
@@ -38,9 +40,27 @@ SCOPE_MAP = {
     "config": "config",
     "cron": "cron",
     "bootstrap": "bootstrap",
+    "browser": "browser",
     ".cursor": "hooks",
     "local-model": "local-model",
+    "mcp": "mcp",
 }
+
+ALLOWED_TOP_LEVELS = {
+    ".codex",
+    ".cursor",
+    "bootstrap",
+    "browser",
+    "config",
+    "cron",
+    "docs",
+    "local-model",
+    "mcp",
+    "scripts",
+    "skills",
+    "tests",
+}
+ALLOWED_ROOT_FILES = {"AGENTS.md", "CODEX.md", "README.md"}
 
 # (path substring match, summary phrase) — first matching entries are combined.
 THEME_SUMMARIES: tuple[tuple[str, str], ...] = (
@@ -86,7 +106,10 @@ def _list_changed(repo: Path) -> list[str]:
 
 
 def _should_skip(path: str) -> bool:
-    return bool(SKIP_PATH_RE.search(path))
+    normalized = path[2:] if path.startswith("./") else path
+    top_level = normalized.split("/", 1)[0]
+    allowed = top_level in ALLOWED_TOP_LEVELS or normalized in ALLOWED_ROOT_FILES
+    return not allowed or bool(SKIP_PATH_RE.search(normalized))
 
 
 def _productive_paths(paths: list[str]) -> list[str]:
@@ -161,6 +184,10 @@ def _summarize(paths: list[str]) -> str:
 
 def build_commit_message(paths: list[str]) -> str:
     """Build a Conventional Commits message without Cursor branding."""
+    top_levels = {path.split("/", 1)[0] for path in paths}
+    if len(paths) >= 10 and len(top_levels) >= 4:
+        return "feat(agent): sync runtime integrations and automation"
+
     commit_type = _commit_type(paths)
     scope = _commit_scope(paths)
     summary = _summarize(paths)
@@ -173,35 +200,87 @@ def build_commit_message(paths: list[str]) -> str:
     return header
 
 
-def commit_and_push(repo: Path) -> tuple[bool, str]:
-    changed = _list_changed(repo)
-    commit_paths = [p for p in changed if not _should_skip(p)]
-    if not commit_paths:
-        return True, "no commit-worthy changes"
-
-    _run(["git", "add", "--"] + commit_paths, cwd=repo)
-    staged = _run(["git", "diff", "--cached", "--name-only"], cwd=repo)
-    if staged.returncode != 0 or not staged.stdout.strip():
-        return True, "nothing staged after filtering"
-
-    message = build_commit_message(staged.stdout.strip().splitlines())
-    commit = _run(["git", "commit", "-m", message], cwd=repo)
-    if commit.returncode != 0:
-        detail = (commit.stderr or commit.stdout or "").strip()
-        return False, detail or "git commit failed"
-
+def _push_if_needed(repo: Path) -> tuple[bool, str]:
+    """Push local commits when the current branch has a configured upstream."""
     upstream = _run(
         ["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
         cwd=repo,
     )
     if upstream.returncode != 0:
-        return True, f"committed locally: {message} (no upstream — skipped push)"
+        return True, "no upstream; skipped push"
+
+    ahead = _run(["git", "rev-list", "--count", "@{u}..HEAD"], cwd=repo)
+    if ahead.returncode != 0:
+        detail = (ahead.stderr or ahead.stdout or "").strip()
+        return False, detail or "could not determine unpushed commit count"
+    try:
+        ahead_count = int(ahead.stdout.strip())
+    except ValueError:
+        return False, "invalid unpushed commit count"
+    if ahead_count == 0:
+        return True, "upstream already current"
 
     push = _run(["git", "push"], cwd=repo)
     if push.returncode != 0:
         detail = (push.stderr or push.stdout or "").strip()
-        return False, f"committed {message}, push failed: {detail}"
-    return True, f"committed and pushed: {message}"
+        return False, f"push failed: {detail}"
+    return True, f"pushed {ahead_count} commit(s)"
+
+
+def commit_and_push(repo: Path) -> tuple[bool, str]:
+    changed = _list_changed(repo)
+    commit_paths = [p for p in changed if not _should_skip(p)]
+    if not commit_paths:
+        ok, detail = _push_if_needed(repo)
+        return ok, f"no commit-worthy changes; {detail}"
+
+    tests = _run([sys.executable, "-m", "pytest", "-q"], cwd=repo)
+    if tests.returncode != 0:
+        detail = (tests.stderr or tests.stdout or "pytest failed").strip()
+        return False, f"tests failed; skipped commit: {detail}"
+
+    add = _run(["git", "add", "--"] + commit_paths, cwd=repo)
+    if add.returncode != 0:
+        detail = (add.stderr or add.stdout or "").strip()
+        return False, detail or "git add failed"
+
+    staged = _run(["git", "diff", "--cached", "--name-only"], cwd=repo)
+    if staged.returncode != 0 or not staged.stdout.strip():
+        return True, "nothing staged after filtering"
+
+    staged_paths = [
+        path for path in staged.stdout.strip().splitlines() if not _should_skip(path)
+    ]
+    if not staged_paths:
+        return True, "nothing staged after filtering"
+
+    message = build_commit_message(staged_paths)
+    # --only prevents unrelated files already present in the user's index from
+    # being pulled into the automatic commit.
+    commit = _run(["git", "commit", "--only", "-m", message, "--"] + staged_paths, cwd=repo)
+    if commit.returncode != 0:
+        detail = (commit.stderr or commit.stdout or "").strip()
+        return False, detail or "git commit failed"
+
+    ok, push_detail = _push_if_needed(repo)
+    if not ok:
+        return False, f"committed locally: {message}; {push_detail}"
+    return True, f"committed: {message}; {push_detail}"
+
+
+def _record_result(repo: Path, ok: bool, detail: str) -> None:
+    """Write a local diagnostic without creating another commit-worthy file."""
+    timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    outcome = "ok" if ok else "error"
+    message = f"[{timestamp}] {outcome}: {detail.strip()[:4000]}"
+    print(message, file=sys.stdout if ok else sys.stderr)
+    try:
+        with (repo / ".git" / "codex-auto-commit.log").open(
+            "a", encoding="utf-8"
+        ) as handle:
+            handle.write(message + "\n")
+    except OSError:
+        pass
 
 
 def main() -> int:
@@ -214,7 +293,11 @@ def main() -> int:
     if repo is None:
         return 0
 
-    ok, _detail = commit_and_push(repo)
+    try:
+        ok, detail = commit_and_push(repo)
+    except Exception as exc:  # fail open, but make unexpected failures observable
+        ok, detail = False, f"unexpected hook failure: {type(exc).__name__}: {exc}"
+    _record_result(repo, ok, detail)
     return 0 if ok else 0  # fail open for stop hook
 
 

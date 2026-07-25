@@ -118,15 +118,70 @@ def save_state(state_path: str, state: dict) -> None:
 
 
 def new_sessions(sessions: Sequence[dict], state: dict) -> list[dict]:
-    """Return sessions whose id is not yet in ``state['processed']``."""
+    """Return only unprocessed files, including later files in the same session."""
     done = set(state.get("processed", []))
-    return [s for s in sessions if s["session_id"] not in done]
+    processed_files = set(state.get("processed_files", []))
+    fresh: list[dict] = []
+    for session in sessions:
+        # A legacy state has session IDs but no file snapshots. The CLI migrates
+        # that state before calling this function. Keep this fallback so library
+        # callers still preserve the old no-duplicate behavior.
+        if "processed_files" not in state and session["session_id"] in done:
+            continue
+        candidate = dict(session)
+        candidate["audio"] = [
+            path for path in session["audio"] if _file_token(path) not in processed_files
+        ]
+        candidate["corrections"] = [
+            path
+            for path in session["corrections"]
+            if _file_token(path) not in processed_files
+        ]
+        if candidate["audio"] or candidate["corrections"]:
+            fresh.append(candidate)
+    return fresh
+
+
+def _file_token(path: str) -> str:
+    """Identify one file version so modified files can be processed again."""
+    absolute = os.path.abspath(path)
+    try:
+        stat = os.stat(absolute)
+    except OSError:
+        return absolute
+    return f"{absolute}|{stat.st_size}|{stat.st_mtime_ns}"
+
+
+def migrate_legacy_state(state: dict, sessions: Sequence[dict]) -> bool:
+    """Snapshot files from legacy processed sessions exactly once.
+
+    Older state tracked only a date/session ID. Recording the files that exist at
+    upgrade time lets a later Kakao message in that same date become fresh without
+    reprocessing historical lesson material.
+    """
+    if "processed_files" in state:
+        return False
+    done = set(state.get("processed", []))
+    state["processed_files"] = sorted(
+        _file_token(path)
+        for session in sessions
+        if session["session_id"] in done
+        for path in (*session["audio"], *session["corrections"])
+    )
+    return True
 
 
 def mark_processed(state: dict, sessions: Sequence[dict]) -> dict:
     done = set(state.get("processed", []))
     done.update(s["session_id"] for s in sessions)
     state["processed"] = sorted(done)
+    processed_files = set(state.get("processed_files", []))
+    processed_files.update(
+        _file_token(path)
+        for session in sessions
+        for path in (*session["audio"], *session["corrections"])
+    )
+    state["processed_files"] = sorted(processed_files)
     return state
 
 
@@ -146,6 +201,30 @@ def save_from_telegram(file_path: str, lessons_dir: str) -> str:
     return dest
 
 
+def save_text_feedback(
+    text: str, lessons_dir: str, session_id: str | None = None, source: str = "feedback"
+) -> str:
+    """Save a pasted feedback message as a scannable correction text file.
+
+    Chat platforms deliver text without a local file path.  Saving the raw text in
+    the normal lesson-folder layout lets the existing intake state and SRS workflow
+    process it without a platform-specific branch.
+    """
+    if not text or not text.strip():
+        raise ValueError("feedback text must not be empty")
+    session = session_id or datetime.now().strftime("%Y-%m-%d")
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", session):
+        raise ValueError("session_id may contain only letters, numbers, _ and -")
+    safe_source = re.sub(r"[^A-Za-z0-9_-]+", "-", source).strip("-") or "feedback"
+    dest_dir = os.path.join(os.path.expanduser(lessons_dir), session)
+    os.makedirs(dest_dir, exist_ok=True)
+    stamp = datetime.now().strftime("%H%M%S%f")
+    dest = os.path.join(dest_dir, f"{safe_source}-{stamp}.txt")
+    with open(dest, "w", encoding="utf-8") as fh:
+        fh.write(text.strip() + "\n")
+    return dest
+
+
 def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--lessons-dir", default=os.environ.get("ENGLISH_LESSONS_DIR", DEFAULT_LESSONS_DIR))
@@ -153,6 +232,11 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--mark", action="store_true", help="mark the new sessions as processed")
     parser.add_argument("--save-file", default=None, metavar="FILE",
                         help="save a file received via Telegram into lessons_dir and exit")
+    parser.add_argument("--save-text", default=None, metavar="TEXT",
+                        help="save pasted feedback text into lessons_dir and exit")
+    parser.add_argument("--session-id", default=None, metavar="ID",
+                        help="optional session id for --save-text (default: today)")
+    parser.add_argument("--source", default="feedback", help="source label for --save-text")
     return parser.parse_args(argv)
 
 
@@ -164,11 +248,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(json.dumps({"saved": dest}))
         return 0
 
+    if args.save_text is not None:
+        dest = save_text_feedback(args.save_text, args.lessons_dir, args.session_id, args.source)
+        print(json.dumps({"saved": dest}))
+        return 0
+
     sessions = scan_sessions(args.lessons_dir)
     state = load_state(args.state)
+    migrated = migrate_legacy_state(state, sessions)
     fresh = new_sessions(sessions, state)
     if args.mark and fresh:
-        save_state(args.state, mark_processed(state, fresh))
+        mark_processed(state, fresh)
+    if migrated or (args.mark and fresh):
+        save_state(args.state, state)
     print(json.dumps({"lessons_dir": args.lessons_dir, "new_sessions": fresh}, indent=2))
     return 0
 

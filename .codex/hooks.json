@@ -1,0 +1,17 @@
+{
+  "description": "Commit and push verified project changes after each Codex turn.",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/python3 .cursor/hooks/auto_git_commit.py",
+            "timeout": 120,
+            "statusMessage": "Running tests, then committing and pushing safe changes"
+          }
+        ]
+      }
+    ]
+  }
+}

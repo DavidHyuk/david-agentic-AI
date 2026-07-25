@@ -58,6 +58,15 @@ def test_query_recent_filters_by_date(tmp_path):
     assert ids == {"1", "2"}  # the 30-day-old paper is excluded
 
 
+def test_query_recommended_falls_back_for_legacy_schema(tmp_path):
+    db = tmp_path / "papers.db"
+    _make_db(db, _sample_rows())
+    conn = pd.connect(str(db))
+    recommended = pd.query_recommended(conn, days=2, limit=10)
+    conn.close()
+    assert {paper["id"] for paper in recommended} == {"1", "2"}
+
+
 def test_filter_keywords_matches_title_and_abstract():
     papers = [
         {"title": "Scaling LVMs", "abstract": "vision"},
@@ -86,6 +95,17 @@ def test_missing_db_raises(tmp_path):
     import pytest
     with pytest.raises(FileNotFoundError):
         pd.connect(str(tmp_path / "nope.db"))
+
+
+def test_connect_is_read_only(tmp_path):
+    import pytest
+
+    db = tmp_path / "papers.db"
+    _make_db(db, _sample_rows())
+    conn = pd.connect(str(db))
+    with pytest.raises(sqlite3.OperationalError):
+        conn.execute("DELETE FROM papers")
+    conn.close()
 
 
 def test_trending_without_upvotes_column_falls_back(tmp_path):

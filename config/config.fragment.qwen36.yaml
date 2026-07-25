@@ -1,4 +1,4 @@
-# Hermes config for Qwen3.6-35B-A3B-AWQ via local vLLM (:8003).
+# Hermes config for Qwen3.6-35B-A3B-FP8 via local vLLM (:8003).
 # Apply by replacing config.fragment.yaml, then:
 #   python3 bootstrap/stage.py
 #   hermes gateway restart
@@ -8,18 +8,26 @@
 #   bash local-model/run_model.sh qwen36
 
 providers:
-  qwen36-hermes:
+  qwen36-fp8-hermes:
     base_url: http://localhost:8003/v1
-    model: Qwen3.6-35B-A3B-AWQ
-    context_length: 65536
+    model: Qwen3.6-35B-A3B-FP8
+    context_length: 131072
     extra_body:
-      presence_penalty: 0.6
-      repetition_penalty: 1.05
+      presence_penalty: 1.5
+      repetition_penalty: 1.0
+      top_k: 20
+      min_p: 0.0
 
 model:
-  provider: custom:qwen36-hermes
-  default: Qwen3.6-35B-A3B-AWQ
-  context_length: 65536
+  provider: custom:qwen36-fp8-hermes
+  default: Qwen3.6-35B-A3B-FP8
+  context_length: 131072
+
+browser:
+  cloud_provider: local
+  engine: chrome
+  cdp_url: http://127.0.0.1:19222
+  command_timeout: 30
 
 memory:
   memory_enabled: true

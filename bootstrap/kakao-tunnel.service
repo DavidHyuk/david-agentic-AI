@@ -1,0 +1,14 @@
+# Temporary public HTTPS tunnel for Kakao i Open Builder testing.
+[Unit]
+Description=Cloudflare Quick Tunnel for Kakao Webhook
+After=network-online.target kakao-webhook.service
+Wants=network-online.target kakao-webhook.service
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8787
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

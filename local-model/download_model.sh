@@ -7,19 +7,23 @@
 #   bash local-model/download_model.sh [MODEL]
 #
 # MODEL choices:
-#   qwen36       Qwen3.6-35B-A3B-AWQ          (~18GB)  — recommended for agents
+#   qwen36       Qwen3.6-35B-A3B-FP8          (~35GB)  — recommended for agents
 #   qwen-hybrid  Qwen3.5-122B AR-INT4+FP8     (~65GB)  — ~51 tok/s on DGX Spark
 #   minimax      MiniMax-M2.7-AWQ-4bit        (~100GB) — alternative MoE
 #   qwen         Qwen3.5-122B-A10B-AWQ        — already on disk (skip or re-download)
 #
 # Environment overrides:
-#   HERMES_MODEL_DIR   base directory for model weights (default: ./models)
+#   HERMES_MODEL_DIR   base directory for model weights (default: workspace/models)
 #   HF_REPO            override the Hugging Face repo ID
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+WORKSPACE_ROOT="$(cd "${REPO_ROOT}/.." && pwd)"
+
 MODEL_TYPE="${1:-}"
-MODEL_BASE_DIR="${HERMES_MODEL_DIR:-./models}"
+MODEL_BASE_DIR="${HERMES_MODEL_DIR:-${WORKSPACE_ROOT}/models}"
 
 if [ -z "${MODEL_TYPE}" ]; then
   echo "Usage: $0 [qwen36|minimax|qwen]" >&2
@@ -37,9 +41,9 @@ case "${MODEL_TYPE}" in
     ;;
 
   qwen36)
-    HF_REPO="${HF_REPO:-Qwen/Qwen3.6-35B-A3B-AWQ}"
-    DEST="${MODEL_BASE_DIR}/Qwen/Qwen3.6-35B-A3B-AWQ"
-    SIZE="~18GB"
+    HF_REPO="${HF_REPO:-Qwen/Qwen3.6-35B-A3B-FP8}"
+    DEST="${MODEL_BASE_DIR}/Qwen/Qwen3.6-35B-A3B-FP8"
+    SIZE="~35GB"
     NEXT_STEP="bash local-model/run_model.sh qwen36"
     ;;
 

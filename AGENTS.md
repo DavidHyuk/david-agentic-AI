@@ -7,7 +7,9 @@ synced into `~/.hermes` (HERMES_HOME) by `bootstrap/stage.py`.
 ## What this agent is for
 A proactive, always-on partner that helps David land a **Staff/Senior ML Engineer**
 role in Silicon Valley, stay current on **LLM/LVM research**, practice **English**,
-and manage his **calendar** — with regular **WhatsApp** notifications.
+and manage his **calendar** — with regular **Telegram** notifications. English
+tutor feedback enters through the KakaoTalk Channel chatbot and is processed
+locally before the review and SRS drill are delivered through Telegram.
 
 ## Layout
 - `config/soul/SOUL.md` — agent personality (staged to `$HERMES_HOME/SOUL.md`).
@@ -15,9 +17,13 @@ and manage his **calendar** — with regular **WhatsApp** notifications.
 - `config/config.fragment.yaml` — non-secret settings, deep-merged into config.yaml.
 - `skills/<category>/<name>/SKILL.md` — the four custom skills.
 - `scripts/*.py` — standalone helpers staged to `$HERMES_HOME/scripts/` and unit-tested.
-- `cron/jobs.yaml` — declarative WhatsApp notification schedule.
+- `cron/jobs.yaml` — declarative Telegram notification schedule.
 - `bootstrap/` — `install.sh`, `stage.py`, `register_cron.py`.
-- `local-model/run_hermes_model.sh` — launch local gpt-oss-120b at 64K+ context.
+- `local-model/run_model.sh` — launch the default Qwen3.6 FP8 vLLM backend at
+  128K context or a supported alternative model.
+- `browser/` — Hermes Built-in Browser backed by localhost-only Chromium CDP.
+- `mcp/` — reproducible external MCP configuration, currently Google Calendar
+  read-only setup.
 - `tests/` — pytest suite for the scripts, skill frontmatter, and cron schema.
 
 ## Conventions
@@ -27,9 +33,68 @@ and manage his **calendar** — with regular **WhatsApp** notifications.
   docstring/comment.
 - Add/adjust unit tests in `tests/` for any new helper logic.
 - Memory seeds must respect Hermes limits: USER.md ≤ 1375 chars, MEMORY.md ≤ 2200.
-- Run `pytest -q` before considering a change done.
+- For changes to executable source code, helper scripts, or tests, run `pytest -q`
+  before considering the change done. For documentation, configuration, memory,
+  skill-content, or other non-code-only changes, run only directly relevant
+  checks (or skip tests when none apply).
+- When a source-code change adds a new feature, update `README.md` with the
+  feature's usage instructions.
+- Codex lifecycle hooks live in `.codex/hooks.json`; after changing a hook,
+  review and trust it through Codex `/hooks` before expecting execution.
+- Automatic git commits use the Conventional Commits rules in `CODEX.md` and
+  must never stage secrets, runtime files, or binary assets.
+
+## Version History
+
+If a change constitutes a project version update, record it in
+`docs/dev-history.md` using semantic versioning:
+
+- **Major** — breaking changes or significant architectural shifts
+- **Minor** — new features or non-breaking capability additions
+- **Patch** — bug fixes, small improvements, or config/documentation updates
+
+Document what changed and why, not just that it changed.
+
+## Commit Style
+
+Commits follow the Conventional Commits format:
+
+```
+<type>(<optional scope>): <short imperative summary>
+```
+
+Allowed types are `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`,
+and `perf`.
+
+Examples:
+
+- `feat(skills): add papers-digest skill with SRS integration`
+- `fix(gateway): resolve skill ambiguity caused by duplicate external_dirs`
+- `refactor(stage): replace shutil.copy with symlinks for skills`
+
+## Living Documentation
+
+After changes affecting structure, capabilities, or usage, keep these documents
+current:
+
+- `docs/dev-history.md` — every version bump.
+- `docs/project-overview.md` — directory structure, scripts, test count, cron
+  schedule, skill capabilities, model/engine options, and the core technology
+  section.
+
+The project overview should describe the current system without requiring the
+reader to reconstruct it from git history.
+
+## Maintainability
+
+- Prefer explicit over clever; clear small functions are preferred.
+- Name things by what they represent, not how they are implemented.
+- Avoid deep nesting and premature abstractions.
 
 ## Key external paths
 - Subscribe-Papers DB: `/home/david/workspace/Subscribe-Papers/data/papers.db`
-- Local LLM endpoint: `http://localhost:8080/v1` (llama.cpp, must be ≥64K ctx)
+- Hermes paper catalog: `~/.hermes/data/papers/papers.db`
+- Local LLM checkpoint:
+  `/home/david/workspace/models/Qwen/Qwen3.6-35B-A3B-FP8`
+- Local LLM endpoint: `http://localhost:8003/v1` (vLLM, 128K context)
 - English lessons inbox: `~/english-lessons/`

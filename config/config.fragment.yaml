@@ -1,8 +1,8 @@
 # Non-secret Hermes config merged into ~/.hermes/config.yaml by stage.py.
 # Secrets (the local endpoint API key) go in ~/.hermes/.env instead.
 
-# --- Named provider: Qwen3.5-122B-A10B-AWQ via vLLM on the DGX Spark ----------
-# model.provider: custom:qwen-hermes → providers.qwen-hermes (base_url + model id).
+# --- Named provider: Qwen3.6-35B-A3B-FP8 via vLLM on the DGX Spark ------------
+# model.provider points to the named provider below (base_url + served model id).
 #
 # Sampling penalties: vllm serve has NO --presence-penalty / --repetition-penalty
 # CLI flags (they fail at startup). Hermes forwards these via extra_body on each
@@ -11,19 +11,31 @@
 # If vLLM runs in Docker without -p 8003:8003, point base_url at the container
 # IP instead of localhost, e.g. http://172.17.0.2:8003/v1
 providers:
-  qwen-hermes:
+  qwen36-fp8-hermes:
     base_url: http://localhost:8003/v1
-    model: Qwen3.5-122B-A10B-AWQ
-    context_length: 65536
+    model: Qwen3.6-35B-A3B-FP8
+    context_length: 131072
     extra_body:
-      presence_penalty: 0.6
-      repetition_penalty: 1.05
+      presence_penalty: 1.5
+      repetition_penalty: 1.0
+      top_k: 20
+      min_p: 0.0
 
 # --- Main model: reference the named provider above --------------------------
 model:
-  provider: custom:qwen-hermes
-  default: Qwen3.5-122B-A10B-AWQ
-  context_length: 65536
+  provider: custom:qwen36-fp8-hermes
+  default: Qwen3.6-35B-A3B-FP8
+  context_length: 131072
+
+# --- Built-in browser --------------------------------------------------------
+# Hermes keeps its own browser tool. agent-browser connects to a localhost-only
+# Chromium CDP service because auto-launching Ubuntu's Snap Chromium hangs on
+# this aarch64 DGX Spark.
+browser:
+  cloud_provider: local
+  engine: chrome
+  cdp_url: http://127.0.0.1:19222
+  command_timeout: 30
 
 # --- Persistent memory -------------------------------------------------------
 memory:

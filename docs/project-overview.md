@@ -10,23 +10,45 @@ David Choi의 개인 AI 에이전트 **Hermes** 의 설정을 버전 관리하�
 ```
 DGX Spark (128GB VRAM)
   └── vLLM 서버 (포트 :8003)
-        └── Qwen3.5-122B-A10B-AWQ  (≥64K 컨텍스트)
+        └── Qwen3.6-35B-A3B-FP8  (128K 컨텍스트)
                 │  OpenAI-호환 API
                 ▼
           Hermes Agent
                 │
-        ┌───────┼───────────────┐
-        │       │               │
-     skills   cron           memory
+        ┌───────┼───────────────┬───────────────────────────────┐
+        │       │               │                               │
+     skills   cron           memory                   Built-in Browser
    (절차 정의) (스케줄)      (장기 기억)
         │       │               │
    papers-digest          USER.md
    interview-prep         MEMORY.md
    english-practice
    calendar-assistant
+                                             agent-browser 0.33.0
+                                                       │ CDP (localhost)
+                                                       ▼
+                                                 Chromium :19222
                 │
                 ▼
             Telegram
+
+arXiv / Hugging Face
+        │
+        ▼
+papers_ingest.py ── SQLite (`~/.hermes/data/papers/papers.db`)
+        ▲
+systemd timer (매일 08:00, Hermes 세션과 독립)
+
+KakaoTalk Channel (영어 선생님/David)
+        │
+        ▼
+Open Builder → Cloudflare Tunnel → kakao_webhook.py
+                                      │
+                                      ▼
+                              `~/english-lessons/`
+                                      │
+                                      ▼
+                         English cron → Telegram 복습
 ```
 
 ---
@@ -41,8 +63,8 @@ david-agentic-ai/
 │   ├── memory/
 │   │   ├── USER.md            # David에 대한 고정 프로필 (≤1375자)
 │   │   └── MEMORY.md          # 런타임 장기 기억 시드 (≤2200자)
-│   ├── config.fragment.yaml       # 기본 설정 (Qwen3.5 AWQ)
-│   ├── config.fragment.qwen36.yaml  # Qwen3.6-35B 설정
+│   ├── config.fragment.yaml       # 기본 설정 (Qwen3.6 FP8)
+│   ├── config.fragment.qwen36.yaml  # Qwen3.6 FP8 설정
 │   └── config.fragment.minimax.yaml # MiniMax-M2.7 설정
 │
 ├── skills/                    # 에이전트 커스텀 스킬
@@ -57,14 +79,19 @@ david-agentic-ai/
 │       └── calendar-assistant/ # Google 캘린더 브리핑
 │
 ├── scripts/                   # 스킬이 호출하는 Python 헬퍼 (→ ~/.hermes/scripts/)
-│   ├── papers_digest.py       # Subscribe-Papers DB 쿼리
+│   ├── papers_ingest.py       # arXiv/HF 메타데이터 수집·중복 병합·실행 이력
+│   ├── papers_digest.py       # 새 논문 카탈로그 읽기 전용 조회
 │   ├── interview_trends.py    # HN·GitHub·논문 실시간 인터뷰 트렌드 수집
+│   ├── kakao_webhook.py       # Kakao 채널 피드백 수신·발신자 allowlist·로컬 큐
 │   ├── english_intake.py      # 새 레슨 탐지 + 처리 상태 관리 + Telegram 파일 저장
 │   ├── english_srs.py         # Leitner SRS 덱 (추가/리뷰/통계)
 │   ├── agenda.py              # 캘린더 이벤트 포맷팅 + 충돌 감지
 │   └── cron_health.py         # cron tick lock / jobs.json 건강 검사 (+ 선택적 gateway restart)
 │
-├── .cursor/                   # Cursor IDE 훅 (에이전트 세션 후 자동 git commit/push)
+├── .codex/                    # Codex 훅 (Stop 후 테스트·자동 git commit/push)
+│   ├── hooks.json
+│   └── hooks/README.md
+├── .cursor/                   # Cursor IDE 훅 (동일 구현 공유)
 │   ├── hooks.json
 │   └── hooks/auto_git_commit.py
 │
@@ -73,20 +100,37 @@ david-agentic-ai/
 │
 ├── bootstrap/                 # 설치 및 동기화 자동화
 │   ├── install.sh             # 원클릭 설치 (Hermes + 설정 + 모델)
+│   ├── install_papers_service.sh # 논문 수집 user service/timer 설치
+│   ├── hermes-papers-ingest.{service,timer}
 │   ├── stage.py               # repo → ~/.hermes 멱등 동기화
 │   └── register_cron.py       # jobs.yaml → hermes cron 등록
 │
 ├── local-model/               # 로컬 LLM 서버 관리
+│   ├── setup_vllm.sh          # 격리된 CUDA 호환 vLLM 환경 생성
+│   ├── model_preflight.py     # 체크포인트 양자화·컨텍스트 사전검사
 │   ├── run_model.sh           # vLLM 서버 실행 (qwen/qwen-hybrid/qwen36/minimax)
+│   ├── install_service.sh     # Qwen3.6 vLLM user systemd 서비스 설치
 │   └── download_model.sh      # Hugging Face에서 모델 가중치 다운로드
+│
+├── browser/                   # Hermes Built-in Browser 런타임
+│   ├── setup_browser.sh       # agent-browser 고정 설치 + user service 설치
+│   ├── hermes-browser.service # localhost-only Chromium CDP
+│   └── browser_smoke.py       # 탐색·클릭·DOM·snapshot E2E 검사
+│
+├── mcp/                       # 외부 서비스 MCP 통합
+│   ├── google-calendar.yaml   # 공식 Calendar MCP 읽기 전용 템플릿
+│   ├── setup_google_calendar.py # OAuth client 설정 + 권한 고정
+│   └── calendar_smoke.py      # MCP discovery + Hermes E2E 검사
 │
 ├── models/                    # 로컬 모델 가중치 저장소 (gitignore됨)
 │   ├── Qwen/                  # Qwen 계열 모델
 │   └── MiniMax/               # MiniMax-M2.7 모델
 │
-├── tests/                     # pytest 테스트 (69개)
+├── tests/                     # pytest 테스트 (131개)
 │   ├── conftest.py
+│   ├── test_papers_ingest.py
 │   ├── test_papers_digest.py
+│   ├── test_papers_service.py
 │   ├── test_interview_trends.py  # 트렌드 수집 (normalization, ranking, cache, network stub)
 │   ├── test_english_intake.py
 │   ├── test_english_srs.py
@@ -94,7 +138,7 @@ david-agentic-ai/
 │   ├── test_skills.py         # 스킬 frontmatter 스키마 검증
 │   ├── test_cron_jobs.py      # cron 스키마 검증
 │   ├── test_cron_health.py    # cron tick lock / jobs.json 건강 검사
-│   ├── test_auto_git_commit.py # stop 훅 커밋 메시지 생성
+│   ├── test_auto_git_commit.py # stop 훅 안전 필터·커밋 메시지 검증
 │   └── test_stage.py          # stage.py 멱등성 검증
 │
 └── docs/
@@ -122,7 +166,7 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 
 | 스킬 | 카테고리 | 핵심 기능 |
 |------|----------|-----------|
-| `papers-digest` | research | Subscribe-Papers DB에서 LLM/LVM 논문을 뽑아 인터뷰 관련성 분석 |
+| `papers-digest` | research | 새 논문 카탈로그에서 LLM/LVM 후보를 뽑아 인터뷰 관련성 분석 |
 | `interview-prep` | career | 5-필러 커리큘럼을 돌아가며 Staff/Senior MLE 드릴 제공 |
 | `english-practice` | learning | 레슨 녹음/교정 파일 → SRS 카드 생성 + 매일 리뷰 |
 | `calendar-assistant` | productivity | Google Calendar 브리핑 + 일정 충돌 경고 + 행동 제안 |
@@ -133,7 +177,8 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 
 | 스크립트 | 역할 |
 |----------|------|
-| `papers_digest.py` | Subscribe-Papers SQLite DB 쿼리 → 논문 digest |
+| `papers_ingest.py` | arXiv 4개 카테고리 + HF Daily Papers 메타데이터 수집, source/run provenance 저장 |
+| `papers_digest.py` | SQLite 카탈로그 읽기 전용 조회 → 추천/최신/인기 digest |
 | `interview_trends.py` | HN·GitHub·논문 DB에서 실시간 인터뷰 트렌드 수집·캐시 |
 | `english_intake.py` | 새 레슨 탐지, Telegram 파일 저장, 처리 상태 관리 |
 | `english_srs.py` | Leitner SRS 덱 (카드 추가/리뷰/통계) |
@@ -152,9 +197,23 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 | `english-drill` | 21:00 매일 | SRS 드릴 전달 |
 | `weekly-review` | 18:00 일요일 | 논문 + 인터뷰 + 영어 주간 요약 |
 
+논문 수집은 Hermes cron이 아니라 별도 `hermes-papers-ingest.timer`가 매일
+08:00에 수행합니다. 따라서 모델이나 gateway가 일시적으로 내려가도
+메타데이터 수집은 독립적으로 실행되며, 08:30 digest는 완성된 카탈로그만
+읽습니다.
+
 ### 6. `local-model/` — LLM 백엔드
-`run_model.sh` 는 4가지 모델을 하나의 스크립트로 지원합니다.
-Hermes는 ≥64K 컨텍스트가 필요해서 Subscribe-Papers의 8K 서버와는 별도 포트(:8003)에서 실행됩니다.
+`run_model.sh` 는 4가지 모델을 하나의 스크립트로 지원하며 Qwen3.6 FP8을
+기본 운영 모델로 사용합니다. Hermes는 ≥64K 컨텍스트가 필요해 포트
+`:8003`에서 128K로 실행됩니다. 새 논문 메타데이터 수집에는 LLM이 필요 없습니다.
+
+### 7. `browser/` — Hermes Built-in Browser
+
+Hermes 내장 브라우저 도구를 그대로 사용하고 직접 Playwright 코드는 추가하지
+않습니다. ARM64 DGX Spark에서 Snap Chromium 자동 실행이 멈추는 문제를 피하기
+위해 Chromium을 localhost 전용 CDP 서비스(`127.0.0.1:19222`)로 먼저 실행하고,
+Hermes가 고정된 `agent-browser 0.33.0`을 통해 연결합니다. 외부 클라우드 브라우저
+자격 증명은 사용하지 않습니다.
 
 ---
 
@@ -167,9 +226,9 @@ Hermes는 ≥64K 컨텍스트가 필요해서 Subscribe-Papers의 8K 서버와�
 | 버전 | 모델 | 엔진 | 속도 | 컨텍스트 | 상태 |
 |------|------|------|------|----------|------|
 | v0.1.0 | gpt-oss-120b | llama.cpp | 기준 | 64K | 구버전 |
-| v0.1.1 | Qwen3.5-122B-A10B-AWQ | vLLM | ~14 tok/s | 64K | 기본값 (`qwen`) |
+| v0.1.1 | Qwen3.5-122B-A10B-AWQ | vLLM | ~14 tok/s | 64K | 레거시 (`qwen`) |
 | v0.1.1 | Qwen3.5-122B AutoRound INT4 | vLLM | ~51 tok/s | 64K | 다운로드 완료 (`qwen-hybrid`) |
-| — | Qwen3.6-35B-A3B-AWQ | vLLM | 더 빠름 | 64K | 옵션 (`qwen36`) |
+| v0.4.0 | Qwen3.6-35B-A3B-FP8 | vLLM | 운영 검증 완료 | 128K | 기본값 (`qwen36`) |
 | — | MiniMax-M2.7-AWQ-4bit | vLLM | 대안 MoE | 64K | 옵션 (`minimax`) |
 
 핵심 흐름: **llama.cpp → vLLM** 전환으로 배치 처리·KV캐시·prefix caching 등 프로덕션급 최적화를 확보했습니다.
@@ -215,13 +274,20 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
 ### 실시간 트렌드 수집 (interview_trends.py)
 - **HN Algolia API**: 포인트 임계값 + 최신 윈도우로 고품질 ML 인터뷰 담론 수집
 - **GitHub Search API**: stars·recency 기준 뜨는 인터뷰 준비 레포 + ML 툴링
-- **Subscribe-Papers DB**: frontier 필러 grounding (매일 갱신되는 arXiv/HF 논문)
+- **Hermes paper catalog**: frontier 필러 grounding (매일 갱신되는 arXiv/HF 메타데이터)
 - **소스 라운드로빈 랭킹**: GitHub 별점이 HN/논문 신호를 압도하지 않도록 소스별 인터리브
 - 네트워크 실패 시 graceful degradation — 드릴이 절대 깨지지 않음, ~7초 소요
 
 ### 멱등 부트스트랩 (재현 가능한 설정)
 - `stage.py`의 deep-merge + backup 방식 → 리포지토리가 항상 런타임의 진실 원천
 - 실험적 설정을 시도 후 재설치해도 기억과 기존 설정이 보존됨
+
+### 검증 후 자동 commit/push
+- Codex `Stop`과 Cursor `stop` 훅이 동일한 Python 구현을 공유
+- allowlist 경로만 stage하고 secret·runtime·DB·모델·binary asset 제외
+- `pytest -q` 성공 후에만 Conventional Commit 생성
+- upstream push 실패 시 `.git/codex-auto-commit.log`에 원인을 남기고 다음
+  Stop 이벤트에서 재시도
 
 ---
 

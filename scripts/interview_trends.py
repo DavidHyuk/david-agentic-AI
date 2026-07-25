@@ -14,7 +14,7 @@ fetching/ranking stays here so it is testable and cheap.
 Sources (all free, no API key):
   * Hacker News (Algolia API) — discourse on system design / ML interviews / hiring.
   * GitHub search API        — trending interview-prep repos + hot ML tooling.
-  * Subscribe-Papers DB      — frontier-pillar grounding (reuses papers_digest).
+  * Hermes paper catalog     — frontier-pillar grounding (reuses papers_digest).
 
 Design
 ------
@@ -37,7 +37,7 @@ import urllib.request
 from datetime import datetime, timezone
 
 DEFAULT_CACHE_PATH = os.path.expanduser("~/.hermes/data/interview/trends.json")
-DEFAULT_PAPERS_DB = "/home/david/workspace/Subscribe-Papers/data/papers.db"
+DEFAULT_PAPERS_DB = os.path.expanduser("~/.hermes/data/papers/papers.db")
 
 HN_ENDPOINT = "https://hn.algolia.com/api/v1/search"
 GITHUB_ENDPOINT = "https://api.github.com/search/repositories"
@@ -64,7 +64,7 @@ PILLAR_QUERIES: dict[str, dict] = {
     "frontier": {
         "hn": ["LLM agents", "multimodal model", "AI reasoning"],
         "github": ["awesome LLM"],
-        "papers": True,  # also pull recent items from the Subscribe-Papers DB
+        "papers": True,  # also pull recent items from the Hermes paper catalog
     },
 }
 
@@ -159,7 +159,7 @@ def normalize_github(items: list[dict]) -> list[dict]:
 
 
 def normalize_papers(papers: list[dict]) -> list[dict]:
-    """Map Subscribe-Papers rows to the common trend-item shape (frontier pillar)."""
+    """Map paper-catalog rows to the common trend-item shape (frontier pillar)."""
     out = []
     for p in papers:
         title = (p.get("title") or "").strip()

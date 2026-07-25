@@ -21,6 +21,8 @@ def test_stage_all_populates_home(tmp_path):
     assert (home / "memories" / "MEMORY.md").exists()
     assert (home / "skills" / "research" / "papers-digest" / "SKILL.md").exists()
     assert (home / "scripts" / "papers_digest.py").exists()
+    assert (home / "scripts" / "papers_ingest.py").exists()
+    assert (home / "data" / "papers").is_dir()
     assert (home / "config.yaml").exists()
     assert report["config_merged"] is True
     assert "research/papers-digest" in report["skills"]
@@ -34,13 +36,22 @@ def test_config_merge_preserves_existing(tmp_path):
     import yaml
     cfg = yaml.safe_load((home / "config.yaml").read_text())
     assert cfg["existing_key"] == 123                              # preserved
-    assert cfg["model"]["provider"] == "custom:qwen-hermes"        # merged from fragment
+    assert cfg["model"]["provider"] == "custom:qwen36-fp8-hermes"  # merged from fragment
     assert cfg["model"]["foo"] == "bar"                            # preserved alongside merge
-    assert "qwen-hermes" in cfg["providers"]
-    assert cfg["providers"]["qwen-hermes"]["base_url"] == "http://localhost:8003/v1"
-    eb = cfg["providers"]["qwen-hermes"]["extra_body"]
-    assert eb["presence_penalty"] == 0.6
-    assert eb["repetition_penalty"] == 1.05
+    assert "qwen36-fp8-hermes" in cfg["providers"]
+    provider = cfg["providers"]["qwen36-fp8-hermes"]
+    assert provider["base_url"] == "http://localhost:8003/v1"
+    assert provider["model"] == "Qwen3.6-35B-A3B-FP8"
+    assert provider["context_length"] == 131072
+    eb = provider["extra_body"]
+    assert eb["presence_penalty"] == 1.5
+    assert eb["repetition_penalty"] == 1.0
+    assert cfg["browser"] == {
+        "cloud_provider": "local",
+        "engine": "chrome",
+        "cdp_url": "http://127.0.0.1:19222",
+        "command_timeout": 30,
+    }
 
 
 def test_memory_not_clobbered_when_present(tmp_path):

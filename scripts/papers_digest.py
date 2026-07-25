@@ -1,21 +1,22 @@
 #!/usr/bin/env python3
 # __author__ = 'David Choi (bestshoot21@gmail.com)'
-"""Query the Subscribe-Papers SQLite database and emit a Markdown digest.
+"""Query the Hermes paper catalog and emit a compact Markdown digest.
 
 Purpose
 -------
 This is the deterministic, zero-LLM data layer behind the ``papers-digest`` Hermes
-skill. The skill runs this script to pull recent / trending LLM & LVM papers out of
-the existing Subscribe-Papers database, then layers its own analysis and
-interview-relevance commentary on top of the structured output.
+skill. The skill runs this script to pull recent / recommended LLM & LVM papers
+collected by ``papers_ingest.py``, then layers its own analysis and
+interview-relevance commentary on top of the structured output. The schema stays
+compatible with the legacy Subscribe-Papers database during migration.
 
 Keeping the data extraction in a standalone, importable module (rather than inline
 in the skill prompt) means it is testable, cheap to run on a schedule, and easy to
-maintain as the Subscribe-Papers schema evolves.
+maintain as the paper-catalog schema evolves.
 
 Usage
 -----
-    python papers_digest.py --mode trending --limit 8
+    python papers_digest.py --mode recommended --days 4 --limit 8
     python papers_digest.py --mode recent --days 2 --keywords LLM LVM agent
 """
 from __future__ import annotations
@@ -24,9 +25,11 @@ import argparse
 import os
 import sqlite3
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Iterable, Sequence
 
-DEFAULT_DB_PATH = "/home/david/workspace/Subscribe-Papers/data/papers.db"
+DEFAULT_DB_PATH = os.path.expanduser("~/.hermes/data/papers/papers.db")
+LEGACY_DB_PATH = "/home/david/workspace/Subscribe-Papers/data/papers.db"
 
 # Topics David cares about for Staff/Senior MLE interviews + research interests.
 DEFAULT_KEYWORDS: tuple[str, ...] = (
@@ -34,7 +37,14 @@ DEFAULT_KEYWORDS: tuple[str, ...] = (
     "LVM",
     "vision",
     "multimodal",
+    "vision-language",
+    "VLM",
     "agent",
+    "browser agent",
+    "web agent",
+    "computer use",
+    "MCP",
+    "GRPO",
     "reasoning",
     "RAG",
     "fine-tuning",
@@ -42,10 +52,11 @@ DEFAULT_KEYWORDS: tuple[str, ...] = (
 
 
 def connect(db_path: str) -> sqlite3.Connection:
-    """Open the papers DB read-only-ish with row access by column name."""
-    if not os.path.exists(db_path):
+    """Open the papers DB strictly read-only with row access by column name."""
+    path = Path(db_path).expanduser()
+    if not path.exists():
         raise FileNotFoundError(f"papers database not found at {db_path}")
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(f"{path.resolve().as_uri()}?mode=ro", uri=True)
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -78,7 +89,18 @@ def query_recent(
 def query_trending(conn: sqlite3.Connection, limit: int = 10) -> list[dict]:
     """Return the most upvoted papers (Hugging Face popularity signal)."""
     if not _has_column(conn, "papers", "upvotes"):
-        return query_recent(conn, days=7, limit=limit)
+        # Older Subscribe-Papers schemas have no popularity signal.  Preserve the
+        # meaning of "trending" as the latest available items instead of returning
+        # an empty digest solely because the database has not been updated recently.
+        rows = conn.execute(
+            """
+            SELECT * FROM papers
+            ORDER BY COALESCE(published_date, created_at, '') DESC
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+        return [dict(r) for r in rows]
     rows = conn.execute(
         """
         SELECT * FROM papers
@@ -89,6 +111,27 @@ def query_trending(conn: sqlite3.Connection, limit: int = 10) -> list[dict]:
         (limit,),
     ).fetchall()
     return [dict(r) for r in rows]
+
+
+def query_recommended(
+    conn: sqlite3.Connection, days: int = 4, limit: int = 10
+) -> list[dict]:
+    """Return fresh papers ranked by personal relevance, then HF popularity."""
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
+    if not _has_column(conn, "papers", "relevance_score"):
+        return query_recent(conn, days=days, limit=limit)
+    rows = conn.execute(
+        """
+        SELECT * FROM papers
+        WHERE COALESCE(published_date, created_at, '') >= ?
+        ORDER BY COALESCE(relevance_score, 0) DESC,
+                 COALESCE(upvotes, 0) DESC,
+                 COALESCE(published_date, created_at, '') DESC
+        LIMIT ?
+        """,
+        (cutoff, limit),
+    ).fetchall()
+    return [dict(row) for row in rows]
 
 
 def filter_keywords(papers: Iterable[dict], keywords: Sequence[str]) -> list[dict]:
@@ -137,7 +180,7 @@ def to_markdown(papers: Sequence[dict], title: str) -> str:
 def build_digest(
     db_path: str,
     mode: str = "trending",
-    days: int = 2,
+    days: int = 4,
     limit: int = 10,
     keywords: Sequence[str] | None = None,
 ) -> str:
@@ -148,6 +191,9 @@ def build_digest(
         if mode == "recent":
             papers = query_recent(conn, days=days, limit=max(limit * 3, limit))
             heading = f"Recent papers (last {days}d)"
+        elif mode == "recommended":
+            papers = query_recommended(conn, days=days, limit=max(limit * 3, limit))
+            heading = f"Recommended papers (last {days}d)"
         else:
             papers = query_trending(conn, limit=max(limit * 3, limit))
             heading = "Trending papers"
@@ -159,9 +205,14 @@ def build_digest(
 
 def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--db", default=os.environ.get("PAPERS_DB_PATH", DEFAULT_DB_PATH))
-    parser.add_argument("--mode", choices=["trending", "recent"], default="trending")
-    parser.add_argument("--days", type=int, default=2)
+    runtime_default = DEFAULT_DB_PATH if os.path.exists(DEFAULT_DB_PATH) else LEGACY_DB_PATH
+    parser.add_argument("--db", default=os.environ.get("PAPERS_DB_PATH", runtime_default))
+    parser.add_argument(
+        "--mode",
+        choices=["recommended", "trending", "recent"],
+        default="recommended",
+    )
+    parser.add_argument("--days", type=int, default=4)
     parser.add_argument("--limit", type=int, default=8)
     parser.add_argument("--keywords", nargs="*", default=None)
     return parser.parse_args(argv)

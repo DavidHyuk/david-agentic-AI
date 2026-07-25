@@ -1,0 +1,21 @@
+# Kakao i Open Builder feedback collector managed as a user service.
+[Unit]
+Description=KakaoTalk English Feedback Webhook
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.hermes/.env
+ExecStart=/usr/bin/python3 %h/.hermes/scripts/kakao_webhook.py
+Restart=on-failure
+RestartSec=3
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/english-lessons %h/.hermes/data/english
+
+[Install]
+WantedBy=default.target

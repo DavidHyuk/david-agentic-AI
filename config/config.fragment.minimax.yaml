@@ -23,6 +23,12 @@ model:
   default: MiniMax-M2.7-AWQ-4bit
   context_length: 65536
 
+browser:
+  cloud_provider: local
+  engine: chrome
+  cdp_url: http://127.0.0.1:19222
+  command_timeout: 30
+
 memory:
   memory_enabled: true
   user_profile_enabled: true
