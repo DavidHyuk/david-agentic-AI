@@ -91,6 +91,11 @@ def _git_root(start: Path) -> Path | None:
     return Path(result.stdout.strip())
 
 
+def _run_tests(repo: Path) -> subprocess.CompletedProcess[str]:
+    """Run the project's pytest entry point from the inherited Codex PATH."""
+    return _run(["pytest", "-q"], cwd=repo)
+
+
 def _list_changed(repo: Path) -> list[str]:
     result = _run(["git", "status", "--porcelain"], cwd=repo)
     if result.returncode != 0:
@@ -244,7 +249,7 @@ def commit_and_push(repo: Path) -> tuple[bool, str]:
     if existing_index.stdout.strip():
         return False, "Git index already contains staged changes; skipped auto-commit"
 
-    tests = _run([sys.executable, "-m", "pytest", "-q"], cwd=repo)
+    tests = _run_tests(repo)
     if tests.returncode != 0:
         detail = (tests.stderr or tests.stdout or "pytest failed").strip()
         return False, f"tests failed; skipped commit: {detail}"
@@ -288,11 +293,16 @@ def commit_and_push(repo: Path) -> tuple[bool, str]:
 
 
 def _record_result(repo: Path, ok: bool, detail: str) -> None:
-    """Write a local diagnostic without creating another commit-worthy file."""
+    """Write diagnostics without emitting invalid JSON on Codex hook stdout.
+
+    Codex parses non-empty ``Stop`` hook stdout as JSON. Human-readable
+    diagnostics therefore belong on stderr; the durable copy stays in local
+    Git metadata so it cannot trigger another commit.
+    """
     timestamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
     outcome = "ok" if ok else "error"
     message = f"[{timestamp}] {outcome}: {detail.strip()[:4000]}"
-    print(message, file=sys.stdout if ok else sys.stderr)
+    print(message, file=sys.stderr)
     try:
         with (repo / ".git" / "codex-auto-commit.log").open(
             "a", encoding="utf-8"

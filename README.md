@@ -115,8 +115,9 @@ current upstream branch. A push failure is retried at the next Stop event even
 if there are no new changes.
 
 After changing `.codex/hooks.json` or the hook implementation, open Codex
-`/hooks` and review/trust the command. Diagnostics are printed and stored only
-in `.git/codex-auto-commit.log`. To run the same flow manually:
+`/hooks` and review/trust the command. Diagnostics are written to stderr and
+stored in `.git/codex-auto-commit.log`; hook stdout stays empty to satisfy the
+Codex `Stop` protocol. To run the same flow manually:
 
 ```bash
 python3 .codex/hooks/auto_git_commit.py </dev/null

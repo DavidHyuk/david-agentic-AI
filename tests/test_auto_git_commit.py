@@ -105,6 +105,20 @@ def test_push_if_needed_retries_existing_local_commits(monkeypatch, tmp_path):
     assert ["git", "push"] in calls
 
 
+def test_run_tests_uses_pytest_from_inherited_path(monkeypatch, tmp_path):
+    calls: list[list[str]] = []
+
+    def fake_run(cmd, *, cwd):
+        calls.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setattr(hook, "_run", fake_run)
+
+    hook._run_tests(tmp_path)
+
+    assert calls == [["pytest", "-q"]]
+
+
 def test_large_cross_cutting_change_uses_compact_release_message():
     paths = [
         "AGENTS.md",
@@ -158,11 +172,23 @@ def test_commit_aborts_when_git_index_is_not_clean(monkeypatch, tmp_path):
     assert not any("pytest" in part for cmd in calls for part in cmd)
 
 
-def test_record_result_writes_local_git_diagnostic(tmp_path, capsys):
+def test_record_result_keeps_codex_stdout_empty_and_writes_diagnostic(tmp_path, capsys):
+    (tmp_path / ".git").mkdir()
+
+    hook._record_result(tmp_path, True, "upstream already current")
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "ok: upstream already current" in captured.err
+    log = (tmp_path / ".git" / "codex-auto-commit.log").read_text()
+    assert "ok: upstream already current" in log
+
+
+def test_record_result_reports_failure_on_stderr(tmp_path, capsys):
     (tmp_path / ".git").mkdir()
 
     hook._record_result(tmp_path, False, "push failed")
 
-    assert "error: push failed" in capsys.readouterr().err
-    log = (tmp_path / ".git" / "codex-auto-commit.log").read_text()
-    assert "error: push failed" in log
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "error: push failed" in captured.err

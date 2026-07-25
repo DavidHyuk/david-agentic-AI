@@ -3,6 +3,25 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v0.6.5 — 2026-07-25 (patch: fix Codex Stop hook output)
+
+### Fixed
+- The Codex-owned automatic commit hook now keeps stdout empty and sends its
+  human-readable status to stderr. Codex treats non-empty `Stop` hook stdout as
+  JSON, so the previous success message caused
+  `hook returned invalid stop hook JSON output` after otherwise successful
+  commits and pushes.
+- The test gate now invokes `pytest -q` from the Codex session's inherited
+  `PATH`. The hook itself runs under `/usr/bin/python3`, where the project's
+  Conda-installed pytest module is not available.
+- Hook documentation now records the Codex stdout contract and the local
+  `.git/codex-auto-commit.log` diagnostic path.
+
+### Verified
+- Added regression coverage for both successful and failed diagnostics,
+  including an assertion that stdout remains empty.
+- Full suite: `135 passed`.
+
 ## v0.6.4 — 2026-07-25 (patch: make the Stop hook Codex-owned)
 
 ### Fixed

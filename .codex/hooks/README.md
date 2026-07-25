@@ -8,10 +8,11 @@ Cursor-owned script.
 After changing the hook definition or implementation, open `/hooks` in Codex
 and review/trust the changed command before expecting it to run.
 
-The hook prints its result and appends the same short diagnostic to
+The hook writes its result to stderr and appends the same short diagnostic to
 `.git/codex-auto-commit.log`, which is local Git metadata and can never be
-staged. A failed push is retried on the next Stop event even when the worktree
-has no new commit-worthy changes.
+staged. Stdout stays empty because Codex parses non-empty `Stop` hook stdout as
+JSON. A failed push is retried on the next Stop event even when the worktree has
+no new commit-worthy changes.
 
 To run the exact hook manually:
 
