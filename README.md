@@ -88,7 +88,7 @@ python3 local-model/smoke_test.py
 bash browser/setup_browser.sh --check
 python3 browser/browser_smoke.py
 
-# Optional but recommended for the always-on gateway
+# Optional but recommended: keep the model endpoint running across logouts/reboots
 bash local-model/install_service.sh
 
 # 3. Verify a plain chat
@@ -104,6 +104,46 @@ Then complete the **interactive, one-time** steps `install.sh` prints:
 - `python3 bootstrap/register_cron.py` → schedule the Telegram briefs.
 - Follow [Kakao Channel setup](docs/kakao-channel-setup.md) to receive tutor feedback
   through the Channel chatbot, then turn it into Telegram drills.
+
+### Always-on vLLM service
+
+`local-model/install_service.sh` installs and enables the user-level
+`hermes-vllm.service`. Manage the Qwen3.6 endpoint with:
+
+```bash
+# Start, stop, restart, and inspect the service
+systemctl --user start hermes-vllm.service
+systemctl --user stop hermes-vllm.service
+systemctl --user restart hermes-vllm.service
+systemctl --user status hermes-vllm.service
+
+# Follow startup and runtime logs (initial model loading takes a few minutes)
+journalctl --user -u hermes-vllm.service -f
+```
+
+The Qwen3.6 launcher reserves 70% of available GPU memory by default for model
+execution and the KV-cache pool. To persistently use a different fraction (for
+example, 50% for a single-user Hermes deployment), create a systemd override:
+
+```bash
+systemctl --user edit hermes-vllm.service
+```
+
+Add the following, then reload and restart the service:
+
+```ini
+[Service]
+Environment=HERMES_VLLM_GPU_UTIL=0.50
+```
+
+```bash
+systemctl --user daemon-reload
+systemctl --user restart hermes-vllm.service
+nvidia-smi
+```
+
+This override leaves the tracked launcher default unchanged. `--gpu-memory-utilization`
+sets the size of vLLM's shared KV-cache pool; it does not create persistent Hermes memory.
 
 ## Automatic verified commit and push
 

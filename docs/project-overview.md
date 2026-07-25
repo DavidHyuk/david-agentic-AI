@@ -205,7 +205,15 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 ### 6. `local-model/` — LLM 백엔드
 `run_model.sh` 는 4가지 모델을 하나의 스크립트로 지원하며 Qwen3.6 FP8을
 기본 운영 모델로 사용합니다. Hermes는 ≥64K 컨텍스트가 필요해 포트
-`:8003`에서 128K로 실행됩니다. 새 논문 메타데이터 수집에는 LLM이 필요 없습니다.
+`:8003`에서 128K로 실행됩니다. `install_service.sh`는 이를 로그인·재부팅 후에도
+유지하는 `hermes-vllm.service` user service를 설치합니다. 서비스는
+`systemctl --user restart hermes-vllm.service`로 재시작하고,
+`journalctl --user -u hermes-vllm.service -f`로 로그를 확인합니다.
+
+Qwen3.6 기본 GPU 예약 비율은 70%이며, 개인용 단일 Hermes 작업에는 service override의
+`HERMES_VLLM_GPU_UTIL=0.50`이 균형 잡힌 선택이다. 이는 vLLM의 공유 KV-cache pool
+크기를 바꾸는 설정이며, Hermes의 영구 기억과는 별개다. 새 논문 메타데이터 수집에는
+LLM이 필요 없습니다.
 
 ### 7. `browser/` — Hermes Built-in Browser
 

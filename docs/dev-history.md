@@ -3,6 +3,17 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v0.6.6 — 2026-07-25 (patch: document vLLM service operation)
+
+### Changed
+- Added README instructions for installing, starting, stopping, restarting, and
+  observing the always-on `hermes-vllm.service`.
+- Documented the persistent `HERMES_VLLM_GPU_UTIL` systemd override, including
+  the 0.50 single-user recommendation and the distinction between vLLM KV cache
+  capacity and Hermes persistent memory.
+- Updated the project overview with the deployed service lifecycle and GPU
+  memory-tuning guidance.
+
 ## v0.6.5 — 2026-07-25 (patch: fix Codex Stop hook output)
 
 ### Fixed
