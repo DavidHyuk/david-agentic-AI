@@ -59,7 +59,11 @@ say "6/6  Next — service and interactive setup"
 cat <<'STEPS'
   a) Start the local model with >=64K context (NOT the 8K Subscribe-Papers script):
        bash /home/david/workspace/david-agentic-ai/local-model/setup_vllm.sh
-       bash /home/david/workspace/david-agentic-ai/local-model/run_model.sh qwen36
+       bash /home/david/workspace/david-agentic-ai/local-model/install_service.sh
+       journalctl --user -u hermes-vllm.service -f
+
+     Model checkpoints are managed separately in /home/david/workspace/models.
+     To add one: cd /home/david/workspace/models && python3 download_model.py OWNER/MODEL
 
   b) Verify a plain chat works:
        hermes -z "Say hi and tell me which model you are."

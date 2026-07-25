@@ -3,6 +3,15 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v0.7.1 — 2026-07-25 (patch: centralize checkpoint management)
+
+### Changed
+- Removed the duplicate `local-model/download_model.sh`; Hugging Face checkpoint
+  downloads are now managed exclusively by `/home/david/workspace/models/download_model.py`.
+- Updated model configuration comments, installer guidance, README, and project
+  overview to use the dedicated models workspace while retaining `run_model.sh`
+  as the vLLM service launcher.
+
 ## v0.7.0 — 2026-07-25 (minor: add vLLM service restart helper)
 
 ### Added

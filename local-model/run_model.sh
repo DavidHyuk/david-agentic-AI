@@ -67,8 +67,9 @@ case "${MODEL_TYPE}" in
 
   qwen-hybrid)
     # Intel AutoRound INT4: better calibration than AWQ, ~51 tok/s on DGX Spark.
-    # Download: bash local-model/download_model.sh qwen-hybrid
-    MODEL_PATH="${HERMES_MODEL_PATH:-${MODEL_BASE_DIR}/Qwen/Qwen3.5-122B-A10B-int4-AutoRound}"
+    # Download: manage Intel/Qwen3.5-122B-A10B-int4-AutoRound from the
+    # dedicated /home/david/workspace/models workspace.
+    MODEL_PATH="${HERMES_MODEL_PATH:-${MODEL_BASE_DIR}/Intel/Qwen3.5-122B-A10B-int4-AutoRound}"
     SERVED_NAME="Qwen3.5-122B-A10B-AWQ"   # same name so Hermes config needs no change
     GPU_UTIL="${HERMES_VLLM_GPU_UTIL:-0.90}"
     MAX_MODEL_LEN="${HERMES_VLLM_MAX_MODEL_LEN:-65536}"
@@ -107,7 +108,7 @@ case "${MODEL_TYPE}" in
     ;;
 
   minimax)
-    MODEL_PATH="${HERMES_MODEL_PATH:-${MODEL_BASE_DIR}/MiniMax/MiniMax-M2.7-AWQ-4bit}"
+    MODEL_PATH="${HERMES_MODEL_PATH:-${MODEL_BASE_DIR}/cyankiwi/MiniMax-M2.7-AWQ-4bit}"
     SERVED_NAME="MiniMax-M2.7-AWQ-4bit"
     GPU_UTIL="${HERMES_VLLM_GPU_UTIL:-0.90}"
     MAX_MODEL_LEN="${HERMES_VLLM_MAX_MODEL_LEN:-65536}"

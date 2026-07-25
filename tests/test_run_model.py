@@ -63,3 +63,12 @@ def test_qwen36_rejects_awq_checkpoint(tmp_path):
     result = _run(_checkpoint(tmp_path, quantization="awq"))
     assert result.returncode == 1
     assert "quantization mismatch" in result.stdout
+
+
+def test_checkpoints_are_managed_outside_the_agent_config_repo():
+    runner = RUNNER.read_text()
+
+    assert not (REPO_ROOT / "local-model" / "download_model.sh").exists()
+    assert 'MODEL_BASE_DIR="${HERMES_MODEL_DIR:-${WORKSPACE_ROOT}/models}"' in runner
+    assert "/Intel/Qwen3.5-122B-A10B-int4-AutoRound" in runner
+    assert "/cyankiwi/MiniMax-M2.7-AWQ-4bit" in runner

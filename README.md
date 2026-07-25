@@ -65,7 +65,7 @@ Local DGX Spark (vLLM @ :8003, Qwen3.6 FP8, 128K ctx)
 | `local-model/run_model.sh` | Launch Qwen3.6 FP8 or an alternative local model |
 | `local-model/restart_service.sh` | Restart the always-on vLLM service and optionally wait for API readiness |
 | `local-model/model_preflight.py` | Validate checkpoint quantization and context |
-| `local-model/download_model.sh` | Download a supported model checkpoint |
+| `/home/david/workspace/models/download_model.py` | Download and manage Hugging Face checkpoints outside this config repo |
 | `config/config.fragment.minimax.yaml` | Hermes provider config for MiniMax |
 | `tests/` | Pytest suite |
 
@@ -440,7 +440,15 @@ cat ~/.hermes/data/english/kakao-skill-url.txt
 ## Local model note
 Hermes requires a model with **≥64K context**. Qwen3.6 is served at 128K on
 `:8003`. Paper metadata ingestion itself is zero-LLM and does not require a
-second model server.
+second model server. Checkpoints are managed separately in
+`/home/david/workspace/models`; install its dependencies once, then download by
+Hugging Face repository ID:
+
+```bash
+cd /home/david/workspace/models
+python3 -m pip install -r requirements.txt
+python3 download_model.py Qwen/Qwen3.6-35B-A3B-FP8
+```
 
 ## Browser note
 
@@ -451,8 +459,10 @@ auto-launch hang observed on the DGX Spark's ARM64 environment.
 
 ### Switching to MiniMax-M2.7 (DGX Spark)
 ```bash
-# 1. Download (~100GB+)
-bash local-model/download_model.sh minimax
+# 1. Download and manage the checkpoint in the dedicated models workspace (~100GB+)
+cd /home/david/workspace/models
+python3 download_model.py cyankiwi/MiniMax-M2.7-AWQ-4bit
+cd /home/david/workspace/david-agentic-ai
 
 # 2. Stop Qwen vLLM, start MiniMax
 bash local-model/run_model.sh minimax

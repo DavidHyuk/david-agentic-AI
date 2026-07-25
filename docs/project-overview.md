@@ -111,7 +111,6 @@ david-agentic-ai/
 │   ├── run_model.sh           # vLLM 서버 실행 (qwen/qwen-hybrid/qwen36/minimax)
 │   ├── install_service.sh     # Qwen3.6 vLLM user systemd 서비스 설치
 │   ├── restart_service.sh     # vLLM 서비스 재시작 및 API 준비 대기
-│   └── download_model.sh      # Hugging Face에서 모델 가중치 다운로드
 │
 ├── browser/                   # Hermes Built-in Browser 런타임
 │   ├── setup_browser.sh       # agent-browser 고정 설치 + user service 설치
@@ -127,7 +126,7 @@ david-agentic-ai/
 │   ├── Qwen/                  # Qwen 계열 모델
 │   └── MiniMax/               # MiniMax-M2.7 모델
 │
-├── tests/                     # pytest 테스트 (135개)
+├── tests/                     # pytest 테스트 (138개)
 │   ├── conftest.py
 │   ├── test_papers_ingest.py
 │   ├── test_papers_digest.py
@@ -215,7 +214,9 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 Qwen3.6 기본 GPU 예약 비율은 70%이며, 개인용 단일 Hermes 작업에는 service override의
 `HERMES_VLLM_GPU_UTIL=0.50`이 균형 잡힌 선택이다. 이는 vLLM의 공유 KV-cache pool
 크기를 바꾸는 설정이며, Hermes의 영구 기억과는 별개다. 새 논문 메타데이터 수집에는
-LLM이 필요 없습니다.
+LLM이 필요 없습니다. 모델 가중치의 다운로드·저장 관리는 이 설정 repo 밖의
+`/home/david/workspace/models/download_model.py`가 담당하며, `run_model.sh`는 해당
+경로의 체크포인트를 vLLM service에 전달하는 실행 계층으로 유지됩니다.
 
 ### 7. `browser/` — Hermes Built-in Browser
 

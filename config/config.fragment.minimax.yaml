@@ -4,7 +4,7 @@
 #   hermes config set model.provider custom:minimax-hermes
 #
 # Start model first:
-#   bash local-model/download_model.sh minimax
+#   cd /home/david/workspace/models && python3 download_model.py cyankiwi/MiniMax-M2.7-AWQ-4bit
 #   bash local-model/run_model.sh minimax
 
 providers:
