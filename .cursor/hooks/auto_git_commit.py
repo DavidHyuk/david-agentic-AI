@@ -60,7 +60,7 @@ ALLOWED_TOP_LEVELS = {
     "skills",
     "tests",
 }
-ALLOWED_ROOT_FILES = {"AGENTS.md", "CODEX.md", "README.md"}
+ALLOWED_ROOT_FILES = {"AGENTS.md", "README.md"}
 
 # (path substring match, summary phrase) — first matching entries are combined.
 THEME_SUMMARIES: tuple[tuple[str, str], ...] = (

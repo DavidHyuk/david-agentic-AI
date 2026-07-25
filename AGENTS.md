@@ -41,7 +41,7 @@ locally before the review and SRS drill are delivered through Telegram.
   feature's usage instructions.
 - Codex lifecycle hooks live in `.codex/hooks.json`; after changing a hook,
   review and trust it through Codex `/hooks` before expecting execution.
-- Automatic git commits use the Conventional Commits rules in `CODEX.md` and
+- Automatic git commits use the Conventional Commits rules in this file and
   must never stage secrets, runtime files, or binary assets.
 
 ## Version History
@@ -71,6 +71,23 @@ Examples:
 - `feat(skills): add papers-digest skill with SRS integration`
 - `fix(gateway): resolve skill ambiguity caused by duplicate external_dirs`
 - `refactor(stage): replace shutil.copy with symlinks for skills`
+
+## Automatic Commit Hook
+
+`AGENTS.md` is the single source of truth for both project instructions and
+automatic commit rules. On a trusted Codex `Stop` or Cursor `stop` event, the
+shared hook must:
+
+1. stage only allowlisted project source, configuration, test, and documentation
+   paths;
+2. exclude secrets, runtime data, databases, model weights, and binary assets;
+3. require `pytest -q` to pass;
+4. create one Conventional Commit using the rules above; and
+5. push the current branch when it has a configured upstream.
+
+Hook failures remain fail-open for the agent turn but must be observable in
+stdout/stderr and `.git/codex-auto-commit.log`. A failed push must be retried on
+the next Stop event even if no new commit-worthy changes exist.
 
 ## Living Documentation
 

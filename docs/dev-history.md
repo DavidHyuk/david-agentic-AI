@@ -3,6 +3,20 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v0.6.3 — 2026-07-25 (patch: consolidate Codex instructions)
+
+### Changed
+- Removed the redundant `CODEX.md`. Codex automatically discovers
+  `AGENTS.md`, while `CODEX.md` was only an ordinary project document.
+- `AGENTS.md` is now the single source of truth for project behavior,
+  Conventional Commits, hook staging exclusions, test gating, push retry, and
+  diagnostics.
+- The auto-commit root allowlist and tests no longer treat `CODEX.md` as a
+  managed instruction file.
+
+### Verified
+- Full suite: `131 passed`.
+
 ## v0.6.2 — 2026-07-25 (patch: runtime instructions and hook observability)
 
 ### Fixed

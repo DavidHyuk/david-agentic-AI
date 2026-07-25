@@ -121,7 +121,7 @@ in `.git/codex-auto-commit.log`. To run the same flow manually:
 python3 .cursor/hooks/auto_git_commit.py </dev/null
 ```
 
-See [CODEX.md](CODEX.md) for the commit and safety rules.
+See [AGENTS.md](AGENTS.md) for the commit and safety rules.
 
 ## 논문 수집과 digest 사용법
 

@@ -70,7 +70,7 @@ def test_should_skip_unallowlisted_and_binary_paths():
     assert hook._should_skip("mcp/calendar_smoke.py") is False
     assert hook._should_skip("README.md") is False
     assert hook._should_skip("AGENTS.md") is False
-    assert hook._should_skip("CODEX.md") is False
+    assert hook._should_skip("CODEX.md") is True
     assert hook._should_skip(".codex/hooks.json") is False
 
 
