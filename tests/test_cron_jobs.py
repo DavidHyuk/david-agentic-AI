@@ -9,8 +9,8 @@ import register_cron as rc
 REPO = Path(__file__).resolve().parent.parent
 JOBS = REPO / "cron" / "jobs.yaml"
 EXPECTED_JOBS = {
-    "morning-brief", "papers-digest", "interview-prep",
-    "english-intake", "english-drill", "weekly-review",
+    "papers-digest", "interview-prep", "english-intake", "english-drill",
+    "weekly-review",
 }
 
 
@@ -25,11 +25,9 @@ def test_defaults_applied_deliver_telegram():
     assert all(j["deliver"] == "telegram" for j in jobs)
 
 
-def test_morning_brief_does_not_fallback_from_calendar_mcp():
+def test_calendar_brief_is_not_scheduled_while_integration_is_deferred():
     jobs = rc.load_jobs(JOBS)
-    morning = next(job for job in jobs if job["name"] == "morning-brief")
-
-    assert "never use Browser or Terminal" in morning["prompt"]
+    assert "morning-brief" not in {job["name"] for job in jobs}
 
 
 def test_build_create_command_shape():

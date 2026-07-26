@@ -54,4 +54,8 @@ cron:
 # --- Skills: skills are staged into ~/.hermes/skills/ by stage.py.
 # No external_dirs needed — adding it alongside the staged copies causes
 # hermes to find two copies of every skill and fail with an ambiguity error.
-skills: {}
+# Calendar source is retained for later, but it is intentionally unavailable to
+# the agent until OAuth setup is resumed.
+skills:
+  disabled:
+    - calendar-assistant

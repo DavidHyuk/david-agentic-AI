@@ -11,18 +11,6 @@ defaults:
   deliver: telegram
 
 jobs:
-  - name: morning-brief
-    schedule: "30 7 * * *"          # 07:30 every day
-    skills: [calendar-assistant]
-    prompt: >
-      Build today's brief. Read my Google Calendar for today via the
-      google-calendar MCP server, format it with the agenda.py helper, then add a
-      short "suggested plan" of 2-3 concrete actions tied to my goals (interview
-      prep, a papers read, an English drill). Flag any priority events, overlaps,
-      and free focus slots. If the google-calendar MCP tools are unavailable,
-      say so plainly; never use Browser or Terminal to discover calendar data or
-      configuration as a fallback.
-
   - name: papers-digest
     schedule: "30 8 * * *"           # 08:30 daily, after the 08:00 ingestion timer
     skills: [papers-digest]

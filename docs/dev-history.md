@@ -3,6 +3,22 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v0.8.3 — 2026-07-25 (patch: defer Calendar agentic integration)
+
+### Changed
+- Disabled `calendar-assistant` through the staged Hermes configuration and
+  removed the 07:30 `morning-brief` from the declarative Telegram schedule.
+- Retained the read-only Calendar MCP implementation, tests, and OAuth guide for
+  a future opt-in reactivation.
+- Updated bootstrap guidance, runtime memory seeds, README, next steps, and the
+  project overview to distinguish active features from deferred Calendar source.
+
+### Verified
+- Runtime configuration lists `calendar-assistant` under `skills.disabled`.
+- Runtime cron no longer contains `morning-brief`; the other five Telegram jobs
+  remain registered.
+- Full suite: `145 passed`.
+
 ## v0.8.2 — 2026-07-25 (patch: align Qwen3.6 GPU reservation default)
 
 ### Changed

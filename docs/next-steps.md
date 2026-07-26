@@ -37,21 +37,18 @@ The bot-test identity and real KakaoTalk identities differ. Each real teacher
 must send one harmless enrollment message, be approved immediately with
 `--approve-latest-sender`, and then re-send the actual feedback.
 
-## 4. Google Calendar MCP authorization — user OAuth step pending
+## 4. Google Calendar MCP authorization — deferred
 
-The Hermes cron runtime now initializes configured MCP servers, and
-`morning-brief` is prohibited from falling back to Browser or Terminal when the
-Calendar tools are absent. The current host still reports
-`No MCP servers configured` because no private Google Web OAuth client JSON or
-Calendar token exists.
+David intentionally deferred Calendar agentic functionality on 2026-07-25.
+The `calendar-assistant` source and read-only MCP tooling remain available, but
+the skill is disabled and `morning-brief` is not scheduled. No Google Cloud or
+OAuth work is needed now.
 
-David must create/download the Web OAuth client described in
-`docs/google-calendar-mcp.md`, then run:
+When David chooses to resume it:
 
-```bash
-python3 mcp/setup_google_calendar.py \
-  --credentials ~/.config/google/hermes-calendar-client.json
-python3 mcp/calendar_smoke.py
-```
-
-After `HERMES_CALENDAR_OK`, restart the gateway and re-register cron.
+1. Remove `calendar-assistant` from `skills.disabled` in
+   `config/config.fragment.yaml`.
+2. Follow `docs/google-calendar-mcp.md` to create the read-only OAuth client and
+   run the privacy-preserving smoke test.
+3. Restore `morning-brief` in `cron/jobs.yaml`.
+4. Stage the config, restart the gateway, register cron, and run a Telegram E2E.

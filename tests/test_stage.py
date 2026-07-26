@@ -52,6 +52,7 @@ def test_config_merge_preserves_existing(tmp_path):
         "cdp_url": "http://127.0.0.1:19222",
         "command_timeout": 30,
     }
+    assert cfg["skills"]["disabled"] == ["calendar-assistant"]
 
 
 def test_memory_not_clobbered_when_present(tmp_path):

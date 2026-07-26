@@ -6,8 +6,9 @@ synced into `~/.hermes` (HERMES_HOME) by `bootstrap/stage.py`.
 
 ## What this agent is for
 A proactive, always-on partner that helps David land a **Staff/Senior ML Engineer**
-role in Silicon Valley, stay current on **LLM/LVM research**, practice **English**,
-and manage his **calendar** — with regular **Telegram** notifications. English
+role in Silicon Valley, stay current on **LLM/LVM research**, and practice
+**English** — with regular **Telegram** notifications. Calendar support is
+retained in source but intentionally deferred and disabled. English
 tutor feedback enters through the KakaoTalk Channel chatbot and is processed
 locally before the review and SRS drill are delivered through Telegram.
 
@@ -22,8 +23,7 @@ locally before the review and SRS drill are delivered through Telegram.
 - `local-model/run_model.sh` — launch the default Qwen3.6 FP8 vLLM backend at
   128K context or a supported alternative model.
 - `browser/` — Hermes Built-in Browser backed by localhost-only Chromium CDP.
-- `mcp/` — reproducible external MCP configuration, currently Google Calendar
-  read-only setup.
+- `mcp/` — deferred Google Calendar read-only MCP setup retained for later.
 - `tests/` — pytest suite for the scripts, skill frontmatter, and cron schema.
 
 ## Conventions

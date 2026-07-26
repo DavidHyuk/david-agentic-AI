@@ -4,7 +4,7 @@
 # One-shot bootstrap for David's personalized Hermes agent.
 # Installs the Hermes runtime (if missing), stages this repo's config into
 # ~/.hermes, points the agent at the local DGX Spark vLLM endpoint, and prints
-# the remaining interactive steps (paper timer, gateway link, Calendar OAuth, cron).
+# the remaining interactive steps (paper timer, gateway link, cron).
 #
 # Safe to re-run: staging is idempotent and backs up anything it overwrites.
 set -euo pipefail
@@ -75,17 +75,14 @@ cat <<'STEPS'
        hermes gateway setup        # choose Telegram
        hermes gateway install      # run the gateway as a service (needed for cron)
 
-  e) Authorize Google Calendar (one-time OAuth) so the calendar skill can read it:
-       # First follow docs/google-calendar-mcp.md to download a Web OAuth client.
-       python3 /home/david/workspace/david-agentic-ai/mcp/setup_google_calendar.py \
-         --credentials ~/.config/google/hermes-calendar-client.json
-       python3 /home/david/workspace/david-agentic-ai/mcp/calendar_smoke.py
-
-  f) Register the scheduled Telegram briefs (after the gateway is up):
+  e) Register the scheduled Telegram briefs (after the gateway is up):
        python3 /home/david/workspace/david-agentic-ai/bootstrap/register_cron.py --dry-run
        python3 /home/david/workspace/david-agentic-ai/bootstrap/register_cron.py
 
-  g) Drop English lessons (audio + corrections) into ~/english-lessons/
+  f) Drop English lessons (audio + corrections) into ~/english-lessons/
+
+  Google Calendar is intentionally deferred. Its read-only setup is retained in
+  docs/google-calendar-mcp.md for a later reactivation.
 STEPS
 echo
 echo "Done. Repo is the source of truth — edit, then re-run stage.py to re-sync."

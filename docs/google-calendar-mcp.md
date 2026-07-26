@@ -1,5 +1,11 @@
 # Google Calendar MCP setup
 
+> **Status: deferred and inactive (2026-07-25).** The source, tests, and this
+> read-only setup guide are retained for later. `calendar-assistant` is disabled
+> in `config/config.fragment.yaml`, no Calendar MCP is configured, and
+> `morning-brief` is not scheduled. Do not perform the OAuth steps until David
+> decides to resume the integration.
+
 Hermes uses Google's official remote Calendar MCP server over HTTP:
 `https://calendarmcp.googleapis.com/mcp/v1`. The integration is intentionally
 read-only: only `list_calendars`, `list_events`, and `get_event` are exposed,
@@ -68,8 +74,9 @@ The second command verifies MCP connection/tool discovery, then asks Qwen3.6 to
 call `list_calendars` without printing calendar names or IDs. Success ends with
 `HERMES_CALENDAR_OK`.
 
-After authorization, restart the long-running gateway so its fresh cron
-sessions discover the server, then refresh the declarative schedule:
+When the integration is resumed, remove `calendar-assistant` from
+`skills.disabled`, complete authorization, restart the long-running gateway,
+and refresh the declarative schedule after restoring `morning-brief`:
 
 ```bash
 systemctl --user restart hermes-gateway.service

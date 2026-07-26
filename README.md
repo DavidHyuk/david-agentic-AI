@@ -3,12 +3,14 @@
 A personalized, always-on AI partner for **David Choi**, built on the
 [**Hermes Agent**](https://github.com/NousResearch/hermes-agent) framework
 (Nous Research). It learns David's life and goals over time and proactively helps
-with four things, delivered to **Telegram**:
+with three active areas, delivered to **Telegram**:
 
 1. **LLM/LVM research** — daily arXiv + Hugging Face ingestion and a personalized digest.
 2. **Staff/Senior MLE interview prep** — a rotating curriculum with drills + rubrics.
 3. **English practice** — turns tutor recordings + corrections into spaced-repetition drills.
-4. **Calendar** — a prioritized Google Calendar brief with conflicts, free slots, and suggestions.
+
+Google Calendar support is retained for a later phase, but its skill, MCP
+connection, and scheduled brief are currently disabled.
 
 This repository is the **single source of truth** for the agent's configuration.
 Assets are synced into the Hermes runtime home (`~/.hermes`) by `bootstrap/stage.py`.
@@ -32,7 +34,7 @@ Local DGX Spark (vLLM @ :8003, Qwen3.6 FP8, 128K ctx)
         ├─ interview-prep ── curriculum + progress log
         ├─ english-practice ─ Kakao webhook → english_intake.py + english_srs.py
         │                    → Telegram review (~/english-lessons)
-        └─ calendar-assistant ─ google-calendar MCP + agenda.py
+        └─ calendar-assistant ─ disabled; source retained for later
 
  arXiv + Hugging Face ── papers_ingest.py ── SQLite paper catalog
                               ▲
@@ -100,8 +102,6 @@ Then complete the **interactive, one-time** steps `install.sh` prints:
 - `bash bootstrap/install_papers_service.sh` → migrate legacy papers and enable
   daily metadata ingestion.
 - `hermes gateway setup` → connect **Telegram**, then `hermes gateway install`.
-- Follow [Google Calendar MCP setup](docs/google-calendar-mcp.md) → authorize the
-  official server with read-only OAuth scopes.
 - `python3 bootstrap/register_cron.py` → schedule the Telegram briefs.
 - Follow [Kakao Channel setup](docs/kakao-channel-setup.md) to receive tutor feedback
   through the Channel chatbot, then turn it into Telegram drills.
@@ -216,7 +216,11 @@ python3 ~/.hermes/scripts/papers_digest.py \
 SQLite는 원본 메타데이터와 ingestion 이력의 기준 저장소입니다. Qdrant는
 PDF 본문 질의·논문 간 비교가 필요해지는 다음 단계까지 사용하지 않습니다.
 
-## Google Calendar MCP 활성화
+## Google Calendar MCP — 추후 활성화
+
+> 현재 상태: `calendar-assistant`는 `config/config.fragment.yaml`에서
+> 비활성화되어 있고 `morning-brief`도 cron에서 제거되었습니다. 지금은 아래
+> OAuth 작업을 진행할 필요가 없습니다. 이 절은 추후 재개용으로 보존합니다.
 
 Hermes는 Google 공식 Calendar MCP 서버를 사용합니다. 기본 설정은 읽기
 전용이며 `list_calendars`, `list_events`, `get_event`만 허용합니다. 일정
@@ -423,7 +427,6 @@ cat ~/.hermes/data/english/kakao-skill-url.txt
 ## Scheduled Telegram notifications (`cron/jobs.yaml`)
 | Job | When (local) | What |
 |---|---|---|
-| `morning-brief` | 07:30 daily | Calendar agenda + suggested plan |
 | `papers-digest` | 08:30 daily | LLM/LVM research signal after 08:00 ingestion |
 | `interview-prep` | 12:00 Mon/Wed/Fri | One focused Staff/Senior MLE drill |
 | `english-intake` | 20:00 daily | Ingest new lessons → SRS cards |
@@ -443,9 +446,7 @@ hermes cron list
 ```
 
 The gateway only starts after `/v1/models` contains
-`Qwen3.6-35B-A3B-FP8`. A Calendar brief never falls back to Browser or Terminal
-when the `google-calendar` MCP is missing; it reports the unavailable
-integration instead.
+`Qwen3.6-35B-A3B-FP8`. Calendar is not part of the active agent runtime.
 
 ## Local model note
 Hermes requires a model with **≥64K context**. Qwen3.6 is served at 128K on

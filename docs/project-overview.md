@@ -23,7 +23,7 @@ DGX Spark (128GB VRAM)
    papers-digest          USER.md
    interview-prep         MEMORY.md
    english-practice
-   calendar-assistant
+   calendar-assistant (disabled; retained for later)
                                              agent-browser 0.33.0
                                                        │ CDP (localhost)
                                                        ▼
@@ -76,7 +76,7 @@ david-agentic-ai/
 │   ├── learning/
 │   │   └── english-practice/  # 영어 레슨 → SRS 드릴
 │   └── productivity/
-│       └── calendar-assistant/ # Google 캘린더 브리핑
+│       └── calendar-assistant/ # 비활성; 추후 Google 캘린더 브리핑
 │
 ├── scripts/                   # 스킬이 호출하는 Python 헬퍼 (→ ~/.hermes/scripts/)
 │   ├── papers_ingest.py       # arXiv/HF 메타데이터 수집·중복 병합·실행 이력
@@ -97,7 +97,7 @@ david-agentic-ai/
 │   └── hooks.json             # `.codex/hooks/auto_git_commit.py` 위임
 │
 ├── cron/
-│   └── jobs.yaml              # 6개의 Telegram 알림 스케줄 정의
+│   └── jobs.yaml              # 5개의 Telegram 알림 스케줄 정의
 │
 ├── bootstrap/                 # 설치 및 동기화 자동화
 │   ├── install.sh             # 원클릭 설치 (Hermes + 설정 + 모델)
@@ -120,7 +120,7 @@ david-agentic-ai/
 │   └── browser_smoke.py       # 탐색·클릭·DOM·snapshot E2E 검사
 │
 ├── mcp/                       # 외부 서비스 MCP 통합
-│   ├── google-calendar.yaml   # 공식 Calendar MCP 읽기 전용 템플릿
+│   ├── google-calendar.yaml   # 비활성; 공식 Calendar MCP 읽기 전용 템플릿
 │   ├── setup_google_calendar.py # OAuth client 설정 + 권한 고정
 │   └── calendar_smoke.py      # MCP discovery + Hermes E2E 검사
 │
@@ -163,7 +163,7 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 두 파일은 Hermes의 캐릭터 크기 제한 안에서 가장 중요한 사실을 압축해서 담습니다.
 `stage.py` 는 기존 메모리가 있으면 덮어쓰지 않아서, Hermes가 대화하며 쌓은 기억이 재설치 시에도 보존됩니다.
 
-### 3. `skills/` — 절차적 스킬 4개
+### 3. `skills/` — 절차적 스킬 4개(3개 활성)
 각 스킬은 `SKILL.md` 하나로 구성된 선언형 절차서입니다. 언제 쓰는지, 무엇을 입력받는지, 어떤 순서로 실행하는지, 어떤 포맷으로 출력하는지를 명시합니다.
 
 | 스킬 | 카테고리 | 핵심 기능 |
@@ -171,7 +171,7 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 | `papers-digest` | research | 새 논문 카탈로그에서 LLM/LVM 후보를 뽑아 인터뷰 관련성 분석 |
 | `interview-prep` | career | 5-필러 커리큘럼을 돌아가며 Staff/Senior MLE 드릴 제공 |
 | `english-practice` | learning | 레슨 녹음/교정 파일 → SRS 카드 생성 + 매일 리뷰 |
-| `calendar-assistant` | productivity | Google Calendar 브리핑 + 일정 충돌 경고 + 행동 제안 |
+| `calendar-assistant` | productivity | **비활성/보존** — 추후 Google Calendar 브리핑 |
 
 ### 4. `scripts/` — 결정론적 데이터 레이어
 스킬이 직접 DB 쿼리나 파일 파싱을 하지 않고, 헬퍼 스크립트를 CLI로 호출합니다.
@@ -189,14 +189,14 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 | `wait_for_vllm.py` | 지정한 served model이 `/v1/models`에 나타날 때까지 gateway 시작 대기 |
 
 ### 5. `cron/jobs.yaml` — 선언형 스케줄
-6개의 Telegram 알림 잡이 YAML로 선언되어 있습니다.
+5개의 Telegram 알림 잡이 YAML로 선언되어 있습니다. Calendar 연동을
+재개할 때까지 `morning-brief`는 등록하지 않습니다.
 
 | 잡 | 시간 | 내용 |
 |----|------|------|
-| `morning-brief` | 07:30 매일 | 캘린더 + 오늘의 행동 제안 |
 | `papers-digest` | 08:30 매일 | LLM/LVM 연구 시그널 |
 | `interview-prep` | 12:00 월/수/금 | 실시간 트렌드 기반 Staff 레벨 드릴 1개 |
-| `english-intake` | 20:00 월/화/수 | 새 레슨 수집 → SRS 카드 생성 |
+| `english-intake` | 20:00 매일 | 새 레슨 수집 → SRS 카드 생성 |
 | `english-drill` | 21:00 매일 | SRS 드릴 전달 |
 | `weekly-review` | 18:00 일요일 | 논문 + 인터뷰 + 영어 주간 요약 |
 
@@ -284,7 +284,8 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
 - **선언형 스킬(Declarative Skills)**: SKILL.md 파일 하나가 절차 전체를 정의 → 코드 없이 에이전트 능력 추가
 - **장기 기억(Persistent Memory)**: 대화 간 기억 유지로 에이전트가 David를 더 깊이 이해할수록 유용해짐
 - **Cron 스케줄러**: YAML 선언으로 주기적 Telegram 알림 → 에이전트가 먼저 행동하는 proactive 패턴
-- **MCP (Model Context Protocol)**: Google Calendar 같은 외부 서비스를 표준 도구로 연결
+- **MCP (Model Context Protocol)**: 외부 서비스를 표준 도구로 연결. Google
+  Calendar 템플릿은 추후 재활성화를 위해 보존되어 있으나 현재 런타임에는 없음
 
 ### 스페이스드 리피티션(Leitner SRS)
 - `english_srs.py`의 Leitner 박스 알고리즘 → 맞힌 카드는 나중에, 틀린 카드는 다음날 재등장

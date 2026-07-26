@@ -8,6 +8,6 @@ Staged helper scripts in ~/.hermes/scripts/: papers_ingest.py, papers_digest.py,
 §
 English lessons folder: ~/english-lessons (audio + correction files). Intake state: ~/.hermes/data/english/processed.json. SRS deck: ~/.hermes/data/english/srs_deck.json.
 §
-Calendar is Google Calendar, read via the 'google-calendar' MCP server.
+Google Calendar agentic integration is intentionally deferred: no active Calendar MCP or morning brief. The read-only setup is retained in the repo for later.
 §
-Installed skills: papers-digest, interview-prep, english-practice, calendar-assistant. Scheduled WhatsApp cron jobs: morning brief, papers digest, interview prep, english practice, SRS drill, weekly review.
+Active skills: papers-digest, interview-prep, english-practice. calendar-assistant is staged but disabled. Scheduled Telegram cron jobs: papers digest, interview prep, English intake, SRS drill, weekly review.
