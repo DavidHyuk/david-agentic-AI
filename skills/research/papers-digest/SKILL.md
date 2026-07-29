@@ -1,7 +1,7 @@
 ---
 name: papers-digest
 description: Surface and analyze fresh arXiv and Hugging Face LLM/LVM research from David's local paper catalog, tying findings to his Staff/Senior MLE interview prep.
-version: 2.0.1
+version: 2.0.2
 platforms: [linux, macos]
 metadata:
   hermes:
@@ -48,7 +48,11 @@ metadata:
 
 ## Output Format
 - Lead with a one-line "today's signal" takeaway.
-- Then the digest list (title · upvotes · date · 1-line why-it-matters · link).
+- Then the digest list (title · upvotes · date · 1-line why-it-matters ·
+  interview angle · canonical URL).
+- Include one explicit, clickable `https://...` URL for **every** paper. Put the
+  URL on its own `Link:` line so Telegram does not hide it in a table. Never send
+  a paper item without its source URL.
 - Keep it skimmable for Telegram. Put long analysis behind a follow-up, not in the
   scheduled push.
 
@@ -64,5 +68,6 @@ metadata:
 
 ## Verification
 - The digest names real papers that exist in the DB with working URLs.
+- Every listed paper has a visible canonical URL copied from the helper output.
 - Ingestion freshness is visible from `papers_ingest.py --status`.
 - Each highlighted paper has an interview-relevance angle.

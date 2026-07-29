@@ -220,6 +220,9 @@ Hermes의 Python helper는 항상 `python3`로 실행합니다. 런타임에는 
 alias가 없으며, SOUL과 각 skill도 `python`을 탐색하거나 재시도하지 않도록
 명시합니다.
 
+매일 전달되는 논문 digest는 각 항목마다 Telegram에서 바로 열 수 있는
+canonical `https://...` 링크를 별도의 `Link:` 줄로 포함합니다.
+
 SQLite는 원본 메타데이터와 ingestion 이력의 기준 저장소입니다. Qdrant는
 PDF 본문 질의·논문 간 비교가 필요해지는 다음 단계까지 사용하지 않습니다.
 

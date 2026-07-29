@@ -19,9 +19,11 @@ jobs:
       recommended papers from the last four days plus today's Hugging Face
       popularity signal, lead with a one-line takeaway, then list at most five
       items with a one-line why-it-matters and an interview-relevance angle for
-      Staff/Senior MLE. If the catalog is stale, report its ingestion status
-      instead of launching a scraper. Invoke helpers with python3 exactly; the
-      python command is unavailable. Keep it skimmable.
+      Staff/Senior MLE. Include a visible clickable canonical https URL on its
+      own Link line for every paper; never send a paper without its URL. If the
+      catalog is stale, report its ingestion status instead of launching a
+      scraper. Invoke helpers with python3 exactly; the python command is
+      unavailable. Keep it skimmable.
 
   - name: interview-prep
     schedule: "0 12 * * 1,3,5"      # 12:00 Mon/Wed/Fri

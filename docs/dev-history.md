@@ -3,6 +3,19 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v0.10.2 — 2026-07-28 (patch: require paper links in Telegram digests)
+
+### Changed
+- Require every `papers-digest` item to include its visible, clickable canonical
+  `https://...` URL on a separate `Link:` line.
+- Reinforced the requirement in both the skill output contract and scheduled
+  cron prompt, and reject linkless paper items during agent self-verification.
+
+### Verified
+- Staged `papers-digest` v2.0.2 into the Hermes runtime and re-registered all
+  five cron jobs; the active job prompt and runtime skill both contain the
+  per-paper URL requirement.
+
 ## v0.10.1 — 2026-07-28 (patch: eliminate Python command retries)
 
 ### Fixed
