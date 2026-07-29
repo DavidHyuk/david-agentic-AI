@@ -101,7 +101,7 @@ def check_jobs_stale(
     stale_hours: int = DEFAULT_JOB_STALE_HOURS,
     now: datetime | None = None,
 ) -> dict[str, Any]:
-    """Flag enabled jobs whose ``last_run_at`` is older than ``stale_hours``."""
+    """Flag jobs with overdue next runs or stale jobs lacking a next run."""
     current = now or _now()
     if not jobs_path.exists():
         return {
@@ -133,7 +133,11 @@ def check_jobs_stale(
                     "name": name,
                     "last_run_at": job.get("last_run_at"),
                     "next_run_at": job.get("next_run_at"),
-                    "hours_since_last_run": round(hours_since, 1),
+                        "hours_since_last_run": (
+                            round(hours_since, 1)
+                            if hours_since is not None
+                            else None
+                        ),
                     "overdue_next_run": overdue_next,
                 }
             )
