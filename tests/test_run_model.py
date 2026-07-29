@@ -31,7 +31,7 @@ def _checkpoint(tmp_path, quantization="fp8"):
     return model
 
 
-def _run(model):
+def _run(model, *model_args):
     env = {
         **os.environ,
         "HERMES_MODEL_PATH": str(model),
@@ -39,7 +39,7 @@ def _run(model):
         "HERMES_VLLM_DRY_RUN": "1",
     }
     return subprocess.run(
-        ["bash", str(RUNNER), "qwen36"],
+        ["bash", str(RUNNER), *model_args],
         cwd=REPO_ROOT,
         env=env,
         text=True,
@@ -49,7 +49,7 @@ def _run(model):
 
 
 def test_qwen36_uses_fp8_compatible_vllm_flags(tmp_path):
-    result = _run(_checkpoint(tmp_path))
+    result = _run(_checkpoint(tmp_path), "qwen36")
     assert result.returncode == 0, result.stderr
     assert "--served-model-name Qwen3.6-35B-A3B-FP8" in result.stdout
     assert "--gpu-memory-utilization 0.50" in result.stdout
@@ -61,9 +61,16 @@ def test_qwen36_uses_fp8_compatible_vllm_flags(tmp_path):
 
 
 def test_qwen36_rejects_awq_checkpoint(tmp_path):
-    result = _run(_checkpoint(tmp_path, quantization="awq"))
+    result = _run(_checkpoint(tmp_path, quantization="awq"), "qwen36")
     assert result.returncode == 1
     assert "quantization mismatch" in result.stdout
+
+
+def test_launcher_defaults_to_qwen36(tmp_path):
+    result = _run(_checkpoint(tmp_path))
+
+    assert result.returncode == 0, result.stderr
+    assert "model   : qwen36 (Qwen3.6-35B-A3B-FP8)" in result.stdout
 
 
 def test_checkpoints_are_managed_outside_the_agent_config_repo():

@@ -24,6 +24,8 @@ from typing import Any
 DEFAULT_HERMES_HOME = Path(os.path.expanduser("~/.hermes"))
 DEFAULT_LOCK_STALE_MINUTES = 30
 DEFAULT_JOB_STALE_HOURS = 36
+DEFAULT_GATEWAY_SERVICE = "hermes-gateway.service"
+DEFAULT_RESTART_TIMEOUT_SECONDS = 75
 
 SECRET_PATTERNS = (".env", "credentials", "secret", "token", "auth.json")
 
@@ -114,11 +116,18 @@ def check_jobs_stale(
         last_run = _parse_iso(job.get("last_run_at"))
         next_run = _parse_iso(job.get("next_run_at"))
         name = job.get("name") or job.get("id", "?")
-        if last_run is None:
-            continue
-        hours_since = (current - last_run).total_seconds() / 3600.0
         overdue_next = next_run is not None and next_run < current
-        if hours_since >= stale_hours or overdue_next:
+        hours_since = (
+            (current - last_run).total_seconds() / 3600.0
+            if last_run is not None
+            else None
+        )
+        stale_without_schedule = (
+            next_run is None
+            and hours_since is not None
+            and hours_since >= stale_hours
+        )
+        if overdue_next or stale_without_schedule:
             stale_jobs.append(
                 {
                     "name": name,
@@ -157,24 +166,28 @@ def assess_health(
     return {"lock": lock, "jobs": jobs, "critical": critical}
 
 
-def restart_gateway() -> tuple[bool, str]:
-    """Best-effort ``hermes gateway restart``."""
+def restart_gateway(
+    *,
+    service: str = DEFAULT_GATEWAY_SERVICE,
+    timeout: int = DEFAULT_RESTART_TIMEOUT_SECONDS,
+) -> tuple[bool, str]:
+    """Restart the systemd user gateway with a bounded client-side wait."""
     try:
         result = subprocess.run(
-            ["hermes", "gateway", "restart"],
+            ["systemctl", "--user", "restart", service],
             capture_output=True,
             text=True,
             check=False,
-            timeout=120,
+            timeout=timeout,
         )
     except FileNotFoundError:
-        return False, "hermes CLI not found on PATH"
+        return False, "systemctl not found on PATH"
     except subprocess.TimeoutExpired:
-        return False, "hermes gateway restart timed out"
+        return False, f"{service} restart timed out after {timeout}s"
     if result.returncode != 0:
         detail = (result.stderr or result.stdout or "").strip()
         return False, detail or f"exit {result.returncode}"
-    return True, (result.stdout or "").strip()
+    return True, (result.stdout or "").strip() or f"{service} restarted"
 
 
 def _format_report(report: dict[str, Any]) -> str:
@@ -199,9 +212,11 @@ def _format_report(report: dict[str, Any]) -> str:
     elif jobs["stale_jobs"]:
         lines.append("stale cron jobs:")
         for item in jobs["stale_jobs"]:
+            last_run = item["last_run_at"] or "never"
+            age = item.get("hours_since_last_run")
+            age_text = f" ({age}h ago)" if age is not None else ""
             lines.append(
-                f"  - {item['name']}: last run {item['last_run_at']} "
-                f"({item['hours_since_last_run']}h ago)"
+                f"  - {item['name']}: last run {last_run}{age_text}"
             )
     else:
         lines.append("cron jobs: last_run timestamps look current")

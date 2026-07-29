@@ -3,6 +3,15 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v0.8.4 — 2026-07-28 (patch: align launcher default with production model)
+
+### Changed
+- Changed `local-model/run_model.sh` to default to `qwen36` when no model
+  argument is supplied, matching the persistent vLLM service and staged Hermes
+  configuration.
+- Added regression coverage for the no-argument launcher path and clarified the
+  default behavior in the project overview.
+
 ## v0.8.3 — 2026-07-25 (patch: defer Calendar agentic integration)
 
 ### Changed

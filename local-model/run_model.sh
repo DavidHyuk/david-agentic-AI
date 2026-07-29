@@ -4,8 +4,8 @@
 # Unified vLLM launcher for Hermes agent models on the DGX Spark (128GB).
 #
 # Usage:
-#   bash local-model/run_model.sh [MODEL]      # foreground
-#   nohup bash local-model/run_model.sh [MODEL] &  # background
+#   bash local-model/run_model.sh [MODEL]      # foreground; defaults to qwen36
+#   nohup bash local-model/run_model.sh [MODEL] &  # background; defaults to qwen36
 #
 # MODEL choices:
 #   qwen           Qwen3.5-122B-A10B-AWQ    — legacy baseline
@@ -37,7 +37,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 WORKSPACE_ROOT="$(cd "${REPO_ROOT}/.." && pwd)"
 
-MODEL_TYPE="${1:-qwen}"
+MODEL_TYPE="${1:-qwen36}"
 PORT="${HERMES_VLLM_PORT:-8003}"
 MTP_TOKENS="${MTP_TOKENS:-0}"
 MODEL_BASE_DIR="${HERMES_MODEL_DIR:-${WORKSPACE_ROOT}/models}"

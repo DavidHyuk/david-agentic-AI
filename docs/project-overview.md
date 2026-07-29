@@ -206,8 +206,8 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 읽습니다.
 
 ### 6. `local-model/` — LLM 백엔드
-`run_model.sh` 는 4가지 모델을 하나의 스크립트로 지원하며 Qwen3.6 FP8을
-기본 운영 모델로 사용합니다. Hermes는 ≥64K 컨텍스트가 필요해 포트
+`run_model.sh` 는 4가지 모델을 하나의 스크립트로 지원하며, 인자 없이 실행해도
+Qwen3.6 FP8을 기본 운영 모델로 사용합니다. Hermes는 ≥64K 컨텍스트가 필요해 포트
 `:8003`에서 128K로 실행됩니다. `install_service.sh`는 이를 로그인·재부팅 후에도
 유지하는 `hermes-vllm.service` user service를 설치합니다. 서비스는
 `bash local-model/restart_service.sh`로 재시작하며, `--wait`을 붙이면 모델 API가
