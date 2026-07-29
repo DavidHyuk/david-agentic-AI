@@ -1,7 +1,7 @@
 ---
 name: calendar-assistant
 description: Read David's Google Calendar, deliver a prioritized daily agenda with conflict warnings and free-focus slots, and suggest schedule-aware actions.
-version: 1.1.0
+version: 1.1.1
 metadata:
   hermes:
     category: productivity
@@ -42,7 +42,7 @@ his interview prep, research reading, and English practice.
    `google-calendar` MCP tools (list events for the primary calendar). Normalize
    each event to `{summary, start, end, location}` with ISO local times.
 2. **Format deterministically.** Write the events to a temp JSON file and run:
-   `python ~/.hermes/scripts/agenda.py --file <tmp.json> --day-start <work_start> --day-end <work_end>`
+   `python3 ~/.hermes/scripts/agenda.py --file <tmp.json> --day-start <work_start> --day-end <work_end>`
    This returns the agenda, ⭐ priority items (interviews/deadlines), ⚠ overlaps,
    and free focus slots.
 3. **Add schedule-aware suggestions** on top of the brief, e.g.:

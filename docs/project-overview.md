@@ -180,6 +180,8 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 ### 4. `scripts/` — 결정론적 데이터 레이어
 스킬이 직접 DB 쿼리나 파일 파싱을 하지 않고, 헬퍼 스크립트를 CLI로 호출합니다.
 스크립트는 repo-relative import 없이 standalone으로 유지돼 `~/.hermes/scripts/`에서 독립 실행됩니다.
+모든 agent 지침과 skill 예시는 호스트에 실제 존재하는 `python3` 실행 파일을
+명시하며, 설치되지 않은 `python` alias를 탐색하거나 재시도하지 않습니다.
 
 | 스크립트 | 역할 |
 |----------|------|

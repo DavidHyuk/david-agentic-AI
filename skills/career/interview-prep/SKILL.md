@@ -1,7 +1,7 @@
 ---
 name: interview-prep
 description: Drive David's Staff/Senior ML Engineer interview prep in Silicon Valley with a structured curriculum, daily focused drills, and curated resources.
-version: 1.0.0
+version: 1.0.1
 metadata:
   hermes:
     category: career
@@ -48,7 +48,7 @@ Rotate across the five pillars in `references/curriculum.md`. Each push should p
 2. Pick today's pillar + one concrete item. Prefer weak/under-covered areas.
 3. **Pull live trend signal for that pillar** — this is what keeps drills current
    instead of recycling the static seed bank:
-   `python ~/.hermes/scripts/interview_trends.py --mode brief --pillar <pillar>`
+   `python3 ~/.hermes/scripts/interview_trends.py --mode brief --pillar <pillar>`
    It returns a ranked, source-diverse brief (GitHub repos + Hacker News discourse +
    recent papers) cached to `interview.trends_cache`. Use it to:
    - choose a concrete item that reflects what's actually being asked/discussed now,
@@ -80,6 +80,8 @@ Systems", arXiv) when they sharpen a point. Always say *why* a resource is worth
 - Don't fire-hose. Staff prep is about depth + signal, not volume.
 - Tie behavioral prompts to *scope and influence*, the differentiators at Staff.
 - Keep the progress log honest; surface neglected pillars.
+- Use `python3` exactly for helper commands. The `python` executable is not
+  installed on this host.
 
 ## Verification
 - The push targets an under-covered pillar (cross-checked against the progress log).

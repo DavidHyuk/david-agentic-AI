@@ -3,6 +3,25 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v0.10.1 — 2026-07-28 (patch: eliminate Python command retries)
+
+### Fixed
+- Replaced bare `python` with `python3` in the paper, interview, and deferred
+  calendar skill helper commands.
+- Added a host-wide SOUL rule and explicit cron prompt guidance so the local
+  Qwen agent does not probe the unavailable `python` command before using
+  `/usr/bin/python3`.
+
+### Verified
+- Reproduced the original behavior in a real `papers-digest` cron run: two
+  `python` calls failed before Qwen recovered with `python3`; the job then
+  completed and delivered to Telegram.
+- Staged the corrected SOUL and skills, re-registered all five cron jobs, and
+  ran `papers-digest` again. Both helper calls used `python3` on their first
+  attempt, the verification window contained zero missing-`python` errors, and
+  the job completed with `last_status=ok` and successful Telegram delivery.
+- Focused skill, cron, and staging checks: `18 passed`.
+
 ## v0.10.0 — 2026-07-28 (minor: add evidence-based English coaching)
 
 ### Added
