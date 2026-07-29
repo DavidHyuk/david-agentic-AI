@@ -83,8 +83,8 @@ david-agentic-ai/
 │   ├── papers_digest.py       # 새 논문 카탈로그 읽기 전용 조회
 │   ├── interview_trends.py    # HN·GitHub·논문 실시간 인터뷰 트렌드 수집
 │   ├── kakao_webhook.py       # Kakao 채널 피드백 수신·발신자 allowlist·로컬 큐
-│   ├── english_intake.py      # 새 레슨 탐지 + 처리 상태 관리 + Telegram 파일 저장
-│   ├── english_srs.py         # Leitner SRS 덱 (추가/리뷰/통계)
+│   ├── english_intake.py      # 새 레슨 탐지 + 이번 주 세션 조회 + 처리 상태 관리
+│   ├── english_srs.py         # Leitner SRS 덱 (추가/리뷰/통계/취약 카드)
 │   ├── agenda.py              # 캘린더 이벤트 포맷팅 + 충돌 감지
 │   ├── cron_health.py         # cron tick lock / jobs.json 건강 검사 (+ 선택적 gateway restart)
 │   └── wait_for_vllm.py       # gateway 시작 전 /v1/models readiness gate
@@ -131,7 +131,7 @@ david-agentic-ai/
 │   ├── Qwen/                  # Qwen 계열 모델
 │   └── MiniMax/               # MiniMax-M2.7 모델
 │
-├── tests/                     # pytest 테스트 (153개)
+├── tests/                     # pytest 테스트 (156개)
 │   ├── conftest.py
 │   ├── test_papers_ingest.py
 │   ├── test_papers_digest.py
@@ -186,8 +186,8 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 | `papers_ingest.py` | arXiv 4개 카테고리 + HF Daily Papers 메타데이터 수집, source/run provenance 저장 |
 | `papers_digest.py` | SQLite 카탈로그 읽기 전용 조회 → 추천/최신/인기 digest |
 | `interview_trends.py` | HN·GitHub·논문 DB에서 실시간 인터뷰 트렌드 수집·캐시 |
-| `english_intake.py` | 새 레슨 탐지, Telegram 파일 저장, 처리 상태 관리 |
-| `english_srs.py` | Leitner SRS 덱 (카드 추가/리뷰/통계) |
+| `english_intake.py` | 새 레슨 탐지, Telegram 파일 저장, 이번 주 세션 조회, 처리 상태 관리 |
+| `english_srs.py` | Leitner SRS 덱 (카드 추가/리뷰/통계/취약 카드 랭킹) |
 | `agenda.py` | 캘린더 이벤트 포맷팅 + 충돌·여유 슬롯 감지 |
 | `cron_health.py` | cron tick lock 점유·`jobs.json` stale 감지, `--restart`로 gateway 복구 |
 | `wait_for_vllm.py` | 지정한 served model이 `/v1/models`에 나타날 때까지 gateway 시작 대기 |
@@ -200,7 +200,7 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 |----|------|------|
 | `papers-digest` | 08:30 매일 | LLM/LVM 연구 시그널 |
 | `interview-prep` | 12:00 월/수/금 | 실시간 트렌드 기반 Staff 레벨 드릴 1개 |
-| `english-intake` | 20:00 매일 | 새 레슨 수집 → SRS 카드 생성 |
+| `english-intake` | 20:00 매일 | 새 피드백 분석 또는 취약 패턴 코칭; 일요일 누적 복습 |
 | `english-drill` | 21:00 매일 | SRS 드릴 전달 |
 | `weekly-review` | 18:00 일요일 | 논문 + 인터뷰 + 영어 주간 요약 |
 

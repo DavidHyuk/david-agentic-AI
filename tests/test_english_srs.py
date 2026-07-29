@@ -41,6 +41,8 @@ def test_wrong_review_resets_to_box_1():
     assert deck["cards"][cid]["box"] == 1
     due = date.fromisoformat(deck["cards"][cid]["due"])
     assert due == date(2026, 6, 5)  # box 1 -> +1 day
+    assert deck["cards"][cid]["wrong_reviews"] == 1
+    assert deck["cards"][cid]["correct_reviews"] == 1
 
 
 def test_box_capped_at_max():
@@ -63,3 +65,18 @@ def test_stats_and_drill_format():
 
 def test_empty_drill_message():
     assert "Nothing due" in srs.format_drill([])
+
+
+def test_weakness_cards_prioritize_low_boxes_and_repeated_errors():
+    deck = {"cards": {}}
+    for wrong, correct in (("new", "new right"), ("weak", "weak right"), ("strong", "strong right")):
+        deck, _ = srs.add_card(deck, wrong, correct, today="2026-06-02")
+
+    cards = {card["wrong"]: card for card in deck["cards"].values()}
+    cards["new"]["box"] = 1
+    cards["weak"].update({"box": 1, "reviews": 3, "wrong_reviews": 2})
+    cards["strong"].update({"box": 4, "reviews": 5, "wrong_reviews": 1})
+
+    ranked = srs.weakness_cards(deck, limit=2)
+    assert [card["wrong"] for card in ranked] == ["weak", "new"]
+    assert srs.weakness_cards(deck, limit=0) == []

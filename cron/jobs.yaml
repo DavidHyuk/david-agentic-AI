@@ -34,16 +34,18 @@ jobs:
       append what you covered to the progress log.
 
   - name: english-intake
-    schedule: "0 20 * * *"          # 20:00 every day; feedback may arrive any day
+    schedule: "0 20 * * *"          # 20:00 daily coaching; Sunday is weekly review
     skills: [english-practice]
     prompt: >
-      Check for new English lessons, including KakaoTalk Channel feedback queued by
-      kakao_webhook.py. Use the english-practice skill (intake branch): run
-      english_intake.py to find new sessions, transcribe recordings when present,
-      mine the tutor's corrections into atomic SRS cards, mark sessions processed,
-      and send a short Korean summary with recurring error patterns and one
-      targeted production challenge. If there are no new lessons, reply only
-      [SILENT].
+      Deliver the 20:00 English coaching using the english-practice skill. First
+      run english_intake.py with python3 and process any new KakaoTalk or lesson
+      feedback through Procedure A. Determine the local weekday. On Sunday, follow
+      Procedure E and send a cumulative review of this week's feedback plus weak
+      SRS cards. On other days with no new feedback, follow Procedure D: use
+      english_srs.py weaknesses and stats to explain one or two evidence-backed
+      weak patterns, include a clearly labeled generated practice example, and ask
+      one short production question. Do not stay silent merely because no new
+      lesson arrived, and never invent a teacher correction.
 
   - name: english-drill
     schedule: "0 21 * * *"          # 21:00 every day

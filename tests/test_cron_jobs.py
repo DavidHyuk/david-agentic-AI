@@ -30,6 +30,15 @@ def test_calendar_brief_is_not_scheduled_while_integration_is_deferred():
     assert "morning-brief" not in {job["name"] for job in jobs}
 
 
+def test_english_intake_coaches_without_feedback_and_reviews_on_sunday():
+    jobs = {job["name"]: job for job in rc.load_jobs(JOBS)}
+    prompt = jobs["english-intake"]["prompt"]
+    assert "Do not stay silent" in prompt
+    assert "weaknesses" in prompt
+    assert "On Sunday" in prompt
+    assert "[SILENT]" not in prompt
+
+
 def test_build_create_command_shape():
     job = {
         "name": "papers-digest",

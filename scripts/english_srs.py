@@ -96,11 +96,30 @@ def review_card(deck: dict, card_id: str, correct: bool, today: str | None = Non
     """Apply a review result, moving the card between Leitner boxes."""
     card = deck["cards"][card_id]
     card["box"] = min(card["box"] + 1, MAX_BOX) if correct else 1
+    outcome_key = "correct_reviews" if correct else "wrong_reviews"
+    card[outcome_key] = card.get(outcome_key, 0) + 1
     interval = BOX_INTERVALS[card["box"]]
     card["due"] = (_today(today) + timedelta(days=interval)).isoformat()
     card["reviews"] = card.get("reviews", 0) + 1
     card["last_review"] = _today(today).isoformat()
     return deck
+
+
+def weakness_cards(deck: dict, limit: int = 5) -> list[dict]:
+    """Return the least-mastered cards, prioritizing repeated wrong reviews."""
+    if limit < 1:
+        return []
+    cards = deck.get("cards", {}).values()
+    return sorted(
+        cards,
+        key=lambda card: (
+            card.get("box", 1),
+            -card.get("wrong_reviews", 0),
+            -card.get("reviews", 0),
+            card.get("due", ""),
+            card.get("created", ""),
+        ),
+    )[:limit]
 
 
 def stats(deck: dict, today: str | None = None) -> dict:
@@ -146,6 +165,11 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     p_rev.add_argument("--id", required=True)
     p_rev.add_argument("--result", choices=["correct", "wrong"], required=True)
 
+    p_weak = sub.add_parser(
+        "weaknesses", help="print least-mastered cards for personalized coaching"
+    )
+    p_weak.add_argument("--limit", type=int, default=5)
+
     sub.add_parser("stats", help="print deck stats")
     return parser.parse_args(argv)
 
@@ -163,6 +187,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         review_card(deck, args.id, args.result == "correct")
         save_deck(args.deck, deck)
         print(json.dumps(stats(deck), indent=2))
+    elif args.cmd == "weaknesses":
+        print(
+            json.dumps(
+                {"weaknesses": weakness_cards(deck, args.limit)},
+                indent=2,
+                ensure_ascii=False,
+            )
+        )
     elif args.cmd == "stats":
         print(json.dumps(stats(deck), indent=2))
     return 0

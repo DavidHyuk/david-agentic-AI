@@ -411,8 +411,17 @@ Open Builder에서 다음 순서로 설정합니다.
 다시 보내야 합니다.
 
 수집된 원문은 `~/english-lessons/YYYY-MM-DD/` 아래에 저장됩니다. 매일
-20:00 `english-intake`가 로컬 LLM으로 분석하고, 21:00 `english-drill`이
-Telegram 복습 문제를 전송합니다.
+20:00 `english-intake`가 새 피드백을 분석합니다. 새 피드백이 없는 날에는
+누적 SRS 카드에서 취약 패턴을 골라 짧은 코칭을 보내며, 일요일에는 그 주의
+전체 피드백과 누적 취약 카드를 묶어 복습합니다. 21:00 `english-drill`은
+당일 복습 문제를 전송합니다.
+
+개인화 코칭과 주간 복습에 사용되는 근거를 직접 확인할 수 있습니다.
+
+```bash
+python3 ~/.hermes/scripts/english_srs.py weaknesses --limit 5
+python3 ~/.hermes/scripts/english_intake.py --week
+```
 
 > 현재 설치 스크립트가 사용하는 Cloudflare Quick Tunnel 주소는 터널
 > 서비스가 재시작되면 변경됩니다. 지속 운영 전에는
@@ -432,7 +441,7 @@ cat ~/.hermes/data/english/kakao-skill-url.txt
 |---|---|---|
 | `papers-digest` | 08:30 daily | LLM/LVM research signal after 08:00 ingestion |
 | `interview-prep` | 12:00 Mon/Wed/Fri | One focused Staff/Senior MLE drill |
-| `english-intake` | 20:00 daily | Ingest new lessons → SRS cards |
+| `english-intake` | 20:00 daily | Feedback analysis or weakness coaching; Sunday cumulative review |
 | `english-drill` | 21:00 daily | Tonight's spaced-repetition drill |
 | `weekly-review` | 18:00 Sunday | Papers + prep + English weekly summary |
 

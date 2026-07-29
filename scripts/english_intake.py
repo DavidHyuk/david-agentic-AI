@@ -24,7 +24,7 @@ import argparse
 import json
 import os
 import re
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Sequence
 
 DEFAULT_LESSONS_DIR = os.path.expanduser("~/english-lessons")
@@ -97,6 +97,29 @@ def scan_sessions(lessons_dir: str) -> list[dict]:
             if date and not sess["date"]:
                 sess["date"] = date
     return [sessions[k] for k in sorted(sessions)]
+
+
+def sessions_for_current_week(
+    sessions: Sequence[dict], today: str | None = None
+) -> list[dict]:
+    """Return dated sessions from Monday through the reference day."""
+    reference = date.fromisoformat(today) if today else date.today()
+    week_start = reference - timedelta(days=reference.weekday())
+    selected = []
+    for session in sessions:
+        raw_date = session.get("date")
+        if not raw_date:
+            match = re.match(r"(20\d{2}-\d{2}-\d{2})", session["session_id"])
+            raw_date = match.group(1) if match else None
+        if not raw_date:
+            continue
+        try:
+            session_date = date.fromisoformat(raw_date)
+        except ValueError:
+            continue
+        if week_start <= session_date <= reference:
+            selected.append(session)
+    return selected
 
 
 def load_state(state_path: str) -> dict:
@@ -230,6 +253,11 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--lessons-dir", default=os.environ.get("ENGLISH_LESSONS_DIR", DEFAULT_LESSONS_DIR))
     parser.add_argument("--state", default=os.environ.get("ENGLISH_STATE_PATH", DEFAULT_STATE_PATH))
     parser.add_argument("--mark", action="store_true", help="mark the new sessions as processed")
+    parser.add_argument(
+        "--week",
+        action="store_true",
+        help="also include all dated sessions from the current Monday through today",
+    )
     parser.add_argument("--save-file", default=None, metavar="FILE",
                         help="save a file received via Telegram into lessons_dir and exit")
     parser.add_argument("--save-text", default=None, metavar="TEXT",
@@ -261,7 +289,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         mark_processed(state, fresh)
     if migrated or (args.mark and fresh):
         save_state(args.state, state)
-    print(json.dumps({"lessons_dir": args.lessons_dir, "new_sessions": fresh}, indent=2))
+    result = {"lessons_dir": args.lessons_dir, "new_sessions": fresh}
+    if args.week:
+        result["week_sessions"] = sessions_for_current_week(sessions)
+    print(json.dumps(result, indent=2))
     return 0
 
 

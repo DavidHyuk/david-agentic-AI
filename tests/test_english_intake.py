@@ -87,6 +87,20 @@ def test_missing_dir_returns_empty(tmp_path):
     assert ei.scan_sessions(str(tmp_path / "nope")) == []
 
 
+def test_sessions_for_current_week_excludes_older_and_future_sessions():
+    sessions = [
+        {"session_id": "2026-07-19", "date": "2026-07-19"},
+        {"session_id": "2026-07-20", "date": "2026-07-20"},
+        {"session_id": "2026-07-24", "date": "2026-07-24"},
+        {"session_id": "2026-07-26", "date": "2026-07-26"},
+    ]
+    selected = ei.sessions_for_current_week(sessions, today="2026-07-25")
+    assert [session["session_id"] for session in selected] == [
+        "2026-07-20",
+        "2026-07-24",
+    ]
+
+
 def test_save_from_telegram_copies_file(tmp_path):
     src = tmp_path / "rec.mp4"
     src.write_bytes(b"video")

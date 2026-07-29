@@ -3,6 +3,23 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v0.10.0 — 2026-07-28 (minor: add evidence-based English coaching)
+
+### Added
+- `english_srs.py weaknesses` ranks the least-mastered correction cards using
+  Leitner box, wrong-review count, and review history so the local LLM can coach
+  from real accumulated evidence.
+- `english_intake.py --week` exposes the current Monday-through-today lesson
+  sessions for a cumulative Sunday review.
+
+### Changed
+- The daily 20:00 English job now sends personalized weakness coaching when no
+  new lesson feedback exists instead of returning `[SILENT]`.
+- On Sunday, the same job combines the week's teacher feedback, weak SRS cards,
+  a cumulative rewrite challenge, and a measurable next-week focus.
+- Updated the English skill to distinguish actual teacher feedback from generated
+  practice examples and use `python3` in scheduled helper commands.
+
 ## v0.9.0 — 2026-07-28 (minor: add automatic cron recovery)
 
 ### Incident

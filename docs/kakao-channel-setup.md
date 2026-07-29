@@ -108,14 +108,17 @@ not process it twice.
 
 6. This prevents unknown channel visitors from writing lesson files. Connect the
    chatbot to the KakaoTalk Channel and deploy it. Then re-register the Hermes cron
-   jobs so the daily 20:00 analysis is active:
+   jobs so the daily 20:00 coaching is active:
 
 ```bash
 python3 bootstrap/register_cron.py
 ```
 
-The 21:00 Telegram drill will include cards created by the 20:00 intake when the
-local model successfully processes the feedback.
+At 20:00, new feedback is analyzed into SRS cards. With no new feedback, Hermes
+coaches from accumulated weak cards instead of suppressing the notification; on
+Sunday it reviews the current week's feedback and cumulative weaknesses. The
+21:00 Telegram drill includes cards created by intake when the local model
+successfully processes the feedback.
 
 ## 5. Rotate a leaked or stale URL
 
