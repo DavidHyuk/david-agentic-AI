@@ -56,6 +56,7 @@ Local DGX Spark (vLLM @ :8003, Qwen3.6 FP8, 128K ctx)
 | `bootstrap/stage.py` | Idempotently stage repo → `~/.hermes` |
 | `bootstrap/register_cron.py` | Register `jobs.yaml` with `hermes cron` |
 | `bootstrap/install_papers_service.sh` | Install daily paper ingestion service/timer |
+| `bootstrap/install_cron_watchdog.sh` | Install automatic cron-stall detection and gateway recovery |
 | `scripts/papers_ingest.py` | Fetch and merge arXiv/Hugging Face paper metadata |
 | `scripts/papers_digest.py` | Read-only recommended/recent/trending paper digest |
 | `browser/setup_browser.sh` | Pin agent-browser + install the local Chromium CDP service |
@@ -102,6 +103,8 @@ Then complete the **interactive, one-time** steps `install.sh` prints:
 - `bash bootstrap/install_papers_service.sh` → migrate legacy papers and enable
   daily metadata ingestion.
 - `hermes gateway setup` → connect **Telegram**, then `hermes gateway install`.
+- `bash bootstrap/install_cron_watchdog.sh` → recover automatically from a
+  permanently stuck cron worker.
 - `python3 bootstrap/register_cron.py` → schedule the Telegram briefs.
 - Follow [Kakao Channel setup](docs/kakao-channel-setup.md) to receive tutor feedback
   through the Channel chatbot, then turn it into Telegram drills.
@@ -432,6 +435,27 @@ cat ~/.hermes/data/english/kakao-skill-url.txt
 | `english-intake` | 20:00 daily | Ingest new lessons → SRS cards |
 | `english-drill` | 21:00 daily | Tonight's spaced-repetition drill |
 | `weekly-review` | 18:00 Sunday | Papers + prep + English weekly summary |
+
+### Automatic cron recovery
+
+Install the watchdog once after installing the Hermes gateway:
+
+```bash
+bash bootstrap/install_cron_watchdog.sh
+```
+
+`hermes-cron-watchdog.timer` checks scheduler state every five minutes. A cron
+tick lock held longer than 20 minutes triggers a gateway restart. The installed
+gateway drop-in caps shutdown at 45 seconds, so a permanently blocked worker
+cannot prevent recovery indefinitely.
+
+Inspect it without changing state:
+
+```bash
+systemctl --user status hermes-cron-watchdog.timer
+systemctl --user list-timers hermes-cron-watchdog.timer --all
+python3 scripts/cron_health.py
+```
 
 Check the scheduler and run a Telegram E2E without exposing its token:
 

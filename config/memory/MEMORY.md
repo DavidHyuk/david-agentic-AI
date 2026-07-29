@@ -11,3 +11,5 @@ English lessons folder: ~/english-lessons (audio + correction files). Intake sta
 Google Calendar agentic integration is intentionally deferred: no active Calendar MCP or morning brief. The read-only setup is retained in the repo for later.
 §
 Active skills: papers-digest, interview-prep, english-practice. calendar-assistant is staged but disabled. Scheduled Telegram cron jobs: papers digest, interview prep, English intake, SRS drill, weekly review.
+§
+Cron watchdog checks every 5 minutes. A tick lock held over 20 minutes triggers a bounded hermes-gateway restart; gateway shutdown is capped at 45 seconds.

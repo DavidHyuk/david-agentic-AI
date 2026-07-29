@@ -19,7 +19,8 @@ locally before the review and SRS drill are delivered through Telegram.
 - `skills/<category>/<name>/SKILL.md` — the four custom skills.
 - `scripts/*.py` — standalone helpers staged to `$HERMES_HOME/scripts/` and unit-tested.
 - `cron/jobs.yaml` — declarative Telegram notification schedule.
-- `bootstrap/` — `install.sh`, `stage.py`, `register_cron.py`.
+- `bootstrap/` — staging, cron registration, and systemd service installers,
+  including the automatic cron watchdog.
 - `local-model/run_model.sh` — launch the default Qwen3.6 FP8 vLLM backend at
   128K context or a supported alternative model.
 - `browser/` — Hermes Built-in Browser backed by localhost-only Chromium CDP.

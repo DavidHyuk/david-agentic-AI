@@ -74,6 +74,7 @@ cat <<'STEPS'
   d) Connect Telegram (bot token + David's private chat, one-time):
        hermes gateway setup        # choose Telegram
        hermes gateway install      # run the gateway as a service (needed for cron)
+       bash /home/david/workspace/david-agentic-ai/bootstrap/install_cron_watchdog.sh
 
   e) Register the scheduled Telegram briefs (after the gateway is up):
        python3 /home/david/workspace/david-agentic-ai/bootstrap/register_cron.py --dry-run
