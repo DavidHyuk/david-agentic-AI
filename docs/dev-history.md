@@ -3,6 +3,39 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v0.9.0 — 2026-07-28 (minor: add automatic cron recovery)
+
+### Incident
+- The 2026-07-26 08:30 `papers-digest` worker remained blocked inside the
+  gateway and held `~/.hermes/cron/.tick.lock`. All later Telegram cron jobs
+  stopped advancing until the incident was detected on 2026-07-28.
+- Kakao collection remained healthy. A teacher message received at 18:56 on
+  2026-07-28 was queued locally but could not reach the scheduled English
+  analysis while cron was blocked.
+
+### Added
+- `hermes-cron-watchdog.service` and `.timer` check cron health every five
+  minutes and restart the gateway when a tick lock remains held over 20 minutes.
+- A gateway systemd drop-in caps shutdown at 45 seconds so a permanently stuck
+  worker cannot block recovery.
+- `bootstrap/install_cron_watchdog.sh` installs the staged health script,
+  watchdog units, and recovery drop-in reproducibly.
+
+### Changed
+- `cron_health.py --restart` now uses a bounded systemd user-service restart.
+- Overdue jobs that have never completed are detected, while weekly jobs with
+  an old last-run timestamp and a valid future next-run are no longer false
+  positives.
+
+### Recovered and verified
+- Terminated the stuck gateway, removed the stale lock, re-registered all five
+  active schedules, and restarted the gateway.
+- Manually ran the pending `english-intake`: it completed at 19:16 with
+  `last_status=ok` and no Telegram delivery error.
+- Installed and enabled the watchdog; its first health check passed, the timer
+  is active, and gateway `TimeoutStopSec` is 45 seconds.
+- Full suite: `153 passed`.
+
 ## v0.8.4 — 2026-07-28 (patch: align launcher default with production model)
 
 ### Changed

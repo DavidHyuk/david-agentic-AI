@@ -103,6 +103,9 @@ david-agentic-ai/
 │   ├── install.sh             # 원클릭 설치 (Hermes + 설정 + 모델)
 │   ├── install_papers_service.sh # 논문 수집 user service/timer 설치
 │   ├── hermes-papers-ingest.{service,timer}
+│   ├── install_cron_watchdog.sh # cron 정지 자동 복구 설치
+│   ├── hermes-cron-watchdog.{service,timer}
+│   ├── hermes-gateway-cron-recovery.conf # gateway 종료 45초 상한
 │   ├── stage.py               # repo → ~/.hermes 멱등 동기화
 │   └── register_cron.py       # jobs.yaml → hermes cron 등록
 │
@@ -128,7 +131,7 @@ david-agentic-ai/
 │   ├── Qwen/                  # Qwen 계열 모델
 │   └── MiniMax/               # MiniMax-M2.7 모델
 │
-├── tests/                     # pytest 테스트 (145개)
+├── tests/                     # pytest 테스트 (153개)
 │   ├── conftest.py
 │   ├── test_papers_ingest.py
 │   ├── test_papers_digest.py
@@ -140,6 +143,7 @@ david-agentic-ai/
 │   ├── test_skills.py         # 스킬 frontmatter 스키마 검증
 │   ├── test_cron_jobs.py      # cron 스키마 검증
 │   ├── test_cron_health.py    # cron tick lock / jobs.json 건강 검사
+│   ├── test_cron_watchdog.py  # 자동 복구 systemd wiring 검증
 │   ├── test_auto_git_commit.py # stop 훅 안전 필터·커밋 메시지 검증
 │   └── test_stage.py          # stage.py 멱등성 검증
 │
@@ -204,6 +208,12 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 08:00에 수행합니다. 따라서 모델이나 gateway가 일시적으로 내려가도
 메타데이터 수집은 독립적으로 실행되며, 08:30 digest는 완성된 카탈로그만
 읽습니다.
+
+`hermes-cron-watchdog.timer`는 5분마다 tick lock과 다음 실행 시각을
+검사합니다. lock이 20분 넘게 유지되면 gateway를 재시작하고,
+`hermes-gateway-cron-recovery.conf`가 멈춘 worker의 종료 대기를 45초로
+제한합니다. 따라서 하나의 agent job이 영구 대기해도 이후 스케줄 전체가
+며칠간 조용히 멈추지 않습니다.
 
 ### 6. `local-model/` — LLM 백엔드
 `run_model.sh` 는 4가지 모델을 하나의 스크립트로 지원하며, 인자 없이 실행해도
