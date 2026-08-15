@@ -305,8 +305,10 @@ Hermes가 고정된 `agent-browser 0.33.0`을 통해 연결합니다. 외부 클
 않고 별도 cookie directory와 `127.0.0.1:19223`을 사용합니다. Google이 headless
 로그인을 거부하므로 Ubuntu 공식 Xvfb를 rootless user path에 추출하고 Chromium은
 headed virtual display에서 실행합니다. David는 localhost CDP를 SSH로만
-forward해 DevTools screencast에서 직접 로그인하며, collector는 고정된 날짜
-검색/상세 download 동작 외 page text를 명령으로 해석하지 않습니다.
+forward해 DevTools screencast에서 직접 로그인합니다. WebSocket Origin은 로컬
+Chrome 내장 `devtools://devtools`만 허용하고 wildcard/public web frontend는
+허용하지 않습니다. Collector는 고정된 날짜 검색/상세 download 동작 외 page
+text를 명령으로 해석하지 않습니다.
 
 ---
 

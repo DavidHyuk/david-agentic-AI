@@ -3,6 +3,15 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v0.13.3 — 2026-08-15 (patch: allow only local DevTools frontend)
+
+### Fixed and protected
+- Allowed the exact `devtools://devtools` WebSocket Origin required by local
+  Chrome's `chrome://inspect` frontend. Chrome 150 otherwise returned HTTP 403
+  while its discovery endpoint remained healthy.
+- Kept wildcard and public web frontend Origins denied; CDP remains bound to
+  loopback and reachable from David's PC only through the SSH local forward.
+
 ## v0.13.2 — 2026-08-15 (patch: support secure remote Google login)
 
 ### Fixed and protected

@@ -11,7 +11,7 @@ ConditionPathExists=%h/.local/opt/clawgram-xvfb/usr/bin/Xvfb
 Type=simple
 ExecStartPre=/usr/bin/mkdir -p %h/snap/chromium/common/clawgram-google-photos-profile
 Environment="PATH=%h/.local/opt/clawgram-xvfb/usr/bin:/usr/local/bin:/usr/bin:/bin"
-ExecStart=%h/.local/opt/clawgram-xvfb/usr/bin/xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24 -nolisten tcp -noreset" /snap/bin/chromium --disable-gpu --no-first-run --no-default-browser-check --remote-debugging-address=127.0.0.1 --remote-debugging-port=19223 --user-data-dir=%h/snap/chromium/common/clawgram-google-photos-profile about:blank
+ExecStart=%h/.local/opt/clawgram-xvfb/usr/bin/xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24 -nolisten tcp -noreset" /snap/bin/chromium --disable-gpu --no-first-run --no-default-browser-check --remote-debugging-address=127.0.0.1 --remote-debugging-port=19223 --remote-allow-origins=devtools://devtools --user-data-dir=%h/snap/chromium/common/clawgram-google-photos-profile about:blank
 Restart=on-failure
 RestartSec=3
 KillMode=mixed

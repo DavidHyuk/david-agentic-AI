@@ -121,6 +121,8 @@ def test_source_is_pre_claim_and_browser_session_is_dedicated() -> None:
     assert "xvfb-run" in browser
     assert "--headless" not in browser
     assert "-nolisten tcp" in browser
+    assert "--remote-allow-origins=devtools://devtools" in browser
+    assert "--remote-allow-origins=*" not in browser
 
 
 def test_remote_google_login_uses_headed_virtual_display_without_root() -> None:

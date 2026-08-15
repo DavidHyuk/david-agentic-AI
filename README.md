@@ -261,7 +261,9 @@ bash bootstrap/clawgram_google_photos_login.sh
 
 On David's local Chrome, open `chrome://inspect/#devices`, configure
 `localhost:19223`, inspect the Google target, and enable its screencast. Enter
-the password and 2FA only in that Google page. Verify afterward:
+the password and 2FA only in that Google page. Chromium accepts only the local
+`devtools://devtools` frontend Origin, not wildcard or public web frontends.
+Verify afterward:
 
 ```bash
 bash bootstrap/clawgram_google_photos_login.sh --check
