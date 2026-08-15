@@ -3,6 +3,14 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v0.13.4 — 2026-08-15 (patch: calibrate Google Photos candidate ceiling)
+
+### Fixed and bounded
+- Calibrated the Google Photos fail-closed candidate ceiling from 500 to 750
+  after the real 29-day family-letter expansion window produced 557 unique
+  candidates. The collector remains bounded and still stops before worker claim
+  if the Google UI returns an abnormal volume.
+
 ## v0.13.3 — 2026-08-15 (patch: allow only local DevTools frontend)
 
 ### Fixed and protected

@@ -33,7 +33,7 @@ def build_environment(review_base_url: str) -> str:
             "CLAWGRAM_GOOGLE_PHOTOS_CDP_URL=http://127.0.0.1:19223",
             f"CLAWGRAM_AGENT_BROWSER_BIN={Path.home() / '.hermes/node_modules/.bin/agent-browser'}",
             "CLAWGRAM_GOOGLE_PHOTOS_TIMEZONE=America/Los_Angeles",
-            "CLAWGRAM_GOOGLE_PHOTOS_MAX_CANDIDATES=500",
+            "CLAWGRAM_GOOGLE_PHOTOS_MAX_CANDIDATES=750",
             "CLAWGRAM_HERMES_PROFILE=clawgram",
             "",
         )

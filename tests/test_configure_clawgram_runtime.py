@@ -14,6 +14,7 @@ def test_runtime_environment_is_private_and_complete(tmp_path):
 
     assert "CLAWGRAM_ASSESSMENT_URL=http://127.0.0.1:8010/v1/assessments" in content
     assert "CLAWGRAM_REVIEW_BASE_URL=https://spark.example.ts.net" in content
+    assert "CLAWGRAM_GOOGLE_PHOTOS_MAX_CANDIDATES=750" in content
     assert "CLAWGRAM_SOURCE_KEY=" in content
     assert "CLAWGRAM_VLM_MODEL=Qwen3.6-35B-A3B-FP8" in content
     assert "CLAWGRAM_GOOGLE_PHOTOS_CDP_URL=http://127.0.0.1:19223" in content

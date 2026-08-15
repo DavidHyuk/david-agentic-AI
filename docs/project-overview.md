@@ -249,7 +249,9 @@ ClawGram은 David Hermes cron에 여섯 번째 장기 job으로 넣지 않습니
 `clawgram-family-letter.timer`가 토요일 02:00마다 짧은 due check만 실행하고,
 13일이 지나야 새 job을 생성합니다. `clawgram-source.service`는 별도
 Chromium `:19223`에서 요청 기간과 자동 확장분을 수집하며, auth/UI/download
-오류 시 queued job을 claim하지 않습니다. 사진 분석은 `clawgram-worker.service`가
+오류 시 queued job을 claim하지 않습니다. 실데이터로 보정한 750장 후보 상한이
+비정상 Google UI 결과를 worker claim 전에 차단합니다. 사진 분석은
+`clawgram-worker.service`가
 동시성 1, `Nice=10`, 낮은 CPU/IO weight로 처리합니다. 별도
 `clawgram-assessment.service`는 기존 Qwen3.6 endpoint에 사진 한 장씩만 보내고,
 content-hash cache와 vLLM running/waiting/KV guard로 Hermes 우선순위를
