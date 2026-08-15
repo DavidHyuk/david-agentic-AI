@@ -3,6 +3,22 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v0.13.2 — 2026-08-15 (patch: support secure remote Google login)
+
+### Fixed and protected
+- Replaced the Google Photos browser's headless launch with headed Chromium on
+  a private Xvfb display because Google rejects account sign-in from the
+  headless DevTools target.
+- Added a rootless installer for Ubuntu's repository-verified Xvfb package and
+  retained the custom cookie profile plus localhost-only CDP. Login is viewed
+  through an SSH-forwarded DevTools screencast; CDP is not exposed to LAN or
+  Tailnet peers.
+- Updated the login helper to prepare the Google target on an SSH-only server
+  and added a separate authentication health check.
+- Full Hermes configuration suite: 172 passed. Runtime verification reports a
+  normal Chrome 150 user agent, `navigator.webdriver=false`, and a listener
+  restricted to `127.0.0.1:19223`.
+
 ## v0.13.1 — 2026-08-15 (patch: make profile gateway install unattended)
 
 ### Fixed and verified

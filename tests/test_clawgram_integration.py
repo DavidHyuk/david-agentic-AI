@@ -17,6 +17,8 @@ WORKER = REPO / "bootstrap" / "clawgram-worker.service"
 SOURCE = REPO / "bootstrap" / "clawgram-source.service"
 BROWSER = REPO / "bootstrap" / "clawgram-google-photos-browser.service"
 INSTALLER = REPO / "bootstrap" / "install_clawgram_integration.sh"
+XVFB_INSTALLER = REPO / "bootstrap" / "install_clawgram_xvfb.sh"
+LOGIN_HELPER = REPO / "bootstrap" / "clawgram_google_photos_login.sh"
 
 
 def test_template_exposes_control_tools_without_approval_authority() -> None:
@@ -116,6 +118,20 @@ def test_source_is_pre_claim_and_browser_session_is_dedicated() -> None:
     assert "remote-debugging-port=19223" in browser
     assert "clawgram-google-photos-profile" in browser
     assert "hermes-agent-profile" not in browser
+    assert "xvfb-run" in browser
+    assert "--headless" not in browser
+    assert "-nolisten tcp" in browser
+
+
+def test_remote_google_login_uses_headed_virtual_display_without_root() -> None:
+    xvfb = XVFB_INSTALLER.read_text()
+    login = LOGIN_HELPER.read_text()
+
+    assert "apt-get download xvfb" in xvfb
+    assert "sudo" not in xvfb
+    assert "chrome://inspect/#devices" in login
+    assert "localhost:19223" in login
+    assert "--check" in login
 
 
 def test_installer_keeps_timer_disabled_until_backend_is_explicit() -> None:
@@ -130,4 +146,5 @@ def test_installer_keeps_timer_disabled_until_backend_is_explicit() -> None:
     assert "--remove --no-restart" in text
     assert "TELEGRAM_BOT_TOKEN" in text
     assert "printf 'y\\ny\\n' | hermes -p clawgram gateway install --force" in text
+    assert "install_clawgram_xvfb.sh" in text
     assert "clawgram.collect_sources --check-auth" in text

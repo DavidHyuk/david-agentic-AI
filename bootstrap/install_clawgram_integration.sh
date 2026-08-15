@@ -28,6 +28,7 @@ python3 "$CLAWGRAM_AGENT_REPO/mcp/setup_clawgram.py" \
   --home "$CLAWGRAM_PROFILE_HOME" --no-restart
 python3 "$CLAWGRAM_AGENT_REPO/mcp/setup_clawgram.py" \
   --home "$HOME/.hermes" --remove --no-restart
+bash "$CLAWGRAM_INSTALL_SCRIPT_DIR/install_clawgram_xvfb.sh"
 
 mkdir -p "$CLAWGRAM_USER_UNIT_DIR"
 for unit in \

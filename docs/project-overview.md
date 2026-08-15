@@ -156,7 +156,7 @@ David-Agent/
 │   ├── Qwen/                  # Qwen 계열 모델
 │   └── MiniMax/               # MiniMax-M2.7 모델
 │
-├── tests/                     # pytest 테스트 (171개)
+├── tests/                     # pytest 테스트 (172개)
 │   ├── conftest.py
 │   ├── test_papers_ingest.py
 │   ├── test_papers_digest.py
@@ -302,9 +302,11 @@ Hermes 내장 브라우저 도구를 그대로 사용하고 직접 Playwright �
 위해 Chromium을 localhost 전용 CDP 서비스(`127.0.0.1:19222`)로 먼저 실행하고,
 Hermes가 고정된 `agent-browser 0.33.0`을 통해 연결합니다. 외부 클라우드 브라우저
 자격 증명은 사용하지 않습니다. Google Photos source는 이 profile을 공유하지
-않고 별도 cookie directory와 `127.0.0.1:19223`을 사용합니다. 로그인은 headed
-helper에서 David가 직접 수행하고, collector는 고정된 날짜 검색/상세 download
-동작 외 page text를 명령으로 해석하지 않습니다.
+않고 별도 cookie directory와 `127.0.0.1:19223`을 사용합니다. Google이 headless
+로그인을 거부하므로 Ubuntu 공식 Xvfb를 rootless user path에 추출하고 Chromium은
+headed virtual display에서 실행합니다. David는 localhost CDP를 SSH로만
+forward해 DevTools screencast에서 직접 로그인하며, collector는 고정된 날짜
+검색/상세 download 동작 외 page text를 명령으로 해석하지 않습니다.
 
 ---
 

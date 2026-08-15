@@ -73,7 +73,8 @@ Local DGX Spark (vLLM @ :8003, Qwen3.6 FP8, 128K ctx)
 | `bootstrap/install_cron_watchdog.sh` | Install automatic cron-stall detection and gateway recovery |
 | `bootstrap/stage_clawgram_profile.py` | Stage only the isolated ClawGram Hermes profile |
 | `bootstrap/install_clawgram_integration.sh` | Register profile-only MCP and install Google source/assessment/review/worker/timer units |
-| `bootstrap/clawgram_google_photos_login.sh` | Interactive login/2FA in the dedicated Google Photos Chromium profile |
+| `bootstrap/clawgram_google_photos_login.sh` | Prepare and verify SSH-forwarded login/2FA in the headed Google Photos browser |
+| `bootstrap/install_clawgram_xvfb.sh` | Install Ubuntu Xvfb into a private user path without root |
 | `bootstrap/configure_clawgram_runtime.py` | Create a private ClawGram env with a generated upload key and HTTPS review URL |
 | `scripts/papers_ingest.py` | Fetch and merge arXiv/Hugging Face paper metadata |
 | `scripts/papers_digest.py` | Read-only recommended/recent/trending paper digest |
@@ -250,12 +251,20 @@ systemctl --user enable --now \
   clawgram-assessment.service clawgram-review.service
 ```
 
-Log in once through the dedicated headed Chromium profile. David enters the
-password and 2FA directly; the script returns the profile to its headless CDP
-service and checks authentication:
+The integration installer runs Chromium in headed mode on a rootless virtual X
+display; Google rejects sign-in from a headless target. Forward `19223` over SSH,
+then prepare the login target:
 
 ```bash
 bash bootstrap/clawgram_google_photos_login.sh
+```
+
+On David's local Chrome, open `chrome://inspect/#devices`, configure
+`localhost:19223`, inspect the Google target, and enable its screencast. Enter
+the password and 2FA only in that Google page. Verify afterward:
+
+```bash
+bash bootstrap/clawgram_google_photos_login.sh --check
 ```
 
 Google Photos web is the default source because the official Picker requires
