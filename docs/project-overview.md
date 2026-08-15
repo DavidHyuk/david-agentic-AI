@@ -23,6 +23,7 @@ DGX Spark (128GB VRAM)
    papers-digest          USER.md
    interview-prep         MEMORY.md
    english-practice
+   family-letter ── ClawGram MCP (queue/status/edit only)
    calendar-assistant (disabled; retained for later)
                                              agent-browser 0.33.0
                                                        │ CDP (localhost)
@@ -49,6 +50,14 @@ Open Builder → Cloudflare Tunnel → kakao_webhook.py
                                       │
                                       ▼
                          English cron → Telegram 복습
+
+Hermes ── stdio MCP ── ClawGram SQLite queue
+                              │
+Saturday 02:00 systemd gate ──┤ (13-day admission check)
+                              ▼
+                    low-priority one-shot worker
+                              │
+                    VLM backend (model deferred)
 ```
 
 ---
@@ -75,8 +84,10 @@ david-agentic-ai/
 │   │       └── references/    # 커리큘럼 + 질문 은행
 │   ├── learning/
 │   │   └── english-practice/  # 영어 레슨 → SRS 드릴
-│   └── productivity/
-│       └── calendar-assistant/ # 비활성; 추후 Google 캘린더 브리핑
+│   ├── productivity/
+│   │   └── calendar-assistant/ # 비활성; 추후 Google 캘린더 브리핑
+│   └── personal/
+│       └── family-letter/      # ClawGram MCP 오케스트레이션 + 승인 경계
 │
 ├── scripts/                   # 스킬이 호출하는 Python 헬퍼 (→ ~/.hermes/scripts/)
 │   ├── papers_ingest.py       # arXiv/HF 메타데이터 수집·중복 병합·실행 이력
@@ -106,6 +117,9 @@ david-agentic-ai/
 │   ├── install_cron_watchdog.sh # cron 정지 자동 복구 설치
 │   ├── hermes-cron-watchdog.{service,timer}
 │   ├── hermes-gateway-cron-recovery.conf # gateway 종료 45초 상한
+│   ├── install_clawgram_integration.sh # ClawGram MCP/user units 설치
+│   ├── clawgram-family-letter.{service,timer}
+│   ├── clawgram-worker.service # Hermes cron과 분리된 저우선순위 worker
 │   ├── stage.py               # repo → ~/.hermes 멱등 동기화
 │   └── register_cron.py       # jobs.yaml → hermes cron 등록
 │
@@ -125,13 +139,15 @@ david-agentic-ai/
 ├── mcp/                       # 외부 서비스 MCP 통합
 │   ├── google-calendar.yaml   # 비활성; 공식 Calendar MCP 읽기 전용 템플릿
 │   ├── setup_google_calendar.py # OAuth client 설정 + 권한 고정
-│   └── calendar_smoke.py      # MCP discovery + Hermes E2E 검사
+│   ├── calendar_smoke.py      # MCP discovery + Hermes E2E 검사
+│   ├── clawgram.yaml          # 승인/delivery를 제외한 도구 allowlist
+│   └── setup_clawgram.py      # 로컬 stdio MCP 등록/검증
 │
 ├── models/                    # 로컬 모델 가중치 저장소 (gitignore됨)
 │   ├── Qwen/                  # Qwen 계열 모델
 │   └── MiniMax/               # MiniMax-M2.7 모델
 │
-├── tests/                     # pytest 테스트 (156개)
+├── tests/                     # pytest 테스트 (162개)
 │   ├── conftest.py
 │   ├── test_papers_ingest.py
 │   ├── test_papers_digest.py
@@ -144,6 +160,7 @@ david-agentic-ai/
 │   ├── test_cron_jobs.py      # cron 스키마 검증
 │   ├── test_cron_health.py    # cron tick lock / jobs.json 건강 검사
 │   ├── test_cron_watchdog.py  # 자동 복구 systemd wiring 검증
+│   ├── test_clawgram_integration.py # MCP 권한/systemd 배치 검증
 │   ├── test_auto_git_commit.py # stop 훅 안전 필터·커밋 메시지 검증
 │   └── test_stage.py          # stage.py 멱등성 검증
 │
@@ -167,7 +184,7 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 두 파일은 Hermes의 캐릭터 크기 제한 안에서 가장 중요한 사실을 압축해서 담습니다.
 `stage.py` 는 기존 메모리가 있으면 덮어쓰지 않아서, Hermes가 대화하며 쌓은 기억이 재설치 시에도 보존됩니다.
 
-### 3. `skills/` — 절차적 스킬 4개(3개 활성)
+### 3. `skills/` — 절차적 스킬 5개(4개 활성)
 각 스킬은 `SKILL.md` 하나로 구성된 선언형 절차서입니다. 언제 쓰는지, 무엇을 입력받는지, 어떤 순서로 실행하는지, 어떤 포맷으로 출력하는지를 명시합니다.
 
 | 스킬 | 카테고리 | 핵심 기능 |
@@ -175,6 +192,7 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 | `papers-digest` | research | 새 논문 카탈로그에서 LLM/LVM 후보를 뽑아 인터뷰 관련성과 항목별 원문 링크 제공 |
 | `interview-prep` | career | 5-필러 커리큘럼을 돌아가며 Staff/Senior MLE 드릴 제공 |
 | `english-practice` | learning | 레슨 녹음/교정 파일 → SRS 카드 생성 + 매일 리뷰 |
+| `family-letter` | personal | ClawGram 사진 큐·초안 편집, 별도 사용자 승인 전 delivery 차단 |
 | `calendar-assistant` | productivity | **비활성/보존** — 추후 Google Calendar 브리핑 |
 
 ### 4. `scripts/` — 결정론적 데이터 레이어
@@ -216,6 +234,12 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 `hermes-gateway-cron-recovery.conf`가 멈춘 worker의 종료 대기를 45초로
 제한합니다. 따라서 하나의 agent job이 영구 대기해도 이후 스케줄 전체가
 며칠간 조용히 멈추지 않습니다.
+
+ClawGram은 Hermes cron에 여섯 번째 장기 job으로 넣지 않습니다.
+`clawgram-family-letter.timer`가 토요일 02:00마다 짧은 due check만 실행하고,
+13일이 지나야 새 job을 생성합니다. 사진 분석은 `clawgram-worker.service`가
+동시성 1, `Nice=10`, 낮은 CPU/IO weight로 처리합니다. 모델 backend가 아직
+선정되지 않았으므로 timer는 비활성 상태가 정상입니다.
 
 ### 6. `local-model/` — LLM 백엔드
 `run_model.sh` 는 4가지 모델을 하나의 스크립트로 지원하며, 인자 없이 실행해도
@@ -297,7 +321,8 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
 - **장기 기억(Persistent Memory)**: 대화 간 기억 유지로 에이전트가 David를 더 깊이 이해할수록 유용해짐
 - **Cron 스케줄러**: YAML 선언으로 주기적 Telegram 알림 → 에이전트가 먼저 행동하는 proactive 패턴
 - **MCP (Model Context Protocol)**: 외부 서비스를 표준 도구로 연결. Google
-  Calendar 템플릿은 추후 재활성화를 위해 보존되어 있으나 현재 런타임에는 없음
+  Calendar 템플릿은 추후 재활성화를 위해 보존됩니다. ClawGram은 로컬 stdio
+  MCP로 활성화하며 queue/status/draft-edit 도구만 허용하고 승인·delivery는 제외
 
 ### 스페이스드 리피티션(Leitner SRS)
 - `english_srs.py`의 Leitner 박스 알고리즘 → 맞힌 카드는 나중에, 틀린 카드는 다음날 재등장

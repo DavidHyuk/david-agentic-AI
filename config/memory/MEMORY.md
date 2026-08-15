@@ -10,6 +10,8 @@ English lessons folder: ~/english-lessons (audio + correction files). Intake sta
 §
 Google Calendar agentic integration is intentionally deferred: no active Calendar MCP or morning brief. The read-only setup is retained in the repo for later.
 §
-Active skills: papers-digest, interview-prep, english-practice. calendar-assistant is staged but disabled. Scheduled Telegram cron jobs: papers digest, interview prep, English intake, SRS drill, weekly review.
+Active skills: papers-digest, interview-prep, english-practice, family-letter. calendar-assistant is staged but disabled. Scheduled Telegram cron jobs: papers digest, interview prep, English intake, SRS drill, weekly review.
 §
 Cron watchdog checks every 5 minutes. A tick lock held over 20 minutes triggers a bounded hermes-gateway restart; gateway shutdown is capped at 45 seconds.
+§
+ClawGram family letters use a local stdio MCP control plane and an independent low-priority systemd worker. MCP can queue/status/edit but cannot approve or deliver. The biweekly timer stays disabled until a separate VLM assessment backend is selected and configured.

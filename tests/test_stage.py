@@ -20,12 +20,14 @@ def test_stage_all_populates_home(tmp_path):
     assert (home / "memories" / "USER.md").exists()
     assert (home / "memories" / "MEMORY.md").exists()
     assert (home / "skills" / "research" / "papers-digest" / "SKILL.md").exists()
+    assert (home / "skills" / "personal" / "family-letter" / "SKILL.md").exists()
     assert (home / "scripts" / "papers_digest.py").exists()
     assert (home / "scripts" / "papers_ingest.py").exists()
     assert (home / "data" / "papers").is_dir()
     assert (home / "config.yaml").exists()
     assert report["config_merged"] is True
     assert "research/papers-digest" in report["skills"]
+    assert "personal/family-letter" in report["skills"]
 
 
 def test_config_merge_preserves_existing(tmp_path):

@@ -6,7 +6,13 @@ import yaml
 
 REPO = Path(__file__).resolve().parent.parent
 SKILLS = sorted((REPO / "skills").rglob("SKILL.md"))
-EXPECTED = {"papers-digest", "interview-prep", "english-practice", "calendar-assistant"}
+EXPECTED = {
+    "papers-digest",
+    "interview-prep",
+    "english-practice",
+    "calendar-assistant",
+    "family-letter",
+}
 
 
 def _frontmatter(text: str) -> dict:

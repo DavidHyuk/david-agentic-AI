@@ -10,13 +10,15 @@ role in Silicon Valley, stay current on **LLM/LVM research**, and practice
 **English** — with regular **Telegram** notifications. Calendar support is
 retained in source but intentionally deferred and disabled. English
 tutor feedback enters through the KakaoTalk Channel chatbot and is processed
-locally before the review and SRS drill are delivered through Telegram.
+locally before the review and SRS drill are delivered through Telegram. A local
+ClawGram MCP integration also prepares child-focused family-letter drafts while
+keeping approval and KakaoTalk delivery outside agent authority.
 
 ## Layout
 - `config/soul/SOUL.md` — agent personality (staged to `$HERMES_HOME/SOUL.md`).
 - `config/memory/{MEMORY,USER}.md` — seed memory (staged to `$HERMES_HOME/memories/`).
 - `config/config.fragment.yaml` — non-secret settings, deep-merged into config.yaml.
-- `skills/<category>/<name>/SKILL.md` — the four custom skills.
+- `skills/<category>/<name>/SKILL.md` — the five custom skills.
 - `scripts/*.py` — standalone helpers staged to `$HERMES_HOME/scripts/` and unit-tested.
 - `cron/jobs.yaml` — declarative Telegram notification schedule.
 - `bootstrap/` — staging, cron registration, and systemd service installers,

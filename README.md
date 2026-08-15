@@ -3,11 +3,12 @@
 A personalized, always-on AI partner for **David Choi**, built on the
 [**Hermes Agent**](https://github.com/NousResearch/hermes-agent) framework
 (Nous Research). It learns David's life and goals over time and proactively helps
-with three active areas, delivered to **Telegram**:
+with four active areas, delivered to **Telegram**:
 
 1. **LLM/LVM research** — daily arXiv + Hugging Face ingestion and a personalized digest.
 2. **Staff/Senior MLE interview prep** — a rotating curriculum with drills + rubrics.
 3. **English practice** — turns tutor recordings + corrections into spaced-repetition drills.
+4. **Family letters** — orchestrates child-focused ClawGram photo drafts through MCP, with explicit approval before KakaoTalk delivery.
 
 Google Calendar support is retained for a later phase, but its skill, MCP
 connection, and scheduled brief are currently disabled.
@@ -34,6 +35,8 @@ Local DGX Spark (vLLM @ :8003, Qwen3.6 FP8, 128K ctx)
         ├─ interview-prep ── curriculum + progress log
         ├─ english-practice ─ Kakao webhook → english_intake.py + english_srs.py
         │                    → Telegram review (~/english-lessons)
+        ├─ family-letter ── ClawGram stdio MCP → SQLite queue/drafts
+        │                   → independent low-priority systemd worker
         └─ calendar-assistant ─ disabled; source retained for later
 
  arXiv + Hugging Face ── papers_ingest.py ── SQLite paper catalog
@@ -48,7 +51,7 @@ Local DGX Spark (vLLM @ :8003, Qwen3.6 FP8, 128K ctx)
 | `config/memory/{USER,MEMORY}.md` | Seed memory (→ `~/.hermes/memories/`) |
 | `config/config.fragment.yaml` | Non-secret settings merged into `config.yaml` |
 | `config/env.example` | Template for `~/.hermes/.env` secrets |
-| `skills/<category>/<name>/SKILL.md` | The four custom skills |
+| `skills/<category>/<name>/SKILL.md` | The five custom skills |
 | `scripts/*.py` | Standalone, unit-tested helpers (→ `~/.hermes/scripts/`) |
 | `cron/jobs.yaml` | Declarative Telegram notification schedule |
 | `docs/kakao-channel-setup.md` | Kakao Channel chatbot and webhook setup |
@@ -57,12 +60,14 @@ Local DGX Spark (vLLM @ :8003, Qwen3.6 FP8, 128K ctx)
 | `bootstrap/register_cron.py` | Register `jobs.yaml` with `hermes cron` |
 | `bootstrap/install_papers_service.sh` | Install daily paper ingestion service/timer |
 | `bootstrap/install_cron_watchdog.sh` | Install automatic cron-stall detection and gateway recovery |
+| `bootstrap/install_clawgram_integration.sh` | Register ClawGram MCP and install its disabled-until-ready timer/worker |
 | `scripts/papers_ingest.py` | Fetch and merge arXiv/Hugging Face paper metadata |
 | `scripts/papers_digest.py` | Read-only recommended/recent/trending paper digest |
 | `browser/setup_browser.sh` | Pin agent-browser + install the local Chromium CDP service |
 | `browser/browser_smoke.py` | Verify browser navigation, click, DOM read, and snapshot |
 | `mcp/setup_google_calendar.py` | Securely configure Google's official Calendar MCP |
 | `mcp/calendar_smoke.py` | Verify MCP discovery and a read-only Hermes calendar call |
+| `mcp/setup_clawgram.py` | Register the local least-authority ClawGram stdio MCP server |
 | `docs/next-steps.md` | Agreed paper/job questions and Kakao English E2E checklist |
 | `local-model/setup_vllm.sh` | Create an isolated CUDA-compatible vLLM runtime |
 | `local-model/run_model.sh` | Launch Qwen3.6 FP8 or an alternative local model |
@@ -106,6 +111,8 @@ Then complete the **interactive, one-time** steps `install.sh` prints:
 - `bash bootstrap/install_cron_watchdog.sh` → recover automatically from a
   permanently stuck cron worker.
 - `python3 bootstrap/register_cron.py` → schedule the Telegram briefs.
+- `bash bootstrap/install_clawgram_integration.sh` → register ClawGram MCP and
+  install its isolated worker units without enabling photo processing yet.
 - Follow [Kakao Channel setup](docs/kakao-channel-setup.md) to receive tutor feedback
   through the Channel chatbot, then turn it into Telegram drills.
 
@@ -168,6 +175,40 @@ python3 .codex/hooks/auto_git_commit.py </dev/null
 ```
 
 See [AGENTS.md](AGENTS.md) for the commit and safety rules.
+
+## ClawGram family-letter integration
+
+ClawGram is a separate media service under `/home/david/workspace/ClawGram`; it is
+not another Hermes profile or subagent. Hermes starts a small local stdio MCP
+process only for queue/status/draft tools. Photo analysis runs later in
+`clawgram-worker.service`, outside Hermes cron, so a long batch cannot occupy the
+single Hermes cron slot.
+
+Install the integration while the model decision is pending:
+
+```bash
+bash bootstrap/install_clawgram_integration.sh
+python3 mcp/setup_clawgram.py --check
+hermes mcp list
+```
+
+This registers MCP and installs the systemd units, but deliberately keeps
+`clawgram-family-letter.timer` disabled. After selecting and testing the small
+VLM/source assessment service, create the local runtime-only file below and
+enable the timer explicitly:
+
+```bash
+mkdir -p ~/.config/clawgram
+printf 'CLAWGRAM_ASSESSMENT_URL=http://127.0.0.1:8010/v1/assessments\n' \
+  > ~/.config/clawgram/worker.env
+chmod 600 ~/.config/clawgram/worker.env
+bash bootstrap/install_clawgram_integration.sh --enable-timer
+```
+
+The timer checks every Saturday at 02:00, while the scheduler's 13-day admission
+gate creates one true biweekly slot. The MCP allowlist has no approve, handoff,
+or sent tool; a future Telegram human-confirmation callback remains the only path
+to approval and KakaoTalk delivery.
 
 ## 논문 수집과 digest 사용법
 

@@ -3,6 +3,32 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v0.11.0 — 2026-08-15 (minor: add isolated ClawGram family-letter control plane)
+
+### Added
+- Added the `family-letter` skill for a child-focused 10–20 photo draft workflow
+  through ClawGram, with revision-safe editing and an explicit human approval
+  boundary before KakaoTalk delivery.
+- Added `mcp/setup_clawgram.py` and a least-authority stdio MCP allowlist. Hermes
+  can enqueue/status/cancel jobs and read/edit drafts, but cannot approve,
+  hand off, or mark delivery complete.
+- Added independent user systemd units: a Saturday 02:00 schedule gate, a
+  13-day admission check for true biweekly jobs, and a low-priority one-shot
+  worker outside Hermes cron.
+
+### Safety and rollout
+- The installer registers MCP and installs units while keeping the schedule
+  disabled by default. `--enable-timer` fails unless the runtime-only
+  `CLAWGRAM_ASSESSMENT_URL` is explicitly configured.
+- ClawGram's worker refuses to claim a queued job when its VLM/source backend is
+  absent, allowing model selection and benchmarking to remain a later decision.
+- The existing five Telegram cron jobs and Qwen3.6 Hermes service remain
+  unchanged; ClawGram does not consume `cron.max_parallel_jobs: 1`.
+
+### Verified
+- ClawGram full suite: 161 passed, 2 skipped.
+- Full Hermes configuration suite: 162 passed.
+
 ## v0.10.2 — 2026-07-28 (patch: require paper links in Telegram digests)
 
 ### Changed

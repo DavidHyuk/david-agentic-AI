@@ -1,0 +1,22 @@
+# __author__ = 'David Choi (bestshoot21@gmail.com)'
+# Purpose: run one isolated ClawGram queue item outside Hermes cron.
+[Unit]
+Description=ClawGram one-shot curation worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/david/workspace/ClawGram
+EnvironmentFile=-%h/.config/clawgram/worker.env
+ExecStart=/home/david/miniconda3/envs/clawgram/bin/python -m clawgram.worker
+TimeoutStartSec=6h
+Nice=10
+CPUWeight=20
+IOWeight=20
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/david/workspace/ClawGram/data
