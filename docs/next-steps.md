@@ -53,7 +53,7 @@ When David chooses to resume it:
 3. Restore `morning-brief` in `cron/jobs.yaml`.
 4. Stage the config, restart the gateway, register cron, and run a Telegram E2E.
 
-## 5. ClawGram VLM benchmark and workflow-engine decision — deferred
+## 5. ClawGram VLM benchmark — deferred
 
 Keep the current ClawGram queue/worker/MCP boundary model-independent. Start with
 the already-running vision-enabled Qwen3.6-35B-A3B-FP8 backend during a quiet
@@ -70,9 +70,9 @@ local Qwen3.5-122B-A10B-AWQ through a fail-safe model-swap service; add Gemma 4
 task-specific acceptance improvement justifies Hermes downtime, cold-start
 latency, peak unified memory, and batch duration.
 
-LangGraph is also deferred. Reconsider it inside ClawGram—not as a replacement
-for Hermes or MCP—if the family-letter pipeline needs durable pause/resume,
-branching retries, checkpoint recovery, or node-by-node execution tracing beyond
-what the existing SQLite state machine provides. A visual graph alone is not a
-sufficient reason to add the dependency; first validate the current workflow and
-approval experience with real drafts.
+The workflow-engine decision is complete: ClawGram now uses LangGraph internally
+for bounded search-window expansion, duplicate-refinement loops, SQLite
+checkpoints, explicit human-review interrupts, node-specific revision reruns, and
+local Mermaid visualization. Hermes remains the conversational/scheduling agent
+and accesses the workflow only through the least-authority MCP control plane.
+Model selection and the private photo benchmark above remain deferred.

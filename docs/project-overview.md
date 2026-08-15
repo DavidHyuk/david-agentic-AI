@@ -57,6 +57,8 @@ Saturday 02:00 systemd gate ──┤ (13-day admission check)
                               ▼
                     low-priority one-shot worker
                               │
+                    LangGraph durable workflow
+                              │
                     VLM backend (model deferred)
 ```
 
@@ -240,6 +242,12 @@ ClawGram은 Hermes cron에 여섯 번째 장기 job으로 넣지 않습니다.
 13일이 지나야 새 job을 생성합니다. 사진 분석은 `clawgram-worker.service`가
 동시성 1, `Nice=10`, 낮은 CPU/IO weight로 처리합니다. 모델 backend가 아직
 선정되지 않았으므로 timer는 비활성 상태가 정상입니다.
+
+worker 내부는 LangGraph가 검색 기간 자동 확장, 중복 재평가, deterministic
+selection, SQLite human-review interrupt를 실행합니다. 수정 요청은 동일한 job
+checkpoint에서 assessment/selection/window/dedup node로 돌아갈 수 있고,
+`get_job_status`는 사진 바이트 없이 next node와 실행 trace를 반환합니다.
+Hermes는 이 그래프를 직접 실행하거나 승인하지 않고 MCP 제어면만 사용합니다.
 
 ### 6. `local-model/` — LLM 백엔드
 `run_model.sh` 는 4가지 모델을 하나의 스크립트로 지원하며, 인자 없이 실행해도

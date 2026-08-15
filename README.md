@@ -184,6 +184,12 @@ process only for queue/status/draft tools. Photo analysis runs later in
 `clawgram-worker.service`, outside Hermes cron, so a long batch cannot occupy the
 single Hermes cron slot.
 
+Inside ClawGram, the worker uses a durable LangGraph state machine for bounded
+search-window expansion, duplicate-refinement loops, SQLite approval interrupts,
+and node-specific revision reruns. LangGraph does not replace Hermes or MCP.
+`get_job_status` includes a privacy-safe workflow checkpoint/next-node summary;
+photo bytes remain in ClawGram.
+
 Install the integration while the model decision is pending:
 
 ```bash
