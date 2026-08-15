@@ -76,3 +76,10 @@ checkpoints, explicit human-review interrupts, node-specific revision reruns, an
 local Mermaid visualization. Hermes remains the conversational/scheduling agent
 and accesses the workflow only through the least-authority MCP control plane.
 Model selection and the private photo benchmark above remain deferred.
+
+The Qwen3.6 baseline integration is now implemented without making it the
+permanent winner: content-addressed Galaxy/Picker import, per-photo cached
+assessment, sequential vLLM load guard, Telegram review link/contact sheet, and
+Galaxy Android share handoff. Before enabling the biweekly timer, finish only
+the external-device steps: populate a real family-photo source, authorize the
+private Tailscale Serve endpoint, and verify one Galaxy review/share E2E.

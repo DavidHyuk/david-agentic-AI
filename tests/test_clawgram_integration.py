@@ -35,8 +35,9 @@ def test_server_config_is_cwd_independent_and_uses_one_database(tmp_path) -> Non
     )
 
     assert config["command"] == str(python.resolve())
-    assert config["args"] == ["-m", "clawgram.mcp_server"]
-    assert config["env"]["PYTHONPATH"] == str(root.resolve())
+    assert config["args"][:2] == ["-I", "-c"]
+    assert str(root.resolve()) in config["args"][2]
+    assert "PYTHONPATH" not in config["env"]
     assert config["env"]["CLAWGRAM_DATABASE_PATH"].endswith(
         "/ClawGram/data/clawgram-v2.sqlite3"
     )

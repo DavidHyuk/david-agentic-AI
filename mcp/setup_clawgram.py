@@ -56,11 +56,18 @@ def build_server_config(
     """Build a cwd-independent Hermes stdio entry for the local ClawGram checkout."""
     root = clawgram_root.expanduser().resolve()
     python = python_path.expanduser().resolve()
+    isolated_launcher = (
+        "import sys; "
+        f"sys.path.insert(0, {str(root)!r}); "
+        "from clawgram.mcp_server import main; "
+        "raise SystemExit(main())"
+    )
     return {
         "command": str(python),
-        "args": ["-m", "clawgram.mcp_server"],
+        # -I prevents the gateway's Python 3.13 user-site from contaminating
+        # the dedicated Python 3.11 ClawGram environment.
+        "args": ["-I", "-c", isolated_launcher],
         "env": {
-            "PYTHONPATH": str(root),
             "CLAWGRAM_DATABASE_PATH": str(root / "data" / "clawgram-v2.sqlite3"),
         },
         "enabled": True,
@@ -80,10 +87,15 @@ def validate_local_runtime(clawgram_root: Path, python_path: Path) -> list[str]:
     result = subprocess.run(
         [
             str(python_path),
+            "-I",
             "-c",
-            "from mcp.server import MCPServer; from clawgram.mcp_server import build_server",
+            (
+                "import sys; "
+                f"sys.path.insert(0, {str(clawgram_root.resolve())!r}); "
+                "from clawgram.mcp_server import build_server"
+            ),
         ],
-        env={**os.environ, "PYTHONPATH": str(clawgram_root)},
+        env=os.environ,
         capture_output=True,
         text=True,
         check=False,

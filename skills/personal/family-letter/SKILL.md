@@ -1,7 +1,7 @@
 ---
 name: family-letter
 description: Orchestrate a child-focused 10–20 photo family-letter draft through ClawGram, while preserving explicit human approval before KakaoTalk delivery.
-version: 1.0.0
+version: 1.1.0
 platforms: [linux]
 metadata:
   hermes:
@@ -19,8 +19,9 @@ metadata:
 
 ## Prerequisites
 - The local `clawgram` MCP server is registered and its tools are available.
-- `clawgram-family-letter.timer` remains disabled until
-  `~/.config/clawgram/worker.env` contains a tested `CLAWGRAM_ASSESSMENT_URL`.
+- `clawgram-family-letter.timer` remains disabled until a real Galaxy/Picker
+  source is populated and the private HTTPS review URL is reachable on David's
+  phone. The local assessment and review services may already be running.
 - If the worker backend is not ready, report that plainly and do not create a job
   merely to demonstrate the workflow.
 
@@ -30,14 +31,15 @@ metadata:
    `job_id`; do not wait inside one MCP request for photo analysis.
 2. **Track durable state.** Use `get_job_status(job_id)`. `queued` and `running`
    are normal. If it fails, report the stored error without inventing a draft.
-3. **Review the result.** On `succeeded`, call `get_draft(draft_id)`. Summarize the
-   number of selected photos, foreground any child-photo shortfall reported by
-   ClawGram, and present the editable Korean message to David.
+3. **Review the result.** On `awaiting_approval`, call `get_draft(draft_id)`.
+   Summarize the selected count and direct David to the separate Telegram review
+   link/contact sheet. The durable worker intentionally exits in this state.
 4. **Apply requested edits only.** Use `update_draft` with the exact current
    revision. A revision conflict means refetch before editing.
 5. **Stop at the approval boundary.** The MCP server intentionally exposes no
-   approval, KakaoTalk handoff, or sent tool. Only a separate human-confirmation
-   callback may change the draft to approved and release delivery.
+   approval, KakaoTalk handoff, or sent tool. Only David's revision-bound review
+   link may approve. After approval, the Galaxy Android sharesheet still
+   requires David to choose KakaoTalk, the parents, and Send.
 
 ## Output Format
 - Telegram-friendly status: job state, selected count, draft revision, and the

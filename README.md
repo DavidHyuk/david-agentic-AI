@@ -60,7 +60,8 @@ Local DGX Spark (vLLM @ :8003, Qwen3.6 FP8, 128K ctx)
 | `bootstrap/register_cron.py` | Register `jobs.yaml` with `hermes cron` |
 | `bootstrap/install_papers_service.sh` | Install daily paper ingestion service/timer |
 | `bootstrap/install_cron_watchdog.sh` | Install automatic cron-stall detection and gateway recovery |
-| `bootstrap/install_clawgram_integration.sh` | Register ClawGram MCP and install its disabled-until-ready timer/worker |
+| `bootstrap/install_clawgram_integration.sh` | Register ClawGram MCP and install assessment/review/worker/timer units |
+| `bootstrap/configure_clawgram_runtime.py` | Create a private ClawGram env with a generated upload key and HTTPS review URL |
 | `scripts/papers_ingest.py` | Fetch and merge arXiv/Hugging Face paper metadata |
 | `scripts/papers_digest.py` | Read-only recommended/recent/trending paper digest |
 | `browser/setup_browser.sh` | Pin agent-browser + install the local Chromium CDP service |
@@ -199,22 +200,38 @@ hermes mcp list
 ```
 
 This registers MCP and installs the systemd units, but deliberately keeps
-`clawgram-family-letter.timer` disabled. After selecting and testing the small
-VLM/source assessment service, create the local runtime-only file below and
-enable the timer explicitly:
+`clawgram-family-letter.timer` disabled. The local Qwen3.6 assessment service
+processes one downsized photo at a time, caches results by content hash, and
+waits while Hermes has running/waiting vLLM requests or more than 10% existing
+KV-cache usage.
+
+Create the runtime-only environment with a private HTTPS review URL. Tailscale
+Serve is preferred because the link contains family photos and Android Web
+Share requires a secure context:
 
 ```bash
-mkdir -p ~/.config/clawgram
-printf 'CLAWGRAM_ASSESSMENT_URL=http://127.0.0.1:8010/v1/assessments\n' \
-  > ~/.config/clawgram/worker.env
-chmod 600 ~/.config/clawgram/worker.env
+python3 bootstrap/configure_clawgram_runtime.py \
+  https://your-private-node.example.ts.net
+bash bootstrap/install_clawgram_integration.sh
+systemctl --user enable --now \
+  clawgram-assessment.service clawgram-review.service
+```
+
+Import a Galaxy-synced folder (or files exported by Google Photos Picker), then
+enable the actual schedule only after the phone can open the review URL:
+
+```bash
+/home/david/miniconda3/envs/clawgram/bin/python \
+  -m clawgram.import_media ~/Pictures/Family --source galaxy_gallery
 bash bootstrap/install_clawgram_integration.sh --enable-timer
 ```
 
 The timer checks every Saturday at 02:00, while the scheduler's 13-day admission
-gate creates one true biweekly slot. The MCP allowlist has no approve, handoff,
-or sent tool; a future Telegram human-confirmation callback remains the only path
-to approval and KakaoTalk delivery.
+gate creates one true biweekly slot. The worker sends a seven-day,
+revision-bound review link through the existing Hermes Telegram transport. The
+contact sheet supports message edits and node-specific reruns. Approval then
+unlocks a Galaxy Android Web Share handoff; it does not claim that KakaoTalk
+actually sent the message. MCP still has no approve, handoff, or sent tool.
 
 ## 논문 수집과 digest 사용법
 

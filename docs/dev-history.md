@@ -3,6 +3,27 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v0.12.0 — 2026-08-15 (minor: operationalize private family-letter review)
+
+### Added
+- Added always-on, low-priority ClawGram source/assessment and review services.
+  Qwen3.6 receives one cached image per request only when its vLLM scheduler/KV
+  guard considers the shared endpoint idle.
+- Added a secret-safe runtime configurator for the authenticated gallery upload
+  boundary and private HTTPS review base URL.
+- Added Telegram review-link delivery through the existing Hermes gateway,
+  tokenized contact-sheet approval, node-specific revisions, and an approved
+  Galaxy Android share handoff for KakaoTalk.
+
+### Fixed and verified
+- Isolated the Python 3.11 ClawGram stdio MCP with `-I`, preventing Hermes's
+  Python 3.13 user-site wheels from breaking startup; `hermes mcp test clawgram`
+  discovers all seven least-authority tools and the gateway reconnects cleanly.
+- Full Hermes configuration suite: 164 passed.
+- Kept the biweekly timer disabled until a real photo source and private HTTPS
+  phone route complete one E2E test. No approval or delivery authority was added
+  to MCP.
+
 ## v0.11.0 — 2026-08-15 (minor: add isolated ClawGram family-letter control plane)
 
 ### Added

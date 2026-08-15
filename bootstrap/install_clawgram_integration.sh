@@ -28,6 +28,12 @@ install -m 0644 \
 install -m 0644 \
   "$CLAWGRAM_INSTALL_SCRIPT_DIR/clawgram-worker.service" \
   "$CLAWGRAM_USER_UNIT_DIR/clawgram-worker.service"
+install -m 0644 \
+  "$CLAWGRAM_INSTALL_SCRIPT_DIR/clawgram-assessment.service" \
+  "$CLAWGRAM_USER_UNIT_DIR/clawgram-assessment.service"
+install -m 0644 \
+  "$CLAWGRAM_INSTALL_SCRIPT_DIR/clawgram-review.service" \
+  "$CLAWGRAM_USER_UNIT_DIR/clawgram-review.service"
 systemctl --user daemon-reload
 
 if [[ "$CLAWGRAM_ENABLE_TIMER" == true ]]; then
@@ -36,10 +42,15 @@ if [[ "$CLAWGRAM_ENABLE_TIMER" == true ]]; then
     echo "Refusing to enable: set CLAWGRAM_ASSESSMENT_URL in $CLAWGRAM_WORKER_ENV" >&2
     exit 1
   fi
+  if ! grep -Eq '^CLAWGRAM_REVIEW_BASE_URL=https://.+$' "$CLAWGRAM_WORKER_ENV"; then
+    echo "Refusing to enable: set an HTTPS CLAWGRAM_REVIEW_BASE_URL in $CLAWGRAM_WORKER_ENV" >&2
+    exit 1
+  fi
+  systemctl --user enable --now clawgram-assessment.service clawgram-review.service
   systemctl --user enable --now clawgram-family-letter.timer
 else
   systemctl --user disable --now clawgram-family-letter.timer >/dev/null 2>&1 || true
-  echo "Timer installed but disabled until a VLM assessment backend is selected."
+  echo "Timer installed but disabled until source ingest and HTTPS review are configured."
 fi
 
 systemctl --user restart hermes-gateway.service

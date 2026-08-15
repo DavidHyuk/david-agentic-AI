@@ -120,8 +120,11 @@ david-agentic-ai/
 │   ├── hermes-cron-watchdog.{service,timer}
 │   ├── hermes-gateway-cron-recovery.conf # gateway 종료 45초 상한
 │   ├── install_clawgram_integration.sh # ClawGram MCP/user units 설치
+│   ├── configure_clawgram_runtime.py # secret-safe source/review env 생성
 │   ├── clawgram-family-letter.{service,timer}
 │   ├── clawgram-worker.service # Hermes cron과 분리된 저우선순위 worker
+│   ├── clawgram-assessment.service # 순차 Qwen3.6 사진 관측
+│   ├── clawgram-review.service # tokenized contact-sheet 승인 UI
 │   ├── stage.py               # repo → ~/.hermes 멱등 동기화
 │   └── register_cron.py       # jobs.yaml → hermes cron 등록
 │
@@ -149,7 +152,7 @@ david-agentic-ai/
 │   ├── Qwen/                  # Qwen 계열 모델
 │   └── MiniMax/               # MiniMax-M2.7 모델
 │
-├── tests/                     # pytest 테스트 (162개)
+├── tests/                     # pytest 테스트 (164개)
 │   ├── conftest.py
 │   ├── test_papers_ingest.py
 │   ├── test_papers_digest.py
@@ -240,14 +243,20 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 ClawGram은 Hermes cron에 여섯 번째 장기 job으로 넣지 않습니다.
 `clawgram-family-letter.timer`가 토요일 02:00마다 짧은 due check만 실행하고,
 13일이 지나야 새 job을 생성합니다. 사진 분석은 `clawgram-worker.service`가
-동시성 1, `Nice=10`, 낮은 CPU/IO weight로 처리합니다. 모델 backend가 아직
-선정되지 않았으므로 timer는 비활성 상태가 정상입니다.
+동시성 1, `Nice=10`, 낮은 CPU/IO weight로 처리합니다. 별도
+`clawgram-assessment.service`는 기존 Qwen3.6 endpoint에 사진 한 장씩만 보내고,
+content-hash cache와 vLLM running/waiting/KV guard로 Hermes 우선순위를
+보장합니다. `clawgram-review.service`는 hash-only 7일 token으로 contact sheet와
+승인 UI를 제공합니다. 실제 사진 source와 private HTTPS phone access가 아직
+완료되지 않았으므로 timer는 비활성 상태가 정상입니다.
 
 worker 내부는 LangGraph가 검색 기간 자동 확장, 중복 재평가, deterministic
 selection, SQLite human-review interrupt를 실행합니다. 수정 요청은 동일한 job
 checkpoint에서 assessment/selection/window/dedup node로 돌아갈 수 있고,
 `get_job_status`는 사진 바이트 없이 next node와 실행 trace를 반환합니다.
 Hermes는 이 그래프를 직접 실행하거나 승인하지 않고 MCP 제어면만 사용합니다.
+승인 후 Galaxy Web Share가 10–20장과 문구를 Android sharesheet에 넘기며,
+사용자가 KakaoTalk 수신자와 Send를 직접 선택한 뒤에만 handoff로 기록합니다.
 
 ### 6. `local-model/` — LLM 백엔드
 `run_model.sh` 는 4가지 모델을 하나의 스크립트로 지원하며, 인자 없이 실행해도
@@ -266,6 +275,13 @@ Qwen3.6 launcher와 `restart_service.sh`는 기본 GPU 예약 비율 50%를 사�
 재시작 helper는 이를 service override에 저장하며, 첫 번째 인자로 바꿀 수 있다
 (예: `restart_service.sh 0.60 --wait`). 이 값은 vLLM의
 모델·workspace·공유 KV-cache pool 전체의 상한이며 Hermes의 영구 기억과는 별개다.
+2026-08-15 현재 0.50 설정의 startup profile은 모델 34.23 GiB와 KV cache
+20.28 GiB(265,056-token cache capacity)를 보고했고 API max context는 131,072다.
+vision encoder cache는 최대 크기 이미지 한 장/16,384 tokens 기준이다. 따라서
+ClawGram은 여러 사진을 한 prompt에 넣지 않고 1536 px 이하 한 장/요청,
+`max_tokens=1600`, batch 동시성 1로 제한한다. 실제 smoke test 전후 scheduler KV는
+idle 0%였고 기존 Hermes 로그의 관측 peak 약 6.4%보다 10% guard를 높게 두어,
+primary 요청이 있으면 다음 사진을 기다린다. 현재 cache를 줄일 이유는 없다.
 새 논문 메타데이터 수집에는 LLM이 필요 없습니다. 모델 가중치의 다운로드·저장 관리는 이 설정 repo 밖의
 `/home/david/workspace/models/download_model.py`가 담당하며, `run_model.sh`는 해당
 경로의 체크포인트를 vLLM service에 전달하는 실행 계층으로 유지됩니다.
