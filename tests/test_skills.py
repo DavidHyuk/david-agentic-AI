@@ -5,7 +5,10 @@ from pathlib import Path
 import yaml
 
 REPO = Path(__file__).resolve().parent.parent
-SKILLS = sorted((REPO / "skills").rglob("SKILL.md"))
+SKILLS = sorted(
+    list((REPO / "skills").rglob("SKILL.md"))
+    + list((REPO / "profiles").rglob("SKILL.md"))
+)
 EXPECTED = {
     "papers-digest",
     "interview-prep",
@@ -24,6 +27,18 @@ def _frontmatter(text: str) -> dict:
 def test_all_expected_skills_present():
     names = {_frontmatter(p.read_text())["name"] for p in SKILLS}
     assert EXPECTED <= names, f"missing skills: {EXPECTED - names}"
+    assert not (
+        REPO / "skills" / "personal" / "family-letter" / "SKILL.md"
+    ).exists()
+    assert (
+        REPO
+        / "profiles"
+        / "clawgram"
+        / "skills"
+        / "personal"
+        / "family-letter"
+        / "SKILL.md"
+    ).exists()
 
 
 def test_each_skill_has_required_fields():

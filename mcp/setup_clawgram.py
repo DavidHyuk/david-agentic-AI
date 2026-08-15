@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import secrets
 import stat
 import subprocess
@@ -32,6 +33,24 @@ ALLOWED_TOOLS = (
     "update_draft",
 )
 FORBIDDEN_AUTHORITY = {"approve_draft", "mark_sent", "handoff"}
+
+
+def gateway_service_name(home: Path, *, default_home: Path | None = None) -> str:
+    """Return the native Hermes systemd unit for a default or named profile."""
+    resolved = home.expanduser().resolve()
+    root = (default_home or (Path.home() / ".hermes")).expanduser().resolve()
+    if resolved == root:
+        return "hermes-gateway.service"
+    try:
+        relative = resolved.relative_to(root / "profiles")
+    except ValueError:
+        return "hermes-gateway.service"
+    valid_profile = re.fullmatch(
+        r"[a-z0-9][a-z0-9_-]{0,63}", relative.name
+    )
+    if len(relative.parts) == 1 and valid_profile:
+        return f"hermes-gateway-{relative.name}.service"
+    return "hermes-gateway.service"
 
 
 def load_template(path: Path = DEFAULT_TEMPLATE) -> dict[str, Any]:
@@ -145,6 +164,38 @@ def write_runtime_config(config_path: Path, server_config: dict[str, Any]) -> No
         raise
 
 
+def remove_runtime_config(config_path: Path) -> bool:
+    """Atomically remove the legacy ClawGram entry from one Hermes profile."""
+    if not config_path.exists():
+        return False
+    current = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+    if not isinstance(current, dict):
+        raise ValueError(f"{config_path} must contain a YAML mapping")
+    servers = current.get("mcp_servers")
+    if not isinstance(servers, dict) or SERVER_NAME not in servers:
+        return False
+    del servers[SERVER_NAME]
+    tmp = config_path.with_name(
+        f".{config_path.name}.tmp-{os.getpid()}-{secrets.token_hex(4)}"
+    )
+    fd = os.open(
+        tmp,
+        os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+        stat.S_IRUSR | stat.S_IWUSR,
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            yaml.safe_dump(current, handle, sort_keys=False)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp, config_path)
+        config_path.chmod(0o600)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
+    return True
+
+
 def validate_runtime_config(config_path: Path, expected: dict[str, Any]) -> list[str]:
     """Check that Hermes has exactly the intended ClawGram command and tools."""
     try:
@@ -175,13 +226,23 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--template", type=Path, default=DEFAULT_TEMPLATE)
     parser.add_argument("--clawgram-root", type=Path, default=DEFAULT_CLAWGRAM_ROOT)
     parser.add_argument("--python", type=Path, default=DEFAULT_PYTHON)
-    parser.add_argument("--check", action="store_true")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--check", action="store_true")
+    mode.add_argument("--remove", action="store_true")
     parser.add_argument("--no-restart", action="store_true")
     return parser.parse_args(argv)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parse_args(argv)
+    config_path = args.home / "config.yaml"
+    if args.remove:
+        removed = remove_runtime_config(config_path)
+        print(
+            f"ClawGram MCP {'removed from' if removed else 'not present in'} "
+            f"{config_path}"
+        )
+        return 0
     template = load_template(args.template)
     expected = build_server_config(
         template,
@@ -189,7 +250,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         python_path=args.python,
     )
     problems = validate_local_runtime(args.clawgram_root, args.python)
-    config_path = args.home / "config.yaml"
     if args.check:
         problems.extend(validate_runtime_config(config_path, expected))
         for problem in problems:
@@ -206,7 +266,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     print(f"Enabled tools: {', '.join(ALLOWED_TOOLS)}")
     if not args.no_restart:
         subprocess.run(
-            ["systemctl", "--user", "restart", "hermes-gateway.service"],
+            ["systemctl", "--user", "restart", gateway_service_name(args.home)],
             check=False,
         )
     return 0

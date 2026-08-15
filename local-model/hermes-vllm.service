@@ -5,9 +5,9 @@ After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=%h/workspace/david-agentic-ai
-ExecStartPre=/usr/bin/test -x %h/workspace/david-agentic-ai/local-model/.venv/bin/vllm
-ExecStart=/usr/bin/bash %h/workspace/david-agentic-ai/local-model/run_model.sh qwen36
+WorkingDirectory=%h/workspace/David-Agent
+ExecStartPre=/usr/bin/test -x %h/workspace/David-Agent/local-model/.venv/bin/vllm
+ExecStart=/usr/bin/bash %h/workspace/David-Agent/local-model/run_model.sh qwen36
 Restart=on-failure
 RestartSec=10
 KillSignal=SIGINT

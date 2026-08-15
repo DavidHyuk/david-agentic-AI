@@ -3,18 +3,24 @@
 A personalized, always-on AI partner for **David Choi**, built on the
 [**Hermes Agent**](https://github.com/NousResearch/hermes-agent) framework
 (Nous Research). It learns David's life and goals over time and proactively helps
-with four active areas, delivered to **Telegram**:
+with three active career-learning areas, delivered to the David **Telegram**
+bot:
 
 1. **LLM/LVM research** — daily arXiv + Hugging Face ingestion and a personalized digest.
 2. **Staff/Senior MLE interview prep** — a rotating curriculum with drills + rubrics.
 3. **English practice** — turns tutor recordings + corrections into spaced-repetition drills.
-4. **Family letters** — orchestrates child-focused ClawGram photo drafts through MCP, with explicit approval before KakaoTalk delivery.
+
+The same repository also owns an isolated **ClawGram Hermes profile and Telegram
+bot** for child-focused family letters. It shares the local model endpoint but
+not David-agent memory, sessions, skills, MCP registration, or Telegram token.
 
 Google Calendar support is retained for a later phase, but its skill, MCP
 connection, and scheduled brief are currently disabled.
 
 This repository is the **single source of truth** for the agent's configuration.
-Assets are synced into the Hermes runtime home (`~/.hermes`) by `bootstrap/stage.py`.
+David-agent assets are synced into `~/.hermes` by `bootstrap/stage.py`;
+ClawGram assets are synced into `~/.hermes/profiles/clawgram` by
+`bootstrap/stage_clawgram_profile.py`.
 
 ## Why a config repo instead of ad-hoc setup?
 Hermes stores skills, memory, personality, scripts, and cron jobs under `~/.hermes`.
@@ -28,16 +34,20 @@ disposable cache.
 Local DGX Spark (vLLM @ :8003, Qwen3.6 FP8, 128K ctx)
         │  OpenAI-compatible API
         ▼
-   Hermes Agent  ──────────────────────────────────────────────► Telegram
+   David Hermes profile ───────────────────────────────────────► David Telegram bot
         │ skills (procedural)   │ cron (schedule)   │ memory (who David is)
         ├─ Built-in Browser ── agent-browser ── local Chromium CDP (:19222)
         ├─ papers-digest  ── reads ~/.hermes/data/papers/papers.db
         ├─ interview-prep ── curriculum + progress log
         ├─ english-practice ─ Kakao webhook → english_intake.py + english_srs.py
         │                    → Telegram review (~/english-lessons)
-        ├─ family-letter ── ClawGram stdio MCP → SQLite queue/drafts
-        │                   → independent low-priority systemd worker
         └─ calendar-assistant ─ disabled; source retained for later
+
+   ClawGram Hermes profile ────────────────────────────────────► ClawGram Telegram bot
+        │ isolated SOUL / memory / sessions / least-authority tools
+        └─ family-letter ── ClawGram stdio MCP → SQLite queue/drafts
+                            → Google Photos source (:19223)
+                            → independent low-priority systemd worker
 
  arXiv + Hugging Face ── papers_ingest.py ── SQLite paper catalog
                               ▲
@@ -51,7 +61,8 @@ Local DGX Spark (vLLM @ :8003, Qwen3.6 FP8, 128K ctx)
 | `config/memory/{USER,MEMORY}.md` | Seed memory (→ `~/.hermes/memories/`) |
 | `config/config.fragment.yaml` | Non-secret settings merged into `config.yaml` |
 | `config/env.example` | Template for `~/.hermes/.env` secrets |
-| `skills/<category>/<name>/SKILL.md` | The five custom skills |
+| `skills/<category>/<name>/SKILL.md` | Four David-agent skills (three active, Calendar disabled) |
+| `profiles/clawgram/` | Isolated ClawGram SOUL, memory, config, and family-letter skill |
 | `scripts/*.py` | Standalone, unit-tested helpers (→ `~/.hermes/scripts/`) |
 | `cron/jobs.yaml` | Declarative Telegram notification schedule |
 | `docs/kakao-channel-setup.md` | Kakao Channel chatbot and webhook setup |
@@ -60,7 +71,9 @@ Local DGX Spark (vLLM @ :8003, Qwen3.6 FP8, 128K ctx)
 | `bootstrap/register_cron.py` | Register `jobs.yaml` with `hermes cron` |
 | `bootstrap/install_papers_service.sh` | Install daily paper ingestion service/timer |
 | `bootstrap/install_cron_watchdog.sh` | Install automatic cron-stall detection and gateway recovery |
-| `bootstrap/install_clawgram_integration.sh` | Register ClawGram MCP and install assessment/review/worker/timer units |
+| `bootstrap/stage_clawgram_profile.py` | Stage only the isolated ClawGram Hermes profile |
+| `bootstrap/install_clawgram_integration.sh` | Register profile-only MCP and install Google source/assessment/review/worker/timer units |
+| `bootstrap/clawgram_google_photos_login.sh` | Interactive login/2FA in the dedicated Google Photos Chromium profile |
 | `bootstrap/configure_clawgram_runtime.py` | Create a private ClawGram env with a generated upload key and HTTPS review URL |
 | `scripts/papers_ingest.py` | Fetch and merge arXiv/Hugging Face paper metadata |
 | `scripts/papers_digest.py` | Read-only recommended/recent/trending paper digest |
@@ -112,8 +125,9 @@ Then complete the **interactive, one-time** steps `install.sh` prints:
 - `bash bootstrap/install_cron_watchdog.sh` → recover automatically from a
   permanently stuck cron worker.
 - `python3 bootstrap/register_cron.py` → schedule the Telegram briefs.
-- `bash bootstrap/install_clawgram_integration.sh` → register ClawGram MCP and
-  install its isolated worker units without enabling photo processing yet.
+- `bash bootstrap/install_clawgram_integration.sh` → create/stage the ClawGram
+  profile and install its dedicated source/worker units without enabling the
+  biweekly timer yet.
 - Follow [Kakao Channel setup](docs/kakao-channel-setup.md) to receive tutor feedback
   through the Channel chatbot, then turn it into Telegram drills.
 
@@ -179,11 +193,13 @@ See [AGENTS.md](AGENTS.md) for the commit and safety rules.
 
 ## ClawGram family-letter integration
 
-ClawGram is a separate media service under `/home/david/workspace/ClawGram`; it is
-not another Hermes profile or subagent. Hermes starts a small local stdio MCP
-process only for queue/status/draft tools. Photo analysis runs later in
+ClawGram is a separate media service under `/home/david/workspace/ClawGram` plus
+a native Hermes profile under `~/.hermes/profiles/clawgram`. The profile has its
+own SOUL, memory, sessions, skill, MCP registration, gateway, and Telegram bot.
+It shares Qwen3.6 at `:8003` with the David profile, so it does not load another
+model. Photo analysis runs later in
 `clawgram-worker.service`, outside Hermes cron, so a long batch cannot occupy the
-single Hermes cron slot.
+David agent's cron slot.
 
 Inside ClawGram, the worker uses a durable LangGraph state machine for bounded
 search-window expansion, duplicate-refinement loops, SQLite approval interrupts,
@@ -191,12 +207,28 @@ and node-specific revision reruns. LangGraph does not replace Hermes or MCP.
 `get_job_status` includes a privacy-safe workflow checkpoint/next-node summary;
 photo bytes remain in ClawGram.
 
-Install the integration while the model decision is pending:
+The installer also removes the legacy family-letter skill/MCP entry from the
+David profile and restricts the ClawGram Telegram toolsets to skill, memory,
+session search, clarification, and ClawGram MCP.
+
+Configure the token through Hermes's local interactive prompt; never paste it
+into Git, documentation, or an agent chat:
 
 ```bash
 bash bootstrap/install_clawgram_integration.sh
-python3 mcp/setup_clawgram.py --check
-hermes mcp list
+hermes -p clawgram gateway setup
+bash bootstrap/install_clawgram_integration.sh
+```
+
+During `gateway setup`, enable Telegram and enter the new ClawGram bot token.
+Then send `/start` to that bot and complete Hermes pairing if requested.
+
+Verify the profile-only MCP:
+
+```bash
+python3 mcp/setup_clawgram.py --home ~/.hermes/profiles/clawgram --check
+hermes -p clawgram mcp list
+hermes -p clawgram gateway status
 ```
 
 This registers MCP and installs the systemd units, but deliberately keeps
@@ -214,21 +246,41 @@ python3 bootstrap/configure_clawgram_runtime.py \
   https://your-private-node.example.ts.net
 bash bootstrap/install_clawgram_integration.sh
 systemctl --user enable --now \
+  clawgram-google-photos-browser.service \
   clawgram-assessment.service clawgram-review.service
 ```
 
-Import a Galaxy-synced folder (or files exported by Google Photos Picker), then
-enable the actual schedule only after the phone can open the review URL:
+Log in once through the dedicated headed Chromium profile. David enters the
+password and 2FA directly; the script returns the profile to its headless CDP
+service and checks authentication:
 
 ```bash
-/home/david/miniconda3/envs/clawgram/bin/python \
-  -m clawgram.import_media ~/Pictures/Family --source galaxy_gallery
+bash bootstrap/clawgram_google_photos_login.sh
+```
+
+Google Photos web is the default source because the official Picker requires
+manual selection and the Library API no longer provides general library read.
+The collector searches the bounded date window, downloads one photo at a time,
+caches provider IDs/content hashes, and fails before worker claim if auth or UI
+is unsafe. The old Galaxy/Picker path remains a separate manifest adapter:
+
+```bash
+# Optional later: populate the galaxy_gallery adapter manually or by companion app
+/home/david/miniconda3/envs/clawgram/bin/python -m clawgram.import_media \
+  ~/Pictures/Family --source galaxy_gallery
+```
+
+Enable the actual schedule only after Google auth and the protected phone review
+URL both work:
+
+```bash
 bash bootstrap/install_clawgram_integration.sh --enable-timer
 ```
 
 The timer checks every Saturday at 02:00, while the scheduler's 13-day admission
-gate creates one true biweekly slot. The worker sends a seven-day,
-revision-bound review link through the existing Hermes Telegram transport. The
+gate creates one true biweekly slot. Source collection runs before job claim;
+login failure leaves the job queued. The worker sends a seven-day,
+revision-bound review link through the dedicated ClawGram Telegram bot. The
 contact sheet supports message edits and node-specific reruns. Approval then
 unlocks a Galaxy Android Web Share handoff; it does not claim that KakaoTalk
 actually sent the message. MCP still has no approve, handoff, or sent tool.
@@ -577,7 +629,7 @@ auto-launch hang observed on the DGX Spark's ARM64 environment.
 # 1. Download and manage the checkpoint in the dedicated models workspace (~100GB+)
 cd /home/david/workspace/models
 python3 download_model.py cyankiwi/MiniMax-M2.7-AWQ-4bit
-cd /home/david/workspace/david-agentic-ai
+cd /home/david/workspace/David-Agent
 
 # 2. Stop Qwen vLLM, start MiniMax
 bash local-model/run_model.sh minimax

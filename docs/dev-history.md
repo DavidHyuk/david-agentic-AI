@@ -3,6 +3,32 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v0.13.0 — 2026-08-15 (minor: isolate ClawGram agent and automate photo source)
+
+### Added
+- Added a native `clawgram` Hermes profile with independent SOUL, memory,
+  sessions, least-authority Telegram tools, MCP registration, gateway service,
+  and dedicated Telegram bot token.
+- Added a dedicated localhost Chromium profile/CDP service and interactive
+  Google login helper. The source service collects a bounded Google Photos
+  window before worker claim; login/UI/download failures preserve queued jobs.
+- Kept Galaxy Gallery and Google Photos Picker as modular local-manifest
+  adapters for later companion-app use.
+
+### Changed and protected
+- Moved `family-letter` out of the David profile and removed the legacy default
+  MCP entry during installation. David's paper, English, interview, memory,
+  sessions, cron, and Telegram bot remain independent.
+- Both profiles share the existing Qwen3.6 vLLM weights. Image assessment stays
+  sequential and obeys the 10% existing-KV guard; a second model is not loaded.
+- The biweekly timer now requires a dedicated bot token, authenticated Google
+  session, assessment endpoint, and HTTPS review URL before it can be enabled.
+
+### Verified
+- Full Hermes configuration suite: 171 passed.
+- ClawGram Python 3.13 suite: 184 passed, 2 skipped. The deployment Python 3.11
+  suite and local systemd/MCP smoke are repeated during rollout.
+
 ## v0.12.0 — 2026-08-15 (minor: operationalize private family-letter review)
 
 ### Added

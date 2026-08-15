@@ -78,8 +78,11 @@ and accesses the workflow only through the least-authority MCP control plane.
 Model selection and the private photo benchmark above remain deferred.
 
 The Qwen3.6 baseline integration is now implemented without making it the
-permanent winner: content-addressed Galaxy/Picker import, per-photo cached
-assessment, sequential vLLM load guard, Telegram review link/contact sheet, and
-Galaxy Android share handoff. Before enabling the biweekly timer, finish only
-the external-device steps: populate a real family-photo source, authorize the
-private Tailscale Serve endpoint, and verify one Galaxy review/share E2E.
+permanent winner: content-addressed Google Photos web collection, modular
+Galaxy/Picker import, per-photo cached assessment, sequential vLLM load guard,
+dedicated ClawGram Hermes/Telegram profile, review link/contact sheet, and
+Galaxy Android share handoff. Before enabling the biweekly timer, finish the
+interactive/external steps only: enter the issued bot token through
+`hermes -p clawgram gateway setup`, log in once with
+`bootstrap/clawgram_google_photos_login.sh`, authorize the private Tailscale
+Serve endpoint, and verify one real review/share E2E.

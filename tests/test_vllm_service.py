@@ -10,6 +10,7 @@ REPO = Path(__file__).resolve().parent.parent
 RESTARTER = REPO / "local-model" / "restart_service.sh"
 INSTALLER = REPO / "local-model" / "install_service.sh"
 GATEWAY_DROPIN = REPO / "local-model" / "hermes-gateway-vllm.conf"
+VLLM_UNIT = REPO / "local-model" / "hermes-vllm.service"
 
 
 def test_restart_helper_exposes_safe_service_controls():
@@ -58,6 +59,13 @@ def test_vllm_installer_deploys_gateway_readiness_assets():
     assert "20-vllm-readiness.conf" in text
     assert "scripts/wait_for_vllm.py" in text
     assert "systemctl --user restart hermes-gateway.service" in text
+
+
+def test_vllm_unit_uses_the_renamed_checkout() -> None:
+    text = VLLM_UNIT.read_text()
+
+    assert "%h/workspace/David-Agent" in text
+    assert "%h/workspace/david-agentic-ai" not in text
 
 
 def test_restart_helper_rejects_an_invalid_gpu_util_before_touching_service():

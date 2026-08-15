@@ -1,0 +1,40 @@
+# Non-secret settings for the isolated ClawGram Hermes profile.
+providers:
+  qwen36-fp8-hermes:
+    base_url: http://localhost:8003/v1
+    model: Qwen3.6-35B-A3B-FP8
+    context_length: 131072
+    extra_body:
+      presence_penalty: 1.5
+      repetition_penalty: 1.0
+      top_k: 20
+      min_p: 0.0
+
+model:
+  provider: custom:qwen36-fp8-hermes
+  default: Qwen3.6-35B-A3B-FP8
+  context_length: 131072
+
+memory:
+  memory_enabled: true
+  user_profile_enabled: true
+  memory_char_limit: 2200
+  user_char_limit: 1375
+
+cron:
+  wrap_response: true
+  max_parallel_jobs: 1
+
+gateway:
+  strict: true
+  media_delivery_allow_dirs: []
+  trust_recent_files: false
+
+# Telegram can converse, remember, clarify, and call only ClawGram MCP.
+platform_toolsets:
+  telegram:
+    - clarify
+    - clawgram
+    - memory
+    - session_search
+    - skills
