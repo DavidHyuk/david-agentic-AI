@@ -3,6 +3,14 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v0.13.5 — 2026-08-15 (patch: reload ClawGram service code)
+
+### Fixed and verified
+- Restart the long-lived assessment and review Python services during each
+  integration install. `systemctl enable --now` alone left active processes on
+  stale source code, which caused the first real Google Photos job to reject the
+  new `google_photos_web` enum with HTTP 422 before any VLM work began.
+
 ## v0.13.4 — 2026-08-15 (patch: calibrate Google Photos candidate ceiling)
 
 ### Fixed and bounded

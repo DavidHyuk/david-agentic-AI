@@ -142,6 +142,14 @@ def test_installer_keeps_timer_disabled_until_backend_is_explicit() -> None:
     assert "--enable-timer" in text
     assert "CLAWGRAM_ASSESSMENT_URL" in text
     assert "disable --now clawgram-family-letter.timer" in text
+
+
+def test_installer_restarts_long_lived_clawgram_python_services() -> None:
+    text = INSTALLER.read_text()
+
+    assert "systemctl --user restart" in text
+    assert "clawgram-assessment.service" in text
+    assert "clawgram-review.service" in text
     assert "stage_clawgram_profile.py" in text
     assert "setup_clawgram.py" in text
     assert "--home \"$CLAWGRAM_PROFILE_HOME\"" in text

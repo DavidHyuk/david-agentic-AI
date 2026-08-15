@@ -48,6 +48,11 @@ systemctl --user enable --now \
   clawgram-google-photos-browser.service \
   clawgram-assessment.service \
   clawgram-review.service
+# `enable --now` leaves an already-running Python process untouched. Reload
+# workspace code explicitly so newly staged source enums and API contracts are live.
+systemctl --user restart \
+  clawgram-assessment.service \
+  clawgram-review.service
 
 if [[ -f "$CLAWGRAM_PROFILE_ENV" ]] && \
    grep -Eq '^TELEGRAM_BOT_TOKEN=.+$' "$CLAWGRAM_PROFILE_ENV"; then
