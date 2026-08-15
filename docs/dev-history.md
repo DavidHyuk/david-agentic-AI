@@ -16,6 +16,11 @@ semantic versioning (major.minor.patch).
   environment already contains `ptxas-blackwell`.
 - Made the local vLLM launcher relocatable by invoking the current virtualenv's
   Python module entry point instead of an absolute-path console-script shebang.
+- Completed the first real family-letter E2E through the approval boundary:
+  535 readable Google Photos assets, 200 Qwen3.6 assessments for the requested
+  14-day window, 20 selected photos all above the child-focus threshold, a
+  durable `human_review` interrupt, and one private HTTPS review link. During an
+  active image request, KV usage was 0.5% with 20.0 GiB available KV cache.
 
 ## v0.13.5 — 2026-08-15 (patch: reload ClawGram service code)
 

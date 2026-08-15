@@ -268,6 +268,13 @@ worker 내부는 LangGraph가 검색 기간 자동 확장, 중복 재평가, det
 selection, SQLite human-review interrupt를 실행합니다. 수정 요청은 동일한 job
 checkpoint에서 assessment/selection/window/dedup node로 돌아갈 수 있고,
 `get_job_status`는 사진 바이트 없이 next node와 실행 trace를 반환합니다.
+
+첫 실제 E2E에서는 29일 확장 수집 범위의 557개 후보 중 readable image 535개를
+저장하고, 원래 14일 창의 200개만 Qwen3.6으로 분석했습니다. selector는 아이 중심
+기준을 통과한 20장을 골라 private HTTPS review link와 함께 `human_review`에서
+정지했습니다. 실제 image request 중 KV usage는 0.5%였고 vLLM은 20.0 GiB KV
+cache를 확보했습니다. timer는 휴대폰에서 review page를 여는 최종 확인 전까지
+disabled 상태를 유지합니다.
 ClawGram Hermes profile은 이 그래프를 직접 실행하거나 승인하지 않고 MCP
 제어면만 사용합니다. David profile에는 family-letter MCP/skill이 없습니다.
 승인 후 Galaxy Web Share가 10–20장과 문구를 Android sharesheet에 넘기며,
