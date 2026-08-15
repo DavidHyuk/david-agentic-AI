@@ -80,3 +80,11 @@ def test_checkpoints_are_managed_outside_the_agent_config_repo():
     assert 'MODEL_BASE_DIR="${HERMES_MODEL_DIR:-${WORKSPACE_ROOT}/models}"' in runner
     assert "/Intel/Qwen3.5-122B-A10B-int4-AutoRound" in runner
     assert "/cyankiwi/MiniMax-M2.7-AWQ-4bit" in runner
+
+
+def test_local_vllm_launcher_is_relocatable_after_repo_rename():
+    runner = RUNNER.read_text()
+
+    assert '"${SCRIPT_DIR}/.venv/bin/python"' in runner
+    assert "vllm.entrypoints.cli.main" in runner
+    assert 'VLLM_COMMAND=("${SCRIPT_DIR}/.venv/bin/vllm")' not in runner

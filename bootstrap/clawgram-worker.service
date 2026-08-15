@@ -11,6 +11,9 @@ WorkingDirectory=/home/david/workspace/ClawGram
 EnvironmentFile=-%h/.config/clawgram/worker.env
 Environment="PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin"
 ExecStart=/home/david/miniconda3/envs/clawgram/bin/python -m clawgram.worker
+Restart=on-failure
+RestartSec=60
+RestartPreventExitStatus=1 78
 TimeoutStartSec=6h
 Nice=10
 CPUWeight=20

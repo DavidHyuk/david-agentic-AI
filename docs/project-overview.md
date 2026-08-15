@@ -156,7 +156,7 @@ David-Agent/
 │   ├── Qwen/                  # Qwen 계열 모델
 │   └── MiniMax/               # MiniMax-M2.7 모델
 │
-├── tests/                     # pytest 테스트 (173개)
+├── tests/                     # pytest 테스트 (174개)
 │   ├── conftest.py
 │   ├── test_papers_ingest.py
 │   ├── test_papers_digest.py
@@ -257,6 +257,8 @@ Chromium `:19223`에서 요청 기간과 자동 확장분을 수집하며, auth/
 content-hash cache와 vLLM running/waiting/KV guard로 Hermes 우선순위를
 보장합니다. integration installer는 장기 실행 중인 assessment/review Python
 프로세스를 명시적으로 재시작해 workspace 계약과 live API가 어긋나지 않게 합니다.
+일시적 assessment 429/5xx/연결 실패는 같은 job을 queued로 돌려 60초 후
+재시도하고, LangGraph pending node와 완료된 사진별 cache에서 이어갑니다.
 `clawgram-review.service`는 hash-only 7일 token으로 contact sheet와
 승인 UI를 제공하고 전용 ClawGram bot이 링크를 전달합니다. Google login과
 private HTTPS phone E2E가 완료되기 전에는 timer 비활성이 정상입니다. 기존

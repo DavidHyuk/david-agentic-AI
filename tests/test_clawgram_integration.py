@@ -106,6 +106,9 @@ def test_worker_is_low_priority_and_refuses_implicit_backend_configuration() -> 
     assert "CPUWeight=20" in worker
     assert "IOWeight=20" in worker
     assert "python -m clawgram.worker" in worker
+    assert "Restart=on-failure" in worker
+    assert "RestartSec=60" in worker
+    assert "RestartPreventExitStatus=1 78" in worker
 
 
 def test_source_is_pre_claim_and_browser_session_is_dedicated() -> None:

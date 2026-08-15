@@ -269,6 +269,11 @@ Verify afterward:
 bash bootstrap/clawgram_google_photos_login.sh --check
 ```
 
+If the shared vLLM is restarting or temporarily returns HTTP 429/5xx, the
+ClawGram worker requeues the same job and retries after 60 seconds. Completed
+per-photo assessments and the pending LangGraph node remain durable; invalid
+request contracts still stop as operator-visible terminal failures.
+
 Google Photos web is the default source because the official Picker requires
 manual selection and the Library API no longer provides general library read.
 The collector searches the bounded date window, downloads one photo at a time,

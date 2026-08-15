@@ -3,6 +3,20 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v0.14.0 — 2026-08-15 (minor: durable transient model retries)
+
+### Added and hardened
+- Added a bounded systemd retry path for ClawGram jobs requeued after transient
+  assessment HTTP 429/5xx or connection failures. The same LangGraph pending
+  node and per-photo cache resume after 60 seconds, while invalid contracts
+  remain terminal and do not loop.
+- Confirmed the first real vLLM interruption was not OOM or KV pressure. A model
+  process started before the repository rename retained the removed lowercase
+  virtualenv path and failed a later Triton JIT lookup; the current `David-Agent`
+  environment already contains `ptxas-blackwell`.
+- Made the local vLLM launcher relocatable by invoking the current virtualenv's
+  Python module entry point instead of an absolute-path console-script shebang.
+
 ## v0.13.5 — 2026-08-15 (patch: reload ClawGram service code)
 
 ### Fixed and verified
