@@ -50,7 +50,9 @@ systemctl --user enable --now \
 
 if [[ -f "$CLAWGRAM_PROFILE_ENV" ]] && \
    grep -Eq '^TELEGRAM_BOT_TOKEN=.+$' "$CLAWGRAM_PROFILE_ENV"; then
-  hermes -p clawgram gateway install --force
+  # Hermes currently has no non-interactive install flag. Answer its two
+  # fixed Linux prompts: start now, and enable the user service at login.
+  printf 'y\ny\n' | hermes -p clawgram gateway install --force
   mkdir -p "$CLAWGRAM_USER_UNIT_DIR/hermes-gateway-clawgram.service.d"
   install -m 0644 \
     "$CLAWGRAM_INSTALL_SCRIPT_DIR/hermes-gateway-clawgram-vllm.conf" \

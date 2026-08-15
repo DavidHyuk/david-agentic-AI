@@ -3,6 +3,16 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v0.13.1 — 2026-08-15 (patch: make profile gateway install unattended)
+
+### Fixed and verified
+- Answer the two fixed Hermes Linux service prompts explicitly when installing
+  the ClawGram gateway, so repeatable integration installs no longer stop for
+  terminal input after the bot token is configured.
+- Re-ran the full Hermes configuration suite: 171 passed, then deployed and
+  verified the enabled `hermes-gateway-clawgram.service`, vLLM readiness
+  drop-in, profile-only MCP connection, and seven least-authority tools.
+
 ## v0.13.0 — 2026-08-15 (minor: isolate ClawGram agent and automate photo source)
 
 ### Added

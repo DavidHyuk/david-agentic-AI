@@ -129,4 +129,5 @@ def test_installer_keeps_timer_disabled_until_backend_is_explicit() -> None:
     assert "--home \"$CLAWGRAM_PROFILE_HOME\"" in text
     assert "--remove --no-restart" in text
     assert "TELEGRAM_BOT_TOKEN" in text
+    assert "printf 'y\\ny\\n' | hermes -p clawgram gateway install --force" in text
     assert "clawgram.collect_sources --check-auth" in text
