@@ -204,9 +204,12 @@ David agent's cron slot.
 
 Inside ClawGram, the worker uses a durable LangGraph state machine for bounded
 search-window expansion, duplicate-refinement loops, SQLite approval interrupts,
-and node-specific revision reruns. LangGraph does not replace Hermes or MCP.
-`get_job_status` includes a privacy-safe workflow checkpoint/next-node summary;
-photo bytes remain in ClawGram.
+and node-specific revision reruns. Personalization is visible as explicit
+`retrieve_preferences` and `grade_selection` nodes: the first retrieves compact
+human feedback before selection, and the second records child/size shortfall,
+duplicate pressure, bounded-loop counters, and the chosen branch. LangGraph does
+not replace Hermes or MCP. `get_job_status` includes a privacy-safe workflow
+checkpoint/next-node/evidence/grade summary; photo bytes remain in ClawGram.
 
 The installer also removes the legacy family-letter skill/MCP entry from the
 David profile and restricts the ClawGram Telegram toolsets to skill, memory,

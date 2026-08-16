@@ -3,6 +3,23 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v0.16.0 — 2026-08-15 (minor: expose personalization as LangGraph nodes)
+
+### Added and verified
+- Refactored ClawGram personalization into explicit `retrieve_preferences` and
+  `grade_selection` LangGraph nodes. The executable Mermaid graph now shows
+  evidence retrieval before every selection and deterministic grading before
+  expansion, duplicate refinement, or draft persistence.
+- Extended the privacy-safe MCP workflow summary with aggregate feedback
+  evidence and selection-grade outcome. Active asset IDs remain local to the
+  checkpoint and are not returned through Hermes.
+- Added a regression that creates a checkpoint with the previous topology and
+  resumes it through the new retrieval/grade path. A SQLite backup of the live
+  awaiting-approval checkpoint also resumed to `human_review` with both new
+  nodes in its trace; the production DB and review link were unchanged.
+- ClawGram Python 3.13 and deployment Python 3.11 suites: 195 passed, 2 skipped
+  in each environment.
+
 ## v0.15.0 — 2026-08-15 (minor: persist ClawGram review preferences)
 
 ### Added and deployed

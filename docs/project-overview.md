@@ -273,6 +273,13 @@ selection, SQLite human-review interrupt를 실행합니다. 수정 요청은 �
 checkpoint에서 assessment/selection/window/dedup node로 돌아갈 수 있고,
 `get_job_status`는 사진 바이트 없이 next node와 실행 trace를 반환합니다.
 
+개인화 경로는 `assess_window → retrieve_preferences → select_candidates →
+grade_selection`의 독립 node로 구성됩니다. retrieval node는 영구 제외와 최근
+feedback의 reason/scope/decision count를 읽고, grade node는 아이/전체 장수
+shortfall, 중복 압력, 자동 loop 횟수와 다음 route를 checkpoint에 기록합니다.
+따라서 Mermaid와 MCP status에서 개인화 검색과 검증을 별도로 디버깅할 수 있으며,
+구 topology의 승인 대기 checkpoint도 새 graph에서 그대로 재개됩니다.
+
 검토 화면에서 제외한 사진은 reason/scope와 함께 ClawGram SQLite의 append-only
 feedback event로 남습니다. `current_draft`는 현재 LangGraph thread에서만
 누적되고, `future`는 다음 selection 전에 검색되어 모델 점수보다 우선합니다.
