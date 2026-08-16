@@ -3,6 +3,12 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.0.2 — 2026-08-16 (patch: clarify dual-bot installation and verification)
+
+- Expanded README setup instructions for the dedicated English Telegram profile,
+  including token isolation, pairing, three profile-scoped cron jobs, and E2E
+  checks for both David and English gateways.
+
 ## v1.0.1 — 2026-08-15 (patch: document Hermes memory architecture)
 
 - Added a Korean study note covering the built-in file-backed memory tool,

@@ -112,6 +112,17 @@ Then complete the **interactive, one-time** steps `install.sh` prints:
 - `bash bootstrap/install_papers_service.sh` → migrate legacy papers and enable
   daily metadata ingestion.
 - `hermes gateway setup` → connect **Telegram**, then `hermes gateway install`.
+- Create the dedicated English bot with BotFather, then configure its isolated
+  profile and gateway:
+
+  ```bash
+  bash bootstrap/install_english_bot.sh
+  hermes -p english gateway setup
+  # Choose Telegram, enter the new bot token, and message the bot once to pair it.
+  bash bootstrap/install_english_bot.sh
+  ```
+
+  The English token is stored only in `~/.hermes/profiles/english/.env`.
 - `bash bootstrap/install_cron_watchdog.sh` → recover automatically from a
   permanently stuck cron worker.
 - `python3 bootstrap/register_cron.py` → schedule the Telegram briefs.
@@ -478,9 +489,9 @@ bash bootstrap/install_english_bot.sh
 
 The first command stages the main and English profiles, removes the main profile's
 former English skill, and tells you to configure the bot when its token is absent.
-Re-running after setup installs the profile gateway and re-syncs
-the two English cron jobs with `--profile english`. Papers, interview prep, and the
-weekly review remain on the original bot.
+Re-running after setup installs the profile gateway and re-syncs the three English
+cron jobs with `--profile english`. Papers, interview prep, and the weekly review
+remain on the original bot.
 
 ### Automatic cron recovery
 
@@ -506,14 +517,21 @@ python3 scripts/cron_health.py
 Check the scheduler and run a Telegram E2E without exposing its token:
 
 ```bash
-systemctl --user is-active hermes-vllm.service hermes-gateway.service
+systemctl --user is-active \
+  hermes-vllm.service hermes-gateway.service hermes-gateway-english.service
 python3 scripts/cron_health.py
 hermes send --to telegram "[Hermes E2E] Telegram 연결 테스트"
+hermes -p english send --to telegram "[English E2E] Telegram 연결 테스트"
 hermes cron list
+hermes -p english cron list
 hermes cron run <JOB_ID_FROM_LIST>
 hermes cron tick
-hermes cron list
+hermes -p english cron run <ENGLISH_JOB_ID_FROM_LIST>
 ```
+
+`hermes cron list` shows the David bot jobs; `hermes -p english cron list` shows
+the isolated English intake, drill, and weekly-review jobs. Run each profile's
+E2E message only after its Telegram bot has completed pairing.
 
 The gateway only starts after `/v1/models` contains
 `Qwen3.6-35B-A3B-FP8`. Calendar is not part of the active agent runtime.
