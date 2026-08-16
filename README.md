@@ -426,10 +426,11 @@ Open Builder에서 다음 순서로 설정합니다.
 영어 수집 서버로 전달되지 않으므로, 채널 홈의 **챗봇 채팅**에서 원문을
 다시 보내야 합니다.
 
-수집된 원문은 `~/english-lessons/YYYY-MM-DD/` 아래에 저장됩니다. 매일
+수집된 원문은 `~/english-lessons/YYYY-MM-DD/` 아래에 저장됩니다. 월–토
 20:00 `english-intake`가 새 피드백을 분석합니다. 새 피드백이 없는 날에는
-누적 SRS 카드에서 취약 패턴을 골라 짧은 코칭을 보내며, 일요일에는 그 주의
-전체 피드백과 누적 취약 카드를 묶어 복습합니다. 21:00 `english-drill`은
+누적 SRS 카드에서 취약 패턴을 골라 짧은 코칭을 보냅니다. 일요일 20:00
+`english-weekly-review`는 그 주의 전체 피드백과 누적 취약 카드를 전용
+English bot으로 복습합니다. 21:00 `english-drill`은
 당일 복습 문제를 전송합니다.
 
 개인화 코칭과 주간 복습에 사용되는 근거를 직접 확인할 수 있습니다.
@@ -457,8 +458,9 @@ cat ~/.hermes/data/english/kakao-skill-url.txt
 |---|---|---|
 | `papers-digest` | 08:30 daily | LLM/LVM research signal after 08:00 ingestion |
 | `interview-prep` | 12:00 Mon/Wed/Fri | One focused Staff/Senior MLE drill |
-| `english-intake` | 20:00 daily | Dedicated English bot: feedback analysis or weakness coaching; Sunday cumulative review |
+| `english-intake` | 20:00 Mon–Sat | Dedicated English bot: feedback analysis or weakness coaching |
 | `english-drill` | 21:00 daily | Dedicated English bot: tonight's spaced-repetition drill |
+| `english-weekly-review` | 20:00 Sunday | Dedicated English bot: tutor feedback + weak SRS cumulative review |
 | `weekly-review` | 18:00 Sunday | Main David bot: papers + interview-prep weekly summary |
 
 ### Dedicated English Telegram bot

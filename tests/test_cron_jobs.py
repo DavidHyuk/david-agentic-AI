@@ -10,7 +10,7 @@ REPO = Path(__file__).resolve().parent.parent
 JOBS = REPO / "cron" / "jobs.yaml"
 EXPECTED_JOBS = {
     "papers-digest", "interview-prep", "english-intake", "english-drill",
-    "weekly-review",
+    "english-weekly-review", "weekly-review",
 }
 
 
@@ -29,6 +29,7 @@ def test_english_jobs_use_the_isolated_english_profile():
     jobs = {job["name"]: job for job in rc.load_jobs(JOBS)}
     assert jobs["english-intake"]["profile"] == "english"
     assert jobs["english-drill"]["profile"] == "english"
+    assert jobs["english-weekly-review"]["profile"] == "english"
     assert "english-practice" not in jobs["weekly-review"]["skills"]
 
 
@@ -37,13 +38,21 @@ def test_calendar_brief_is_not_scheduled_while_integration_is_deferred():
     assert "morning-brief" not in {job["name"] for job in jobs}
 
 
-def test_english_intake_coaches_without_feedback_and_reviews_on_sunday():
+def test_english_intake_coaches_without_feedback_on_weekdays():
     jobs = {job["name"]: job for job in rc.load_jobs(JOBS)}
     prompt = jobs["english-intake"]["prompt"]
     assert "Do not stay silent" in prompt
     assert "weaknesses" in prompt
-    assert "On Sunday" in prompt
+    assert jobs["english-intake"]["schedule"] == "0 20 * * 1-6"
     assert "[SILENT]" not in prompt
+
+
+def test_english_weekly_review_is_a_dedicated_sunday_job():
+    jobs = {job["name"]: job for job in rc.load_jobs(JOBS)}
+    review = jobs["english-weekly-review"]
+    assert review["schedule"] == "0 20 * * 0"
+    assert "Procedure E" in review["prompt"]
+    assert "standalone weekly review" in review["prompt"]
 
 
 def test_english_drill_always_includes_inline_answers():

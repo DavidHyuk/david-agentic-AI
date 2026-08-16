@@ -78,7 +78,7 @@ David-Agent/
 │   └── hooks.json             # `.codex/hooks/auto_git_commit.py` 위임
 │
 ├── cron/
-│   └── jobs.yaml              # 5개의 Telegram 알림 스케줄 정의 (영어 2개는 english profile)
+│   └── jobs.yaml              # 6개의 Telegram 알림 스케줄 정의 (영어 3개는 english profile)
 │
 ├── bootstrap/                 # 설치 및 동기화 자동화
 │   ├── install.sh             # 원클릭 설치 (Hermes + 설정 + 모델)
@@ -115,7 +115,7 @@ David-Agent/
 │   ├── Qwen/                  # Qwen 계열 모델
 │   └── MiniMax/               # MiniMax-M2.7 모델
 │
-├── tests/                     # pytest 테스트 (164개)
+├── tests/                     # pytest 테스트 (165개)
 │   ├── conftest.py
 │   ├── test_papers_ingest.py
 │   ├── test_papers_digest.py
@@ -182,15 +182,16 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 | `wait_for_vllm.py` | 지정한 served model이 `/v1/models`에 나타날 때까지 gateway 시작 대기 |
 
 ### 5. `cron/jobs.yaml` — 선언형 스케줄
-5개의 Telegram 알림 잡이 YAML로 선언되어 있습니다. Calendar 연동을
+6개의 Telegram 알림 잡이 YAML로 선언되어 있습니다. Calendar 연동을
 재개할 때까지 `morning-brief`는 등록하지 않습니다.
 
 | 잡 | 시간 | 내용 |
 |----|------|------|
 | `papers-digest` | 08:30 매일 | LLM/LVM 연구 시그널 |
 | `interview-prep` | 12:00 월/수/금 | 실시간 트렌드 기반 Staff 레벨 드릴 1개 |
-| `english-intake` | 20:00 매일 | English bot: 새 피드백 분석 또는 취약 패턴 코칭; 일요일 누적 복습 |
+| `english-intake` | 월–토 20:00 | English bot: 새 피드백 분석 또는 취약 패턴 코칭 |
 | `english-drill` | 21:00 매일 | English bot: SRS 드릴 전달 |
+| `english-weekly-review` | 일요일 20:00 | English bot: tutor feedback + 취약 SRS 누적 복습 |
 | `weekly-review` | 18:00 일요일 | David bot: 논문 + 인터뷰 주간 요약 |
 
 논문 수집은 Hermes cron이 아니라 별도 `hermes-papers-ingest.timer`가 매일

@@ -20,6 +20,7 @@ Shared infrastructure
     └── English Hermes profile ── English Telegram bot
         ├── english-practice
         ├── english-intake
+        ├── english-weekly-review
         └── english-drill
 ```
 
@@ -37,7 +38,7 @@ Shared infrastructure
 | SOUL | `config/soul/SOUL.md` | `profiles/english/config/soul/SOUL.md` |
 | Memory/session | `~/.hermes/` | `~/.hermes/profiles/english/` |
 | Active skills | papers, interview | english-practice |
-| Active cron | papers, interview, weekly review | English intake, English drill |
+| Active cron | papers, interview, weekly review | English intake, weekly review, drill |
 
 두 gateway는 모두 독립된 프로세스로 실행된다. `cron/jobs.yaml`의 English job은
 `profile: english`를 명시하므로 English profile의 Telegram destination과

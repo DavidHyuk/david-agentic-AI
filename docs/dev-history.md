@@ -11,6 +11,10 @@ semantic versioning (major.minor.patch).
 - Documented the verified David/English peer-profile architecture, why persistent
   channel agents should not be modeled as parent/child sub-agents, and the
   decision criteria for future profiles, coordinators, and ephemeral workers.
+- Split Sunday English review into its own `english-weekly-review` cron job;
+  weekday intake coaching and English weekly review now have explicit, separate
+  schedules and delivery semantics.
+- Verified the updated configuration suite: 165 passed.
 
 ## v1.0.0 — 2026-08-15 (major: make David-Agent ownership explicit)
 
