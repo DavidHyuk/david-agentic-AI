@@ -88,6 +88,12 @@ def build_server_config(
         "args": ["-I", "-c", isolated_launcher],
         "env": {
             "CLAWGRAM_DATABASE_PATH": str(root / "data" / "clawgram-v2.sqlite3"),
+            "CLAWGRAM_WORKFLOW_DATABASE_PATH": str(
+                root / "data" / "clawgram-workflows.sqlite3"
+            ),
+            "CLAWGRAM_PERSONALIZATION_DATABASE_PATH": str(
+                root / "data" / "clawgram-personalization.sqlite3"
+            ),
         },
         "enabled": True,
         "tools": {"include": list(template["tools"]["include"])},

@@ -274,6 +274,15 @@ selection, SQLite human-review interrupt를 실행합니다. 수정 요청은 �
 checkpoint에서 assessment/selection/window/dedup node로 돌아갈 수 있고,
 `get_job_status`는 사진 바이트 없이 next node와 실행 trace를 반환합니다.
 
+ClawGram SQLite는 권한과 수명에 따라 세 파일로 나뉩니다. domain DB
+`clawgram-v2.sqlite3`는 jobs/drafts/media/review link, workflow DB
+`clawgram-workflows.sqlite3`는 LangGraph checkpoints/writes, personalization DB
+`clawgram-personalization.sqlite3`는 편지 간 append-only feedback을 담당합니다.
+기존 단일 DB 테이블은 idempotent migration 뒤에도 복구본으로 남습니다.
+검토 token으로 보호된 **워크플로 보기**는 current node와 aggregate evidence/grade를
+asset ID 없이 보여줍니다. 상세 Studio는 별도 `.studio/venv`와 online backup
+snapshot만 사용하고 loopback `:2024`를 SSH forward할 때만 접근합니다.
+
 개인화 경로는 `assess_window → retrieve_preferences → select_candidates →
 grade_selection`의 독립 node로 구성됩니다. retrieval node는 영구 제외와 최근
 feedback의 reason/scope/decision count를 읽고, grade node는 아이/전체 장수

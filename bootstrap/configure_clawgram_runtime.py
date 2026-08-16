@@ -23,6 +23,9 @@ def build_environment(review_base_url: str) -> str:
     return "\n".join(
         (
             "# Generated locally; do not commit or share this file.",
+            "CLAWGRAM_DATABASE_PATH=/home/david/workspace/ClawGram/data/clawgram-v2.sqlite3",
+            "CLAWGRAM_WORKFLOW_DATABASE_PATH=/home/david/workspace/ClawGram/data/clawgram-workflows.sqlite3",
+            "CLAWGRAM_PERSONALIZATION_DATABASE_PATH=/home/david/workspace/ClawGram/data/clawgram-personalization.sqlite3",
             "CLAWGRAM_ASSESSMENT_URL=http://127.0.0.1:8010/v1/assessments",
             f"CLAWGRAM_REVIEW_BASE_URL={review_base_url.rstrip('/')}",
             f"CLAWGRAM_SOURCE_KEY={source_key}",

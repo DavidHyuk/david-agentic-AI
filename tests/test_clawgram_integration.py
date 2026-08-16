@@ -39,7 +39,7 @@ def test_gateway_service_name_is_profile_scoped(tmp_path) -> None:
     ) == "hermes-gateway-clawgram.service"
 
 
-def test_server_config_is_cwd_independent_and_uses_one_database(tmp_path) -> None:
+def test_server_config_is_cwd_independent_and_separates_database_roles(tmp_path) -> None:
     root = tmp_path / "ClawGram"
     python = tmp_path / "env" / "bin" / "python"
     config = setup.build_server_config(
@@ -54,6 +54,12 @@ def test_server_config_is_cwd_independent_and_uses_one_database(tmp_path) -> Non
     assert "PYTHONPATH" not in config["env"]
     assert config["env"]["CLAWGRAM_DATABASE_PATH"].endswith(
         "/ClawGram/data/clawgram-v2.sqlite3"
+    )
+    assert config["env"]["CLAWGRAM_WORKFLOW_DATABASE_PATH"].endswith(
+        "/ClawGram/data/clawgram-workflows.sqlite3"
+    )
+    assert config["env"]["CLAWGRAM_PERSONALIZATION_DATABASE_PATH"].endswith(
+        "/ClawGram/data/clawgram-personalization.sqlite3"
     )
 
 

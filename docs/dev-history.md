@@ -3,6 +3,21 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v0.17.0 — 2026-08-15 (minor: isolate ClawGram workflow observability)
+
+- Split ClawGram's local persistence into domain, LangGraph checkpoint, and
+  cross-thread personalization SQLite files. The migration copies and verifies
+  existing state while retaining the legacy tables as a recovery copy.
+- Added a revision-token-protected, read-only workflow dashboard with current
+  nodes, branch metrics, retrieval evidence, grade, and trace, without photo
+  bytes, paths, or asset IDs.
+- Added a separate LangGraph Studio venv and online-backup snapshots, loopback
+  binding, tracing/analytics opt-out, one-worker limit, and automatic snapshot
+  thread registration. Production SQLite files are never used as Studio write
+  targets.
+- Extended the version-controlled Hermes MCP/runtime environment with explicit
+  workflow and personalization database paths.
+
 ## v0.16.1 — 2026-08-15 (patch: isolate English Telegram delivery)
 
 - Added an `english` Hermes profile with its own SOUL, memory, skill copies,

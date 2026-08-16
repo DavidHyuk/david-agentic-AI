@@ -13,6 +13,9 @@ def test_runtime_environment_is_private_and_complete(tmp_path):
     content = path.read_text()
 
     assert "CLAWGRAM_ASSESSMENT_URL=http://127.0.0.1:8010/v1/assessments" in content
+    assert "CLAWGRAM_DATABASE_PATH=" in content
+    assert "CLAWGRAM_WORKFLOW_DATABASE_PATH=" in content
+    assert "CLAWGRAM_PERSONALIZATION_DATABASE_PATH=" in content
     assert "CLAWGRAM_REVIEW_BASE_URL=https://spark.example.ts.net" in content
     assert "CLAWGRAM_GOOGLE_PHOTOS_MAX_CANDIDATES=750" in content
     assert "CLAWGRAM_SOURCE_KEY=" in content

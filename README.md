@@ -217,6 +217,13 @@ duplicate pressure, bounded-loop counters, and the chosen branch. LangGraph does
 not replace Hermes or MCP. `get_job_status` includes a privacy-safe workflow
 checkpoint/next-node/evidence/grade summary; photo bytes remain in ClawGram.
 
+Persistence is split by authority: `clawgram-v2.sqlite3` holds jobs, drafts,
+media metadata and review links; `clawgram-workflows.sqlite3` holds LangGraph
+thread checkpoints; `clawgram-personalization.sqlite3` holds cross-letter human
+feedback. The review page's **워크플로 보기** button provides the normal
+privacy-safe node UI. Deeper LangGraph Studio debugging uses disposable
+`.studio/` database snapshots and a separate venv, never the live databases.
+
 The installer also removes the legacy family-letter skill/MCP entry from the
 David profile and restricts the ClawGram Telegram toolsets to skill, memory,
 session search, clarification, and ClawGram MCP.
@@ -317,6 +324,11 @@ store and retrieved before later selections, where it overrides model scores.
 The feedback store contains asset IDs and decision metadata, not photo bytes;
 it is the first personalization/agentic-RAG layer. A checked exclusion cannot be
 silently ignored by `이대로 승인`.
+
+For the isolated Studio view, follow ClawGram's README. Forward only over SSH by
+adding `LocalForward 2024 127.0.0.1:2024` to `Host dgx`; do not publish the
+unauthenticated Studio API through Tailscale Serve because its snapshot view
+contains detailed checkpoint metadata.
 
 ## 논문 수집과 digest 사용법
 
