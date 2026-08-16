@@ -135,7 +135,8 @@ David-Agent/
     ├── dev-history.md         # 버전 이력
     ├── project-overview.md    # 이 문서
     └── study/
-        └── hermes-agent-memory-and-context.md # Hermes memory/context 학습 노트
+        ├── hermes-agent-memory-and-context.md # Hermes memory/context 학습 노트
+        └── hermes-profiles-vs-subagents.md # 지속형 profile과 sub-agent 설계
 ```
 
 ---

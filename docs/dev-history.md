@@ -8,6 +8,9 @@ semantic versioning (major.minor.patch).
 - Added a Korean study note covering the built-in file-backed memory tool,
   frozen system-prompt snapshots, profile isolation, durable-state boundaries,
   cron fresh-session behavior, and a practical code-reading sequence.
+- Documented the verified David/English peer-profile architecture, why persistent
+  channel agents should not be modeled as parent/child sub-agents, and the
+  decision criteria for future profiles, coordinators, and ephemeral workers.
 
 ## v1.0.0 — 2026-08-15 (major: make David-Agent ownership explicit)
 
