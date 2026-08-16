@@ -5,8 +5,16 @@ from pathlib import Path
 import yaml
 
 REPO = Path(__file__).resolve().parent.parent
-SKILLS = sorted((REPO / "skills").rglob("SKILL.md"))
-EXPECTED = {"papers-digest", "interview-prep", "english-practice", "calendar-assistant"}
+SKILLS = sorted(
+    list((REPO / "skills").rglob("SKILL.md"))
+    + list((REPO / "profiles").rglob("SKILL.md"))
+)
+EXPECTED = {
+    "papers-digest",
+    "interview-prep",
+    "english-practice",
+    "calendar-assistant",
+}
 
 
 def _frontmatter(text: str) -> dict:
@@ -18,6 +26,16 @@ def _frontmatter(text: str) -> dict:
 def test_all_expected_skills_present():
     names = {_frontmatter(p.read_text())["name"] for p in SKILLS}
     assert EXPECTED <= names, f"missing skills: {EXPECTED - names}"
+    assert not (REPO / "skills" / "learning" / "english-practice" / "SKILL.md").exists()
+    assert (
+        REPO
+        / "profiles"
+        / "english"
+        / "skills"
+        / "learning"
+        / "english-practice"
+        / "SKILL.md"
+    ).exists()
 
 
 def test_each_skill_has_required_fields():
@@ -42,3 +60,18 @@ def test_skill_body_has_core_sections():
         body = p.read_text()
         for section in ("## When to Use", "## Procedure"):
             assert section in body, f"{p}: missing '{section}'"
+
+
+def test_english_drill_requires_inline_answers():
+    path = (
+        REPO
+        / "profiles"
+        / "english"
+        / "skills"
+        / "learning"
+        / "english-practice"
+        / "SKILL.md"
+    )
+    body = path.read_text()
+    assert "immediately followed by its answer" in body
+    assert "Do not collect all answers in a separate answer key" in body

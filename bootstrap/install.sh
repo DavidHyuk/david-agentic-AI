@@ -58,8 +58,8 @@ fi
 say "6/6  Next — service and interactive setup"
 cat <<'STEPS'
   a) Start the local model with >=64K context (NOT the 8K Subscribe-Papers script):
-       bash /home/david/workspace/david-agentic-ai/local-model/setup_vllm.sh
-       bash /home/david/workspace/david-agentic-ai/local-model/install_service.sh
+       bash /home/david/workspace/David-Agent/local-model/setup_vllm.sh
+       bash /home/david/workspace/David-Agent/local-model/install_service.sh
        journalctl --user -u hermes-vllm.service -f
 
      Model checkpoints are managed separately in /home/david/workspace/models.
@@ -69,16 +69,16 @@ cat <<'STEPS'
        hermes -z "Say hi and tell me which model you are."
 
   c) Install the independent daily paper-ingestion timer:
-       bash /home/david/workspace/david-agentic-ai/bootstrap/install_papers_service.sh
+       bash /home/david/workspace/David-Agent/bootstrap/install_papers_service.sh
 
   d) Connect Telegram (bot token + David's private chat, one-time):
        hermes gateway setup        # choose Telegram
        hermes gateway install      # run the gateway as a service (needed for cron)
-       bash /home/david/workspace/david-agentic-ai/bootstrap/install_cron_watchdog.sh
+       bash /home/david/workspace/David-Agent/bootstrap/install_cron_watchdog.sh
 
   e) Register the scheduled Telegram briefs (after the gateway is up):
-       python3 /home/david/workspace/david-agentic-ai/bootstrap/register_cron.py --dry-run
-       python3 /home/david/workspace/david-agentic-ai/bootstrap/register_cron.py
+       python3 /home/david/workspace/David-Agent/bootstrap/register_cron.py --dry-run
+       python3 /home/david/workspace/David-Agent/bootstrap/register_cron.py
 
   f) Drop English lessons (audio + corrections) into ~/english-lessons/
 

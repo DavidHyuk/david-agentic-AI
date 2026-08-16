@@ -1,7 +1,9 @@
 # 프로젝트 구조 개요 — david-agentic-ai
 
-David Choi의 개인 AI 에이전트 **Hermes** 의 설정을 버전 관리하는 리포지토리입니다.
-이 저장소가 단일 진실 원천(single source of truth)이며, `bootstrap/stage.py` 가 모든 파일을 런타임 디렉터리(`~/.hermes`)로 동기화합니다.
+David Choi의 David 및 English Hermes profile을 버전 관리하는 리포지토리입니다.
+이 저장소가 두 profile의 단일 진실 원천이며, `bootstrap/stage.py`는 David
+profile을 `~/.hermes`로, `stage_english_profile.py`는 English profile을
+`~/.hermes/profiles/english`로 동기화합니다.
 
 ---
 
@@ -9,46 +11,23 @@ David Choi의 개인 AI 에이전트 **Hermes** 의 설정을 버전 관리하�
 
 ```
 DGX Spark (128GB VRAM)
-  └── vLLM 서버 (포트 :8003)
-        └── Qwen3.6-35B-A3B-FP8  (128K 컨텍스트)
-                │  OpenAI-호환 API
-                ▼
-          Hermes Agent
+  └── vLLM 서버 :8003
+        └── Qwen3.6-35B-A3B-FP8 (128K 컨텍스트)
                 │
-        ┌───────┼───────────────┬───────────────────────────────┐
-        │       │               │                               │
-     skills   cron           memory                   Built-in Browser
-   (절차 정의) (스케줄)      (장기 기억)
-        │       │               │
-   papers-digest          USER.md
-   interview-prep         MEMORY.md
-   english-practice
-   calendar-assistant (disabled; retained for later)
-                                             agent-browser 0.33.0
-                                                       │ CDP (localhost)
-                                                       ▼
-                                                 Chromium :19222
+                ├── David Hermes gateway ── David Telegram bot
+                │     ├── papers / interview / weekly review
+                │     └── Chromium CDP :19222
                 │
-                ▼
-            Telegram
+                └── English Hermes gateway ── English Telegram bot
+                      └── tutor feedback / SRS
 
 arXiv / Hugging Face
         │
-        ▼
-papers_ingest.py ── SQLite (`~/.hermes/data/papers/papers.db`)
-        ▲
-systemd timer (매일 08:00, Hermes 세션과 독립)
+        └── papers_ingest.py ── SQLite ── daily systemd timer
 
-KakaoTalk Channel (영어 선생님/David)
+KakaoTalk Channel
         │
-        ▼
-Open Builder → Cloudflare Tunnel → kakao_webhook.py
-                                      │
-                                      ▼
-                              `~/english-lessons/`
-                                      │
-                                      ▼
-                         English cron → Telegram 복습
+        └── Open Builder → kakao_webhook.py → ~/english-lessons/
 ```
 
 ---
@@ -56,7 +35,7 @@ Open Builder → Cloudflare Tunnel → kakao_webhook.py
 ## 디렉터리 구조
 
 ```
-david-agentic-ai/
+David-Agent/
 ├── config/                    # 에이전트 핵심 설정
 │   ├── soul/
 │   │   └── SOUL.md            # 에이전트 인격(Identity) 정의
@@ -67,16 +46,18 @@ david-agentic-ai/
 │   ├── config.fragment.qwen36.yaml  # Qwen3.6 FP8 설정
 │   └── config.fragment.minimax.yaml # MiniMax-M2.7 설정
 │
-├── skills/                    # 에이전트 커스텀 스킬
+├── skills/                    # David profile 스킬 3개
 │   ├── research/
 │   │   └── papers-digest/     # LLM/LVM 논문 소화
 │   ├── career/
 │   │   └── interview-prep/    # Staff/Senior MLE 인터뷰 준비
 │   │       └── references/    # 커리큘럼 + 질문 은행
-│   ├── learning/
-│   │   └── english-practice/  # 영어 레슨 → SRS 드릴
 │   └── productivity/
 │       └── calendar-assistant/ # 비활성; 추후 Google 캘린더 브리핑
+│
+├── profiles/english/          # 영어 전용 Hermes profile의 source of truth
+│   ├── config/{soul,memory,config.fragment.yaml}
+│   └── skills/learning/english-practice/SKILL.md
 │
 ├── scripts/                   # 스킬이 호출하는 Python 헬퍼 (→ ~/.hermes/scripts/)
 │   ├── papers_ingest.py       # arXiv/HF 메타데이터 수집·중복 병합·실행 이력
@@ -97,7 +78,7 @@ david-agentic-ai/
 │   └── hooks.json             # `.codex/hooks/auto_git_commit.py` 위임
 │
 ├── cron/
-│   └── jobs.yaml              # 5개의 Telegram 알림 스케줄 정의
+│   └── jobs.yaml              # 6개의 Telegram 알림 스케줄 정의 (영어 3개는 english profile)
 │
 ├── bootstrap/                 # 설치 및 동기화 자동화
 │   ├── install.sh             # 원클릭 설치 (Hermes + 설정 + 모델)
@@ -106,6 +87,9 @@ david-agentic-ai/
 │   ├── install_cron_watchdog.sh # cron 정지 자동 복구 설치
 │   ├── hermes-cron-watchdog.{service,timer}
 │   ├── hermes-gateway-cron-recovery.conf # gateway 종료 45초 상한
+│   ├── stage_english_profile.py # profile → ~/.hermes/profiles/english
+│   ├── install_english_bot.sh # English Telegram bot gateway 설치
+│   ├── hermes-gateway-english-vllm.conf # 모델 readiness + 종료 제한
 │   ├── stage.py               # repo → ~/.hermes 멱등 동기화
 │   └── register_cron.py       # jobs.yaml → hermes cron 등록
 │
@@ -131,7 +115,7 @@ david-agentic-ai/
 │   ├── Qwen/                  # Qwen 계열 모델
 │   └── MiniMax/               # MiniMax-M2.7 모델
 │
-├── tests/                     # pytest 테스트 (156개)
+├── tests/                     # pytest 테스트 (165개)
 │   ├── conftest.py
 │   ├── test_papers_ingest.py
 │   ├── test_papers_digest.py
@@ -149,7 +133,10 @@ david-agentic-ai/
 │
 └── docs/
     ├── dev-history.md         # 버전 이력
-    └── project-overview.md    # 이 문서
+    ├── project-overview.md    # 이 문서
+    └── study/
+        ├── hermes-agent-memory-and-context.md # Hermes memory/context 학습 노트
+        └── hermes-profiles-vs-subagents.md # 지속형 profile과 sub-agent 설계
 ```
 
 ---
@@ -167,14 +154,14 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 두 파일은 Hermes의 캐릭터 크기 제한 안에서 가장 중요한 사실을 압축해서 담습니다.
 `stage.py` 는 기존 메모리가 있으면 덮어쓰지 않아서, Hermes가 대화하며 쌓은 기억이 재설치 시에도 보존됩니다.
 
-### 3. `skills/` — 절차적 스킬 4개(3개 활성)
+### 3. profile별 절차적 스킬
 각 스킬은 `SKILL.md` 하나로 구성된 선언형 절차서입니다. 언제 쓰는지, 무엇을 입력받는지, 어떤 순서로 실행하는지, 어떤 포맷으로 출력하는지를 명시합니다.
 
 | 스킬 | 카테고리 | 핵심 기능 |
 |------|----------|-----------|
 | `papers-digest` | research | 새 논문 카탈로그에서 LLM/LVM 후보를 뽑아 인터뷰 관련성과 항목별 원문 링크 제공 |
 | `interview-prep` | career | 5-필러 커리큘럼을 돌아가며 Staff/Senior MLE 드릴 제공 |
-| `english-practice` | learning | 레슨 녹음/교정 파일 → SRS 카드 생성 + 매일 리뷰 |
+| `english-practice` | English profile / learning | 레슨 녹음/교정 파일 → SRS 카드 생성 + 전용 Telegram bot 매일 리뷰 |
 | `calendar-assistant` | productivity | **비활성/보존** — 추후 Google Calendar 브리핑 |
 
 ### 4. `scripts/` — 결정론적 데이터 레이어
@@ -195,16 +182,17 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 | `wait_for_vllm.py` | 지정한 served model이 `/v1/models`에 나타날 때까지 gateway 시작 대기 |
 
 ### 5. `cron/jobs.yaml` — 선언형 스케줄
-5개의 Telegram 알림 잡이 YAML로 선언되어 있습니다. Calendar 연동을
+6개의 Telegram 알림 잡이 YAML로 선언되어 있습니다. Calendar 연동을
 재개할 때까지 `morning-brief`는 등록하지 않습니다.
 
 | 잡 | 시간 | 내용 |
 |----|------|------|
 | `papers-digest` | 08:30 매일 | LLM/LVM 연구 시그널 |
 | `interview-prep` | 12:00 월/수/금 | 실시간 트렌드 기반 Staff 레벨 드릴 1개 |
-| `english-intake` | 20:00 매일 | 새 피드백 분석 또는 취약 패턴 코칭; 일요일 누적 복습 |
-| `english-drill` | 21:00 매일 | SRS 드릴 전달 |
-| `weekly-review` | 18:00 일요일 | 논문 + 인터뷰 + 영어 주간 요약 |
+| `english-intake` | 월–토 20:00 | English bot: 새 피드백 분석 또는 취약 패턴 코칭 |
+| `english-drill` | 21:00 매일 | English bot: SRS 드릴 전달 |
+| `english-weekly-review` | 일요일 20:00 | English bot: tutor feedback + 취약 SRS 누적 복습 |
+| `weekly-review` | 18:00 일요일 | David bot: 논문 + 인터뷰 주간 요약 |
 
 논문 수집은 Hermes cron이 아니라 별도 `hermes-papers-ingest.timer`가 매일
 08:00에 수행합니다. 따라서 모델이나 gateway가 일시적으로 내려가도
@@ -216,6 +204,7 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 `hermes-gateway-cron-recovery.conf`가 멈춘 worker의 종료 대기를 45초로
 제한합니다. 따라서 하나의 agent job이 영구 대기해도 이후 스케줄 전체가
 며칠간 조용히 멈추지 않습니다.
+
 
 ### 6. `local-model/` — LLM 백엔드
 `run_model.sh` 는 4가지 모델을 하나의 스크립트로 지원하며, 인자 없이 실행해도
@@ -238,7 +227,7 @@ Qwen3.6 launcher와 `restart_service.sh`는 기본 GPU 예약 비율 50%를 사�
 `/home/david/workspace/models/download_model.py`가 담당하며, `run_model.sh`는 해당
 경로의 체크포인트를 vLLM service에 전달하는 실행 계층으로 유지됩니다.
 
-### 7. `browser/` — Hermes Built-in Browser
+### 7. browser 격리
 
 Hermes 내장 브라우저 도구를 그대로 사용하고 직접 Playwright 코드는 추가하지
 않습니다. ARM64 DGX Spark에서 Snap Chromium 자동 실행이 멈추는 문제를 피하기
@@ -267,14 +256,16 @@ Hermes가 고정된 `agent-browser 0.33.0`을 통해 연결합니다. 외부 클
 
 ### 방향 2 — 기억(Memory) 품질 향상
 
-에이전트는 대화를 거듭하며 `~/.hermes/memories/`에 기억을 누적합니다.
-`stage.py`의 "seed-only" 정책(기존 기억은 덮어쓰지 않음)이 이 성장을 보호합니다.
-결과적으로 재설치 후에도 David에 대한 이해가 초기화되지 않습니다.
+David agent는 `~/.hermes/memories/`, English agent는
+`~/.hermes/profiles/english/memories/`에 독립적으로 기억을 누적합니다.
+profile별 seed-only 정책이 기존 기억을 덮어쓰지 않아 재설치 후에도 누적된
+사용자 이해와 학습 맥락이 보존됩니다.
 
 ### 방향 3 — 스킬 커버리지 확대
 
 v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버하는 방향으로 설계되어 있습니다.
-`skills/<category>/<name>/SKILL.md` 하나를 추가하면 새 능력이 즉시 에이전트에 합쳐집니다.
+`skills/` 또는 `profiles/<name>/skills/` 아래에 skill을 추가해 어느 agent가
+능력을 소유할지 명확히 선택합니다.
 
 ---
 
@@ -293,11 +284,13 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   - Qwen3.5-122B AWQ → AutoRound 전환 시 추론 속도 약 3.6× 향상 예상 (~14 → ~51 tok/s)
 
 ### Hermes Agent 프레임워크 (Nous Research)
+- **Native profiles**: gateway, Telegram token, SOUL, memory, session, skill,
+  MCP를 agent별로 격리하면서 같은 vLLM endpoint를 공유
 - **선언형 스킬(Declarative Skills)**: SKILL.md 파일 하나가 절차 전체를 정의 → 코드 없이 에이전트 능력 추가
 - **장기 기억(Persistent Memory)**: 대화 간 기억 유지로 에이전트가 David를 더 깊이 이해할수록 유용해짐
 - **Cron 스케줄러**: YAML 선언으로 주기적 Telegram 알림 → 에이전트가 먼저 행동하는 proactive 패턴
 - **MCP (Model Context Protocol)**: 외부 서비스를 표준 도구로 연결. Google
-  Calendar 템플릿은 추후 재활성화를 위해 보존되어 있으나 현재 런타임에는 없음
+  Calendar 템플릿은 추후 재활성화를 위해 보존됩니다.
 
 ### 스페이스드 리피티션(Leitner SRS)
 - `english_srs.py`의 Leitner 박스 알고리즘 → 맞힌 카드는 나중에, 틀린 카드는 다음날 재등장

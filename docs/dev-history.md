@@ -3,6 +3,246 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.0.1 — 2026-08-15 (patch: document Hermes memory architecture)
+
+- Added a Korean study note covering the built-in file-backed memory tool,
+  frozen system-prompt snapshots, profile isolation, durable-state boundaries,
+  cron fresh-session behavior, and a practical code-reading sequence.
+- Documented the verified David/English peer-profile architecture, why persistent
+  channel agents should not be modeled as parent/child sub-agents, and the
+  decision criteria for future profiles, coordinators, and ephemeral workers.
+- Split Sunday English review into its own `english-weekly-review` cron job;
+  weekday intake coaching and English weekly review now have explicit, separate
+  schedules and delivery semantics.
+- Verified the updated configuration suite: 165 passed.
+
+## v1.0.0 — 2026-08-15 (major: make David-Agent ownership explicit)
+
+- Moved the ClawGram Hermes profile, MCP registration, systemd services,
+  runtime configuration, Google Photos login helper, and their tests into the
+  independent `/home/david/workspace/ClawGram` repository.
+- Removed ClawGram's duplicate Docker files and all active ClawGram deployment
+  ownership from this repository. David-Agent no longer stages, installs, or
+  restarts the ClawGram profile or gateway.
+- Kept the already-running profiles as peer Hermes gateways; any shared local
+  vLLM endpoint is infrastructure rather than an agent parent-child relation.
+
+## v0.17.0 — 2026-08-15 (minor: isolate ClawGram workflow observability)
+
+- Split ClawGram's local persistence into domain, LangGraph checkpoint, and
+  cross-thread personalization SQLite files. The migration copies and verifies
+  existing state while retaining the legacy tables as a recovery copy.
+- Added a revision-token-protected, read-only workflow dashboard with current
+  nodes, branch metrics, retrieval evidence, grade, and trace, without photo
+  bytes, paths, or asset IDs.
+- Added a separate LangGraph Studio venv and online-backup snapshots, loopback
+  binding, tracing/analytics opt-out, one-worker limit, and automatic snapshot
+  thread registration. Production SQLite files are never used as Studio write
+  targets.
+- Extended the version-controlled Hermes MCP/runtime environment with explicit
+  workflow and personalization database paths.
+
+## v0.16.1 — 2026-08-15 (patch: isolate English Telegram delivery)
+
+- Added an `english` Hermes profile with its own SOUL, memory, skill copies,
+  gateway configuration, and Telegram token location.
+- Moved the English intake and drill cron jobs to that profile, while leaving
+  papers, interview preparation, and the weekly review on the existing David bot.
+- Added a token-safe installer that creates/stages the profile and only installs
+  its gateway after the dedicated Telegram bot is configured.
+- Accounted for Hermes profile-local `HOME` by using profile-local helper paths
+  and explicit absolute paths for the shared Kakao inbox and existing SRS state.
+- Added the shared-vLLM readiness dependency and a bounded gateway shutdown so a
+  failed English tool call cannot leave profile deployment stuck indefinitely.
+- Made David's established drill preference durable in the English skill, cron
+  prompt, and profile seed: every question now carries its answer immediately
+  below it, with answerless or separate-answer-key drills explicitly prohibited.
+- Fixed cron synchronization to remove an existing job from the same Hermes
+  profile where it is created, preventing duplicate English schedules on reruns.
+
+## v0.16.0 — 2026-08-15 (minor: expose personalization as LangGraph nodes)
+
+### Added and verified
+- Refactored ClawGram personalization into explicit `retrieve_preferences` and
+  `grade_selection` LangGraph nodes. The executable Mermaid graph now shows
+  evidence retrieval before every selection and deterministic grading before
+  expansion, duplicate refinement, or draft persistence.
+- Extended the privacy-safe MCP workflow summary with aggregate feedback
+  evidence and selection-grade outcome. Active asset IDs remain local to the
+  checkpoint and are not returned through Hermes.
+- Added a regression that creates a checkpoint with the previous topology and
+  resumes it through the new retrieval/grade path. A SQLite backup of the live
+  awaiting-approval checkpoint also resumed to `human_review` with both new
+  nodes in its trace; the production DB and review link were unchanged.
+- ClawGram Python 3.13 and deployment Python 3.11 suites: 195 passed, 2 skipped
+  in each environment.
+
+## v0.15.0 — 2026-08-15 (minor: persist ClawGram review preferences)
+
+### Added and deployed
+- Added durable ClawGram review scopes for one-draft exclusions and future
+  screenshot, document, or unwanted-photo exclusions. Human feedback is stored
+  as append-only decision/reason/scope evidence and retrieved before later
+  deterministic selection, where it takes precedence over model scores.
+- Prevented checked exclusions from being silently approved; David must first
+  apply them through `선택 다시 하기`. Updated the isolated family-letter skill
+  to explain this review boundary without granting Hermes approval authority.
+- Strengthened Qwen's screen/document rubric and advanced the assessment cache
+  version so the first post-upgrade run refreshes prior v1 observations once.
+- Kept private photo bytes out of Hermes memory, feedback events, and LangGraph
+  checkpoints. This structured evidence store is the foundation for a later
+  agentic-RAG preference planner, separate from Instagram visual RAG.
+- Restarted the live ClawGram assessment/review services and verified both
+  loopback health endpoints. The biweekly timer remains disabled until its
+  explicit operational enable.
+
+### Verified
+- ClawGram Python 3.13 and deployment Python 3.11 suites: 194 passed, 2 skipped
+  in each environment.
+
+## v0.14.0 — 2026-08-15 (minor: durable transient model retries)
+
+### Added and hardened
+- Added a bounded systemd retry path for ClawGram jobs requeued after transient
+  assessment HTTP 429/5xx or connection failures. The same LangGraph pending
+  node and per-photo cache resume after 60 seconds, while invalid contracts
+  remain terminal and do not loop.
+- Confirmed the first real vLLM interruption was not OOM or KV pressure. A model
+  process started before the repository rename retained the removed lowercase
+  virtualenv path and failed a later Triton JIT lookup; the current `David-Agent`
+  environment already contains `ptxas-blackwell`.
+- Made the local vLLM launcher relocatable by invoking the current virtualenv's
+  Python module entry point instead of an absolute-path console-script shebang.
+- Completed the first real family-letter E2E through the approval boundary:
+  535 readable Google Photos assets, 200 Qwen3.6 assessments for the requested
+  14-day window, 20 selected photos all above the child-focus threshold, a
+  durable `human_review` interrupt, and one private HTTPS review link. During an
+  active image request, KV usage was 0.5% with 20.0 GiB available KV cache.
+
+## v0.13.5 — 2026-08-15 (patch: reload ClawGram service code)
+
+### Fixed and verified
+- Restart the long-lived assessment and review Python services during each
+  integration install. `systemctl enable --now` alone left active processes on
+  stale source code, which caused the first real Google Photos job to reject the
+  new `google_photos_web` enum with HTTP 422 before any VLM work began.
+
+## v0.13.4 — 2026-08-15 (patch: calibrate Google Photos candidate ceiling)
+
+### Fixed and bounded
+- Calibrated the Google Photos fail-closed candidate ceiling from 500 to 750
+  after the real 29-day family-letter expansion window produced 557 unique
+  candidates. The collector remains bounded and still stops before worker claim
+  if the Google UI returns an abnormal volume.
+
+## v0.13.3 — 2026-08-15 (patch: allow only local DevTools frontend)
+
+### Fixed and protected
+- Allowed the exact `devtools://devtools` WebSocket Origin required by local
+  Chrome's `chrome://inspect` frontend. Chrome 150 otherwise returned HTTP 403
+  while its discovery endpoint remained healthy.
+- Kept wildcard and public web frontend Origins denied; CDP remains bound to
+  loopback and reachable from David's PC only through the SSH local forward.
+
+## v0.13.2 — 2026-08-15 (patch: support secure remote Google login)
+
+### Fixed and protected
+- Replaced the Google Photos browser's headless launch with headed Chromium on
+  a private Xvfb display because Google rejects account sign-in from the
+  headless DevTools target.
+- Added a rootless installer for Ubuntu's repository-verified Xvfb package and
+  retained the custom cookie profile plus localhost-only CDP. Login is viewed
+  through an SSH-forwarded DevTools screencast; CDP is not exposed to LAN or
+  Tailnet peers.
+- Updated the login helper to prepare the Google target on an SSH-only server
+  and added a separate authentication health check.
+- Full Hermes configuration suite: 172 passed. Runtime verification reports a
+  normal Chrome 150 user agent, `navigator.webdriver=false`, and a listener
+  restricted to `127.0.0.1:19223`.
+
+## v0.13.1 — 2026-08-15 (patch: make profile gateway install unattended)
+
+### Fixed and verified
+- Answer the two fixed Hermes Linux service prompts explicitly when installing
+  the ClawGram gateway, so repeatable integration installs no longer stop for
+  terminal input after the bot token is configured.
+- Re-ran the full Hermes configuration suite: 171 passed, then deployed and
+  verified the enabled `hermes-gateway-clawgram.service`, vLLM readiness
+  drop-in, profile-only MCP connection, and seven least-authority tools.
+
+## v0.13.0 — 2026-08-15 (minor: isolate ClawGram agent and automate photo source)
+
+### Added
+- Added a native `clawgram` Hermes profile with independent SOUL, memory,
+  sessions, least-authority Telegram tools, MCP registration, gateway service,
+  and dedicated Telegram bot token.
+- Added a dedicated localhost Chromium profile/CDP service and interactive
+  Google login helper. The source service collects a bounded Google Photos
+  window before worker claim; login/UI/download failures preserve queued jobs.
+- Kept Galaxy Gallery and Google Photos Picker as modular local-manifest
+  adapters for later companion-app use.
+
+### Changed and protected
+- Moved `family-letter` out of the David profile and removed the legacy default
+  MCP entry during installation. David's paper, English, interview, memory,
+  sessions, cron, and Telegram bot remain independent.
+- Both profiles share the existing Qwen3.6 vLLM weights. Image assessment stays
+  sequential and obeys the 10% existing-KV guard; a second model is not loaded.
+- The biweekly timer now requires a dedicated bot token, authenticated Google
+  session, assessment endpoint, and HTTPS review URL before it can be enabled.
+
+### Verified
+- Full Hermes configuration suite: 171 passed.
+- ClawGram Python 3.13 suite: 184 passed, 2 skipped. The deployment Python 3.11
+  suite and local systemd/MCP smoke are repeated during rollout.
+
+## v0.12.0 — 2026-08-15 (minor: operationalize private family-letter review)
+
+### Added
+- Added always-on, low-priority ClawGram source/assessment and review services.
+  Qwen3.6 receives one cached image per request only when its vLLM scheduler/KV
+  guard considers the shared endpoint idle.
+- Added a secret-safe runtime configurator for the authenticated gallery upload
+  boundary and private HTTPS review base URL.
+- Added Telegram review-link delivery through the existing Hermes gateway,
+  tokenized contact-sheet approval, node-specific revisions, and an approved
+  Galaxy Android share handoff for KakaoTalk.
+
+### Fixed and verified
+- Isolated the Python 3.11 ClawGram stdio MCP with `-I`, preventing Hermes's
+  Python 3.13 user-site wheels from breaking startup; `hermes mcp test clawgram`
+  discovers all seven least-authority tools and the gateway reconnects cleanly.
+- Full Hermes configuration suite: 164 passed.
+- Kept the biweekly timer disabled until a real photo source and private HTTPS
+  phone route complete one E2E test. No approval or delivery authority was added
+  to MCP.
+
+## v0.11.0 — 2026-08-15 (minor: add isolated ClawGram family-letter control plane)
+
+### Added
+- Added the `family-letter` skill for a child-focused 10–20 photo draft workflow
+  through ClawGram, with revision-safe editing and an explicit human approval
+  boundary before KakaoTalk delivery.
+- Added `mcp/setup_clawgram.py` and a least-authority stdio MCP allowlist. Hermes
+  can enqueue/status/cancel jobs and read/edit drafts, but cannot approve,
+  hand off, or mark delivery complete.
+- Added independent user systemd units: a Saturday 02:00 schedule gate, a
+  13-day admission check for true biweekly jobs, and a low-priority one-shot
+  worker outside Hermes cron.
+
+### Safety and rollout
+- The installer registers MCP and installs units while keeping the schedule
+  disabled by default. `--enable-timer` fails unless the runtime-only
+  `CLAWGRAM_ASSESSMENT_URL` is explicitly configured.
+- ClawGram's worker refuses to claim a queued job when its VLM/source backend is
+  absent, allowing model selection and benchmarking to remain a later decision.
+- The existing five Telegram cron jobs and Qwen3.6 Hermes service remain
+  unchanged; ClawGram does not consume `cron.max_parallel_jobs: 1`.
+
+### Verified
+- ClawGram full suite: 161 passed, 2 skipped.
+- Full Hermes configuration suite: 162 passed.
+
 ## v0.10.2 — 2026-07-28 (patch: require paper links in Telegram digests)
 
 ### Changed

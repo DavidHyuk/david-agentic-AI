@@ -31,10 +31,10 @@ his interview prep, research reading, and English practice.
 
 ## Prerequisites
 - The `google-calendar` MCP server is registered and authorized
-  (`python3 /home/david/workspace/david-agentic-ai/mcp/setup_google_calendar.py
+  (`python3 /home/david/workspace/David-Agent/mcp/setup_google_calendar.py
   --credentials <web-oauth.json>`; one-time OAuth). If MCP calendar tools are
   unavailable, say so plainly and point David to
-  `/home/david/workspace/david-agentic-ai/docs/google-calendar-mcp.md` — do not
+  `/home/david/workspace/David-Agent/docs/google-calendar-mcp.md` — do not
   fabricate events.
 
 ## Procedure

@@ -49,6 +49,6 @@ print(f"PyTorch runtime: torch={torch.__version__} cuda={torch.version.cuda}")
 print(f"GPU: {torch.cuda.get_device_name(0)}")
 PY
 
-"${VENV_DIR}/bin/vllm" --version
+"${VENV_DIR}/bin/python" -m vllm.entrypoints.cli.main --version
 echo "vLLM CUDA extension import: OK"
 echo "Next: bash local-model/run_model.sh qwen36"

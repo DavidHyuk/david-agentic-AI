@@ -137,11 +137,19 @@ fi
 python3 "${SCRIPT_DIR}/model_preflight.py" "${PREFLIGHT_ARGS[@]}"
 
 if [ -n "${HERMES_VLLM_BIN:-}" ]; then
-  VLLM_BIN="${HERMES_VLLM_BIN}"
-elif [ -x "${SCRIPT_DIR}/.venv/bin/vllm" ]; then
-  VLLM_BIN="${SCRIPT_DIR}/.venv/bin/vllm"
+  VLLM_COMMAND=("${HERMES_VLLM_BIN}")
+elif [ -x "${SCRIPT_DIR}/.venv/bin/python" ] && \
+     "${SCRIPT_DIR}/.venv/bin/python" -c 'import vllm' >/dev/null 2>&1; then
+  # Console-script shebangs embed the absolute venv path and break after a
+  # repository rename. Python's module entry point resolves from the current
+  # venv location instead.
+  VLLM_COMMAND=(
+    "${SCRIPT_DIR}/.venv/bin/python"
+    -m
+    vllm.entrypoints.cli.main
+  )
 elif command -v vllm >/dev/null 2>&1; then
-  VLLM_BIN="$(command -v vllm)"
+  VLLM_COMMAND=("$(command -v vllm)")
 else
   echo "ERROR: vLLM executable not found." >&2
   echo "Create the isolated runtime with: bash local-model/setup_vllm.sh" >&2
@@ -165,7 +173,7 @@ echo
 
 # Build command — conditionally add --quantization only when set
 VLLM_ARGS=(
-  "${VLLM_BIN}" serve "${MODEL_PATH}"
+  "${VLLM_COMMAND[@]}" serve "${MODEL_PATH}"
   --served-model-name "${SERVED_NAME}"
   --tensor-parallel-size 1
   --gpu-memory-utilization "${GPU_UTIL}"
@@ -205,8 +213,8 @@ if [ "${HERMES_VLLM_DRY_RUN:-0}" = "1" ]; then
   exit 0
 fi
 
-if ! VLLM_VERSION_OUTPUT="$("${VLLM_BIN}" --version 2>&1)"; then
-  echo "ERROR: ${VLLM_BIN} exists but cannot load its CUDA/PyTorch runtime." >&2
+if ! VLLM_VERSION_OUTPUT="$("${VLLM_COMMAND[@]}" --version 2>&1)"; then
+  echo "ERROR: vLLM exists but cannot load its CUDA/PyTorch runtime." >&2
   echo "${VLLM_VERSION_OUTPUT}" >&2
   echo "Recreate the isolated runtime with: bash local-model/setup_vllm.sh" >&2
   exit 1

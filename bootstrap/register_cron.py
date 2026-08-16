@@ -61,17 +61,23 @@ def build_create_command(job: dict) -> list[str]:
         cmd += ["--deliver", str(job["deliver"])]
     if job.get("workdir"):
         cmd += ["--workdir", str(job["workdir"])]
+    if job.get("profile"):
+        cmd += ["--profile", str(job["profile"])]
     return cmd
 
 
-def build_remove_command(name: str) -> list[str]:
-    return ["hermes", "cron", "remove", name]
+def build_remove_command(name: str, profile: str | None = None) -> list[str]:
+    """Build removal in the same profile store used by job creation."""
+    cmd = ["hermes"]
+    if profile:
+        cmd += ["-p", profile]
+    return cmd + ["cron", "remove", name]
 
 
 def register(jobs: list[dict], dry_run: bool = False) -> None:
     have_cli = shutil.which("hermes") is not None
     for job in jobs:
-        remove_cmd = build_remove_command(job["name"])
+        remove_cmd = build_remove_command(job["name"], job.get("profile"))
         create_cmd = build_create_command(job)
         if dry_run or not have_cli:
             prefix = "[dry-run]" if dry_run else "[no hermes CLI on PATH]"

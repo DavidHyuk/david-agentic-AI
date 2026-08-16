@@ -10,7 +10,7 @@ REPO = Path(__file__).resolve().parent.parent
 JOBS = REPO / "cron" / "jobs.yaml"
 EXPECTED_JOBS = {
     "papers-digest", "interview-prep", "english-intake", "english-drill",
-    "weekly-review",
+    "english-weekly-review", "weekly-review",
 }
 
 
@@ -25,18 +25,42 @@ def test_defaults_applied_deliver_telegram():
     assert all(j["deliver"] == "telegram" for j in jobs)
 
 
+def test_english_jobs_use_the_isolated_english_profile():
+    jobs = {job["name"]: job for job in rc.load_jobs(JOBS)}
+    assert jobs["english-intake"]["profile"] == "english"
+    assert jobs["english-drill"]["profile"] == "english"
+    assert jobs["english-weekly-review"]["profile"] == "english"
+    assert "english-practice" not in jobs["weekly-review"]["skills"]
+
+
 def test_calendar_brief_is_not_scheduled_while_integration_is_deferred():
     jobs = rc.load_jobs(JOBS)
     assert "morning-brief" not in {job["name"] for job in jobs}
 
 
-def test_english_intake_coaches_without_feedback_and_reviews_on_sunday():
+def test_english_intake_coaches_without_feedback_on_weekdays():
     jobs = {job["name"]: job for job in rc.load_jobs(JOBS)}
     prompt = jobs["english-intake"]["prompt"]
     assert "Do not stay silent" in prompt
     assert "weaknesses" in prompt
-    assert "On Sunday" in prompt
+    assert jobs["english-intake"]["schedule"] == "0 20 * * 1-6"
     assert "[SILENT]" not in prompt
+
+
+def test_english_weekly_review_is_a_dedicated_sunday_job():
+    jobs = {job["name"]: job for job in rc.load_jobs(JOBS)}
+    review = jobs["english-weekly-review"]
+    assert review["schedule"] == "0 20 * * 0"
+    assert "Procedure E" in review["prompt"]
+    assert "standalone weekly review" in review["prompt"]
+
+
+def test_english_drill_always_includes_inline_answers():
+    jobs = {job["name"]: job for job in rc.load_jobs(JOBS)}
+    prompt = jobs["english-drill"]["prompt"]
+    assert "each answer immediately below" in prompt
+    assert "Never send a drill without answers" in prompt
+    assert "separate answer key" in prompt
 
 
 def test_build_create_command_shape():
@@ -46,6 +70,7 @@ def test_build_create_command_shape():
         "prompt": "Send   my   digest",   # collapsed whitespace expected
         "skills": ["papers-digest"],
         "deliver": "whatsapp",
+        "profile": "research",
     }
     cmd = rc.build_create_command(job)
     assert cmd[:3] == ["hermes", "cron", "create"]
@@ -54,6 +79,16 @@ def test_build_create_command_shape():
     assert "--name" in cmd and "papers-digest" in cmd
     assert cmd[cmd.index("--skill") + 1] == "papers-digest"
     assert cmd[cmd.index("--deliver") + 1] == "whatsapp"
+    assert cmd[cmd.index("--profile") + 1] == "research"
+
+
+def test_build_remove_command_targets_the_same_profile():
+    assert rc.build_remove_command("english-drill", "english") == [
+        "hermes", "-p", "english", "cron", "remove", "english-drill"
+    ]
+    assert rc.build_remove_command("papers-digest") == [
+        "hermes", "cron", "remove", "papers-digest"
+    ]
 
 
 def test_missing_required_field_raises(tmp_path):

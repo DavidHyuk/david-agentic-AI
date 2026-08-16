@@ -2,7 +2,8 @@
 #
 # Registered by bootstrap/register_cron.py via `hermes cron create`. Schedules are
 # cron expressions evaluated in the gateway host's local timezone
-# (set the host to America/Los_Angeles). All jobs deliver to telegram.
+# (set the host to America/Los_Angeles). The English jobs run in the isolated
+# `english` profile, so delivery uses its dedicated Telegram bot.
 #
 # Cron jobs run in a FRESH session, so every prompt is self-contained and names the
 # skill(s) it relies on. Keep prompts skimmable — these are push notifications.
@@ -38,14 +39,13 @@ jobs:
       exactly; the python command is unavailable.
 
   - name: english-intake
-    schedule: "0 20 * * *"          # 20:00 daily coaching; Sunday is weekly review
+    schedule: "0 20 * * 1-6"        # 20:00 Mon-Sat coaching
+    profile: english
     skills: [english-practice]
     prompt: >
       Deliver the 20:00 English coaching using the english-practice skill. First
       run english_intake.py with python3 and process any new KakaoTalk or lesson
-      feedback through Procedure A. Determine the local weekday. On Sunday, follow
-      Procedure E and send a cumulative review of this week's feedback plus weak
-      SRS cards. On other days with no new feedback, follow Procedure D: use
+      feedback through Procedure A. With no new feedback, follow Procedure D: use
       english_srs.py weaknesses and stats to explain one or two evidence-backed
       weak patterns, include a clearly labeled generated practice example, and ask
       one short production question. Do not stay silent merely because no new
@@ -53,20 +53,37 @@ jobs:
 
   - name: english-drill
     schedule: "0 21 * * *"          # 21:00 every day
+    profile: english
     skills: [english-practice]
     prompt: >
       Send tonight's English drill. Use the english-practice skill (drill branch):
       run english_srs.py due and deliver the due cards as a Korean-guided rewrite
-      quiz. Prioritize weak patterns observed in the recent tutor feedback. Invite
-      me to reply with my attempts so you can grade and record results. If nothing
-      is due, reply only [SILENT].
+      drill. Put each answer immediately below its corresponding question, labeled
+      정답. Never send a drill without answers and never collect the answers in a
+      separate answer key. Prioritize weak patterns observed in the recent tutor
+      feedback. I may still reply with my attempts for grading. If nothing is due,
+      reply only [SILENT].
+
+  - name: english-weekly-review
+    schedule: "0 20 * * 0"          # 20:00 Sunday, dedicated English review
+    profile: english
+    skills: [english-practice]
+    prompt: >
+      Deliver the dedicated weekly English review using the english-practice skill
+      and Procedure E. Run english_intake.py --week, then english_srs.py weaknesses
+      and stats with python3. Send this only through the English Telegram bot:
+      summarize this week's tutor feedback, the top three recurring patterns,
+      representative actual corrections when available, weak SRS cards, a
+      three-question rewrite challenge with each answer immediately below its
+      question, and one measurable focus for next week. Do not invent teacher
+      corrections. This is a standalone weekly review, not a daily intake message.
 
   - name: weekly-review
     schedule: "0 18 * * 0"          # 18:00 Sunday
-    skills: [papers-digest, interview-prep, english-practice]
+    skills: [papers-digest, interview-prep]
     prompt: >
       Write my weekly review. Summarize: (1) the most important LLM/LVM papers this
       week and one I should deep-read, (2) interview-prep pillars covered vs
-      neglected from the progress log with next week's focus, and (3) English
-      progress from the SRS deck stats (cards added, due, mastery by box). End with
-      3 concrete goals for next week tied to landing a Staff/Senior MLE role.
+      neglected from the progress log with next week's focus. End with 2 concrete
+      goals for next week tied to landing a Staff/Senior MLE role. English coaching
+      and SRS progress are delivered only through the dedicated English Telegram bot.

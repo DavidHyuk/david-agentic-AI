@@ -3,7 +3,8 @@
 A personalized, always-on AI partner for **David Choi**, built on the
 [**Hermes Agent**](https://github.com/NousResearch/hermes-agent) framework
 (Nous Research). It learns David's life and goals over time and proactively helps
-with three active areas, delivered to **Telegram**:
+with research and interview preparation delivered to the David **Telegram**
+bot, plus English feedback delivered to a dedicated English **Telegram** bot:
 
 1. **LLM/LVM research** — daily arXiv + Hugging Face ingestion and a personalized digest.
 2. **Staff/Senior MLE interview prep** — a rotating curriculum with drills + rubrics.
@@ -12,8 +13,10 @@ with three active areas, delivered to **Telegram**:
 Google Calendar support is retained for a later phase, but its skill, MCP
 connection, and scheduled brief are currently disabled.
 
-This repository is the **single source of truth** for the agent's configuration.
-Assets are synced into the Hermes runtime home (`~/.hermes`) by `bootstrap/stage.py`.
+This repository is the **single source of truth** for the David and English
+agent configurations. David-agent assets are synced into `~/.hermes` by
+`bootstrap/stage.py`; English assets are synced into their own profile by
+`bootstrap/stage_english_profile.py`.
 
 ## Why a config repo instead of ad-hoc setup?
 Hermes stores skills, memory, personality, scripts, and cron jobs under `~/.hermes`.
@@ -27,14 +30,17 @@ disposable cache.
 Local DGX Spark (vLLM @ :8003, Qwen3.6 FP8, 128K ctx)
         │  OpenAI-compatible API
         ▼
-   Hermes Agent  ──────────────────────────────────────────────► Telegram
+   David Hermes profile ───────────────────────────────────────► David Telegram bot
         │ skills (procedural)   │ cron (schedule)   │ memory (who David is)
         ├─ Built-in Browser ── agent-browser ── local Chromium CDP (:19222)
         ├─ papers-digest  ── reads ~/.hermes/data/papers/papers.db
         ├─ interview-prep ── curriculum + progress log
-        ├─ english-practice ─ Kakao webhook → english_intake.py + english_srs.py
-        │                    → Telegram review (~/english-lessons)
         └─ calendar-assistant ─ disabled; source retained for later
+
+   English Hermes profile ─────────────────────────────────────► English Telegram bot
+        │ isolated SOUL / memory / sessions / Telegram token
+        └─ english-practice ─ Kakao webhook → english_intake.py + english_srs.py
+                             → review + SRS drill (~/english-lessons)
 
  arXiv + Hugging Face ── papers_ingest.py ── SQLite paper catalog
                               ▲
@@ -48,7 +54,8 @@ Local DGX Spark (vLLM @ :8003, Qwen3.6 FP8, 128K ctx)
 | `config/memory/{USER,MEMORY}.md` | Seed memory (→ `~/.hermes/memories/`) |
 | `config/config.fragment.yaml` | Non-secret settings merged into `config.yaml` |
 | `config/env.example` | Template for `~/.hermes/.env` secrets |
-| `skills/<category>/<name>/SKILL.md` | The four custom skills |
+| `skills/<category>/<name>/SKILL.md` | Three David-agent skills (two active, Calendar disabled) |
+| `profiles/english/` | Isolated English SOUL, memory, config, and English-practice skill |
 | `scripts/*.py` | Standalone, unit-tested helpers (→ `~/.hermes/scripts/`) |
 | `cron/jobs.yaml` | Declarative Telegram notification schedule |
 | `docs/kakao-channel-setup.md` | Kakao Channel chatbot and webhook setup |
@@ -57,6 +64,8 @@ Local DGX Spark (vLLM @ :8003, Qwen3.6 FP8, 128K ctx)
 | `bootstrap/register_cron.py` | Register `jobs.yaml` with `hermes cron` |
 | `bootstrap/install_papers_service.sh` | Install daily paper ingestion service/timer |
 | `bootstrap/install_cron_watchdog.sh` | Install automatic cron-stall detection and gateway recovery |
+| `bootstrap/stage_english_profile.py` | Stage only the isolated English-coaching Hermes profile |
+| `bootstrap/install_english_bot.sh` | Create/stage the English profile, install its gateway, and sync cron jobs |
 | `scripts/papers_ingest.py` | Fetch and merge arXiv/Hugging Face paper metadata |
 | `scripts/papers_digest.py` | Read-only recommended/recent/trending paper digest |
 | `browser/setup_browser.sh` | Pin agent-browser + install the local Chromium CDP service |
@@ -417,10 +426,11 @@ Open Builder에서 다음 순서로 설정합니다.
 영어 수집 서버로 전달되지 않으므로, 채널 홈의 **챗봇 채팅**에서 원문을
 다시 보내야 합니다.
 
-수집된 원문은 `~/english-lessons/YYYY-MM-DD/` 아래에 저장됩니다. 매일
+수집된 원문은 `~/english-lessons/YYYY-MM-DD/` 아래에 저장됩니다. 월–토
 20:00 `english-intake`가 새 피드백을 분석합니다. 새 피드백이 없는 날에는
-누적 SRS 카드에서 취약 패턴을 골라 짧은 코칭을 보내며, 일요일에는 그 주의
-전체 피드백과 누적 취약 카드를 묶어 복습합니다. 21:00 `english-drill`은
+누적 SRS 카드에서 취약 패턴을 골라 짧은 코칭을 보냅니다. 일요일 20:00
+`english-weekly-review`는 그 주의 전체 피드백과 누적 취약 카드를 전용
+English bot으로 복습합니다. 21:00 `english-drill`은
 당일 복습 문제를 전송합니다.
 
 개인화 코칭과 주간 복습에 사용되는 근거를 직접 확인할 수 있습니다.
@@ -448,9 +458,29 @@ cat ~/.hermes/data/english/kakao-skill-url.txt
 |---|---|---|
 | `papers-digest` | 08:30 daily | LLM/LVM research signal after 08:00 ingestion |
 | `interview-prep` | 12:00 Mon/Wed/Fri | One focused Staff/Senior MLE drill |
-| `english-intake` | 20:00 daily | Feedback analysis or weakness coaching; Sunday cumulative review |
-| `english-drill` | 21:00 daily | Tonight's spaced-repetition drill |
-| `weekly-review` | 18:00 Sunday | Papers + prep + English weekly summary |
+| `english-intake` | 20:00 Mon–Sat | Dedicated English bot: feedback analysis or weakness coaching |
+| `english-drill` | 21:00 daily | Dedicated English bot: tonight's spaced-repetition drill |
+| `english-weekly-review` | 20:00 Sunday | Dedicated English bot: tutor feedback + weak SRS cumulative review |
+| `weekly-review` | 18:00 Sunday | Main David bot: papers + interview-prep weekly summary |
+
+### Dedicated English Telegram bot
+
+Create a new bot with BotFather, then run the following once. The profile setup
+stores that bot's token only in `~/.hermes/profiles/english/.env`; it never goes
+in this repository or the main David profile.
+
+```bash
+bash bootstrap/install_english_bot.sh
+hermes -p english gateway setup
+# Choose Telegram, enter the new bot token, and message the bot once to pair it.
+bash bootstrap/install_english_bot.sh
+```
+
+The first command stages the main and English profiles, removes the main profile's
+former English skill, and tells you to configure the bot when its token is absent.
+Re-running after setup installs the profile gateway and re-syncs
+the two English cron jobs with `--profile english`. Papers, interview prep, and the
+weekly review remain on the original bot.
 
 ### Automatic cron recovery
 
@@ -513,7 +543,7 @@ auto-launch hang observed on the DGX Spark's ARM64 environment.
 # 1. Download and manage the checkpoint in the dedicated models workspace (~100GB+)
 cd /home/david/workspace/models
 python3 download_model.py cyankiwi/MiniMax-M2.7-AWQ-4bit
-cd /home/david/workspace/david-agentic-ai
+cd /home/david/workspace/David-Agent
 
 # 2. Stop Qwen vLLM, start MiniMax
 bash local-model/run_model.sh minimax
