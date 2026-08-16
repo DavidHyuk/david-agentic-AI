@@ -60,9 +60,11 @@ jobs:
     prompt: >
       Send tonight's English drill. Use the english-practice skill (drill branch):
       run english_srs.py due and deliver the due cards as a Korean-guided rewrite
-      quiz. Prioritize weak patterns observed in the recent tutor feedback. Invite
-      me to reply with my attempts so you can grade and record results. If nothing
-      is due, reply only [SILENT].
+      drill. Put each answer immediately below its corresponding question, labeled
+      정답. Never send a drill without answers and never collect the answers in a
+      separate answer key. Prioritize weak patterns observed in the recent tutor
+      feedback. I may still reply with my attempts for grading. If nothing is due,
+      reply only [SILENT].
 
   - name: weekly-review
     schedule: "0 18 * * 0"          # 18:00 Sunday

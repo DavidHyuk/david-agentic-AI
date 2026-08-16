@@ -30,6 +30,11 @@ semantic versioning (major.minor.patch).
   and explicit absolute paths for the shared Kakao inbox and existing SRS state.
 - Added the shared-vLLM readiness dependency and a bounded gateway shutdown so a
   failed English tool call cannot leave profile deployment stuck indefinitely.
+- Made David's established drill preference durable in the English skill, cron
+  prompt, and profile seed: every question now carries its answer immediately
+  below it, with answerless or separate-answer-key drills explicitly prohibited.
+- Fixed cron synchronization to remove an existing job from the same Hermes
+  profile where it is created, preventing duplicate English schedules on reruns.
 
 ## v0.16.0 — 2026-08-15 (minor: expose personalization as LangGraph nodes)
 

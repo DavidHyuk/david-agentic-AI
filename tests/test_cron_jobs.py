@@ -46,6 +46,14 @@ def test_english_intake_coaches_without_feedback_and_reviews_on_sunday():
     assert "[SILENT]" not in prompt
 
 
+def test_english_drill_always_includes_inline_answers():
+    jobs = {job["name"]: job for job in rc.load_jobs(JOBS)}
+    prompt = jobs["english-drill"]["prompt"]
+    assert "each answer immediately below" in prompt
+    assert "Never send a drill without answers" in prompt
+    assert "separate answer key" in prompt
+
+
 def test_build_create_command_shape():
     job = {
         "name": "papers-digest",
@@ -63,6 +71,15 @@ def test_build_create_command_shape():
     assert cmd[cmd.index("--skill") + 1] == "papers-digest"
     assert cmd[cmd.index("--deliver") + 1] == "whatsapp"
     assert cmd[cmd.index("--profile") + 1] == "research"
+
+
+def test_build_remove_command_targets_the_same_profile():
+    assert rc.build_remove_command("english-drill", "english") == [
+        "hermes", "-p", "english", "cron", "remove", "english-drill"
+    ]
+    assert rc.build_remove_command("papers-digest") == [
+        "hermes", "cron", "remove", "papers-digest"
+    ]
 
 
 def test_missing_required_field_raises(tmp_path):

@@ -73,3 +73,18 @@ def test_skill_body_has_core_sections():
         body = p.read_text()
         for section in ("## When to Use", "## Procedure"):
             assert section in body, f"{p}: missing '{section}'"
+
+
+def test_english_drill_requires_inline_answers():
+    path = (
+        REPO
+        / "profiles"
+        / "english"
+        / "skills"
+        / "learning"
+        / "english-practice"
+        / "SKILL.md"
+    )
+    body = path.read_text()
+    assert "immediately followed by its answer" in body
+    assert "Do not collect all answers in a separate answer key" in body
