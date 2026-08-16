@@ -52,37 +52,3 @@ When David chooses to resume it:
    run the privacy-preserving smoke test.
 3. Restore `morning-brief` in `cron/jobs.yaml`.
 4. Stage the config, restart the gateway, register cron, and run a Telegram E2E.
-
-## 5. ClawGram VLM benchmark — deferred
-
-Keep the current ClawGram queue/worker/MCP boundary model-independent. Start with
-the already-running vision-enabled Qwen3.6-35B-A3B-FP8 backend during a quiet
-window; do not reduce Hermes's 128K context or co-host another 31B-class model
-merely to make the first family-letter draft.
-
-Before choosing a permanent VLM, build a private 150–300-photo evaluation set
-with 30–50 burst or near-duplicate groups. It must emphasize David's actual
-criteria: children-first coverage, best-frame choice, blur/closed-eye rejection,
-duplicate suppression, privacy safety, story coherence, and the human keep/edit
-rate for the final 10–20 photos. Blind-compare the Qwen3.6 baseline with the
-local Qwen3.5-122B-A10B-AWQ through a fail-safe model-swap service; add Gemma 4
-31B only as an optional third challenger. Adopt the larger model only when the
-task-specific acceptance improvement justifies Hermes downtime, cold-start
-latency, peak unified memory, and batch duration.
-
-The workflow-engine decision is complete: ClawGram now uses LangGraph internally
-for bounded search-window expansion, duplicate-refinement loops, SQLite
-checkpoints, explicit human-review interrupts, node-specific revision reruns, and
-local Mermaid visualization. Hermes remains the conversational/scheduling agent
-and accesses the workflow only through the least-authority MCP control plane.
-Model selection and the private photo benchmark above remain deferred.
-
-The Qwen3.6 baseline integration is now implemented without making it the
-permanent winner: content-addressed Google Photos web collection, modular
-Galaxy/Picker import, per-photo cached assessment, sequential vLLM load guard,
-dedicated ClawGram Hermes/Telegram profile, review link/contact sheet, and
-Galaxy Android share handoff. Before enabling the biweekly timer, finish the
-interactive/external steps only: enter the issued bot token through
-`hermes -p clawgram gateway setup`, log in once with
-`bootstrap/clawgram_google_photos_login.sh`, authorize the private Tailscale
-Serve endpoint, and verify one real review/share E2E.

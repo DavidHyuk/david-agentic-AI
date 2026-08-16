@@ -11,9 +11,7 @@ role in Silicon Valley, stay current on **LLM/LVM research**, and practice
 bot**. Calendar support is
 retained in source but intentionally deferred and disabled. English
 tutor feedback enters through the KakaoTalk Channel chatbot and is processed
-locally before the review and SRS drill are delivered through Telegram. ClawGram
-runs as a separate Hermes profile and Telegram bot, with approval and KakaoTalk
-delivery outside agent authority.
+locally before the review and SRS drill are delivered through Telegram.
 
 ## Layout
 - `config/soul/SOUL.md` — agent personality (staged to `$HERMES_HOME/SOUL.md`).
@@ -23,7 +21,6 @@ delivery outside agent authority.
   isolated under `profiles/english/skills/`.
 - `profiles/english/` — isolated SOUL, memory, config, and English-practice
   skill, staged to `~/.hermes/profiles/english`.
-- `profiles/clawgram/` — isolated SOUL, memory, config, and family-letter skill.
 - `scripts/*.py` — standalone helpers staged to `$HERMES_HOME/scripts/` and unit-tested.
 - `cron/jobs.yaml` — declarative Telegram notification schedule.
 - `bootstrap/` — staging, cron registration, and systemd service installers,

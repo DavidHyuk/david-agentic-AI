@@ -13,7 +13,6 @@ def test_stage_profile_includes_only_english_assets(tmp_path: Path) -> None:
     assert "english_intake.py" in report["scripts"]
     assert (profile_home / "SOUL.md").exists()
     assert (profile_home / "skills" / "learning" / "english-practice" / "SKILL.md").exists()
-    assert not (profile_home / "data" / "clawgram").exists()
     environment = (profile_home / ".env").read_text()
     assert "TELEGRAM_BOT_TOKEN" not in environment
     assert "ENGLISH_LESSONS_DIR=" in environment

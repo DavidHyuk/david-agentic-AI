@@ -1,9 +1,9 @@
 # 프로젝트 구조 개요 — david-agentic-ai
 
-David Choi의 Hermes profile들을 버전 관리하는 리포지토리입니다. 이 저장소가
-단일 진실 원천이며, `bootstrap/stage.py`는 David profile을 `~/.hermes`로,
-`stage_english_profile.py`와 `stage_clawgram_profile.py`는 별도 profile을
-`~/.hermes/profiles/`로 동기화합니다.
+David Choi의 David 및 English Hermes profile을 버전 관리하는 리포지토리입니다.
+이 저장소가 두 profile의 단일 진실 원천이며, `bootstrap/stage.py`는 David
+profile을 `~/.hermes`로, `stage_english_profile.py`는 English profile을
+`~/.hermes/profiles/english`로 동기화합니다.
 
 ---
 
@@ -11,52 +11,23 @@ David Choi의 Hermes profile들을 버전 관리하는 리포지토리입니다.
 
 ```
 DGX Spark (128GB VRAM)
-  └── vLLM 서버 (포트 :8003)
-        └── Qwen3.6-35B-A3B-FP8  (128K 컨텍스트)
-                │  OpenAI-호환 API
-                ▼
- David Hermes profile        English Hermes profile       ClawGram Hermes profile
- papers / interview          tutor feedback + SRS         family-letter only
- David memory + sessions     isolated memory + sessions   isolated memory + sessions
- Chromium :19222
-        │                         │                         │
-        ▼                         ▼                         ▼
- David Telegram bot          English Telegram bot        ClawGram Telegram bot
-                                                            │
-                                               Google Photos Chromium :19223
+  └── vLLM 서버 :8003
+        └── Qwen3.6-35B-A3B-FP8 (128K 컨텍스트)
+                │
+                ├── David Hermes gateway ── David Telegram bot
+                │     ├── papers / interview / weekly review
+                │     └── Chromium CDP :19222
+                │
+                └── English Hermes gateway ── English Telegram bot
+                      └── tutor feedback / SRS
 
 arXiv / Hugging Face
         │
-        ▼
-papers_ingest.py ── SQLite (`~/.hermes/data/papers/papers.db`)
-        ▲
-systemd timer (매일 08:00, Hermes 세션과 독립)
+        └── papers_ingest.py ── SQLite ── daily systemd timer
 
-KakaoTalk Channel (영어 선생님/David)
+KakaoTalk Channel
         │
-        ▼
-Open Builder → Cloudflare Tunnel → kakao_webhook.py
-                                      │
-                                      ▼
-                              `~/english-lessons/`
-                                      │
-                                      ▼
-             English profile cron → English Telegram 복습
-
-ClawGram profile ── stdio MCP ── ClawGram SQLite queue
-                              │
-Saturday 02:00 systemd gate ──┤ (13-day admission check)
-                              ▼
-                 pre-claim Google Photos source
-                              │
-                    low-priority one-shot worker
-                              │
-                    LangGraph durable workflow
-                              │
-                    shared Qwen3.6 VLM endpoint
-                              │
-                    personalization feedback DB
-                    (decision/reason/scope only)
+        └── Open Builder → kakao_webhook.py → ~/english-lessons/
 ```
 
 ---
@@ -84,11 +55,6 @@ David-Agent/
 │   └── productivity/
 │       └── calendar-assistant/ # 비활성; 추후 Google 캘린더 브리핑
 │
-├── profiles/clawgram/         # 별도 Hermes profile의 source of truth
-│   ├── config/soul/SOUL.md
-│   ├── config/memory/{USER,MEMORY}.md
-│   ├── config/config.fragment.yaml # Telegram least-authority toolsets
-│   └── skills/personal/family-letter/SKILL.md
 ├── profiles/english/          # 영어 전용 Hermes profile의 source of truth
 │   ├── config/{soul,memory,config.fragment.yaml}
 │   └── skills/learning/english-practice/SKILL.md
@@ -121,19 +87,9 @@ David-Agent/
 │   ├── install_cron_watchdog.sh # cron 정지 자동 복구 설치
 │   ├── hermes-cron-watchdog.{service,timer}
 │   ├── hermes-gateway-cron-recovery.conf # gateway 종료 45초 상한
-│   ├── install_clawgram_integration.sh # ClawGram MCP/user units 설치
-│   ├── configure_clawgram_runtime.py # secret-safe source/review env 생성
-│   ├── stage_clawgram_profile.py # profile → ~/.hermes/profiles/clawgram
 │   ├── stage_english_profile.py # profile → ~/.hermes/profiles/english
 │   ├── install_english_bot.sh # English Telegram bot gateway 설치
 │   ├── hermes-gateway-english-vllm.conf # 모델 readiness + 종료 제한
-│   ├── clawgram_google_photos_login.sh # headed login/2FA helper
-│   ├── clawgram-family-letter.{service,timer}
-│   ├── clawgram-source.service # worker claim 전 fail-closed 수집
-│   ├── clawgram-worker.service # Hermes cron과 분리된 저우선순위 worker
-│   ├── clawgram-assessment.service # 순차 Qwen3.6 사진 관측
-│   ├── clawgram-review.service # tokenized contact-sheet 승인 UI
-│   ├── clawgram-google-photos-browser.service # 전용 localhost CDP :19223
 │   ├── stage.py               # repo → ~/.hermes 멱등 동기화
 │   └── register_cron.py       # jobs.yaml → hermes cron 등록
 │
@@ -153,15 +109,13 @@ David-Agent/
 ├── mcp/                       # 외부 서비스 MCP 통합
 │   ├── google-calendar.yaml   # 비활성; 공식 Calendar MCP 읽기 전용 템플릿
 │   ├── setup_google_calendar.py # OAuth client 설정 + 권한 고정
-│   ├── calendar_smoke.py      # MCP discovery + Hermes E2E 검사
-│   ├── clawgram.yaml          # 승인/delivery를 제외한 도구 allowlist
-│   └── setup_clawgram.py      # 로컬 stdio MCP 등록/검증
+│   └── calendar_smoke.py      # MCP discovery + Hermes E2E 검사
 │
 ├── models/                    # 로컬 모델 가중치 저장소 (gitignore됨)
 │   ├── Qwen/                  # Qwen 계열 모델
 │   └── MiniMax/               # MiniMax-M2.7 모델
 │
-├── tests/                     # pytest 테스트 (180개)
+├── tests/                     # pytest 테스트 (164개)
 │   ├── conftest.py
 │   ├── test_papers_ingest.py
 │   ├── test_papers_digest.py
@@ -174,14 +128,14 @@ David-Agent/
 │   ├── test_cron_jobs.py      # cron 스키마 검증
 │   ├── test_cron_health.py    # cron tick lock / jobs.json 건강 검사
 │   ├── test_cron_watchdog.py  # 자동 복구 systemd wiring 검증
-│   ├── test_clawgram_integration.py # MCP 권한/systemd 배치 검증
-│   ├── test_stage_clawgram_profile.py # profile 격리/메모리 limit 검증
 │   ├── test_auto_git_commit.py # stop 훅 안전 필터·커밋 메시지 검증
 │   └── test_stage.py          # stage.py 멱등성 검증
 │
 └── docs/
     ├── dev-history.md         # 버전 이력
-    └── project-overview.md    # 이 문서
+    ├── project-overview.md    # 이 문서
+    └── study/
+        └── hermes-agent-memory-and-context.md # Hermes memory/context 학습 노트
 ```
 
 ---
@@ -207,7 +161,6 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 | `papers-digest` | research | 새 논문 카탈로그에서 LLM/LVM 후보를 뽑아 인터뷰 관련성과 항목별 원문 링크 제공 |
 | `interview-prep` | career | 5-필러 커리큘럼을 돌아가며 Staff/Senior MLE 드릴 제공 |
 | `english-practice` | English profile / learning | 레슨 녹음/교정 파일 → SRS 카드 생성 + 전용 Telegram bot 매일 리뷰 |
-| `family-letter` | ClawGram profile/personal | ClawGram 사진 큐·초안 편집, 별도 사용자 승인 전 delivery 차단 |
 | `calendar-assistant` | productivity | **비활성/보존** — 추후 Google Calendar 브리핑 |
 
 ### 4. `scripts/` — 결정론적 데이터 레이어
@@ -250,66 +203,6 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 제한합니다. 따라서 하나의 agent job이 영구 대기해도 이후 스케줄 전체가
 며칠간 조용히 멈추지 않습니다.
 
-ClawGram은 David Hermes cron에 여섯 번째 장기 job으로 넣지 않습니다.
-`clawgram-family-letter.timer`가 토요일 02:00마다 짧은 due check만 실행하고,
-13일이 지나야 새 job을 생성합니다. `clawgram-source.service`는 별도
-Chromium `:19223`에서 요청 기간과 자동 확장분을 수집하며, auth/UI/download
-오류 시 queued job을 claim하지 않습니다. 실데이터로 보정한 750장 후보 상한이
-비정상 Google UI 결과를 worker claim 전에 차단합니다. 사진 분석은
-`clawgram-worker.service`가
-동시성 1, `Nice=10`, 낮은 CPU/IO weight로 처리합니다. 별도
-`clawgram-assessment.service`는 기존 Qwen3.6 endpoint에 사진 한 장씩만 보내고,
-content-hash cache와 vLLM running/waiting/KV guard로 Hermes 우선순위를
-보장합니다. integration installer는 장기 실행 중인 assessment/review Python
-프로세스를 명시적으로 재시작해 workspace 계약과 live API가 어긋나지 않게 합니다.
-일시적 assessment 429/5xx/연결 실패는 같은 job을 queued로 돌려 60초 후
-재시도하고, LangGraph pending node와 완료된 사진별 cache에서 이어갑니다.
-`clawgram-review.service`는 hash-only 7일 token으로 contact sheet와
-승인 UI를 제공하고 전용 ClawGram bot이 링크를 전달합니다. Google login과
-private HTTPS phone E2E는 완료됐으며 timer는 명시적 운영 enable 전까지
-비활성으로 유지합니다. 기존
-Galaxy/Picker 경로는 별도 manifest adapter로 보존돼 있습니다.
-
-worker 내부는 LangGraph가 검색 기간 자동 확장, 중복 재평가, deterministic
-selection, SQLite human-review interrupt를 실행합니다. 수정 요청은 동일한 job
-checkpoint에서 assessment/selection/window/dedup node로 돌아갈 수 있고,
-`get_job_status`는 사진 바이트 없이 next node와 실행 trace를 반환합니다.
-
-ClawGram SQLite는 권한과 수명에 따라 세 파일로 나뉩니다. domain DB
-`clawgram-v2.sqlite3`는 jobs/drafts/media/review link, workflow DB
-`clawgram-workflows.sqlite3`는 LangGraph checkpoints/writes, personalization DB
-`clawgram-personalization.sqlite3`는 편지 간 append-only feedback을 담당합니다.
-기존 단일 DB 테이블은 idempotent migration 뒤에도 복구본으로 남습니다.
-검토 token으로 보호된 **워크플로 보기**는 current node와 aggregate evidence/grade를
-asset ID 없이 보여줍니다. 상세 Studio는 별도 `.studio/venv`와 online backup
-snapshot만 사용하고 loopback `:2024`를 SSH forward할 때만 접근합니다.
-
-개인화 경로는 `assess_window → retrieve_preferences → select_candidates →
-grade_selection`의 독립 node로 구성됩니다. retrieval node는 영구 제외와 최근
-feedback의 reason/scope/decision count를 읽고, grade node는 아이/전체 장수
-shortfall, 중복 압력, 자동 loop 횟수와 다음 route를 checkpoint에 기록합니다.
-따라서 Mermaid와 MCP status에서 개인화 검색과 검증을 별도로 디버깅할 수 있으며,
-구 topology의 승인 대기 checkpoint도 새 graph에서 그대로 재개됩니다.
-
-검토 화면에서 제외한 사진은 reason/scope와 함께 ClawGram SQLite의 append-only
-feedback event로 남습니다. `current_draft`는 현재 LangGraph thread에서만
-누적되고, `future`는 다음 selection 전에 검색되어 모델 점수보다 우선합니다.
-스크린샷/앱 화면과 문서 판정은 Qwen assessor v2에서 risk flag 지시도
-구체화했으며, 잘못된 영구 판정은 후속 include event로 되돌릴 수 있습니다.
-이 계층은 기존 Instagram visual-style RAG와 분리된 agentic-RAG personalization
-기반이고 사진 바이트를 Hermes memory나 LangGraph checkpoint에 넣지 않습니다.
-
-첫 실제 E2E에서는 29일 확장 수집 범위의 557개 후보 중 readable image 535개를
-저장하고, 원래 14일 창의 200개만 Qwen3.6으로 분석했습니다. selector는 아이 중심
-기준을 통과한 20장을 골라 private HTTPS review link와 함께 `human_review`에서
-정지했습니다. 실제 image request 중 KV usage는 0.5%였고 vLLM은 20.0 GiB KV
-cache를 확보했습니다. 휴대폰에서 private review page가 열리는 것까지 확인했고,
-개인화 제외 UI와 assessor v2를 배포한 상태에서 timer만 명시적 enable 전까지
-disabled로 유지합니다.
-ClawGram Hermes profile은 이 그래프를 직접 실행하거나 승인하지 않고 MCP
-제어면만 사용합니다. David profile에는 family-letter MCP/skill이 없습니다.
-승인 후 Galaxy Web Share가 10–20장과 문구를 Android sharesheet에 넘기며,
-사용자가 KakaoTalk 수신자와 Send를 직접 선택한 뒤에만 handoff로 기록합니다.
 
 ### 6. `local-model/` — LLM 백엔드
 `run_model.sh` 는 4가지 모델을 하나의 스크립트로 지원하며, 인자 없이 실행해도
@@ -328,13 +221,6 @@ Qwen3.6 launcher와 `restart_service.sh`는 기본 GPU 예약 비율 50%를 사�
 재시작 helper는 이를 service override에 저장하며, 첫 번째 인자로 바꿀 수 있다
 (예: `restart_service.sh 0.60 --wait`). 이 값은 vLLM의
 모델·workspace·공유 KV-cache pool 전체의 상한이며 Hermes의 영구 기억과는 별개다.
-2026-08-15 현재 0.50 설정의 startup profile은 모델 34.23 GiB와 KV cache
-20.28 GiB(265,056-token cache capacity)를 보고했고 API max context는 131,072다.
-vision encoder cache는 최대 크기 이미지 한 장/16,384 tokens 기준이다. 따라서
-ClawGram은 여러 사진을 한 prompt에 넣지 않고 1536 px 이하 한 장/요청,
-`max_tokens=1600`, batch 동시성 1로 제한한다. 실제 smoke test 전후 scheduler KV는
-idle 0%였고 기존 Hermes 로그의 관측 peak 약 6.4%보다 10% guard를 높게 두어,
-primary 요청이 있으면 다음 사진을 기다린다. 현재 cache를 줄일 이유는 없다.
 새 논문 메타데이터 수집에는 LLM이 필요 없습니다. 모델 가중치의 다운로드·저장 관리는 이 설정 repo 밖의
 `/home/david/workspace/models/download_model.py`가 담당하며, `run_model.sh`는 해당
 경로의 체크포인트를 vLLM service에 전달하는 실행 계층으로 유지됩니다.
@@ -345,14 +231,7 @@ Hermes 내장 브라우저 도구를 그대로 사용하고 직접 Playwright �
 않습니다. ARM64 DGX Spark에서 Snap Chromium 자동 실행이 멈추는 문제를 피하기
 위해 Chromium을 localhost 전용 CDP 서비스(`127.0.0.1:19222`)로 먼저 실행하고,
 Hermes가 고정된 `agent-browser 0.33.0`을 통해 연결합니다. 외부 클라우드 브라우저
-자격 증명은 사용하지 않습니다. Google Photos source는 이 profile을 공유하지
-않고 별도 cookie directory와 `127.0.0.1:19223`을 사용합니다. Google이 headless
-로그인을 거부하므로 Ubuntu 공식 Xvfb를 rootless user path에 추출하고 Chromium은
-headed virtual display에서 실행합니다. David는 localhost CDP를 SSH로만
-forward해 DevTools screencast에서 직접 로그인합니다. WebSocket Origin은 로컬
-Chrome 내장 `devtools://devtools`만 허용하고 wildcard/public web frontend는
-허용하지 않습니다. Collector는 고정된 날짜 검색/상세 download 동작 외 page
-text를 명령으로 해석하지 않습니다.
+자격 증명은 사용하지 않습니다.
 
 ---
 
@@ -375,10 +254,10 @@ text를 명령으로 해석하지 않습니다.
 
 ### 방향 2 — 기억(Memory) 품질 향상
 
-David agent는 `~/.hermes/memories/`, ClawGram은
-`~/.hermes/profiles/clawgram/memories/`에 독립적으로 기억을 누적합니다.
-`stage.py`의 "seed-only" 정책(기존 기억은 덮어쓰지 않음)이 이 성장을 보호합니다.
-결과적으로 재설치 후에도 David에 대한 이해가 초기화되지 않습니다.
+David agent는 `~/.hermes/memories/`, English agent는
+`~/.hermes/profiles/english/memories/`에 독립적으로 기억을 누적합니다.
+profile별 seed-only 정책이 기존 기억을 덮어쓰지 않아 재설치 후에도 누적된
+사용자 이해와 학습 맥락이 보존됩니다.
 
 ### 방향 3 — 스킬 커버리지 확대
 
@@ -409,8 +288,7 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
 - **장기 기억(Persistent Memory)**: 대화 간 기억 유지로 에이전트가 David를 더 깊이 이해할수록 유용해짐
 - **Cron 스케줄러**: YAML 선언으로 주기적 Telegram 알림 → 에이전트가 먼저 행동하는 proactive 패턴
 - **MCP (Model Context Protocol)**: 외부 서비스를 표준 도구로 연결. Google
-  Calendar 템플릿은 추후 재활성화를 위해 보존됩니다. ClawGram은 로컬 stdio
-  MCP로 활성화하며 queue/status/draft-edit 도구만 허용하고 승인·delivery는 제외
+  Calendar 템플릿은 추후 재활성화를 위해 보존됩니다.
 
 ### 스페이스드 리피티션(Leitner SRS)
 - `english_srs.py`의 Leitner 박스 알고리즘 → 맞힌 카드는 나중에, 틀린 카드는 다음날 재등장

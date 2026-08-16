@@ -3,6 +3,23 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.0.1 — 2026-08-15 (patch: document Hermes memory architecture)
+
+- Added a Korean study note covering the built-in file-backed memory tool,
+  frozen system-prompt snapshots, profile isolation, durable-state boundaries,
+  cron fresh-session behavior, and a practical code-reading sequence.
+
+## v1.0.0 — 2026-08-15 (major: make David-Agent ownership explicit)
+
+- Moved the ClawGram Hermes profile, MCP registration, systemd services,
+  runtime configuration, Google Photos login helper, and their tests into the
+  independent `/home/david/workspace/ClawGram` repository.
+- Removed ClawGram's duplicate Docker files and all active ClawGram deployment
+  ownership from this repository. David-Agent no longer stages, installs, or
+  restarts the ClawGram profile or gateway.
+- Kept the already-running profiles as peer Hermes gateways; any shared local
+  vLLM endpoint is infrastructure rather than an agent parent-child relation.
+
 ## v0.17.0 — 2026-08-15 (minor: isolate ClawGram workflow observability)
 
 - Split ClawGram's local persistence into domain, LangGraph checkpoint, and

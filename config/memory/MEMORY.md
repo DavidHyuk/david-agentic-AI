@@ -10,7 +10,7 @@ English lessons folder: ~/english-lessons (audio + correction files). Intake sta
 §
 Google Calendar agentic integration is intentionally deferred: no active Calendar MCP or morning brief. The read-only setup is retained in the repo for later.
 §
-Active David skills: papers-digest and interview-prep; calendar-assistant is staged but disabled. English practice runs in the isolated `english` profile and its dedicated Telegram bot, sharing only lesson/SRS data. ClawGram also has its own profile, memory, skill, MCP, and Telegram bot. David-agent Telegram cron jobs: papers digest, interview prep, weekly review.
+Active David skills: papers-digest and interview-prep; calendar-assistant is staged but disabled. English practice runs in the isolated `english` profile and its dedicated Telegram bot, sharing only lesson/SRS data. David-agent Telegram cron jobs: papers digest, interview prep, weekly review.
 §
 Cron watchdog checks every 5 minutes. A tick lock held over 20 minutes triggers a bounded hermes-gateway restart; gateway shutdown is capped at 45 seconds.
 §

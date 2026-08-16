@@ -14,7 +14,6 @@ EXPECTED = {
     "interview-prep",
     "english-practice",
     "calendar-assistant",
-    "family-letter",
 }
 
 
@@ -27,18 +26,6 @@ def _frontmatter(text: str) -> dict:
 def test_all_expected_skills_present():
     names = {_frontmatter(p.read_text())["name"] for p in SKILLS}
     assert EXPECTED <= names, f"missing skills: {EXPECTED - names}"
-    assert not (
-        REPO / "skills" / "personal" / "family-letter" / "SKILL.md"
-    ).exists()
-    assert (
-        REPO
-        / "profiles"
-        / "clawgram"
-        / "skills"
-        / "personal"
-        / "family-letter"
-        / "SKILL.md"
-    ).exists()
     assert not (REPO / "skills" / "learning" / "english-practice" / "SKILL.md").exists()
     assert (
         REPO
