@@ -1,7 +1,7 @@
 ---
 name: family-letter
 description: Orchestrate a child-focused 10–20 photo family-letter draft through ClawGram, while preserving explicit human approval before KakaoTalk delivery.
-version: 1.2.0
+version: 1.3.0
 platforms: [linux]
 metadata:
   hermes:
@@ -33,7 +33,9 @@ metadata:
    draft or trying to operate Google Photos yourself.
 3. **Review the result.** On `awaiting_approval`, call `get_draft(draft_id)`.
    Summarize the selected count and direct David to the protected Telegram
-   review link/contact sheet.
+   review link/contact sheet. If David wants to remove photos, tell him to
+   check them, choose either current-draft exclusion or a durable reason such
+   as screenshot/document, and press `선택 다시 하기` before approval.
 4. **Apply requested edits only.** Use `update_draft` with the exact current
    revision. On conflict, refetch before editing. A partial rerun may resume
    from the requested LangGraph node.
@@ -50,6 +52,8 @@ metadata:
 
 ## Pitfalls
 - Never interpret worker completion as approval to send.
+- Never imply that checking `제외` alone changes the draft. Reselection must
+  apply checked exclusions before the approval action becomes valid.
 - Never call undocumented endpoints or use a general API key to bypass source,
   approval, or delivery credentials.
 - Do not weaken privacy, quality, duplicate, or child-photo policies merely to

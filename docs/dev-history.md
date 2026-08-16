@@ -3,6 +3,29 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v0.15.0 — 2026-08-15 (minor: persist ClawGram review preferences)
+
+### Added and deployed
+- Added durable ClawGram review scopes for one-draft exclusions and future
+  screenshot, document, or unwanted-photo exclusions. Human feedback is stored
+  as append-only decision/reason/scope evidence and retrieved before later
+  deterministic selection, where it takes precedence over model scores.
+- Prevented checked exclusions from being silently approved; David must first
+  apply them through `선택 다시 하기`. Updated the isolated family-letter skill
+  to explain this review boundary without granting Hermes approval authority.
+- Strengthened Qwen's screen/document rubric and advanced the assessment cache
+  version so the first post-upgrade run refreshes prior v1 observations once.
+- Kept private photo bytes out of Hermes memory, feedback events, and LangGraph
+  checkpoints. This structured evidence store is the foundation for a later
+  agentic-RAG preference planner, separate from Instagram visual RAG.
+- Restarted the live ClawGram assessment/review services and verified both
+  loopback health endpoints. The biweekly timer remains disabled until its
+  explicit operational enable.
+
+### Verified
+- ClawGram Python 3.13 and deployment Python 3.11 suites: 194 passed, 2 skipped
+  in each environment.
+
 ## v0.14.0 — 2026-08-15 (minor: durable transient model retries)
 
 ### Added and hardened

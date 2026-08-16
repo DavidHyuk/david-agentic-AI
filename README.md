@@ -301,6 +301,14 @@ contact sheet supports message edits and node-specific reruns. Approval then
 unlocks a Galaxy Android Web Share handoff; it does not claim that KakaoTalk
 actually sent the message. MCP still has no approve, handoff, or sent tool.
 
+Photo exclusions now have explicit scope. Check photos, choose `이번 편지에서만
+제외` or a durable screenshot/document/unwanted-photo reason, then press `선택
+다시 하기`. Durable feedback is appended to ClawGram's local SQLite evidence
+store and retrieved before later selections, where it overrides model scores.
+The feedback store contains asset IDs and decision metadata, not photo bytes;
+it is the first personalization/agentic-RAG layer. A checked exclusion cannot be
+silently ignored by `이대로 승인`.
+
 ## 논문 수집과 digest 사용법
 
 논문 수집은 Hermes 대화 세션과 분리된 `hermes-papers-ingest.timer`가 매일
