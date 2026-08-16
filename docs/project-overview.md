@@ -2,8 +2,8 @@
 
 David Choi의 Hermes profile들을 버전 관리하는 리포지토리입니다. 이 저장소가
 단일 진실 원천이며, `bootstrap/stage.py`는 David profile을 `~/.hermes`로,
-`stage_clawgram_profile.py`는 ClawGram profile을
-`~/.hermes/profiles/clawgram`으로 동기화합니다.
+`stage_english_profile.py`와 `stage_clawgram_profile.py`는 별도 profile을
+`~/.hermes/profiles/`로 동기화합니다.
 
 ---
 
@@ -15,17 +15,15 @@ DGX Spark (128GB VRAM)
         └── Qwen3.6-35B-A3B-FP8  (128K 컨텍스트)
                 │  OpenAI-호환 API
                 ▼
-        ┌────────────────────────────┴────────────────────────────┐
-        ▼                                                         ▼
- David Hermes profile                                  ClawGram Hermes profile
- papers / interview / English                          family-letter only
- David memory + sessions + cron                        isolated memory + sessions
- Chromium :19222                                       ClawGram MCP
-        │                                                         │
-        ▼                                                         ▼
- David Telegram bot                                    ClawGram Telegram bot
-                                                                  │
-                                                    Google Photos Chromium :19223
+ David Hermes profile        English Hermes profile       ClawGram Hermes profile
+ papers / interview          tutor feedback + SRS         family-letter only
+ David memory + sessions     isolated memory + sessions   isolated memory + sessions
+ Chromium :19222
+        │                         │                         │
+        ▼                         ▼                         ▼
+ David Telegram bot          English Telegram bot        ClawGram Telegram bot
+                                                            │
+                                               Google Photos Chromium :19223
 
 arXiv / Hugging Face
         │
@@ -43,7 +41,7 @@ Open Builder → Cloudflare Tunnel → kakao_webhook.py
                               `~/english-lessons/`
                                       │
                                       ▼
-                         English cron → Telegram 복습
+             English profile cron → English Telegram 복습
 
 ClawGram profile ── stdio MCP ── ClawGram SQLite queue
                               │
@@ -77,14 +75,12 @@ David-Agent/
 │   ├── config.fragment.qwen36.yaml  # Qwen3.6 FP8 설정
 │   └── config.fragment.minimax.yaml # MiniMax-M2.7 설정
 │
-├── skills/                    # David profile 스킬 4개
+├── skills/                    # David profile 스킬 3개
 │   ├── research/
 │   │   └── papers-digest/     # LLM/LVM 논문 소화
 │   ├── career/
 │   │   └── interview-prep/    # Staff/Senior MLE 인터뷰 준비
 │   │       └── references/    # 커리큘럼 + 질문 은행
-│   ├── learning/
-│   │   └── english-practice/  # 영어 레슨 → SRS 드릴
 │   └── productivity/
 │       └── calendar-assistant/ # 비활성; 추후 Google 캘린더 브리핑
 │
@@ -93,6 +89,9 @@ David-Agent/
 │   ├── config/memory/{USER,MEMORY}.md
 │   ├── config/config.fragment.yaml # Telegram least-authority toolsets
 │   └── skills/personal/family-letter/SKILL.md
+├── profiles/english/          # 영어 전용 Hermes profile의 source of truth
+│   ├── config/{soul,memory,config.fragment.yaml}
+│   └── skills/learning/english-practice/SKILL.md
 │
 ├── scripts/                   # 스킬이 호출하는 Python 헬퍼 (→ ~/.hermes/scripts/)
 │   ├── papers_ingest.py       # arXiv/HF 메타데이터 수집·중복 병합·실행 이력
@@ -113,7 +112,7 @@ David-Agent/
 │   └── hooks.json             # `.codex/hooks/auto_git_commit.py` 위임
 │
 ├── cron/
-│   └── jobs.yaml              # 5개의 Telegram 알림 스케줄 정의
+│   └── jobs.yaml              # 5개의 Telegram 알림 스케줄 정의 (영어 2개는 english profile)
 │
 ├── bootstrap/                 # 설치 및 동기화 자동화
 │   ├── install.sh             # 원클릭 설치 (Hermes + 설정 + 모델)
@@ -125,6 +124,8 @@ David-Agent/
 │   ├── install_clawgram_integration.sh # ClawGram MCP/user units 설치
 │   ├── configure_clawgram_runtime.py # secret-safe source/review env 생성
 │   ├── stage_clawgram_profile.py # profile → ~/.hermes/profiles/clawgram
+│   ├── stage_english_profile.py # profile → ~/.hermes/profiles/english
+│   ├── install_english_bot.sh # English Telegram bot gateway 설치
 │   ├── clawgram_google_photos_login.sh # headed login/2FA helper
 │   ├── clawgram-family-letter.{service,timer}
 │   ├── clawgram-source.service # worker claim 전 fail-closed 수집
@@ -159,7 +160,7 @@ David-Agent/
 │   ├── Qwen/                  # Qwen 계열 모델
 │   └── MiniMax/               # MiniMax-M2.7 모델
 │
-├── tests/                     # pytest 테스트 (174개)
+├── tests/                     # pytest 테스트 (177개)
 │   ├── conftest.py
 │   ├── test_papers_ingest.py
 │   ├── test_papers_digest.py
@@ -204,7 +205,7 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 |------|----------|-----------|
 | `papers-digest` | research | 새 논문 카탈로그에서 LLM/LVM 후보를 뽑아 인터뷰 관련성과 항목별 원문 링크 제공 |
 | `interview-prep` | career | 5-필러 커리큘럼을 돌아가며 Staff/Senior MLE 드릴 제공 |
-| `english-practice` | learning | 레슨 녹음/교정 파일 → SRS 카드 생성 + 매일 리뷰 |
+| `english-practice` | English profile / learning | 레슨 녹음/교정 파일 → SRS 카드 생성 + 전용 Telegram bot 매일 리뷰 |
 | `family-letter` | ClawGram profile/personal | ClawGram 사진 큐·초안 편집, 별도 사용자 승인 전 delivery 차단 |
 | `calendar-assistant` | productivity | **비활성/보존** — 추후 Google Calendar 브리핑 |
 
@@ -233,9 +234,9 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 |----|------|------|
 | `papers-digest` | 08:30 매일 | LLM/LVM 연구 시그널 |
 | `interview-prep` | 12:00 월/수/금 | 실시간 트렌드 기반 Staff 레벨 드릴 1개 |
-| `english-intake` | 20:00 매일 | 새 피드백 분석 또는 취약 패턴 코칭; 일요일 누적 복습 |
-| `english-drill` | 21:00 매일 | SRS 드릴 전달 |
-| `weekly-review` | 18:00 일요일 | 논문 + 인터뷰 + 영어 주간 요약 |
+| `english-intake` | 20:00 매일 | English bot: 새 피드백 분석 또는 취약 패턴 코칭; 일요일 누적 복습 |
+| `english-drill` | 21:00 매일 | English bot: SRS 드릴 전달 |
+| `weekly-review` | 18:00 일요일 | David bot: 논문 + 인터뷰 주간 요약 |
 
 논문 수집은 Hermes cron이 아니라 별도 `hermes-papers-ingest.timer`가 매일
 08:00에 수행합니다. 따라서 모델이나 gateway가 일시적으로 내려가도

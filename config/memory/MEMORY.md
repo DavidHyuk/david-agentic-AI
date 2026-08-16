@@ -4,13 +4,13 @@ Paper ingestion: independent systemd timer at 08:00 collects arXiv cs.AI/cs.CL/c
 §
 Local LLM: Qwen3.6-35B-A3B-FP8 via vLLM at http://localhost:8003/v1 (run local-model/run_model.sh qwen36). 128K context; qwen3 reasoning + qwen3_coder tool parsers. Paper metadata ingestion uses no LLM.
 §
-Staged helper scripts in ~/.hermes/scripts/: papers_ingest.py, papers_digest.py, english_intake.py, english_srs.py, agenda.py.
+Staged helper scripts in ~/.hermes/scripts/: papers_ingest.py, papers_digest.py, english_intake.py, english_srs.py, agenda.py. English profile stages its own copies of the English helpers.
 §
 English lessons folder: ~/english-lessons (audio + correction files). Intake state: ~/.hermes/data/english/processed.json. SRS deck: ~/.hermes/data/english/srs_deck.json.
 §
 Google Calendar agentic integration is intentionally deferred: no active Calendar MCP or morning brief. The read-only setup is retained in the repo for later.
 §
-Active skills: papers-digest, interview-prep, english-practice. calendar-assistant is staged but disabled. ClawGram now has its own Hermes profile, memory, skill, MCP, and Telegram bot. Scheduled David-agent Telegram cron jobs: papers digest, interview prep, English intake, SRS drill, weekly review.
+Active David skills: papers-digest and interview-prep; calendar-assistant is staged but disabled. English practice runs in the isolated `english` profile and its dedicated Telegram bot, sharing only lesson/SRS data. ClawGram also has its own profile, memory, skill, MCP, and Telegram bot. David-agent Telegram cron jobs: papers digest, interview prep, weekly review.
 §
 Cron watchdog checks every 5 minutes. A tick lock held over 20 minutes triggers a bounded hermes-gateway restart; gateway shutdown is capped at 45 seconds.
 §

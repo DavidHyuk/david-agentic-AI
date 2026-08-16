@@ -2,7 +2,8 @@
 #
 # Registered by bootstrap/register_cron.py via `hermes cron create`. Schedules are
 # cron expressions evaluated in the gateway host's local timezone
-# (set the host to America/Los_Angeles). All jobs deliver to telegram.
+# (set the host to America/Los_Angeles). The English jobs run in the isolated
+# `english` profile, so delivery uses its dedicated Telegram bot.
 #
 # Cron jobs run in a FRESH session, so every prompt is self-contained and names the
 # skill(s) it relies on. Keep prompts skimmable — these are push notifications.
@@ -39,6 +40,7 @@ jobs:
 
   - name: english-intake
     schedule: "0 20 * * *"          # 20:00 daily coaching; Sunday is weekly review
+    profile: english
     skills: [english-practice]
     prompt: >
       Deliver the 20:00 English coaching using the english-practice skill. First
@@ -53,6 +55,7 @@ jobs:
 
   - name: english-drill
     schedule: "0 21 * * *"          # 21:00 every day
+    profile: english
     skills: [english-practice]
     prompt: >
       Send tonight's English drill. Use the english-practice skill (drill branch):
@@ -63,10 +66,10 @@ jobs:
 
   - name: weekly-review
     schedule: "0 18 * * 0"          # 18:00 Sunday
-    skills: [papers-digest, interview-prep, english-practice]
+    skills: [papers-digest, interview-prep]
     prompt: >
       Write my weekly review. Summarize: (1) the most important LLM/LVM papers this
       week and one I should deep-read, (2) interview-prep pillars covered vs
-      neglected from the progress log with next week's focus, and (3) English
-      progress from the SRS deck stats (cards added, due, mastery by box). End with
-      3 concrete goals for next week tied to landing a Staff/Senior MLE role.
+      neglected from the progress log with next week's focus. End with 2 concrete
+      goals for next week tied to landing a Staff/Senior MLE role. English coaching
+      and SRS progress are delivered only through the dedicated English Telegram bot.

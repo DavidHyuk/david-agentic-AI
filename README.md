@@ -3,8 +3,8 @@
 A personalized, always-on AI partner for **David Choi**, built on the
 [**Hermes Agent**](https://github.com/NousResearch/hermes-agent) framework
 (Nous Research). It learns David's life and goals over time and proactively helps
-with three active career-learning areas, delivered to the David **Telegram**
-bot:
+with research and interview preparation delivered to the David **Telegram**
+bot, plus English feedback delivered to a dedicated English **Telegram** bot:
 
 1. **LLM/LVM research** — daily arXiv + Hugging Face ingestion and a personalized digest.
 2. **Staff/Senior MLE interview prep** — a rotating curriculum with drills + rubrics.
@@ -18,9 +18,9 @@ Google Calendar support is retained for a later phase, but its skill, MCP
 connection, and scheduled brief are currently disabled.
 
 This repository is the **single source of truth** for the agent's configuration.
-David-agent assets are synced into `~/.hermes` by `bootstrap/stage.py`;
-ClawGram assets are synced into `~/.hermes/profiles/clawgram` by
-`bootstrap/stage_clawgram_profile.py`.
+David-agent assets are synced into `~/.hermes` by `bootstrap/stage.py`; English
+and ClawGram assets are synced into their own profiles by
+`bootstrap/stage_english_profile.py` and `bootstrap/stage_clawgram_profile.py`.
 
 ## Why a config repo instead of ad-hoc setup?
 Hermes stores skills, memory, personality, scripts, and cron jobs under `~/.hermes`.
@@ -39,9 +39,12 @@ Local DGX Spark (vLLM @ :8003, Qwen3.6 FP8, 128K ctx)
         ├─ Built-in Browser ── agent-browser ── local Chromium CDP (:19222)
         ├─ papers-digest  ── reads ~/.hermes/data/papers/papers.db
         ├─ interview-prep ── curriculum + progress log
-        ├─ english-practice ─ Kakao webhook → english_intake.py + english_srs.py
-        │                    → Telegram review (~/english-lessons)
         └─ calendar-assistant ─ disabled; source retained for later
+
+   English Hermes profile ─────────────────────────────────────► English Telegram bot
+        │ isolated SOUL / memory / sessions / Telegram token
+        └─ english-practice ─ Kakao webhook → english_intake.py + english_srs.py
+                             → review + SRS drill (~/english-lessons)
 
    ClawGram Hermes profile ────────────────────────────────────► ClawGram Telegram bot
         │ isolated SOUL / memory / sessions / least-authority tools
@@ -61,8 +64,9 @@ Local DGX Spark (vLLM @ :8003, Qwen3.6 FP8, 128K ctx)
 | `config/memory/{USER,MEMORY}.md` | Seed memory (→ `~/.hermes/memories/`) |
 | `config/config.fragment.yaml` | Non-secret settings merged into `config.yaml` |
 | `config/env.example` | Template for `~/.hermes/.env` secrets |
-| `skills/<category>/<name>/SKILL.md` | Four David-agent skills (three active, Calendar disabled) |
+| `skills/<category>/<name>/SKILL.md` | Three David-agent skills (two active, Calendar disabled) |
 | `profiles/clawgram/` | Isolated ClawGram SOUL, memory, config, and family-letter skill |
+| `profiles/english/` | Isolated English SOUL, memory, config, and English-practice skill |
 | `scripts/*.py` | Standalone, unit-tested helpers (→ `~/.hermes/scripts/`) |
 | `cron/jobs.yaml` | Declarative Telegram notification schedule |
 | `docs/kakao-channel-setup.md` | Kakao Channel chatbot and webhook setup |
@@ -72,6 +76,8 @@ Local DGX Spark (vLLM @ :8003, Qwen3.6 FP8, 128K ctx)
 | `bootstrap/install_papers_service.sh` | Install daily paper ingestion service/timer |
 | `bootstrap/install_cron_watchdog.sh` | Install automatic cron-stall detection and gateway recovery |
 | `bootstrap/stage_clawgram_profile.py` | Stage only the isolated ClawGram Hermes profile |
+| `bootstrap/stage_english_profile.py` | Stage only the isolated English-coaching Hermes profile |
+| `bootstrap/install_english_bot.sh` | Create/stage the English profile, install its gateway, and sync cron jobs |
 | `bootstrap/install_clawgram_integration.sh` | Register profile-only MCP and install Google source/assessment/review/worker/timer units |
 | `bootstrap/clawgram_google_photos_login.sh` | Prepare and verify SSH-forwarded login/2FA in the headed Google Photos browser |
 | `bootstrap/install_clawgram_xvfb.sh` | Install Ubuntu Xvfb into a private user path without root |
@@ -591,9 +597,28 @@ cat ~/.hermes/data/english/kakao-skill-url.txt
 |---|---|---|
 | `papers-digest` | 08:30 daily | LLM/LVM research signal after 08:00 ingestion |
 | `interview-prep` | 12:00 Mon/Wed/Fri | One focused Staff/Senior MLE drill |
-| `english-intake` | 20:00 daily | Feedback analysis or weakness coaching; Sunday cumulative review |
-| `english-drill` | 21:00 daily | Tonight's spaced-repetition drill |
-| `weekly-review` | 18:00 Sunday | Papers + prep + English weekly summary |
+| `english-intake` | 20:00 daily | Dedicated English bot: feedback analysis or weakness coaching; Sunday cumulative review |
+| `english-drill` | 21:00 daily | Dedicated English bot: tonight's spaced-repetition drill |
+| `weekly-review` | 18:00 Sunday | Main David bot: papers + interview-prep weekly summary |
+
+### Dedicated English Telegram bot
+
+Create a new bot with BotFather, then run the following once. The profile setup
+stores that bot's token only in `~/.hermes/profiles/english/.env`; it never goes
+in this repository or the main David profile.
+
+```bash
+bash bootstrap/install_english_bot.sh
+hermes -p english gateway setup
+# Choose Telegram, enter the new bot token, and message the bot once to pair it.
+bash bootstrap/install_english_bot.sh
+```
+
+The first command stages the main and English profiles, removes the main profile's
+former English skill, and tells you to configure the bot when its token is absent.
+Re-running after setup installs the profile gateway and re-syncs
+the two English cron jobs with `--profile english`. Papers, interview prep, and the
+weekly review remain on the original bot.
 
 ### Automatic cron recovery
 

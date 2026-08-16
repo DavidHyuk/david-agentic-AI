@@ -3,6 +3,15 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v0.16.1 — 2026-08-15 (patch: isolate English Telegram delivery)
+
+- Added an `english` Hermes profile with its own SOUL, memory, skill copies,
+  gateway configuration, and Telegram token location.
+- Moved the English intake and drill cron jobs to that profile, while leaving
+  papers, interview preparation, and the weekly review on the existing David bot.
+- Added a token-safe installer that creates/stages the profile and only installs
+  its gateway after the dedicated Telegram bot is configured.
+
 ## v0.16.0 — 2026-08-15 (minor: expose personalization as LangGraph nodes)
 
 ### Added and verified

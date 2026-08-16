@@ -39,6 +39,16 @@ def test_all_expected_skills_present():
         / "family-letter"
         / "SKILL.md"
     ).exists()
+    assert not (REPO / "skills" / "learning" / "english-practice" / "SKILL.md").exists()
+    assert (
+        REPO
+        / "profiles"
+        / "english"
+        / "skills"
+        / "learning"
+        / "english-practice"
+        / "SKILL.md"
+    ).exists()
 
 
 def test_each_skill_has_required_fields():

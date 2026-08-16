@@ -25,6 +25,13 @@ def test_defaults_applied_deliver_telegram():
     assert all(j["deliver"] == "telegram" for j in jobs)
 
 
+def test_english_jobs_use_the_isolated_english_profile():
+    jobs = {job["name"]: job for job in rc.load_jobs(JOBS)}
+    assert jobs["english-intake"]["profile"] == "english"
+    assert jobs["english-drill"]["profile"] == "english"
+    assert "english-practice" not in jobs["weekly-review"]["skills"]
+
+
 def test_calendar_brief_is_not_scheduled_while_integration_is_deferred():
     jobs = rc.load_jobs(JOBS)
     assert "morning-brief" not in {job["name"] for job in jobs}
@@ -46,6 +53,7 @@ def test_build_create_command_shape():
         "prompt": "Send   my   digest",   # collapsed whitespace expected
         "skills": ["papers-digest"],
         "deliver": "whatsapp",
+        "profile": "research",
     }
     cmd = rc.build_create_command(job)
     assert cmd[:3] == ["hermes", "cron", "create"]
@@ -54,6 +62,7 @@ def test_build_create_command_shape():
     assert "--name" in cmd and "papers-digest" in cmd
     assert cmd[cmd.index("--skill") + 1] == "papers-digest"
     assert cmd[cmd.index("--deliver") + 1] == "whatsapp"
+    assert cmd[cmd.index("--profile") + 1] == "research"
 
 
 def test_missing_required_field_raises(tmp_path):

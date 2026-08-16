@@ -3,7 +3,7 @@
 This integration collects messages sent **to the Channel chatbot**, not messages
 from David's existing private KakaoTalk conversations. The webhook only queues raw
 teacher feedback locally; Hermes's scheduled English intake analyzes it with the
-local model and sends the summary and SRS drill to Telegram.
+local model and sends the summary and SRS drill to the dedicated English Telegram bot.
 
 ## 1. Complete the Open Builder bot
 
@@ -117,7 +117,7 @@ python3 bootstrap/register_cron.py
 At 20:00, new feedback is analyzed into SRS cards. With no new feedback, Hermes
 coaches from accumulated weak cards instead of suppressing the notification; on
 Sunday it reviews the current week's feedback and cumulative weaknesses. The
-21:00 Telegram drill includes cards created by intake when the local model
+21:00 dedicated English Telegram drill includes cards created by intake when the local model
 successfully processes the feedback.
 
 ## 5. Rotate a leaked or stale URL

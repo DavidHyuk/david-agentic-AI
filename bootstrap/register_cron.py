@@ -61,6 +61,8 @@ def build_create_command(job: dict) -> list[str]:
         cmd += ["--deliver", str(job["deliver"])]
     if job.get("workdir"):
         cmd += ["--workdir", str(job["workdir"])]
+    if job.get("profile"):
+        cmd += ["--profile", str(job["profile"])]
     return cmd
 
 

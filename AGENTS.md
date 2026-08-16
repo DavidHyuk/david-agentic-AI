@@ -7,7 +7,8 @@ synced into `~/.hermes` (HERMES_HOME) by `bootstrap/stage.py`.
 ## What this agent is for
 A proactive, always-on partner that helps David land a **Staff/Senior ML Engineer**
 role in Silicon Valley, stay current on **LLM/LVM research**, and practice
-**English** — with regular **Telegram** notifications. Calendar support is
+**English** — with regular notifications through a dedicated **English Telegram
+bot**. Calendar support is
 retained in source but intentionally deferred and disabled. English
 tutor feedback enters through the KakaoTalk Channel chatbot and is processed
 locally before the review and SRS drill are delivered through Telegram. ClawGram
@@ -18,7 +19,10 @@ delivery outside agent authority.
 - `config/soul/SOUL.md` — agent personality (staged to `$HERMES_HOME/SOUL.md`).
 - `config/memory/{MEMORY,USER}.md` — seed memory (staged to `$HERMES_HOME/memories/`).
 - `config/config.fragment.yaml` — non-secret settings, deep-merged into config.yaml.
-- `skills/<category>/<name>/SKILL.md` — the four David-agent skills.
+- `skills/<category>/<name>/SKILL.md` — the David profile skills; English is
+  isolated under `profiles/english/skills/`.
+- `profiles/english/` — isolated SOUL, memory, config, and English-practice
+  skill, staged to `~/.hermes/profiles/english`.
 - `profiles/clawgram/` — isolated SOUL, memory, config, and family-letter skill.
 - `scripts/*.py` — standalone helpers staged to `$HERMES_HOME/scripts/` and unit-tested.
 - `cron/jobs.yaml` — declarative Telegram notification schedule.
