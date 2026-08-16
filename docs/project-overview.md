@@ -126,6 +126,7 @@ David-Agent/
 │   ├── stage_clawgram_profile.py # profile → ~/.hermes/profiles/clawgram
 │   ├── stage_english_profile.py # profile → ~/.hermes/profiles/english
 │   ├── install_english_bot.sh # English Telegram bot gateway 설치
+│   ├── hermes-gateway-english-vllm.conf # 모델 readiness + 종료 제한
 │   ├── clawgram_google_photos_login.sh # headed login/2FA helper
 │   ├── clawgram-family-letter.{service,timer}
 │   ├── clawgram-source.service # worker claim 전 fail-closed 수집

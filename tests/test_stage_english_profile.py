@@ -14,7 +14,11 @@ def test_stage_profile_includes_only_english_assets(tmp_path: Path) -> None:
     assert (profile_home / "SOUL.md").exists()
     assert (profile_home / "skills" / "learning" / "english-practice" / "SKILL.md").exists()
     assert not (profile_home / "data" / "clawgram").exists()
-    assert "TELEGRAM_BOT_TOKEN" not in (profile_home / ".env").read_text()
+    environment = (profile_home / ".env").read_text()
+    assert "TELEGRAM_BOT_TOKEN" not in environment
+    assert "ENGLISH_LESSONS_DIR=" in environment
+    assert "ENGLISH_STATE_PATH=" in environment
+    assert "ENGLISH_DECK_PATH=" in environment
 
 
 def test_stage_profile_removes_legacy_default_english_skill(tmp_path: Path) -> None:

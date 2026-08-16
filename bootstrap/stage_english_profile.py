@@ -20,15 +20,30 @@ DEFAULT_PROFILE_HOME = Path.home() / ".hermes" / "profiles" / "english"
 DEFAULT_DAVID_HOME = Path.home() / ".hermes"
 
 
-def ensure_local_model_environment(home: Path) -> Path:
-    """Add the non-secret local-vLLM key without replacing Telegram secrets."""
+def ensure_profile_environment(home: Path) -> Path:
+    """Add non-secret runtime defaults without replacing Telegram secrets."""
     env_path = home / ".env"
     current = env_path.read_text(encoding="utf-8") if env_path.exists() else ""
-    if any(line.startswith("OPENAI_API_KEY=") for line in current.splitlines()):
+    existing_keys = {
+        line.split("=", 1)[0]
+        for line in current.splitlines()
+        if line and not line.startswith("#") and "=" in line
+    }
+    defaults = {
+        "OPENAI_API_KEY": "sk-local-no-key-required",
+        # Hermes profiles intentionally override HOME. Use absolute shared-data
+        # paths so this profile continues the existing Kakao/SRS history.
+        "ENGLISH_LESSONS_DIR": str(Path.home() / "english-lessons"),
+        "ENGLISH_STATE_PATH": str(Path.home() / ".hermes" / "data" / "english" / "processed.json"),
+        "ENGLISH_DECK_PATH": str(Path.home() / ".hermes" / "data" / "english" / "srs_deck.json"),
+    }
+    missing = {key: value for key, value in defaults.items() if key not in existing_keys}
+    if not missing:
         env_path.chmod(0o600)
         return env_path
     suffix = "" if not current or current.endswith("\n") else "\n"
-    content = f"{current}{suffix}OPENAI_API_KEY=sk-local-no-key-required\n"
+    additions = "".join(f"{key}={value}\n" for key, value in missing.items())
+    content = f"{current}{suffix}{additions}"
     temporary = env_path.with_name(f".{env_path.name}.tmp-{os.getpid()}-{secrets.token_hex(4)}")
     descriptor = os.open(
         temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, stat.S_IRUSR | stat.S_IWUSR
@@ -63,7 +78,7 @@ def stage_profile(
         "config_merged": stage.stage_config(resolved_home, source),
     }
     stage.stage_soul(resolved_home, source)
-    ensure_local_model_environment(resolved_home)
+    ensure_profile_environment(resolved_home)
     # The Kakao service and existing SRS deck deliberately remain under the main
     # Hermes home, allowing the dedicated bot to continue the existing learning
     # history without copying tutor feedback or card state.

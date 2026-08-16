@@ -26,6 +26,10 @@ semantic versioning (major.minor.patch).
   papers, interview preparation, and the weekly review on the existing David bot.
 - Added a token-safe installer that creates/stages the profile and only installs
   its gateway after the dedicated Telegram bot is configured.
+- Accounted for Hermes profile-local `HOME` by using profile-local helper paths
+  and explicit absolute paths for the shared Kakao inbox and existing SRS state.
+- Added the shared-vLLM readiness dependency and a bounded gateway shutdown so a
+  failed English tool call cannot leave profile deployment stuck indefinitely.
 
 ## v0.16.0 — 2026-08-15 (minor: expose personalization as LangGraph nodes)
 
