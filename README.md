@@ -493,6 +493,11 @@ Re-running after setup installs the profile gateway and re-syncs the three Engli
 cron jobs with `--profile english`. Papers, interview prep, and the weekly review
 remain on the original bot.
 
+The English profile's skill library is repository-owned: staging removes unmanaged
+runtime-created skills, while background skill creation and curator maintenance are
+disabled for this profile. Edit `profiles/english/` and stage again for durable
+changes.
+
 ### Automatic cron recovery
 
 Install the watchdog once after installing the Hermes gateway:
@@ -501,10 +506,12 @@ Install the watchdog once after installing the Hermes gateway:
 bash bootstrap/install_cron_watchdog.sh
 ```
 
-`hermes-cron-watchdog.timer` checks scheduler state every five minutes. A cron
-tick lock held longer than 20 minutes triggers a gateway restart. The installed
-gateway drop-in caps shutdown at 45 seconds, so a permanently blocked worker
-cannot prevent recovery indefinitely.
+`hermes-cron-watchdog.timer` checks both the David and installed English profile
+schedulers every five minutes. A stale next-run timestamp or cron tick lock held
+longer than 20 minutes triggers a restart of the matching gateway. The installed
+gateway drop-ins cap shutdown at 45 seconds, so a permanently blocked worker
+cannot prevent recovery indefinitely. An English profile that has not yet been
+installed is skipped cleanly.
 
 Inspect it without changing state:
 
@@ -512,6 +519,8 @@ Inspect it without changing state:
 systemctl --user status hermes-cron-watchdog.timer
 systemctl --user list-timers hermes-cron-watchdog.timer --all
 python3 scripts/cron_health.py
+python3 scripts/cron_health.py --hermes-home ~/.hermes/profiles/english \
+  --gateway-service hermes-gateway-english.service
 ```
 
 Check the scheduler and run a Telegram E2E without exposing its token:

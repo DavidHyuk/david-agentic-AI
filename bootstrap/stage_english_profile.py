@@ -61,6 +61,23 @@ def ensure_profile_environment(home: Path) -> Path:
     return env_path
 
 
+def remove_unmanaged_skills(home: Path, managed_skills: list[str]) -> list[str]:
+    """Remove runtime-created skills from the repository-owned English profile."""
+    skills_root = (home / "skills").resolve()
+    managed_dirs = {(skills_root / rel).resolve() for rel in managed_skills}
+    removed: list[str] = []
+    for skill_file in list(skills_root.rglob("SKILL.md")):
+        relative = skill_file.relative_to(skills_root)
+        if any(part.startswith(".") for part in relative.parts):
+            continue
+        skill_dir = skill_file.parent.resolve()
+        if skill_dir in managed_dirs:
+            continue
+        shutil.rmtree(skill_dir)
+        removed.append(str(skill_file.parent.relative_to(skills_root)))
+    return sorted(removed)
+
+
 def stage_profile(
     home: Path,
     *,
@@ -70,10 +87,14 @@ def stage_profile(
     """Stage the English-only profile while preserving its Telegram token."""
     resolved_home = home.expanduser().resolve()
     resolved_home.mkdir(parents=True, exist_ok=True)
+    managed_skills = stage.stage_skills(resolved_home, source)
     report = {
         "home": str(resolved_home),
         "memory": stage.stage_memory(resolved_home, source),
-        "skills": stage.stage_skills(resolved_home, source),
+        "skills": managed_skills,
+        "removed_unmanaged_skills": remove_unmanaged_skills(
+            resolved_home, managed_skills,
+        ),
         "scripts": stage.stage_scripts(resolved_home, REPO_ROOT),
         "config_merged": stage.stage_config(resolved_home, source),
     }
@@ -111,6 +132,10 @@ def main() -> int:
     print(f"Staged isolated English profile into {report['home']}")
     print("  SOUL.md     :", "ok" if report["soul"] else "missing")
     print("  skills      :", ", ".join(report["skills"]) or "none")
+    print(
+        "  unmanaged   :",
+        ", ".join(report["removed_unmanaged_skills"]) or "none",
+    )
     print("  scripts     :", ", ".join(report["scripts"]) or "none")
     print("  .env        : local model key ready; Telegram token preserved")
     print("  shared data :", report["shared_english_data"])

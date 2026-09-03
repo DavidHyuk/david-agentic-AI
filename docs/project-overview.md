@@ -115,7 +115,7 @@ David-Agent/
 │   ├── Qwen/                  # Qwen 계열 모델
 │   └── MiniMax/               # MiniMax-M2.7 모델
 │
-├── tests/                     # pytest 테스트 (165개)
+├── tests/                     # pytest 테스트 (169개)
 │   ├── conftest.py
 │   ├── test_papers_ingest.py
 │   ├── test_papers_digest.py
@@ -199,11 +199,16 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 메타데이터 수집은 독립적으로 실행되며, 08:30 digest는 완성된 카탈로그만
 읽습니다.
 
-`hermes-cron-watchdog.timer`는 5분마다 tick lock과 다음 실행 시각을
-검사합니다. lock이 20분 넘게 유지되면 gateway를 재시작하고,
+`hermes-cron-watchdog.timer`는 5분마다 David와 설치된 English profile의
+tick lock과 다음 실행 시각을 각각 검사합니다. lock이 20분 넘게 유지되거나
+다음 실행 시각이 지났으면 해당 profile의 gateway를 재시작하고,
 `hermes-gateway-cron-recovery.conf`가 멈춘 worker의 종료 대기를 45초로
 제한합니다. 따라서 하나의 agent job이 영구 대기해도 이후 스케줄 전체가
 며칠간 조용히 멈추지 않습니다.
+
+English profile의 skill은 저장소가 단일 진실 원천입니다. staging은
+런타임에서 자동 생성된 관리 대상 외 skill을 제거하고,
+English profile에서는 background skill creation과 curator를 비활성화합니다.
 
 
 ### 6. `local-model/` — LLM 백엔드

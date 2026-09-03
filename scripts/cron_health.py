@@ -8,7 +8,8 @@ Detects the two failure modes that silently stop Telegram cron alerts:
   1. ``~/.hermes/cron/.tick.lock`` held longer than a threshold (stuck tick).
   2. ``jobs.json`` last_run timestamps older than expected (scheduler idle).
 
-Standalone CLI for manual checks or cron/systemd watchdog use. Exit 0 when
+Standalone CLI for manual checks or cron/systemd watchdog use. A caller can
+target a profile home and its matching systemd gateway service. Exit 0 when
 healthy, 1 when warnings are present, 2 when action is recommended.
 """
 from __future__ import annotations
@@ -251,6 +252,16 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Restart the gateway when health check is critical",
     )
+    parser.add_argument(
+        "--gateway-service",
+        default=DEFAULT_GATEWAY_SERVICE,
+        help=f"systemd user service to restart (default: {DEFAULT_GATEWAY_SERVICE})",
+    )
+    parser.add_argument(
+        "--skip-missing-home",
+        action="store_true",
+        help="Exit successfully when --hermes-home does not exist",
+    )
     parser.add_argument("--json", action="store_true", help="Emit JSON report")
     return parser.parse_args(argv)
 
@@ -258,6 +269,9 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
     home = Path(args.hermes_home).expanduser()
+    if args.skip_missing_home and not home.exists():
+        print(f"Hermes home not installed; skipping: {home}")
+        return 0
     report = assess_health(
         home,
         lock_stale_minutes=args.lock_stale_minutes,
@@ -270,7 +284,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if report["critical"]:
         if args.restart:
-            ok, msg = restart_gateway()
+            ok, msg = restart_gateway(service=args.gateway_service)
             if ok:
                 print("gateway restart: ok")
                 if msg:

@@ -75,3 +75,19 @@ def test_english_drill_requires_inline_answers():
     body = path.read_text()
     assert "immediately followed by its answer" in body
     assert "Do not collect all answers in a separate answer key" in body
+
+
+def test_english_skill_uses_the_staged_profile_script_path():
+    path = (
+        REPO
+        / "profiles"
+        / "english"
+        / "skills"
+        / "learning"
+        / "english-practice"
+        / "SKILL.md"
+    )
+    body = path.read_text()
+    assert "~/scripts" not in body
+    assert "/home/david/.hermes/profiles/english/scripts/english_intake.py" in body
+    assert "/home/david/.hermes/profiles/english/scripts/english_srs.py" in body

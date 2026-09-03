@@ -3,6 +3,25 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.0.3 — 2026-09-02 (patch: recover stalled English cron independently)
+
+- Diagnosed the English gateway outage that began on 2026-08-24: Kakao feedback
+  continued reaching the local inbox, but the profile gateway and all three
+  English cron schedules stopped advancing.
+- Extended `cron_health.py` so a watchdog check can target a profile-specific
+  Hermes home and systemd gateway service.
+- Updated the five-minute watchdog to inspect both David and English schedulers,
+  restart the matching gateway on stale state, and skip a not-yet-installed
+  English profile cleanly.
+- Replaced ambiguous `~/scripts` helper references in `english-practice` with
+  the absolute staged profile path used by the isolated Hermes shell.
+- Disabled runtime skill creation/curation for the repository-owned English
+  profile and made staging remove unmanaged generated skills, preventing the
+  scheduled `english-practice` skill from being renamed or displaced again.
+- Restaged the missing `english-practice` skill, restarted the English gateway,
+  and processed and delivered the four pending lesson sessions through Telegram.
+- Verified the full configuration suite: 169 passed.
+
 ## v1.0.2 — 2026-08-16 (patch: clarify dual-bot installation and verification)
 
 - Expanded README setup instructions for the dedicated English Telegram profile,

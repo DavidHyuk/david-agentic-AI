@@ -15,7 +15,10 @@ def test_watchdog_checks_frequently_and_recovers_stale_locks():
     timer = TIMER.read_text()
 
     assert "cron_health.py --lock-stale-minutes 20 --restart" in service
-    assert "TimeoutStartSec=90" in service
+    assert "--hermes-home %h/.hermes/profiles/english" in service
+    assert "--gateway-service hermes-gateway-english.service" in service
+    assert "--skip-missing-home" in service
+    assert "TimeoutStartSec=180" in service
     assert "OnBootSec=5min" in timer
     assert "OnUnitActiveSec=5min" in timer
 
