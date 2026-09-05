@@ -3,6 +3,36 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.1.0 — 2026-09-05 (minor: proactive interview study coach)
+
+- Extended the existing `interview-prep` skill with beginner Coding Coach at noon
+  Tue/Thu/Sat and Hello Interview System Design Coach at noon Sunday. Mon/Wed/Fri
+  Staff/Senior MLE drills, papers, and isolated English coaching remain intact.
+- Added a version-controlled catalog of ten NeetCode/LeetCode problems, twelve
+  coding study slots, and four Hello Interview topics. Every new coach push
+  contains an actual task, canonical source URLs, and a time budget; design
+  lessons include explanation goals and a connection to David's Hermes work.
+- Added standalone `interview_progress.py`, automatically copied with existing
+  staging. Runtime `data/interview/coach_state.json` separates daily assignments
+  from completed attempts, records coding/design feedback, and persists hint
+  levels. The solution gate requires all three hints and an explicit request.
+- Reviews use 2/7/21-day eligibility. Weak due reviews interrupt new study; strong
+  reviews use reserved/consolidation slots so the initial curriculum remains
+  reachable. Unreported study never advances the curriculum or inflates reports.
+- Extended Sunday's existing papers/MLE review with measured coding counts,
+  new/review split, weak patterns, time/hint usage, design topics and dimension
+  scores, and recommended focus. Writes are locked and atomic; completion retries
+  are idempotent and malformed state is retained for recovery.
+- Validated curated links against their primary sites. The Notification System
+  walkthrough is Premium, so its push includes a self-contained 45-minute mock
+  and free Hello Interview supporting pages without relying on gated content.
+- Added offline progress/schedule/hint/report tests, cron regressions, and an
+  isolated staged CLI test that confirms restaging preserves runtime progress.
+- Staged only the interview helper/skill/catalog and registered the two coach
+  jobs plus the updated weekly review on the running David gateway. Verified
+  America/Los_Angeles schedules and preserved papers, MLE, and English jobs.
+- Verified the full configuration suite: `pytest -q` — **207 passed**.
+
 ## v1.0.3 — 2026-09-02 (patch: recover stalled English cron independently)
 
 - Diagnosed the English gateway outage that began on 2026-08-24: Kakao feedback

@@ -115,3 +115,43 @@ def test_register_dry_run_smoke(capsys):
     rc.register(jobs, dry_run=True)
     out = capsys.readouterr().out
     assert "hermes cron create" in out
+
+
+def test_interview_coaches_fill_noon_without_replacing_mle_drills():
+    jobs = {j['name']: j for j in rc.load_jobs(JOBS)}
+    for name, schedule in {'interview-prep': '0 12 * * 1,3,5',
+                           'coding-coach': '0 12 * * 2,4,6',
+                           'system-design-coach': '0 12 * * 0'}.items():
+        assert jobs[name]['schedule'] == schedule
+        assert jobs[name]['skills'] == ['interview-prep']
+        assert not jobs[name].get('profile')
+        assert jobs[name]['deliver'] == 'telegram'
+    assert 'interview_trends.py' in jobs['interview-prep']['prompt']
+    assert jobs['papers-digest']['schedule'] == '30 8 * * *'
+    assert jobs['english-drill']['schedule'] == '0 21 * * *'
+
+
+def test_coach_cron_requires_material_canonical_links_and_real_feedback():
+    jobs = {j['name']: j for j in rc.load_jobs(JOBS)}
+    coding = jobs['coding-coach']['prompt']
+    assert 'python3 ~/.hermes/scripts/interview_progress.py plan coding' in coding
+    assert 'canonical NeetCode and LeetCode URLs' in coding
+    assert '35-minute' in coding and '20 minutes without AI' in coding
+    assert 'never a solution first' in coding
+    assert 'until I report results' in coding
+    design = jobs['system-design-coach']['prompt']
+    assert 'plan system_design' in design and 'canonical Hello Interview URL' in design
+    assert '45–60 minute' in design and '3–5' in design
+    assert '45-minute mock' in design and 'Agent/Hermes' in design
+    assert 'without my results' in design
+
+
+def test_sunday_weekly_review_keeps_papers_and_adds_coach_metrics():
+    jobs = {j['name']: j for j in rc.load_jobs(JOBS)}
+    job = jobs['weekly-review']
+    assert job['schedule'] == '0 18 * * 0'
+    assert job['skills'] == ['papers-digest', 'interview-prep']
+    for phrase in ('papers', 'interview_progress.py weekly', 'new vs review',
+                   'weak patterns', 'solving time', 'hint usage', 'topics covered',
+                   'weakest design dimension', "next week's recommended focus"):
+        assert phrase in job['prompt']

@@ -38,6 +38,33 @@ jobs:
       append what you covered to the progress log. Invoke helpers with python3
       exactly; the python command is unavailable.
 
+  - name: coding-coach
+    schedule: "0 12 * * 2,4,6"      # 12:00 Tue/Thu/Sat
+    skills: [interview-prep]
+    prompt: >
+      Deliver today's Coding Coach using the interview-prep skill's Coding Coach
+      procedure. Run python3 ~/.hermes/scripts/interview_progress.py plan coding
+      and send the actual study message it returns. Include the concrete problem,
+      pattern, goal, 35-minute target, and visible clickable canonical NeetCode and
+      LeetCode URLs. Due weak reviews take priority over new curriculum problems.
+      Start as a beginner; try 20 minutes without AI first. Offer only staged hints,
+      never a solution first. Do not log a completed session until I report results.
+      Never replace the study item with a generic reminder.
+
+  - name: system-design-coach
+    schedule: "0 12 * * 0"          # 12:00 Sunday
+    skills: [interview-prep]
+    prompt: >
+      Deliver today's System Design Coach using the interview-prep skill's System
+      Design Coach procedure. Run python3 ~/.hermes/scripts/interview_progress.py
+      plan system_design and send the actual study message it returns. Include
+      the concrete Hello Interview topic/problem and visible clickable canonical
+      Hello Interview URL, a 45–60 minute target, 3–5 things I should be able to
+      explain afterward, and its connection to my real Agent/Hermes experience.
+      Retain the timed 45-minute mock for Design a Notification System and any
+      access note/free supporting links. Do not log completion without my results.
+      Never replace the study item with a generic reminder.
+
   - name: english-intake
     schedule: "0 20 * * 1-6"        # 20:00 Mon-Sat coaching
     profile: english
@@ -84,6 +111,11 @@ jobs:
     prompt: >
       Write my weekly review. Summarize: (1) the most important LLM/LVM papers this
       week and one I should deep-read, (2) interview-prep pillars covered vs
-      neglected from the progress log with next week's focus. End with 2 concrete
+      neglected from the progress log with next week's focus. Run python3
+      ~/.hermes/scripts/interview_progress.py weekly and include its measured
+      coding sessions completed, new vs review problems, weak patterns, average
+      solving time, hint usage and solutions viewed, system-design topics covered,
+      weakest design dimension, and next week's recommended focus. Distinguish
+      missing feedback from completed study; never invent scores. End with 2 concrete
       goals for next week tied to landing a Staff/Senior MLE role. English coaching
       and SRS progress are delivered only through the dedicated English Telegram bot.

@@ -7,7 +7,7 @@ with research and interview preparation delivered to the David **Telegram**
 bot, plus English feedback delivered to a dedicated English **Telegram** bot:
 
 1. **LLM/LVM research** — daily arXiv + Hugging Face ingestion and a personalized digest.
-2. **Staff/Senior MLE interview prep** — a rotating curriculum with drills + rubrics.
+2. **Staff/Senior MLE interview prep** — MLE drills plus beginner coding and system-design study delivered daily at noon.
 3. **English practice** — turns tutor recordings + corrections into spaced-repetition drills.
 
 Google Calendar support is retained for a later phase, but its skill, MCP
@@ -34,7 +34,7 @@ Local DGX Spark (vLLM @ :8003, Qwen3.6 FP8, 128K ctx)
         │ skills (procedural)   │ cron (schedule)   │ memory (who David is)
         ├─ Built-in Browser ── agent-browser ── local Chromium CDP (:19222)
         ├─ papers-digest  ── reads ~/.hermes/data/papers/papers.db
-        ├─ interview-prep ── curriculum + progress log
+        ├─ interview-prep ── MLE drills + curated coaches + adaptive coach_state.json
         └─ calendar-assistant ─ disabled; source retained for later
 
    English Hermes profile ─────────────────────────────────────► English Telegram bot
@@ -68,6 +68,8 @@ Local DGX Spark (vLLM @ :8003, Qwen3.6 FP8, 128K ctx)
 | `bootstrap/install_english_bot.sh` | Create/stage the English profile, install its gateway, and sync cron jobs |
 | `scripts/papers_ingest.py` | Fetch and merge arXiv/Hugging Face paper metadata |
 | `scripts/papers_digest.py` | Read-only recommended/recent/trending paper digest |
+| `scripts/interview_progress.py` | Concrete study messages, feedback, hints, adaptive reviews, weekly metrics |
+| `skills/career/interview-prep/references/coach_catalog.json` | Curated NeetCode/LeetCode problems and Hello Interview lessons |
 | `browser/setup_browser.sh` | Pin agent-browser + install the local Chromium CDP service |
 | `browser/browser_smoke.py` | Verify browser navigation, click, DOM read, and snapshot |
 | `mcp/setup_google_calendar.py` | Securely configure Google's official Calendar MCP |
@@ -469,10 +471,115 @@ cat ~/.hermes/data/english/kakao-skill-url.txt
 |---|---|---|
 | `papers-digest` | 08:30 daily | LLM/LVM research signal after 08:00 ingestion |
 | `interview-prep` | 12:00 Mon/Wed/Fri | One focused Staff/Senior MLE drill |
+| `coding-coach` | 12:00 Tue/Thu/Sat | 35-minute beginner problem with canonical NeetCode + LeetCode links |
+| `system-design-coach` | 12:00 Sunday | Hello Interview topic, 45–60 minute task, explanation goals + Hermes connection |
 | `english-intake` | 20:00 Mon–Sat | Dedicated English bot: feedback analysis or weakness coaching |
 | `english-drill` | 21:00 daily | Dedicated English bot: tonight's spaced-repetition drill |
 | `english-weekly-review` | 20:00 Sunday | Dedicated English bot: tutor feedback + weak SRS cumulative review |
-| `weekly-review` | 18:00 Sunday | Main David bot: papers + interview-prep weekly summary |
+| `weekly-review` | 18:00 Sunday | Main David bot: papers + MLE coverage + coding/design progress and next focus |
+
+### Interview study coach
+
+The existing `interview-prep` skill owns all interview coaching. The catalog at
+[`coach_catalog.json`](skills/career/interview-prep/references/coach_catalog.json)
+contains problem IDs, names, patterns, difficulty, canonical exercise URLs,
+prerequisites, recommended order, and concrete study goals. It uses the
+[NeetCode roadmap](https://neetcode.io/roadmap) and
+[NeetCode 150](https://neetcode.io/practice/practice/neetcode150) as the backbone,
+LeetCode for practice, and Hello Interview for system design. Daily pushes are
+rendered locally from curated content; no scraping, login cookies, or live
+lookups are required. Web lookup is only for maintaining links.
+
+| Nominal week | Coding: Tue / Thu / Sat | System design: Sunday |
+|---|---|---|
+| 1 | Contains Duplicate / Valid Anagram / Two Sum | Delivery framework, requirements, relevant estimation |
+| 2 | Valid Palindrome / Two Sum II / weak review | API design and data modeling through URL Shortener |
+| 3 | Valid Parentheses / Binary Search / Min Stack or weak review | Cache, queue, load balancer, DB replication |
+| 4 | Best Time to Buy and Sell Stock / Longest Substring Without Repeating Characters / weak review | 45-minute Design a Notification System mock + 5-minute self-review |
+
+Start as a coding beginner. Each coding push includes a goal, both problem links,
+a 35-minute budget, and “try 20 minutes without AI first.” Ask for a hint when
+stuck: Hermes gives observation → algorithm/data structure → pseudocode, one
+request at a time. A full solution requires another explicit request after
+hint 3. The helper retains hint levels across fresh cron sessions.
+
+Reply with your actual results. Coding tracks minutes, independent yes/no,
+highest hint 0–3, solution viewed yes/no, confidence 1–5, and a lesson/mistake.
+Design tracks minutes, requirements/architecture/trade-off/failure-mode scores
+(each 1–5), confidence, and next improvement. Sending a lesson never counts as
+completing it. Missing feedback keeps the current curriculum slot pending.
+
+Solution viewed or confidence ≤2 schedules a review in 2 days; hint 2/3 or
+confidence 3 in 7 days; independent work with confidence ≥4 in 21 days. Other
+assisted attempts use 7 days. Due weak reviews interrupt new material and may
+extend the nominal four weeks. Strong reviews use reserved/consolidation slots;
+a review due date means eligibility at the next applicable coach slot. Design
+uses its lowest dimension/confidence score with the same 2/7/21-day intervals.
+After the seed curriculum, concrete consolidation reviews continue.
+
+Sunday's existing 18:00 review includes completed coding sessions, new/review
+counts, weak patterns, average session minutes (including unsuccessful attempts),
+hint usage, solutions viewed, design topics and weakest dimension, and next
+week's focus, alongside papers and MLE coverage. Reports cover local Monday
+through the requested date; unknown scores remain unknown.
+
+Stage and register using the existing bootstrap:
+
+```bash
+python3 bootstrap/stage.py
+python3 bootstrap/register_cron.py --dry-run
+python3 bootstrap/register_cron.py
+```
+
+`stage.py` already copies the helper and the skill's catalog. It preserves runtime
+progress in `~/.hermes/data/interview/coach_state.json`; `HERMES_HOME` also works.
+The older MLE `progress.md` and `trends.json` remain separate. Cron uses the host's
+local timezone, which should be America/Los_Angeles. The full registration command
+syncs all declared jobs, including existing English jobs; for an interview-only
+update, use the existing registrar with just these three jobs:
+
+```bash
+python3 - <<'PYCOACH'
+from bootstrap.register_cron import DEFAULT_JOBS, load_jobs, register
+names = {"coding-coach", "system-design-coach", "weekly-review"}
+register([job for job in load_jobs(DEFAULT_JOBS) if job["name"] in names])
+PYCOACH
+```
+
+Inspect a lesson and its assignment ID locally (these commands print text/JSON;
+Telegram delivery belongs to cron):
+
+```bash
+python3 ~/.hermes/scripts/interview_progress.py plan coding
+python3 ~/.hermes/scripts/interview_progress.py plan coding --format json
+python3 ~/.hermes/scripts/interview_progress.py plan system_design
+python3 ~/.hermes/scripts/interview_progress.py weekly
+```
+
+Log the real assignment ID returned by `plan`, for example:
+
+```bash
+python3 ~/.hermes/scripts/interview_progress.py log-coding \
+  --assignment coding:2026-09-08 --duration 35 --independent no \
+  --hint-level 2 --solution-viewed no --confidence 3 \
+  --lesson "Forgot to consider repeated values"
+python3 ~/.hermes/scripts/interview_progress.py log-design \
+  --assignment system_design:2026-09-13 --duration 50 \
+  --requirements-score 4 --architecture-score 3 --trade-off-score 3 \
+  --failure-mode-score 2 --confidence 3 \
+  --next-improvement "Explain retry behavior after an ambiguous provider timeout"
+```
+
+Global `--state PATH`, `--catalog PATH`, and `--date YYYY-MM-DD` options go before
+the subcommand. Use a temporary state for previews/simulations. Logs must be
+chronological. Identical completion retries are ignored; conflicting feedback
+for the same assignment fails explicitly. Locked atomic writes preserve concurrent
+updates, and corrupt state is retained for recovery instead of silently reset.
+
+[Hello Interview's Notification System](https://www.hellointerview.com/learn/system-design/problem-breakdowns/notification-system)
+full walkthrough is Premium. Its public problem prompt plus the coach's timed
+exercise and free delivery-framework/key-technologies links support practice
+without a subscription. The coach does not claim access to gated content.
 
 ### Dedicated English Telegram bot
 

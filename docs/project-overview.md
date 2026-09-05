@@ -50,8 +50,8 @@ David-Agent/
 │   ├── research/
 │   │   └── papers-digest/     # LLM/LVM 논문 소화
 │   ├── career/
-│   │   └── interview-prep/    # Staff/Senior MLE 인터뷰 준비
-│   │       └── references/    # 커리큘럼 + 질문 은행
+│   │   └── interview-prep/    # MLE 드릴 + Coding / System Design Coach
+│   │       └── references/    # 커리큘럼 + 질문 은행 + coach_catalog.json
 │   └── productivity/
 │       └── calendar-assistant/ # 비활성; 추후 Google 캘린더 브리핑
 │
@@ -62,6 +62,7 @@ David-Agent/
 ├── scripts/                   # 스킬이 호출하는 Python 헬퍼 (→ ~/.hermes/scripts/)
 │   ├── papers_ingest.py       # arXiv/HF 메타데이터 수집·중복 병합·실행 이력
 │   ├── papers_digest.py       # 새 논문 카탈로그 읽기 전용 조회
+│   ├── interview_progress.py  # 학습 자료 렌더링·힌트·진도·적응형 복습·주간 통계
 │   ├── interview_trends.py    # HN·GitHub·논문 실시간 인터뷰 트렌드 수집
 │   ├── kakao_webhook.py       # Kakao 채널 피드백 수신·발신자 allowlist·로컬 큐
 │   ├── english_intake.py      # 새 레슨 탐지 + 이번 주 세션 조회 + 처리 상태 관리
@@ -115,11 +116,12 @@ David-Agent/
 │   ├── Qwen/                  # Qwen 계열 모델
 │   └── MiniMax/               # MiniMax-M2.7 모델
 │
-├── tests/                     # pytest 테스트 (169개)
+├── tests/                     # pytest 테스트 (207개)
 │   ├── conftest.py
 │   ├── test_papers_ingest.py
 │   ├── test_papers_digest.py
 │   ├── test_papers_service.py
+│   ├── test_interview_progress.py # 커리큘럼·복습·힌트·리포트·staged CLI
 │   ├── test_interview_trends.py  # 트렌드 수집 (normalization, ranking, cache, network stub)
 │   ├── test_english_intake.py
 │   ├── test_english_srs.py
@@ -160,7 +162,7 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 | 스킬 | 카테고리 | 핵심 기능 |
 |------|----------|-----------|
 | `papers-digest` | research | 새 논문 카탈로그에서 LLM/LVM 후보를 뽑아 인터뷰 관련성과 항목별 원문 링크 제공 |
-| `interview-prep` | career | 5-필러 커리큘럼을 돌아가며 Staff/Senior MLE 드릴 제공 |
+| `interview-prep` | career | 월/수/금 Staff MLE 드릴 + 화/목/토 NeetCode/LeetCode 입문 코딩 + 일요일 Hello Interview 설계 코칭 |
 | `english-practice` | English profile / learning | 레슨 녹음/교정 파일 → SRS 카드 생성 + 전용 Telegram bot 매일 리뷰 |
 | `calendar-assistant` | productivity | **비활성/보존** — 추후 Google Calendar 브리핑 |
 
@@ -174,6 +176,7 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 |----------|------|
 | `papers_ingest.py` | arXiv 4개 카테고리 + HF Daily Papers 메타데이터 수집, source/run provenance 저장 |
 | `papers_digest.py` | SQLite 카탈로그 읽기 전용 조회 → 추천/최신/인기 digest |
+| `interview_progress.py` | curated catalog → 실제 학습 메시지, 힌트 단계, 결과 저장, 2/7/21일 복습, 주간 통계 |
 | `interview_trends.py` | HN·GitHub·논문 DB에서 실시간 인터뷰 트렌드 수집·캐시 |
 | `english_intake.py` | 새 레슨 탐지, Telegram 파일 저장, 이번 주 세션 조회, 처리 상태 관리 |
 | `english_srs.py` | Leitner SRS 덱 (카드 추가/리뷰/통계/취약 카드 랭킹) |
@@ -182,17 +185,19 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 | `wait_for_vllm.py` | 지정한 served model이 `/v1/models`에 나타날 때까지 gateway 시작 대기 |
 
 ### 5. `cron/jobs.yaml` — 선언형 스케줄
-6개의 Telegram 알림 잡이 YAML로 선언되어 있습니다. Calendar 연동을
+8개의 Telegram 알림 잡이 YAML로 선언되어 있습니다. Calendar 연동을
 재개할 때까지 `morning-brief`는 등록하지 않습니다.
 
 | 잡 | 시간 | 내용 |
 |----|------|------|
 | `papers-digest` | 08:30 매일 | LLM/LVM 연구 시그널 |
 | `interview-prep` | 12:00 월/수/금 | 실시간 트렌드 기반 Staff 레벨 드릴 1개 |
+| `coding-coach` | 12:00 화/목/토 | 35분 문제·목표·NeetCode/LeetCode canonical URL |
+| `system-design-coach` | 12:00 일요일 | Hello Interview 주제·URL·45–60분 과제·설명 목표·Hermes 연결 |
 | `english-intake` | 월–토 20:00 | English bot: 새 피드백 분석 또는 취약 패턴 코칭 |
 | `english-drill` | 21:00 매일 | English bot: SRS 드릴 전달 |
 | `english-weekly-review` | 일요일 20:00 | English bot: tutor feedback + 취약 SRS 누적 복습 |
-| `weekly-review` | 18:00 일요일 | David bot: 논문 + 인터뷰 주간 요약 |
+| `weekly-review` | 18:00 일요일 | David bot: 논문 + MLE coverage + 코딩/설계 실측 진도·다음 주 집중 영역 |
 
 논문 수집은 Hermes cron이 아니라 별도 `hermes-papers-ingest.timer`가 매일
 08:00에 수행합니다. 따라서 모델이나 gateway가 일시적으로 내려가도
@@ -300,6 +305,34 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
 ### 스페이스드 리피티션(Leitner SRS)
 - `english_srs.py`의 Leitner 박스 알고리즘 → 맞힌 카드는 나중에, 틀린 카드는 다음날 재등장
 - 영어 교정 데이터를 단순 저장이 아닌 **점진적 장기 학습**으로 전환
+
+### 인터뷰 학습 코치 (interview_progress.py)
+- 기존 `interview-prep` 스킬 안에서 동작하며, `stage.py`가 standalone helper와
+  `references/coach_catalog.json`을 그대로 배포합니다. 모델/엔진 구성은 기존
+  Qwen3.6 FP8 vLLM 128K 설정과 지원 대안을 사용합니다.
+- NeetCode roadmap/150의 패턴 순서: Arrays & Hashing → Two Pointers →
+  Stack / Binary Search → Sliding Window. 10개 문제 + 2개 복습 슬롯이며,
+  각 문제에 ID·이름·난도·선행 문제·권장 순서·NeetCode/LeetCode URL을 저장합니다.
+- Hello Interview: framework/요구사항/추정 → URL Shortener의 API/데이터 모델 →
+  cache/queue/load balancer/DB replication → 45분 Notification System mock.
+  마지막 문서의 Premium 제한을 표시하고 무료 보조 링크와 자체 과제를 제공합니다.
+- 새 cron push는 날짜별 assignment일 뿐 완료가 아닙니다. 실제 결과를 받은 후에만
+  `~/.hermes/data/interview/coach_state.json`에 기록하고 커리큘럼을 진행합니다.
+  놓친 세션과 취약 복습 때문에 기본 4주 일정이 늘어날 수 있습니다.
+- 코딩은 날짜·문제·패턴·시간·독립 해결 여부·최고 힌트·해설 열람·자신감·교훈·복습일을
+  기록합니다. 설계는 주제·시간·요구사항/구조/trade-off/failure-mode 점수·자신감·다음
+  개선점을 기록하며 점수는 1–5입니다.
+- 해설 열람/자신감 ≤2 → 2일, 힌트 2/3 또는 자신감 3 → 7일, 독립 해결/자신감 ≥4 →
+  21일. 취약 due 복습을 새 문제보다 우선하며 강한 문제는 지정 복습/통합 슬롯에서
+  다룹니다. 설계는 최저 차원 점수/자신감으로 같은 간격을 적용하고 일요일에 전달합니다.
+- 힌트는 관찰 → 알고리즘/자료구조 → 의사코드 순서로 요청당 하나씩 제공합니다.
+  전체 해설은 3단계 이후 다시 명시적으로 요청해야 합니다.
+- Python 표준 라이브러리만 사용하며 runtime scraping/cookies/network 의존성이 없습니다.
+  파일 잠금 + atomic replace로 저장하고 동일 assignment 결과 재시도는 중복 기록하지
+  않습니다. 기존 MLE `progress.md`와 트렌드 cache는 계속 유지합니다.
+- 일요일 18시 보고서는 월요일부터의 완료 세션, 신규/복습, 평균 시간, 힌트/해설 사용,
+  최신 취약 패턴, 설계 주제, 최저 설계 차원과 다음 주 집중 영역을 논문 리뷰에 합칩니다.
+  CLI 배포/기록 예시는 README의 Interview study coach 절을 참조합니다.
 
 ### 실시간 트렌드 수집 (interview_trends.py)
 - **HN Algolia API**: 포인트 임계값 + 최신 윈도우로 고품질 ML 인터뷰 담론 수집

@@ -1,0 +1,261 @@
+{
+  "version": 1,
+  "links_checked": "2026-09-05",
+  "curriculum_sources": [
+    "https://neetcode.io/roadmap",
+    "https://neetcode.io/practice/practice/neetcode150"
+  ],
+  "problems": [
+    {
+      "id": "contains-duplicate",
+      "leetcode_id": 217,
+      "name": "Contains Duplicate",
+      "pattern": "Arrays & Hashing",
+      "difficulty": "Easy",
+      "neetcode_url": "https://neetcode.io/problems/duplicate-integer/question",
+      "leetcode_url": "https://leetcode.com/problems/contains-duplicate/",
+      "prerequisites": [],
+      "recommended_order": 1,
+      "goal": "Decide whether a list contains a repeated value; compare the time and memory costs of two approaches."
+    },
+    {
+      "id": "valid-anagram",
+      "leetcode_id": 242,
+      "name": "Valid Anagram",
+      "pattern": "Arrays & Hashing",
+      "difficulty": "Easy",
+      "neetcode_url": "https://neetcode.io/problems/is-anagram/question",
+      "leetcode_url": "https://leetcode.com/problems/valid-anagram/",
+      "prerequisites": [
+        "contains-duplicate"
+      ],
+      "recommended_order": 2,
+      "goal": "Determine whether two strings use the same letters with the same counts, including repeated letters."
+    },
+    {
+      "id": "two-sum",
+      "leetcode_id": 1,
+      "name": "Two Sum",
+      "pattern": "Arrays & Hashing",
+      "difficulty": "Easy",
+      "neetcode_url": "https://neetcode.io/problems/two-integer-sum/question",
+      "leetcode_url": "https://leetcode.com/problems/two-sum/",
+      "prerequisites": [
+        "valid-anagram"
+      ],
+      "recommended_order": 3,
+      "goal": "Find two distinct indices that sum to a target; explain how to improve on checking every pair."
+    },
+    {
+      "id": "valid-palindrome",
+      "leetcode_id": 125,
+      "name": "Valid Palindrome",
+      "pattern": "Two Pointers",
+      "difficulty": "Easy",
+      "neetcode_url": "https://neetcode.io/problems/is-palindrome/question",
+      "leetcode_url": "https://leetcode.com/problems/valid-palindrome/",
+      "prerequisites": [
+        "two-sum"
+      ],
+      "recommended_order": 4,
+      "goal": "Check a phrase for palindrome symmetry while ignoring punctuation and letter case."
+    },
+    {
+      "id": "two-sum-ii-input-array-is-sorted",
+      "leetcode_id": 167,
+      "name": "Two Sum II",
+      "pattern": "Two Pointers",
+      "difficulty": "Medium",
+      "neetcode_url": "https://neetcode.io/problems/two-integer-sum-ii/question",
+      "leetcode_url": "https://leetcode.com/problems/two-sum-ii-input-array-is-sorted/",
+      "prerequisites": [
+        "valid-palindrome"
+      ],
+      "recommended_order": 5,
+      "goal": "Use sorted input to find a target pair and justify why each move can discard candidates."
+    },
+    {
+      "id": "valid-parentheses",
+      "leetcode_id": 20,
+      "name": "Valid Parentheses",
+      "pattern": "Stack",
+      "difficulty": "Easy",
+      "neetcode_url": "https://neetcode.io/problems/validate-parentheses/question",
+      "leetcode_url": "https://leetcode.com/problems/valid-parentheses/",
+      "prerequisites": [
+        "contains-duplicate"
+      ],
+      "recommended_order": 6,
+      "goal": "Check whether mixed bracket types close in the correct order; test empty and incomplete input."
+    },
+    {
+      "id": "binary-search",
+      "leetcode_id": 704,
+      "name": "Binary Search",
+      "pattern": "Binary Search",
+      "difficulty": "Easy",
+      "neetcode_url": "https://neetcode.io/problems/binary-search/question",
+      "leetcode_url": "https://leetcode.com/problems/binary-search/",
+      "prerequisites": [
+        "two-sum-ii-input-array-is-sorted"
+      ],
+      "recommended_order": 7,
+      "goal": "Locate a target in a sorted array; state an invariant and test absent targets and boundary indices."
+    },
+    {
+      "id": "min-stack",
+      "leetcode_id": 155,
+      "name": "Min Stack",
+      "pattern": "Stack",
+      "difficulty": "Medium",
+      "neetcode_url": "https://neetcode.io/problems/minimum-stack/question",
+      "leetcode_url": "https://leetcode.com/problems/min-stack/",
+      "prerequisites": [
+        "valid-parentheses"
+      ],
+      "recommended_order": 8,
+      "goal": "Design push, pop, top, and minimum queries with constant time per operation, including duplicate minima."
+    },
+    {
+      "id": "best-time-to-buy-and-sell-stock",
+      "leetcode_id": 121,
+      "name": "Best Time to Buy and Sell Stock",
+      "pattern": "Sliding Window",
+      "difficulty": "Easy",
+      "neetcode_url": "https://neetcode.io/problems/buy-and-sell-crypto/question",
+      "leetcode_url": "https://leetcode.com/problems/best-time-to-buy-and-sell-stock/",
+      "prerequisites": [
+        "two-sum-ii-input-array-is-sorted"
+      ],
+      "recommended_order": 9,
+      "goal": "Choose a buy day before a sell day to maximize one trade; explain the result for falling prices."
+    },
+    {
+      "id": "longest-substring-without-repeating-characters",
+      "leetcode_id": 3,
+      "name": "Longest Substring Without Repeating Characters",
+      "pattern": "Sliding Window",
+      "difficulty": "Medium",
+      "neetcode_url": "https://neetcode.io/problems/longest-substring-without-duplicates/question",
+      "leetcode_url": "https://leetcode.com/problems/longest-substring-without-repeating-characters/",
+      "prerequisites": [
+        "best-time-to-buy-and-sell-stock",
+        "valid-anagram"
+      ],
+      "recommended_order": 10,
+      "goal": "Find the longest contiguous substring with unique characters; explain how to handle a repeated character."
+    }
+  ],
+  "coding_curriculum": [
+    {
+      "problem": "contains-duplicate"
+    },
+    {
+      "problem": "valid-anagram"
+    },
+    {
+      "problem": "two-sum"
+    },
+    {
+      "problem": "valid-palindrome"
+    },
+    {
+      "problem": "two-sum-ii-input-array-is-sorted"
+    },
+    {
+      "review": true
+    },
+    {
+      "problem": "valid-parentheses"
+    },
+    {
+      "problem": "binary-search"
+    },
+    {
+      "problem": "min-stack"
+    },
+    {
+      "problem": "best-time-to-buy-and-sell-stock"
+    },
+    {
+      "problem": "longest-substring-without-repeating-characters"
+    },
+    {
+      "review": true
+    }
+  ],
+  "system_design": [
+    {
+      "id": "delivery-framework",
+      "name": "Delivery framework: requirements and estimation",
+      "target_minutes": 50,
+      "url": "https://www.hellointerview.com/learn/system-design/in-a-hurry/delivery",
+      "prerequisites": [],
+      "focus": [
+        "Separate functional requirements from measurable quality targets.",
+        "Explain the sequence from requirements to interfaces, architecture, and deep dives.",
+        "Estimate average and peak request rates and storage from explicit assumptions.",
+        "Use estimates to justify one design decision rather than calculating everything."
+      ],
+      "exercise": "Spend 20 minutes reading, 20 minutes framing a daily study notification service, and 10 minutes explaining your requirements and estimates aloud.",
+      "hermes_connection": "Use Hermes daily Telegram delivery as the example: define delivery latency, missed-message behavior, and expected traffic."
+    },
+    {
+      "id": "url-shortener",
+      "name": "API design + data modeling: Design a URL Shortener",
+      "target_minutes": 55,
+      "url": "https://www.hellointerview.com/learn/system-design/problem-breakdowns/bitly",
+      "prerequisites": [
+        "delivery-framework"
+      ],
+      "focus": [
+        "Specify create-link and redirect APIs, including error cases.",
+        "Define the link record, key, expiry, and lookup index.",
+        "Explain code uniqueness and collision handling.",
+        "Trace a redirect and justify caching and storage choices."
+      ],
+      "exercise": "Read for 20 minutes, sketch APIs and records for 20 minutes, then defend the redirect path for 15 minutes.",
+      "hermes_connection": "Compare stable short-link IDs with the canonical paper URLs Hermes includes in Telegram; distinguish identifiers from delivery records."
+    },
+    {
+      "id": "key-technologies",
+      "name": "Key technologies: cache, queue, load balancer, DB replication",
+      "target_minutes": 55,
+      "url": "https://www.hellointerview.com/learn/system-design/in-a-hurry/key-technologies",
+      "prerequisites": [
+        "url-shortener"
+      ],
+      "focus": [
+        "Explain cache placement, invalidation, and stale reads.",
+        "Describe how a queue buffers work and how workers acknowledge it.",
+        "Explain routing and health checks at a load balancer.",
+        "Explain primary/replica writes, replication lag, and failover."
+      ],
+      "exercise": "Study the building blocks for 25 minutes, draw their request and background-work paths for 20 minutes, and explain a failure in each path for 10 minutes.",
+      "hermes_connection": "Start with the current Hermes cron and watchdog; propose when separate queued workers and replicated storage would become useful, without claiming they already exist."
+    },
+    {
+      "id": "notification-system",
+      "name": "Design a Notification System",
+      "target_minutes": 50,
+      "url": "https://www.hellointerview.com/learn/system-design/problem-breakdowns/notification-system",
+      "prerequisites": [
+        "key-technologies"
+      ],
+      "focus": [
+        "Justify queue and worker boundaries.",
+        "Define retries, backoff, and terminal failures.",
+        "Explain idempotency when a send succeeds but acknowledgement is lost.",
+        "Set provider rate limits and priority handling.",
+        "Explain backlog recovery and provider outages."
+      ],
+      "exercise": "Run a 45-minute mock: 5 minutes requirements, 5 APIs/data, 15 architecture, 15 trade-offs/failures, 5 recap. Then spend 5 minutes scoring your answer.",
+      "hermes_connection": "Scale Hermes scheduled Telegram pushes into a multi-user service; use cron stalls and provider failures as concrete failure scenarios.",
+      "access_note": "Hello Interview labels the full walkthrough Premium. Use the public prompt for the mock; its free delivery framework and key-technologies pages support the exercise without a login.",
+      "supporting_urls": [
+        "https://www.hellointerview.com/learn/system-design/in-a-hurry/delivery",
+        "https://www.hellointerview.com/learn/system-design/in-a-hurry/key-technologies"
+      ]
+    }
+  ]
+}
