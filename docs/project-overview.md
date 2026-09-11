@@ -35,7 +35,8 @@ KakaoTalk Channel
 
 Tailscale browser → Hermes HQ :8788 (tailnet IP + loopback)
         ├── read-only sessions / schedules / memory / logs
-        └── study workbenches → coach feedback / SRS / notes / reading list
+        ├── study workbenches → coach feedback / SRS / notes / reading list
+        └── HQ mission → Kanban graph → specialist workers → HQ synthesis
 ```
 
 ---
@@ -63,9 +64,13 @@ David-Agent/
 │   └── productivity/
 │       └── calendar-assistant/ # 비활성; 추후 Google 캘린더 브리핑
 │
-├── profiles/english/          # 영어 전용 Hermes profile의 source of truth
-│   ├── config/{soul,memory,config.fragment.yaml}
-│   └── skills/learning/english-practice/SKILL.md
+├── profiles/                  # 격리된 English + headless 전문 에이전트 identity
+│   ├── english/               # 영어 전용 Telegram profile
+│   ├── papers/                # 논문·연구 worker SOUL
+│   ├── interview/             # MLE interview worker SOUL
+│   ├── coding/                # coding worker SOUL
+│   ├── design/                # system-design worker SOUL
+│   └── specialists.yaml       # 역할 설명과 허용 skill 매핑
 │
 ├── scripts/                   # 스킬이 호출하는 Python 헬퍼 (→ ~/.hermes/scripts/)
 │   ├── papers_ingest.py       # arXiv/HF 메타데이터 수집·중복 병합·실행 이력
@@ -77,7 +82,7 @@ David-Agent/
 │   ├── english_srs.py         # Leitner SRS 덱 (추가/리뷰/통계/취약 카드)
 │   ├── agenda.py              # 캘린더 이벤트 포맷팅 + 충돌 감지
 │   ├── cron_health.py         # cron tick lock / jobs.json 건강 검사 (+ 선택적 gateway restart)
-│   ├── observatory.py         # 프로필 기록 조회 + 학습 작업 API·관제실 서버
+│   ├── observatory.py         # 기록·학습·Kanban orchestration API + 관제실
 │   └── wait_for_vllm.py       # gateway 시작 전 /v1/models readiness gate
 │
 ├── .codex/                    # Codex 훅 (Stop 후 테스트·자동 git commit/push)
@@ -98,6 +103,7 @@ David-Agent/
 │   ├── hermes-cron-watchdog.{service,timer}
 │   ├── hermes-gateway-cron-recovery.conf # gateway 종료 45초 상한
 │   ├── stage_english_profile.py # profile → ~/.hermes/profiles/english
+│   ├── stage_specialist_profiles.py # headless 전문 profile staging
 │   ├── install_english_bot.sh # English Telegram bot gateway 설치
 │   ├── install_observatory.sh # 관제실 UI staging + Tailscale IP 전용 서비스
 │   ├── hermes-gateway-english-vllm.conf # 모델 readiness + 종료 제한
@@ -127,7 +133,7 @@ David-Agent/
 │   ├── Qwen/                  # Qwen 계열 모델
 │   └── MiniMax/               # MiniMax-M2.7 모델
 │
-├── tests/                     # pytest 테스트 (231개)
+├── tests/                     # pytest 테스트 (235개)
 │   ├── conftest.py
 │   ├── test_papers_ingest.py
 │   ├── test_papers_digest.py
@@ -143,7 +149,8 @@ David-Agent/
 │   ├── test_cron_watchdog.py  # 자동 복구 systemd wiring 검증
 │   ├── test_observatory.py    # 기록 조회·HTTP 경계·학습 저장·중복/동시 쓰기
 │   ├── test_auto_git_commit.py # stop 훅 안전 필터·커밋 메시지 검증
-│   └── test_stage.py          # stage.py 멱등성 검증
+│   ├── test_stage.py          # stage.py 멱등성 검증
+│   └── test_stage_specialist_profiles.py # 전문 profile 격리·재현성
 │
 └── docs/
     ├── dev-history.md         # 버전 이력
@@ -314,8 +321,8 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
 ### Hermes HQ 관제실
 - `scripts/observatory.py` + `browser/observatory/`의 HTML/CSS/JavaScript
   (`app.js`, `workbench.js`, `style.css`, `workbench.css`):
-  Python 표준 라이브러리 HTTP 서버와 로컬 HTML/CSS/JavaScript. 추가 모델
-  호출이나 CDN 없이 픽셀 작업실, 세션 날짜별 리플레이, 검색·페이지네이션 제공.
+  Python 표준 라이브러리 HTTP 서버와 로컬 HTML/CSS/JavaScript. CDN 없이
+  픽셀 작업실, 세션 날짜별 리플레이, 검색·페이지네이션 제공.
 - 캠퍼스 방 클릭으로 학습 작업실을 엽니다. 코딩·시스템 디자인은 미완료
   과제 재개, 타이머, 실제 연습 결과 제출을 제공하고, English는 정답 확인과
   SRS 채점, Papers는 읽기 목록과 읽음 표시를 제공합니다. MLE는 저장된
@@ -326,8 +333,15 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   `data/observatory/workspace.json`에 버전과 함께 저장하고, 이전 노트도
   기록 보관소에서 조회합니다. 저장 API는 동일 출처·JSON·전용 헤더와 입력을
   검증합니다. 초안·타이머는 브라우저에 남습니다.
-- 질문 복사는 Telegram에 전달할 문맥을 준비합니다. 웹 모델 호출·자동 채점·
-  에이전트 작업 실행은 아직 제공하지 않습니다.
+- HQ Command Center는 명시적으로 제출한 목표를 `hermes-hq` Kanban 보드의
+  triage에 기록합니다. Qwen decomposer가 2~6개의 의존 작업으로 나누고 역할
+  설명에 따라 papers/interview/coding/design/english로 배정합니다. 각 worker는
+  결과·오류·실행 시도를 영속적으로 남기며, 의존 작업이 끝나면 default HQ가
+  최종 결과를 종합합니다. 작업 카드에서 댓글, 재배정, 중지, 재시도가 가능합니다.
+- 전문 프로필은 repo의 SOUL과 허용 skill만 배포하는 headless agent이며 별도
+  Telegram gateway를 실행하지 않습니다. 로컬 Qwen의 안정성을 위해 dispatcher는
+  동시 worker를 1개로 제한합니다. 질문 복사는 기존처럼 Telegram용 문맥만
+  준비하며 자동 채점은 하지 않습니다.
 - 프로필별 `state.db`는 SQLite 읽기 전용으로 조회합니다. gateway PID와
   프로세스 시작 시각으로 가동 여부를 검사하고, 세션 종료 미기록을 실행 중으로
   간주하지 않습니다. cron ID가 바뀐 과거 작업은 저장된 요청으로 분류합니다.
@@ -339,8 +353,9 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   loopback + Tailscale IPv4의 8788 포트만 엽니다. Tailscale 연결 기기에서
   접속하며, 필요 시 별도 8443 HTTPS Serve를 추가할 수 있습니다. 기본 접근
   제어는 tailnet 정책이며 앱 로그인은 별도로 없습니다.
-- 캠퍼스는 10초 간격 조회. 웹에서 저장한 노트·읽기 활동은 이력을 남기지만,
-  에이전트 실행의 별도 영구 이벤트 수집기는 없으며 기존 세션 기록을 사용합니다.
+- 캠퍼스와 Mission Board는 10초 간격 조회. 일반 agent replay는 기존 세션
+  기록을 사용하고, HQ orchestration은 Kanban DB에 task graph, comment, run,
+  outcome을 별도로 보존합니다.
 
 ### vLLM (고성능 LLM 서빙 엔진)
 - **PagedAttention**: KV 캐시를 페이지 단위로 관리 → 긴 컨텍스트에서 메모리 낭비 최소화

@@ -3,6 +3,29 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.7.0 — 2026-09-11 (minor: HQ multi-agent orchestration)
+
+- Turned Hermes HQ into a real command center backed by Hermes' durable Kanban
+  engine. A submitted goal enters triage, the local Qwen decomposer creates a
+  dependency graph, specialist workers execute it, and the default HQ worker
+  receives dependent results for synthesis.
+- Added repository-owned headless `papers`, `interview`, `coding`, and `design`
+  profiles with narrow identities, curated skills, descriptions for model-based
+  routing, and no Telegram gateway. The existing English profile remains the
+  English specialist.
+- Added a live five-column mission board, agent roster, dispatcher status, task
+  details, dependencies, comments, run attempts, errors, results, reassignment,
+  pause, and retry controls. Goal drafts survive browser/network retries and each
+  create request carries a durable idempotency key.
+- Restricted the web bridge to exact Kanban subcommands and validated task IDs,
+  profile names, priorities, text sizes, and same-origin action requests. Mission
+  execution is capped at one local-model worker, 20 minutes per task, and two
+  failed attempts before blocking.
+- Verified actual Qwen decomposition in an isolated Hermes home: one interview
+  sprint became three parallel specialist tasks and one dependent synthesis task,
+  correctly routed to papers, coding, design, and interview. Full suite:
+  `pytest -q` — **235 passed**.
+
 ## v1.6.0 — 2026-09-11 (minor: campus study workbenches)
 
 - Campus rooms now open actionable workbenches: coding and system-design

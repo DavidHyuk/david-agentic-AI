@@ -776,9 +776,11 @@ tailscale ip -4
 # Open http://<the-Tailscale-IP>:8788 from a device on your tailnet.
 ```
 
-The installer stages the standalone Python server and local HTML/CSS/JavaScript
-assets, then enables `hermes-observatory.service`. No npm build, external CDN,
-model request, or new Python dependency is required. It listens only on loopback
+The installer stages the standalone Python server, local HTML/CSS/JavaScript,
+HQ specialist profiles and Kanban settings, then enables
+`hermes-observatory.service` and refreshes the main gateway dispatcher. Installation
+does not make a model request and needs no npm build, external CDN, or new Python
+dependency. It listens only on loopback
 and the machine's Tailscale IPv4, never `0.0.0.0`. Tailscale access policy governs
 remote access; there is no additional app login. HTTP is carried inside the
 encrypted Tailscale tunnel. For browser HTTPS, optionally add a separate Serve
@@ -802,14 +804,22 @@ workbench; its history button opens the room's saved conversations.
 - **Papers**: browse recent catalog entries, save a reading list, and mark papers
   read or unread. Original links open the source paper.
 - **MLE Interview**: reopen the latest saved drill and keep your answer in room
-  notes. **HQ** brings together unfinished assignments, due cards and unread papers.
+  notes.
+- **HQ Command Center**: submit a goal with context and priority. Hermes' Kanban
+  decomposer turns it into a dependency graph, routes work to the `papers`,
+  `interview`, `coding`, `design`, or `english` profile, and asks the default HQ
+  profile to synthesize dependent results. The live board shows queued, running,
+  blocked, and completed work. Open a card for its body, parents/children, worker
+  attempts, comments, errors, and final handoff; blocked work can be retried and
+  non-running work can be reassigned.
 - **Room notes**: save notes on the server and browse earlier versions under
   **기록 보관소 → 캠퍼스 노트 · 읽기 활동**. Unsaved note/form drafts, timer state,
   and the last opened room are retained in that browser's local storage.
 
-This workbench uses existing saved content and deterministic study helpers.
-The question-copy button prepares context to paste into Telegram; web-based model
-generation, automatic grading and agent job dispatch are not implemented.
+Study workbenches use existing saved content and deterministic helpers. The
+question-copy button prepares context to paste into Telegram. HQ missions are the
+explicit path that invokes models and agents; submitting **계획 · 실행 시작** places
+real work on the private `hermes-hq` board. Automatic grading is not used.
 
 Use **대화 & 작업 기록** to search message text, titles, or tool names, select a
 profile/room/date range, and page through transcripts and tool calls. An absent
@@ -829,10 +839,13 @@ Sources are existing `state.db`, `sessions/sessions.json`, `gateway_state.json`,
 data and `~/english-lessons/`. SQLite connections use read-only/query-only mode.
 The app never sends Telegram messages. Explicit study actions call the existing
 `interview_progress.py` and `english_srs.py` helpers; notes and reading activity
-are stored in `~/.hermes/data/observatory/workspace.json`. Writes require a
+are stored in `~/.hermes/data/observatory/workspace.json`. HQ tasks, dependencies,
+comments, worker attempts, failures, and results are retained by Hermes under
+`~/.hermes/kanban/boards/hermes-hq/`. Writes require a
 same-origin JSON request with the action header and validated inputs. Coach
 feedback is idempotent; SRS reviews use locking and a review counter to reject
-stale retries; notebook revisions prevent stale overwrites across devices.
+stale retries; notebook revisions prevent stale overwrites across devices. Mission
+creation also has an idempotency key so a network retry cannot duplicate a goal.
 The app excludes system
 message rows, private reasoning columns, request dumps, auth/config files, audio,
 compressed logs, and text attachments larger than 2 MB. Recognizable credentials
@@ -854,7 +867,10 @@ Re-run the installer after changing the UI, service settings, Tailscale address,
 or machine DNS name. `bootstrap/stage.py` copies the server alongside other
 standalone helpers; the observatory installer owns UI staging and service setup.
 It also stages the study helpers, including the SRS helper in the existing English
-profile, so web and scheduled reviews share the same locking behavior.
+profile, so web and scheduled reviews share the same locking behavior. The four
+headless specialist profiles are repository-owned and do not run Telegram gateways;
+the default gateway dispatches their work. With the shared local Qwen endpoint,
+`max_in_progress: 1` deliberately executes one mission worker at a time.
 
 ## Development
 ```bash
