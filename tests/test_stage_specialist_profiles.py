@@ -17,6 +17,9 @@ def test_stage_specialists_assigns_identity_and_only_role_skills(tmp_path: Path)
     papers = root / "papers"
     assert "research specialist" in (papers / "SOUL.md").read_text()
     assert (papers / "skills/research/papers-digest/SKILL.md").is_file()
+    staged_skill = (papers / "skills/research/papers-digest/SKILL.md").read_text()
+    assert "~/.hermes" not in staged_skill
+    assert str(tmp_path) in staged_skill
     assert not (papers / "skills/career/interview-prep").exists()
     assert (root / "coding/skills/career/interview-prep/SKILL.md").is_file()
     metadata = yaml.safe_load((root / "design/profile.yaml").read_text())

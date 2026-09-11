@@ -67,8 +67,9 @@ def ensure_local_environment(home: Path) -> None:
         raise
 
 
-def stage_skills(home: Path, skill_names: list[str], repo: Path = REPO_ROOT) -> list[str]:
-    """Replace a specialist's skills with its explicit repository allowlist."""
+def stage_skills(home: Path, skill_names: list[str], shared_home: Path,
+                 repo: Path = REPO_ROOT) -> list[str]:
+    """Replace skills and resolve shared-data paths for an isolated worker HOME."""
     destination = home / "skills"
     destination.mkdir(parents=True, exist_ok=True)
     allowed = set(skill_names)
@@ -86,6 +87,13 @@ def stage_skills(home: Path, skill_names: list[str], repo: Path = REPO_ROOT) -> 
             shutil.rmtree(target)
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copytree(source, target)
+        skill_file = target / "SKILL.md"
+        skill_file.write_text(
+            skill_file.read_text(encoding="utf-8").replace(
+                "~/.hermes", str(shared_home.resolve()),
+            ),
+            encoding="utf-8",
+        )
         staged.append(relative)
     (home / ".no-bundled-skills").write_text(
         "Managed by David-Agent/bootstrap/stage_specialist_profiles.py\n",
@@ -107,7 +115,7 @@ def stage_profile(root: Path, name: str, definition: dict, repo: Path = REPO_ROO
     shutil.copy2(soul, home / "SOUL.md")
     stage.stage_memory(home, repo)
     stage.stage_config(home, repo)
-    skills = stage_skills(home, definition.get("skills", []), repo)
+    skills = stage_skills(home, definition.get("skills", []), root.parent, repo)
     ensure_local_environment(home)
     (home / "profile.yaml").write_text(yaml.safe_dump({
         "description": definition["description"].strip(),
