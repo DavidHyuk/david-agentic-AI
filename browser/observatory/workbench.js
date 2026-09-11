@@ -186,11 +186,13 @@ function hqDesk(d) {
   ];
   const draft = localRead("hermes-mission-draft", {});
   return `<article class="desk-card mission-command"><span class="tag">COMMAND CENTER · ${esc(o.board)}</span><h2>HQ에 목표 맡기기</h2><p>목표를 접수하면 HQ가 전문 에이전트별 작업과 의존관계로 나누고 결과를 다시 종합합니다. 제출 즉시 실제 에이전트 실행 대기열에 들어갑니다.</p><form id="mission-form"><label class="desk-field">달성할 목표<input name="goal" maxlength="200" required placeholder="예: 이번 주 Anthropic MLE 면접 준비 계획과 연습 자료를 만들어줘" value="${esc(draft.goal || "")}"></label><label class="desk-field">배경·제약·원하는 결과<textarea name="context" maxlength="4000" rows="5" placeholder="마감, 지원 회사, 산출물 형태, 이미 시도한 내용 등을 적어주세요.">${esc(draft.context || "")}</textarea></label><label class="desk-field compact-field">우선순위<select name="priority"><option value="80" ${draft.priority === "80" ? "selected" : ""}>높음</option><option value="50" ${!draft.priority || draft.priority === "50" ? "selected" : ""}>보통</option><option value="20" ${draft.priority === "20" ? "selected" : ""}>낮음</option></select></label><button class="primary">계획 · 실행 시작</button></form></article>
-    <article class="desk-card"><div class="mission-heading"><div><span class="tag">LIVE MISSION BOARD</span><h2>에이전트 작업 흐름</h2></div><span class="dispatcher ${o.dispatcher_alive ? "on" : ""}">● ${o.dispatcher_alive ? "Dispatcher online" : "Dispatcher offline"}</span></div><div class="agent-roster">${o.assignees.map((a) => `<span>${esc(roomIcon(a.room))} ${esc(a.name)} <small>${Object.values(a.counts || {}).reduce((sum, n) => sum + n, 0)}</small></span>`).join("")}</div><div class="mission-board">${columns.map(([keys, title]) => {
-      const statuses = keys.split(","),
-        tasks = o.tasks.filter((task) => statuses.includes(task.status));
-      return `<section class="mission-column"><header><b>${esc(title)}</b><span>${tasks.length}</span></header>${tasks.map(missionCard).join("") || '<div class="mission-empty">비어 있음</div>'}</section>`;
-    }).join("")}</div></article><section id="mission-detail"></section>
+    <article class="desk-card"><div class="mission-heading"><div><span class="tag">LIVE MISSION BOARD</span><h2>에이전트 작업 흐름</h2></div><span class="dispatcher ${o.dispatcher_alive ? "on" : ""}">● ${o.dispatcher_alive ? "Dispatcher online" : "Dispatcher offline"}</span></div><div class="agent-roster">${o.assignees.map((a) => `<span>${esc(roomIcon(a.room))} ${esc(a.name)} <small>${Object.values(a.counts || {}).reduce((sum, n) => sum + n, 0)}</small></span>`).join("")}</div><div class="mission-board">${columns
+      .map(([keys, title]) => {
+        const statuses = keys.split(","),
+          tasks = o.tasks.filter((task) => statuses.includes(task.status));
+        return `<section class="mission-column"><header><b>${esc(title)}</b><span>${tasks.length}</span></header>${tasks.map(missionCard).join("") || '<div class="mission-empty">비어 있음</div>'}</section>`;
+      })
+      .join("")}</div></article><section id="mission-detail"></section>
     <article class="desk-card"><span class="tag">YOUR NEXT MOVE</span><h2>직접 확인할 학습</h2><div class="pending-list">${d.pending.map((a) => `<button data-open-desk="${a.track === "coding" ? "coding" : "design"}"><span>${a.track === "coding" ? "⌨" : "🏗"} ${esc(a.item_id)}</span><small>${esc(a.date)} · 결과 미입력 →</small></button>`).join("")}<button data-open-desk="english"><span>💬 영어 복습 ${d.due_count}개</span><small>교정 문장 연습 →</small></button><button data-open-desk="papers"><span>🔭 읽기 대기 ${d.reading_count}편</span><small>논문 읽기 목록 →</small></button></div></article>`;
 }
 function renderWorkbench(d) {
@@ -263,21 +265,19 @@ function renderWorkbench(d) {
         );
       }),
   );
-  document
-    .querySelectorAll("[data-bookmark]")
-    .forEach(
-      (b) =>
-        (b.onclick = () =>
-          deskAction(
-            {
-              action: "bookmark",
-              room: "papers",
-              paper: d.papers[Number(b.dataset.bookmark)].id,
-              revision: d.revision,
-            },
-            "읽기 목록에 추가했습니다.",
-          )),
-    );
+  document.querySelectorAll("[data-bookmark]").forEach(
+    (b) =>
+      (b.onclick = () =>
+        deskAction(
+          {
+            action: "bookmark",
+            room: "papers",
+            paper: d.papers[Number(b.dataset.bookmark)].id,
+            revision: d.revision,
+          },
+          "읽기 목록에 추가했습니다.",
+        )),
+  );
   document.querySelectorAll("[data-paper-read]").forEach(
     (b) =>
       (b.onclick = () => {
@@ -333,24 +333,38 @@ function wireHq(d) {
   document
     .querySelectorAll("[data-mission]")
     .forEach((button) =>
-      button.addEventListener("click", () => showMission(button.dataset.mission)),
+      button.addEventListener("click", () =>
+        showMission(button.dataset.mission),
+      ),
     );
 }
 async function showMission(taskId) {
   const target = $("mission-detail");
   if (!target) return;
-  target.innerHTML = '<article class="desk-card">실행 기록을 불러오는 중…</article>';
+  target.innerHTML =
+    '<article class="desk-card">실행 기록을 불러오는 중…</article>';
   try {
     const detail = await api("mission", { task: taskId }),
       task = detail.task,
       status = missionStatuses[task.status] || [task.status, task.status],
       assignees = bench.data.orchestration.assignees;
-    target.innerHTML = `<article class="desk-card mission-detail-card"><div class="mission-heading"><div><span class="mission-state state-${esc(task.status)}">${esc(status[0])}</span><h2>${esc(task.title)}</h2></div><button class="text-button" id="mission-close">닫기</button></div><p class="mission-meta">${esc(task.id)} · ${esc(task.assignee || "미배정")} · ${when(task.created_at)}</p><div class="mission-body">${linkedText(task.body || "설명 없음")}</div>${detail.latest_summary || task.result ? `<section class="mission-result"><b>현재 결과</b><div>${linkedText(detail.latest_summary || task.result)}</div></section>` : ""}<div class="mission-relations">${detail.parents.length ? `<div><b>선행 작업</b>${detail.parents.map((id) => `<button data-related-mission="${esc(id)}">${esc(id)}</button>`).join("")}</div>` : ""}${detail.children.length ? `<div><b>하위 작업</b>${detail.children.map((id) => `<button data-related-mission="${esc(id)}">${esc(id)}</button>`).join("")}</div>` : ""}</div><details class="desk-help" ${detail.runs.length ? "open" : ""}><summary>실행 시도 ${detail.runs.length}개</summary>${detail.runs.map((run) => `<div class="mission-run"><b>${esc(run.profile)} · ${esc(run.outcome || run.status)}</b><small>${when(run.started_at)}${run.ended_at ? " → " + when(run.ended_at) : ""}</small>${run.summary ? `<p>${linkedText(run.summary)}</p>` : ""}${run.error ? `<p class="mission-error">${esc(run.error)}</p>` : ""}</div>`).join("") || '<p class="muted">아직 실행되지 않았습니다.</p>'}</details><details class="desk-help"><summary>댓글·이벤트 ${detail.comments.length + detail.events.length}개</summary>${detail.comments.map((comment) => `<div class="mission-run"><b>${esc(comment.author)}</b><small>${when(comment.created_at)}</small><p>${linkedText(comment.body)}</p></div>`).join("")}${detail.events.slice().reverse().map((item) => `<div class="mission-event"><span>${esc(item.kind)}</span><small>${when(item.created_at)}</small></div>`).join("")}</details><form id="mission-comment-form" class="mission-inline"><input name="comment" maxlength="2000" required placeholder="방향 수정이나 추가 정보를 남기세요"><button class="outline">댓글 추가</button></form>${!["running", "done", "archived"].includes(task.status) ? `<div class="mission-admin"><label>담당 에이전트<select id="mission-assignee">${assignees.map((a) => `<option value="${esc(a.name)}" ${a.name === task.assignee ? "selected" : ""}>${esc(a.name)}</option>`).join("")}</select></label><button class="outline" id="mission-assign">재배정</button>${task.status === "blocked" || task.status === "scheduled" ? '<button class="primary" id="mission-unblock">다시 실행</button>' : '<button class="outline danger" id="mission-block">중지</button>'}</div>` : ""}</article>`;
+    target.innerHTML = `<article class="desk-card mission-detail-card"><div class="mission-heading"><div><span class="mission-state state-${esc(task.status)}">${esc(status[0])}</span><h2>${esc(task.title)}</h2></div><button class="text-button" id="mission-close">닫기</button></div><p class="mission-meta">${esc(task.id)} · ${esc(task.assignee || "미배정")} · ${when(task.created_at)}</p><div class="mission-body">${linkedText(task.body || "설명 없음")}</div>${detail.latest_summary || task.result ? `<section class="mission-result"><b>현재 결과</b><div>${linkedText(detail.latest_summary || task.result)}</div></section>` : ""}<div class="mission-relations">${detail.parents.length ? `<div><b>선행 작업</b>${detail.parents.map((id) => `<button data-related-mission="${esc(id)}">${esc(id)}</button>`).join("")}</div>` : ""}${detail.children.length ? `<div><b>하위 작업</b>${detail.children.map((id) => `<button data-related-mission="${esc(id)}">${esc(id)}</button>`).join("")}</div>` : ""}</div><details class="desk-help" ${detail.runs.length ? "open" : ""}><summary>실행 시도 ${detail.runs.length}개</summary>${detail.runs.map((run) => `<div class="mission-run"><b>${esc(run.profile)} · ${esc(run.outcome || run.status)}</b><small>${when(run.started_at)}${run.ended_at ? " → " + when(run.ended_at) : ""}</small>${run.summary ? `<p>${linkedText(run.summary)}</p>` : ""}${run.error ? `<p class="mission-error">${esc(run.error)}</p>` : ""}</div>`).join("") || '<p class="muted">아직 실행되지 않았습니다.</p>'}</details><details class="desk-help"><summary>댓글·이벤트 ${detail.comments.length + detail.events.length}개</summary>${detail.comments.map((comment) => `<div class="mission-run"><b>${esc(comment.author)}</b><small>${when(comment.created_at)}</small><p>${linkedText(comment.body)}</p></div>`).join("")}${detail.events
+      .slice()
+      .reverse()
+      .map(
+        (item) =>
+          `<div class="mission-event"><span>${esc(item.kind)}</span><small>${when(item.created_at)}</small></div>`,
+      )
+      .join(
+        "",
+      )}</details><form id="mission-comment-form" class="mission-inline"><input name="comment" maxlength="2000" required placeholder="방향 수정이나 추가 정보를 남기세요"><button class="outline">댓글 추가</button></form>${!["running", "done", "archived"].includes(task.status) ? `<div class="mission-admin"><label>담당 에이전트<select id="mission-assignee">${assignees.map((a) => `<option value="${esc(a.name)}" ${a.name === task.assignee ? "selected" : ""}>${esc(a.name)}</option>`).join("")}</select></label><button class="outline" id="mission-assign">재배정</button>${task.status === "blocked" || task.status === "scheduled" ? '<button class="primary" id="mission-unblock">다시 실행</button>' : '<button class="outline danger" id="mission-block">중지</button>'}</div>` : ""}</article>`;
     $("mission-close").onclick = () => target.replaceChildren();
-    target.querySelectorAll("[data-related-mission]").forEach(
-      (button) =>
-        (button.onclick = () => showMission(button.dataset.relatedMission)),
-    );
+    target
+      .querySelectorAll("[data-related-mission]")
+      .forEach(
+        (button) =>
+          (button.onclick = () => showMission(button.dataset.relatedMission)),
+      );
     $("mission-comment-form").onsubmit = (event) => {
       event.preventDefault();
       const comment = new FormData(event.currentTarget).get("comment");

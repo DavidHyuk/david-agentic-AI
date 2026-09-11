@@ -55,6 +55,8 @@ def test_config_merge_preserves_existing(tmp_path):
         "command_timeout": 30,
     }
     assert cfg["skills"]["disabled"] == ["calendar-assistant"]
+    assert cfg["kanban"]["orchestrator_profile"] == "default"
+    assert cfg["kanban"]["max_in_progress"] == 1
 
 
 def test_memory_not_clobbered_when_present(tmp_path):

@@ -6,6 +6,7 @@ import sqlite3
 import shutil
 from concurrent.futures import ThreadPoolExecutor
 import threading
+from types import SimpleNamespace
 from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
 
@@ -286,3 +287,77 @@ def test_http_actions_require_same_origin_json_and_action_header(store):
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+def test_hq_orchestration_reads_board_and_maps_specialist_rooms(store, monkeypatch):
+    executable = Path('/bin/true')
+    store.hermes_cli = executable
+    task = {'id': 't_1234abcd', 'title': 'Read agent papers', 'body': 'Find evidence',
+            'assignee': 'papers', 'status': 'running', 'priority': 80,
+            'created_at': 1789150000, 'result': None}
+
+    def run(command, **kwargs):
+        assert command[:4] == [str(executable), 'kanban', '--board', 'hermes-hq']
+        if command[4] == 'list':
+            output = [task]
+        elif command[4] == 'assignees':
+            output = [{'name': 'default', 'on_disk': True, 'counts': {}},
+                      {'name': 'papers', 'on_disk': True, 'counts': {'running': 1}}]
+        else:
+            raise AssertionError(command)
+        return SimpleNamespace(returncode=0, stdout=json.dumps(output), stderr='')
+
+    monkeypatch.setattr('observatory.subprocess.run', run)
+    board = store.orchestration()
+    assert board['available'] is True, board
+    assert board['tasks'][0]['room'] == 'papers'
+    assert board['counts'] == {'running': 1}
+
+
+def test_hq_mission_actions_validate_and_use_fixed_cli_arguments(store, monkeypatch):
+    executable = Path('/bin/true')
+    store.hermes_cli = executable
+    calls = []
+    task = {'id': 't_1234abcd', 'title': 'Goal', 'body': 'Context',
+            'assignee': 'default', 'status': 'triage', 'priority': 50,
+            'created_at': 1789150000, 'result': None}
+
+    def run(command, **kwargs):
+        calls.append(command)
+        action = command[4]
+        if action == 'create':
+            output = task
+        elif action == 'show':
+            output = {'task': dict(task), 'latest_summary': None, 'parents': [],
+                      'children': [], 'comments': [], 'events': [], 'runs': []}
+        elif action == 'assignees':
+            output = [{'name': 'default', 'on_disk': True, 'counts': {}},
+                      {'name': 'papers', 'on_disk': True, 'counts': {}}]
+        elif action in ('assign', 'comment', 'block', 'unblock'):
+            return SimpleNamespace(returncode=0, stdout='ok\n', stderr='')
+        else:
+            raise AssertionError(command)
+        return SimpleNamespace(returncode=0, stdout=json.dumps(output), stderr='')
+
+    monkeypatch.setattr('observatory.subprocess.run', run)
+    request_id = '11111111-1111-4111-8111-111111111111'
+    response = store.study_action({'action': 'mission_create',
+                                   'goal': 'Goal; touch /tmp/never',
+                                   'context': 'Only summarize.', 'priority': 80,
+                                   'request_id': request_id})
+    assert response['task']['id'] == 't_1234abcd'
+    create = calls[0]
+    assert create[5] == 'Goal; touch /tmp/never'
+    assert create[create.index('--idempotency-key') + 1] == 'hq:' + request_id
+    assert '--triage' in create and '--max-runtime' in create
+    store.study_action({'action': 'mission_assign', 'task': 't_1234abcd',
+                        'assignee': 'papers'})
+    assert any(call[4:7] == ['assign', 't_1234abcd', 'papers'] for call in calls)
+    with pytest.raises(ValueError):
+        store.study_action({'action': 'mission_create', 'goal': 'short',
+                            'context': '', 'priority': 101, 'request_id': request_id})
+    with pytest.raises(ValueError):
+        store.mission_detail('../../secret')
+    with pytest.raises(ValueError, match='캠퍼스'):
+        store.study_action({'action': 'mission_assign', 'task': 't_1234abcd',
+                            'assignee': 'clawgram'})
