@@ -3,21 +3,22 @@
 """Read-only Hermes observatory: local HTTP UI over existing runtime records.
 
 No Hermes imports, database migrations, model calls, or runtime writes. Bind to
-loopback and publish with Tailscale Serve. Only explicit data sources and static
+loopback and optionally the local Tailscale IP or use Tailscale Serve. Only explicit data sources and static
 assets are exposed; request dumps, auth files and private reasoning are excluded.
 """
 from __future__ import annotations
 
 import argparse
 from datetime import datetime, timedelta
+import ipaddress
 import json
 import mimetypes
-import os
 from pathlib import Path
 import re
 import sqlite3
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import time
+import threading
 from urllib.parse import parse_qs, urlsplit
 from zoneinfo import ZoneInfo
 
@@ -40,13 +41,13 @@ SECRET_KEY = re.compile(r'(token|secret|password|api[_-]?key|authorization|cooki
 def redact(value):
     """Mask recognizable credentials in both structured records and text."""
     if isinstance(value, dict):
-        return {k: '[redacted]' if SECRET_KEY.search(k) else redact(v)
+        return {k: '[redacted]' if SECRET_KEY.search(k) and not isinstance(v, (int, float)) else redact(v)
                 for k, v in value.items()}
     if isinstance(value, list):
         return [redact(v) for v in value]
     if not isinstance(value, str):
         return value
-    value = re.sub(r'\b\d{6,12}:[A-Za-z0-9_-]{25,}\b', '[redacted]', value)
+    value = re.sub(r'\b(?:bot)?\d{6,12}:[A-Za-z0-9_-]{25,}\b', '[redacted]', value)
     value = re.sub(r'\b(?:sk-|hf_)[A-Za-z0-9_-]{12,}', '[redacted]', value)
     value = re.sub(r'(?i)Bearer\s+[^\s"\x27,}]+', 'Bearer [redacted]', value)
     return re.sub(r'''(?im)((?:[\w-]*(?:token|secret|password|api_key|authorization|cookie)[\w-]*)["']?\s*[:=]\s*)[^\n]+''',
@@ -59,6 +60,13 @@ def read_json(path: Path, default=None):
     return json.loads(path.read_text())
 
 
+def task_prompt(prompt):
+    """Separate a cron task from the injected skill and delivery instructions."""
+    if 'and nothing more.]' in prompt:
+        return prompt.rsplit('and nothing more.]', 1)[-1].strip()
+    return prompt.rsplit('\n\n', 1)[-1].strip()
+
+
 def room_for(profile, session_id, prompt, jobs):
     if profile != 'david':
         return 'english' if profile == 'english' else profile
@@ -69,10 +77,11 @@ def room_for(profile, session_id, prompt, jobs):
     # remains evidence for classification. General chats default to HQ.
     if not session_id.startswith('cron_'):
         return 'hq'
-    p = prompt.lower()
+    p = task_prompt(prompt).lower()
     for needle, room in [('weekly review', 'hq'), ('system design coach', 'design'),
                          ('system-design coach', 'design'), ('coding coach', 'coding'),
-                         ('papers-digest', 'papers'), ('interview-prep', 'interview'),
+                         ('papers-digest', 'papers'), ('research signal', 'papers'),
+                         ('interview-prep', 'interview'), ('interview', 'interview'),
                          ('english', 'english')]:
         if needle in p:
             return room
@@ -126,6 +135,15 @@ class Observatory:
         doc = read_json(self.profile_home(profile) / 'cron/jobs.json', {})
         return doc.get('jobs', [])
 
+    def channel_rooms(self, profile, jobs):
+        """Map current Telegram session IDs using persisted gateway origins."""
+        index = read_json(self.profile_home(profile) / 'sessions/sessions.json', {})
+        targets = {str(j.get('deliver', '')).removeprefix('telegram:'): JOB_ROOMS.get(j['name'], 'hq')
+                   for j in jobs if str(j.get('deliver', '')).startswith('telegram:')}
+        return {entry.get('session_id'): targets[str(entry.get('origin', {}).get('chat_id'))]
+                for entry in index.values() if isinstance(entry, dict)
+                and str(entry.get('origin', {}).get('chat_id')) in targets}
+
     def sessions(self, profile='', q='', room='', start='', end='', offset=0, limit=40):
         low, high = date_range(start, end)
         rows, errors = [], []
@@ -153,15 +171,17 @@ class Observatory:
                 finally:
                     conn.close()
                 jobs = self.jobs(name)
+                channels = self.channel_rooms(name, jobs)
                 for raw in found:
                     row = dict(raw)
                     prompt = row.pop('first_prompt')
-                    row['room'] = room_for(name, row['id'], prompt, jobs)
+                    row['room'] = channels.get(row['id']) or room_for(name, row['id'], prompt, jobs)
                     if room and row['room'] != room:
                         continue
                     row['profile'] = name
-                    row['preview'] = prompt[:240]
-                    row['title'] = row['title'] or prompt[:100] or row['id']
+                    task = task_prompt(prompt) if row['source'] == 'cron' else prompt
+                    row['preview'] = task[:240]
+                    row['title'] = row['title'] or task[:100] or row['id']
                     # ended_at=NULL is not proof that an agent is running.
                     row['status'] = '종료 기록 있음' if row['ended_at'] else '종료 기록 없음'
                     rows.append(row)
@@ -184,7 +204,12 @@ class Observatory:
             records = conn.execute('''SELECT id,role,content,tool_name,tool_calls,
                 timestamp,finish_reason FROM messages WHERE ''' + where +
                 ' ORDER BY id LIMIT ? OFFSET ?', [*args, limit, offset]).fetchall()
-            return {'items': [dict(r) for r in records], 'total': total, 'offset': offset, 'limit': limit}
+            items = [dict(r) for r in records]
+            for item in items:
+                content = item.get('content') or ''
+                if item['role'] == 'user' and 'and nothing more.]' in content:
+                    item['display_content'] = task_prompt(content)
+            return {'items': items, 'total': total, 'offset': offset, 'limit': limit}
         finally:
             conn.close()
 
@@ -356,10 +381,17 @@ def main():
     parser.add_argument('--assets', type=Path, default=Path.home() / '.hermes/observatory')
     parser.add_argument('--port', type=int, default=8788)
     parser.add_argument('--allowed-host', action='append', default=[])
+    parser.add_argument('--tailnet-ip', help='Optional local Tailscale IPv4; also keep loopback listener')
     args = parser.parse_args()
     hosts = {'127.0.0.1', 'localhost', *[h.lower() for h in args.allowed_host]}
+    if args.tailnet_ip:
+        if ipaddress.ip_address(args.tailnet_ip) not in ipaddress.ip_network('100.64.0.0/10'):
+            parser.error('--tailnet-ip must be a Tailscale IPv4 address')
+        hosts.add(args.tailnet_ip)
+        tailnet = ThreadingHTTPServer((args.tailnet_ip, args.port), make_handler(Observatory(args.home), args.assets, hosts))
+        threading.Thread(target=tailnet.serve_forever, daemon=True).start()
     server = ThreadingHTTPServer(('127.0.0.1', args.port), make_handler(Observatory(args.home), args.assets, hosts))
-    print(f'Hermes HQ listening on 127.0.0.1:{args.port}', flush=True)
+    print(f'Hermes HQ listening on 127.0.0.1:{args.port}; tailnet={args.tailnet_ip or "disabled"}', flush=True)
     server.serve_forever()
 
 

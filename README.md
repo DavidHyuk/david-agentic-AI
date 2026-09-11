@@ -759,6 +759,73 @@ Use **cyankiwi/MiniMax-M2.7-AWQ-4bit** on a single 128GB GPU. The official
 `MiniMaxAI/MiniMax-M2.7` BF16 checkpoint needs ~220GB and 4–8 GPUs.
 Review the [MiniMax-M2.7 license](https://github.com/MiniMax-AI/MiniMax-M2.7/blob/main/LICENSE) for commercial-use limits.
 
+## Hermes HQ — private agent observatory
+
+Hermes HQ is a web app for watching your agents and browsing their saved records.
+The campus has separate paper, MLE, coding, system-design, English, and HQ rooms;
+other installed Hermes profiles also appear as independent rooms. Room animation
+is decorative; the explicitly labeled daily replay follows real session start
+times. Gateway process availability is checked separately from session history.
+
+Install or update while Tailscale is connected:
+
+```bash
+bash bootstrap/install_observatory.sh
+tailscale ip -4
+# Open http://<the-Tailscale-IP>:8788 from a device on your tailnet.
+```
+
+The installer stages the standalone Python server and local HTML/CSS/JavaScript
+assets, then enables `hermes-observatory.service`. No npm build, external CDN,
+model request, or new Python dependency is required. It listens only on loopback
+and the machine's Tailscale IPv4, never `0.0.0.0`. Tailscale access policy governs
+remote access; there is no additional app login. HTTP is carried inside the
+encrypted Tailscale tunnel. For browser HTTPS, optionally add a separate Serve
+listener (this can require sudo; it does not replace an existing port 443 app):
+
+```bash
+sudo tailscale serve --bg --https=8443 http://127.0.0.1:8788
+# Then open https://<machine-tailnet-DNS-name>:8443
+```
+
+The first screen refreshes every ten seconds and links rooms to filtered history.
+Use **대화 & 작업 기록** to search message text, titles, or tool names, select a
+profile/room/date range, and page through transcripts and tool calls. An absent
+session end timestamp is shown as unknown, not as evidence of an active agent.
+Use **알림 스케줄** for next runs, prior execution status and delivery errors;
+absence of a delivery error is not a receipt confirmation.
+
+**기록 보관소** provides searchable, paginated learning assignments, submitted
+feedback, English SRS cards, paper metadata and original links, current profile
+memories, retained cron output, text lesson files, and noncompressed gateway logs.
+Learning, papers and lesson sources are shared; memories, logs and outputs follow
+the selected profile. Other profiles such as ClawGram are observed read-only;
+their external project databases are not integrated or modified.
+
+Sources are existing `state.db`, `sessions/sessions.json`, `gateway_state.json`,
+`cron/jobs.json`, `cron/output/`, `memories/{MEMORY,USER}.md`, shared paper/learning
+data and `~/english-lessons/`. SQLite connections use read-only/query-only mode.
+The app never sends Telegram messages or edits agent state. It excludes system
+message rows, private reasoning columns, request dumps, auth/config files, audio,
+compressed logs, and text attachments larger than 2 MB. Recognizable credentials
+are redacted and transcript text is rendered without executing HTML. Missing or
+deleted history cannot be reconstructed, and there is no separate durable event
+collector; replay uses the retained session history.
+
+```bash
+systemctl --user status hermes-observatory.service
+journalctl --user -u hermes-observatory.service -n 30 --no-pager
+systemctl --user restart hermes-observatory.service
+# Stop the observatory:
+systemctl --user disable --now hermes-observatory.service
+# If you enabled its optional HTTPS listener:
+sudo tailscale serve --https=8443 off
+```
+
+Re-run the installer after changing the UI, service settings, Tailscale address,
+or machine DNS name. `bootstrap/stage.py` copies the server alongside other
+standalone helpers; the observatory installer owns UI staging and service setup.
+
 ## Development
 ```bash
 python3 -m pytest -q          # run the test suite

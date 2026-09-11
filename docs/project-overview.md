@@ -32,6 +32,9 @@ arXiv / Hugging Face
 KakaoTalk Channel
         │
         └── Open Builder → kakao_webhook.py → ~/english-lessons/
+
+Tailscale browser → Hermes HQ :8788 (tailnet IP + loopback)
+        └── read-only sessions / schedules / learning / memory / logs
 ```
 
 ---
@@ -73,6 +76,7 @@ David-Agent/
 │   ├── english_srs.py         # Leitner SRS 덱 (추가/리뷰/통계/취약 카드)
 │   ├── agenda.py              # 캘린더 이벤트 포맷팅 + 충돌 감지
 │   ├── cron_health.py         # cron tick lock / jobs.json 건강 검사 (+ 선택적 gateway restart)
+│   ├── observatory.py         # 프로필 기록 읽기 전용 HTTP API + 관제실 서버
 │   └── wait_for_vllm.py       # gateway 시작 전 /v1/models readiness gate
 │
 ├── .codex/                    # Codex 훅 (Stop 후 테스트·자동 git commit/push)
@@ -83,7 +87,7 @@ David-Agent/
 │   └── hooks.json             # `.codex/hooks/auto_git_commit.py` 위임
 │
 ├── cron/
-│   └── jobs.yaml              # 6개의 Telegram 알림 스케줄 정의 (영어 3개는 english profile)
+│   └── jobs.yaml              # 8개의 Telegram 알림 스케줄 정의 (영어 3개는 english profile)
 │
 ├── bootstrap/                 # 설치 및 동기화 자동화
 │   ├── install.sh             # 원클릭 설치 (Hermes + 설정 + 모델)
@@ -94,6 +98,7 @@ David-Agent/
 │   ├── hermes-gateway-cron-recovery.conf # gateway 종료 45초 상한
 │   ├── stage_english_profile.py # profile → ~/.hermes/profiles/english
 │   ├── install_english_bot.sh # English Telegram bot gateway 설치
+│   ├── install_observatory.sh # 관제실 UI staging + Tailscale IP 전용 서비스
 │   ├── hermes-gateway-english-vllm.conf # 모델 readiness + 종료 제한
 │   ├── stage.py               # repo → ~/.hermes 멱등 동기화
 │   └── register_cron.py       # jobs.yaml → hermes cron 등록
@@ -106,7 +111,8 @@ David-Agent/
 │   ├── hermes-gateway-vllm.conf # gateway → vLLM 의존성/readiness drop-in
 │   ├── restart_service.sh     # vLLM 서비스 재시작 및 API 준비 대기
 │
-├── browser/                   # Hermes Built-in Browser 런타임
+├── browser/                   # Built-in Browser 런타임 + 관제실 정적 UI
+│   ├── observatory/          # 픽셀 사무실·검색·기록·리플레이 HTML/CSS/JS
 │   ├── setup_browser.sh       # agent-browser 고정 설치 + user service 설치
 │   ├── hermes-browser.service # localhost-only Chromium CDP
 │   └── browser_smoke.py       # 탐색·클릭·DOM·snapshot E2E 검사
@@ -120,7 +126,7 @@ David-Agent/
 │   ├── Qwen/                  # Qwen 계열 모델
 │   └── MiniMax/               # MiniMax-M2.7 모델
 │
-├── tests/                     # pytest 테스트 (211개)
+├── tests/                     # pytest 테스트 (222개)
 │   ├── conftest.py
 │   ├── test_papers_ingest.py
 │   ├── test_papers_digest.py
@@ -134,6 +140,7 @@ David-Agent/
 │   ├── test_cron_jobs.py      # cron 스키마 검증
 │   ├── test_cron_health.py    # cron tick lock / jobs.json 건강 검사
 │   ├── test_cron_watchdog.py  # 자동 복구 systemd wiring 검증
+│   ├── test_observatory.py    # 읽기 전용 DB·검색·분류·개인정보·HTTP 경계
 │   ├── test_auto_git_commit.py # stop 훅 안전 필터·커밋 메시지 검증
 │   └── test_stage.py          # stage.py 멱등성 검증
 │
@@ -302,6 +309,23 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
 ---
 
 ## 발전을 이끄는 핵심 기술
+
+### Hermes HQ 관제실
+- `scripts/observatory.py` + `browser/observatory/{index.html,style.css,app.js}`:
+  Python 표준 라이브러리 HTTP 서버와 로컬 HTML/CSS/JavaScript. 추가 모델
+  호출이나 CDN 없이 픽셀 작업실, 세션 날짜별 리플레이, 검색·페이지네이션 제공.
+- 프로필별 `state.db`는 SQLite 읽기 전용으로 조회합니다. gateway PID와
+  프로세스 시작 시각으로 가동 여부를 검사하고, 세션 종료 미기록을 실행 중으로
+  간주하지 않습니다. cron ID가 바뀐 과거 작업은 저장된 요청으로 분류합니다.
+- 기록 보관소: 학습 과제/실제 피드백, SRS 카드, 논문 초록/링크, 현재 메모리,
+  보관된 cron 본문, 레슨 텍스트, gateway 로그. 요청 덤프·인증 파일·내부 추론·
+  음성·압축 로그는 제외합니다. ClawGram 등 설치된 프로필의 Hermes 기록도
+  관찰하지만 외부 프로젝트의 데이터베이스와 운영 설정은 관리하지 않습니다.
+- `install_observatory.sh`가 `hermes-observatory.service`를 설치하고
+  loopback + Tailscale IPv4의 8788 포트만 엽니다. Tailscale 연결 기기에서
+  접속하며, 필요 시 별도 8443 HTTPS Serve를 추가할 수 있습니다. 기본 접근
+  제어는 tailnet 정책이며 앱 로그인은 별도로 없습니다.
+- 10초 간격 조회. 별도 영구 이벤트 수집기는 없으며 기존 저장 기록을 사용합니다.
 
 ### vLLM (고성능 LLM 서빙 엔진)
 - **PagedAttention**: KV 캐시를 페이지 단위로 관리 → 긴 컨텍스트에서 메모리 낭비 최소화

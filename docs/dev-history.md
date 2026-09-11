@@ -3,6 +3,26 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.5.0 — 2026-09-11 (minor: private Hermes HQ observatory)
+
+- Added a responsive pixel-campus UI backed by actual Hermes records: profile
+  availability, topic rooms, daily session replay, searchable conversations/tool
+  calls, cron schedules, learning/SRS records, papers, memories, retained outputs,
+  text lessons and gateway logs.
+- Kept the data path read-only and dependency-free, using explicit source paths,
+  read-only SQLite connections, paginated APIs, escaped transcript text, credential
+  redaction and host/cross-site request checks. System messages, reasoning fields,
+  auth files and raw request dumps are outside the UI's data boundary.
+- Distinguished process availability from session activity and execution status
+  from delivery confirmation. Historical cron routing uses the task after skill
+  injection, so replaced job IDs still map to the right topic when identifiable.
+- Added an installer that stages local assets and enables a user service bound
+  only to loopback and the Tailscale IPv4. The deployed app uses the tailnet IP;
+  optional HTTPS Serve requires administrator configuration and preserves the
+  existing port 443 service.
+- Verified desktop/mobile browser flows, search, transcript detail, paper links,
+  replay and Tailscale-IP access. Full suite: `pytest -q` — **222 passed**.
+
 ## v1.4.1 — 2026-09-11 (patch: add company-aware coding strategy)
 
 - Added durable interview-coach guidance that distinguishes official
