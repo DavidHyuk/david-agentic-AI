@@ -325,7 +325,9 @@ def test_hq_orchestration_reads_board_and_maps_specialist_rooms(store, monkeypat
     assert board['available'] is True, board
     assert board['tasks'][0]['room'] == 'papers'
     assert board['counts'] == {'running': 1}
-    assert [row['name'] for row in board['assignees']] == ['default', 'papers']
+    assert [row['name'] for row in board['assignees']] == [
+        'default', 'papers', 'clawgram',
+    ]
 
 
 def test_hq_mission_actions_validate_and_use_fixed_cli_arguments(store, monkeypatch):
@@ -362,6 +364,7 @@ def test_hq_mission_actions_validate_and_use_fixed_cli_arguments(store, monkeypa
     assert response['task']['id'] == 't_1234abcd'
     create = calls[0]
     assert create[5] == 'Goal; touch /tmp/never'
+    assert 'self-contained result' in create[create.index('--body') + 1]
     assert create[create.index('--idempotency-key') + 1] == 'hq:' + request_id
     assert '--triage' in create and '--max-runtime' in create
     store.study_action({'action': 'mission_assign', 'task': 't_1234abcd',
@@ -374,4 +377,4 @@ def test_hq_mission_actions_validate_and_use_fixed_cli_arguments(store, monkeypa
         store.mission_detail('../../secret')
     with pytest.raises(ValueError, match='캠퍼스'):
         store.study_action({'action': 'mission_assign', 'task': 't_1234abcd',
-                            'assignee': 'clawgram'})
+                            'assignee': 'rogue'})

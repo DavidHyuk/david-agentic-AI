@@ -12,15 +12,18 @@ semantic versioning (major.minor.patch).
 - Added repository-owned headless `papers`, `interview`, `coding`, and `design`
   profiles with narrow identities, curated skills, descriptions for model-based
   routing, and no Telegram gateway. The existing English profile remains the
-  English specialist.
+  English specialist, and the existing ClawGram profile remains available for
+  family-letter missions.
 - Added a live five-column mission board, agent roster, dispatcher status, task
   details, dependencies, comments, run attempts, errors, results, reassignment,
   pause, and retry controls. Goal drafts survive browser/network retries and each
-  create request carries a durable idempotency key.
+  create request carries a durable idempotency key. Worker instructions require a
+  self-contained database handoff so scratch files are never the only artifact.
 - Restricted the web bridge to exact Kanban subcommands and validated task IDs,
   profile names, priorities, text sizes, and same-origin action requests. Mission
-  execution is capped at one local-model worker, 20 minutes per task, and two
-  failed attempts before blocking.
+  execution is capped at one local-model worker; submitted root missions carry a
+  20-minute runtime cap and two failed attempts before blocking. Gateway drain is
+  now 15 seconds, safely inside the existing 45-second systemd recovery boundary.
 - Verified actual Qwen decomposition in an isolated Hermes home: one interview
   sprint became three parallel specialist tasks and one dependent synthesis task,
   correctly routed to papers, coding, design, and interview. Dispatched the paper

@@ -27,6 +27,10 @@ model:
   default: Qwen3.6-35B-A3B-FP8
   context_length: 131072
 
+# Finish gateway draining before the 45-second systemd recovery boundary.
+agent:
+  restart_drain_timeout: 15
+
 # --- Built-in browser --------------------------------------------------------
 # Hermes keeps its own browser tool. agent-browser connects to a localhost-only
 # Chromium CDP service because auto-launching Ubuntu's Snap Chromium hangs on

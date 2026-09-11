@@ -6,6 +6,10 @@ OBS_REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OBS_HOME="${HERMES_HOME:-$HOME/.hermes}"
 OBS_UNITS="$HOME/.config/systemd/user"
 OBS_HERMES_CLI="$(command -v hermes)"
+OBS_CONFIG_BEFORE="missing"
+if [[ -f "$OBS_HOME/config.yaml" ]]; then
+  OBS_CONFIG_BEFORE="$(sha256sum "$OBS_HOME/config.yaml" | cut -d ' ' -f 1)"
+fi
 OBS_HOST="${OBSERVATORY_HOST:-$(tailscale status --json | python3 -c 'import json,sys; print(json.load(sys.stdin)["Self"]["DNSName"].rstrip("."))')}"
 OBS_IP="$(tailscale ip -4)"
 if [[ ! "$OBS_HOST" =~ ^[a-zA-Z0-9.-]+$ ]]; then
@@ -59,7 +63,9 @@ PY
 systemctl --user daemon-reload
 systemctl --user enable --now hermes-observatory.service
 systemctl --user restart hermes-observatory.service
-if systemctl --user is-active --quiet hermes-gateway.service; then
+OBS_CONFIG_AFTER="$(sha256sum "$OBS_HOME/config.yaml" | cut -d ' ' -f 1)"
+if [[ "$OBS_CONFIG_BEFORE" != "$OBS_CONFIG_AFTER" ]] && \
+  systemctl --user is-active --quiet hermes-gateway.service; then
   systemctl --user restart hermes-gateway.service
 fi
 python3 - <<'PY'

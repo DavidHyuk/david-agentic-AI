@@ -778,7 +778,8 @@ tailscale ip -4
 
 The installer stages the standalone Python server, local HTML/CSS/JavaScript,
 HQ specialist profiles and Kanban settings, then enables
-`hermes-observatory.service` and refreshes the main gateway dispatcher. Installation
+`hermes-observatory.service`. It refreshes the main gateway dispatcher when its
+configuration changed. Installation
 does not make a model request and needs no npm build, external CDN, or new Python
 dependency. It listens only on loopback
 and the machine's Tailscale IPv4, never `0.0.0.0`. Tailscale access policy governs
@@ -807,7 +808,7 @@ workbench; its history button opens the room's saved conversations.
   notes.
 - **HQ Command Center**: submit a goal with context and priority. Hermes' Kanban
   decomposer turns it into a dependency graph, routes work to the `papers`,
-  `interview`, `coding`, `design`, or `english` profile, and asks the default HQ
+  `interview`, `coding`, `design`, `english`, or existing `clawgram` profile, and asks the default HQ
   profile to synthesize dependent results. The live board shows queued, running,
   blocked, and completed work. Open a card for its body, parents/children, worker
   attempts, comments, errors, and final handoff; blocked work can be retried and

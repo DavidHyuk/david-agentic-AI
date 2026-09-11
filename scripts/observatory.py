@@ -49,6 +49,7 @@ MISSION_BOARD = 'hermes-hq'
 SPECIALIST_ROOMS = {
     'default': 'hq', 'papers': 'papers', 'interview': 'interview',
     'coding': 'coding', 'design': 'design', 'english': 'english',
+    'clawgram': 'clawgram',
 }
 
 
@@ -330,8 +331,13 @@ class Observatory:
                 raise ValueError('요청 ID가 올바르지 않습니다.')
             if type(priority) is not int or not 0 <= priority <= 100:
                 raise ValueError('우선순위는 0~100 사이의 정수여야 합니다.')
+            mission_body = (context or goal) + (
+                '\n\nDurable handoff requirement: every worker must put a self-contained '
+                'result, key evidence, and next action in its Kanban completion summary. '
+                'Do not rely on scratch-workspace files as the only artifact.'
+            )
             task = self.kanban([
-                'create', goal, '--body', context or goal, '--assignee', 'default',
+                'create', goal, '--body', mission_body, '--assignee', 'default',
                 '--workspace', 'scratch', '--tenant', 'hermes-hq', '--priority', str(priority),
                 '--triage', '--created-by', 'hq-ui', '--idempotency-key', 'hq:' + request_id,
                 '--max-runtime', '20m', '--max-retries', '2', '--json',

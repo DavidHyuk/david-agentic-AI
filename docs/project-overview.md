@@ -335,7 +335,7 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   검증합니다. 초안·타이머는 브라우저에 남습니다.
 - HQ Command Center는 명시적으로 제출한 목표를 `hermes-hq` Kanban 보드의
   triage에 기록합니다. Qwen decomposer가 2~6개의 의존 작업으로 나누고 역할
-  설명에 따라 papers/interview/coding/design/english로 배정합니다. 각 worker는
+  설명에 따라 papers/interview/coding/design/english/clawgram으로 배정합니다. 각 worker는
   결과·오류·실행 시도를 영속적으로 남기며, 의존 작업이 끝나면 default HQ가
   최종 결과를 종합합니다. 작업 카드에서 댓글, 재배정, 중지, 재시도가 가능합니다.
 - 전문 프로필은 repo의 SOUL과 허용 skill만 배포하는 headless agent이며 별도

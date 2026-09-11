@@ -57,6 +57,7 @@ def test_config_merge_preserves_existing(tmp_path):
     assert cfg["skills"]["disabled"] == ["calendar-assistant"]
     assert cfg["kanban"]["orchestrator_profile"] == "default"
     assert cfg["kanban"]["max_in_progress"] == 1
+    assert cfg["agent"]["restart_drain_timeout"] == 15
 
 
 def test_memory_not_clobbered_when_present(tmp_path):
