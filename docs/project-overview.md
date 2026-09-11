@@ -16,7 +16,8 @@ DGX Spark (128GB VRAM)
                 │
                 ├── David Hermes gateway ── David Telegram bot
                 │     ├── dedicated paper group: daily papers digest
-                │     ├── dedicated interview group: MLE / system design
+                │     ├── dedicated interview group: Staff / MLE drill
+                │     ├── dedicated system-design group: architecture coach
                 │     ├── dedicated LeetCode group: coding coach
                 │     ├── private chat: combined weekly review
                 │     └── Chromium CDP :19222
@@ -196,7 +197,7 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 | `papers-digest` | 08:30 매일 | 전용 Telegram 논문 그룹: LLM/LVM 연구 시그널 |
 | `interview-prep` | 12:00 월/수/금 | 전용 Interview 그룹: 실시간 트렌드 기반 Staff 레벨 드릴 1개 |
 | `coding-coach` | 12:00 화/목/토 | 전용 LeetCode 그룹: 35분 문제·목표·canonical URL |
-| `system-design-coach` | 12:00 일요일 | 전용 Interview 그룹: Hello Interview 시스템 설계 과제 |
+| `system-design-coach` | 12:00 일요일 | 전용 System Design 그룹: Hello Interview 설계 과제 |
 | `english-intake` | 월–토 20:00 | English bot: 새 피드백 분석 또는 취약 패턴 코칭 |
 | `english-drill` | 21:00 매일 | English bot: SRS 드릴 전달 |
 | `english-weekly-review` | 일요일 20:00 | English bot: tutor feedback + 취약 SRS 누적 복습 |
@@ -209,10 +210,11 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 
 주제별 전송 대상은 저장소에 chat ID를 기록하지 않고 `~/.hermes/.env`의
 `PAPERS_TELEGRAM_CHAT_ID`, `INTERVIEW_TELEGRAM_CHAT_ID`,
-`LEETCODE_TELEGRAM_CHAT_ID`에서 읽습니다. `register_cron.py`가 각 값을
+`LEETCODE_TELEGRAM_CHAT_ID`, `SYSTEM_DESIGN_TELEGRAM_CHAT_ID`에서 읽습니다.
+`register_cron.py`가 각 값을
 `telegram:<chat_id>`로 변환하며, 값이 없거나 숫자가 아니면 등록을 중단해
-기존 개인 채팅으로 잘못 전송되는 것을 방지합니다. Staff/MLE와 System
-Design은 Interview 그룹을 공유하고 Coding Coach는 LeetCode 그룹을
+기존 개인 채팅으로 잘못 전송되는 것을 방지합니다. Staff/MLE, System
+Design, Coding Coach는 각각 Interview, System Design, LeetCode 그룹을
 사용합니다. 모든 진도를 함께 다루는 `weekly-review`는 David의 기존 개인
 채팅에 유지됩니다.
 

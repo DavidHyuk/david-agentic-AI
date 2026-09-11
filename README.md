@@ -127,8 +127,9 @@ Then complete the **interactive, one-time** steps `install.sh` prints:
   The English token is stored only in `~/.hermes/profiles/english/.env`.
 - `bash bootstrap/install_cron_watchdog.sh` → recover automatically from a
   permanently stuck cron worker.
-- Create Telegram groups for papers, interviews, and LeetCode practice; add the
-  David bot and set their IDs in `~/.hermes/.env` (details below).
+- Create Telegram groups for papers, MLE interviews, system design, and LeetCode
+  practice; add the David bot and set their IDs in `~/.hermes/.env` (details
+  below).
 - `python3 bootstrap/register_cron.py` → schedule the Telegram briefs.
 - Follow [Kakao Channel setup](docs/kakao-channel-setup.md) to receive tutor feedback
   through the Channel chatbot, then turn it into Telegram drills.
@@ -476,7 +477,8 @@ Sunday review stays in the existing private chat:
 | Destination | Suggested name | Jobs |
 |---|---|---|
 | Research | **Frontier Radar** | `papers-digest` |
-| Interviews | **Interview Lab** | `interview-prep`, `system-design-coach` |
+| MLE interviews | **Interview Lab** | `interview-prep` |
+| System design | **System Design Studio** | `system-design-coach` |
 | Coding | **LeetCode Gym** | `coding-coach` |
 | Main private chat | **Hermes HQ** | `weekly-review` |
 
@@ -500,6 +502,7 @@ Configure each topic group once:
    PAPERS_TELEGRAM_CHAT_ID=-1001234567890
    INTERVIEW_TELEGRAM_CHAT_ID=-1001234567891
    LEETCODE_TELEGRAM_CHAT_ID=-1001234567892
+   SYSTEM_DESIGN_TELEGRAM_CHAT_ID=-1001234567893
    ```
 
 4. Verify each delivery, then register the declared jobs:
@@ -508,6 +511,7 @@ Configure each topic group once:
    hermes send --to telegram:-1001234567890 "[Hermes E2E] paper room test"
    hermes send --to telegram:-1001234567891 "[Hermes E2E] interview room test"
    hermes send --to telegram:-1001234567892 "[Hermes E2E] LeetCode room test"
+   hermes send --to telegram:-1001234567893 "[Hermes E2E] system-design room test"
    python3 bootstrap/register_cron.py --dry-run
    python3 bootstrap/register_cron.py
    ```
@@ -522,7 +526,7 @@ coding, and system-design progress.
 | `papers-digest` | 08:30 daily | Dedicated paper group: LLM/LVM research signal after 08:00 ingestion |
 | `interview-prep` | 12:00 Mon/Wed/Fri | Interview group: one focused Staff/Senior MLE drill |
 | `coding-coach` | 12:00 Tue/Thu/Sat | LeetCode group: 35-minute beginner problem with canonical links |
-| `system-design-coach` | 12:00 Sunday | Interview group: Hello Interview system-design exercise |
+| `system-design-coach` | 12:00 Sunday | System-design group: Hello Interview exercise |
 | `english-intake` | 20:00 Mon–Sat | Dedicated English bot: feedback analysis or weakness coaching |
 | `english-drill` | 21:00 daily | Dedicated English bot: tonight's spaced-repetition drill |
 | `english-weekly-review` | 20:00 Sunday | Dedicated English bot: tutor feedback + weak SRS cumulative review |

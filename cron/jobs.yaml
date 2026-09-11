@@ -57,7 +57,7 @@ jobs:
   - name: system-design-coach
     schedule: "0 12 * * 0"          # 12:00 Sunday
     skills: [interview-prep]
-    deliver_chat_id_env: INTERVIEW_TELEGRAM_CHAT_ID
+    deliver_chat_id_env: SYSTEM_DESIGN_TELEGRAM_CHAT_ID
     prompt: >
       Deliver today's System Design Coach using the interview-prep skill's System
       Design Coach procedure. Run python3 ~/.hermes/scripts/interview_progress.py

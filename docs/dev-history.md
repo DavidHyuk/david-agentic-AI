@@ -3,6 +3,17 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.4.0 — 2026-09-11 (minor: isolate system-design coaching)
+
+- Moved `system-design-coach` out of the MLE Interview group and assigned it a
+  dedicated Telegram destination configured by
+  `SYSTEM_DESIGN_TELEGRAM_CHAT_ID`.
+- Kept `interview-prep`, `coding-coach`, and the combined Sunday review in their
+  existing Interview, LeetCode, and main-chat destinations respectively.
+- Updated the environment template, routing guide, architecture overview, and
+  topic-to-chat regression coverage.
+- Verified the full configuration suite: `pytest -q` — **211 passed**.
+
 ## v1.3.0 — 2026-09-11 (minor: split interview and coding notifications)
 
 - Routed `interview-prep` and `system-design-coach` to a dedicated Interview

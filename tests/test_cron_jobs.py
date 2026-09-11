@@ -37,13 +37,13 @@ def test_papers_digest_uses_dedicated_telegram_chat_from_environment():
     assert cmd[cmd.index("--deliver") + 1] == "telegram:-1001234567890"
 
 
-def test_interview_and_leetcode_jobs_use_separate_topic_chats():
+def test_interview_system_design_and_leetcode_use_separate_topic_chats():
     jobs = {job["name"]: job for job in rc.load_jobs(JOBS)}
     assert jobs["interview-prep"]["deliver_chat_id_env"] == (
         "INTERVIEW_TELEGRAM_CHAT_ID"
     )
     assert jobs["system-design-coach"]["deliver_chat_id_env"] == (
-        "INTERVIEW_TELEGRAM_CHAT_ID"
+        "SYSTEM_DESIGN_TELEGRAM_CHAT_ID"
     )
     assert jobs["coding-coach"]["deliver_chat_id_env"] == (
         "LEETCODE_TELEGRAM_CHAT_ID"
@@ -53,6 +53,7 @@ def test_interview_and_leetcode_jobs_use_separate_topic_chats():
     environment = {
         "INTERVIEW_TELEGRAM_CHAT_ID": "-1001111111111",
         "LEETCODE_TELEGRAM_CHAT_ID": "-1002222222222",
+        "SYSTEM_DESIGN_TELEGRAM_CHAT_ID": "-1003333333333",
     }
     interview_cmd = rc.build_create_command(
         jobs["interview-prep"], environment=environment
@@ -67,7 +68,7 @@ def test_interview_and_leetcode_jobs_use_separate_topic_chats():
         "telegram:-1001111111111"
     )
     assert design_cmd[design_cmd.index("--deliver") + 1] == (
-        "telegram:-1001111111111"
+        "telegram:-1003333333333"
     )
     assert coding_cmd[coding_cmd.index("--deliver") + 1] == (
         "telegram:-1002222222222"
@@ -191,6 +192,7 @@ def test_register_dry_run_smoke(capsys):
     assert "telegram:<PAPERS_TELEGRAM_CHAT_ID>" in out
     assert "telegram:<INTERVIEW_TELEGRAM_CHAT_ID>" in out
     assert "telegram:<LEETCODE_TELEGRAM_CHAT_ID>" in out
+    assert "telegram:<SYSTEM_DESIGN_TELEGRAM_CHAT_ID>" in out
 
 
 def test_interview_coaches_fill_noon_without_replacing_mle_drills():
