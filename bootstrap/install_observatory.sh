@@ -13,6 +13,11 @@ if [[ ! "$OBS_HOST" =~ ^[a-zA-Z0-9.-]+$ ]]; then
 fi
 install -d -m 0700 "$OBS_HOME/observatory" "$OBS_HOME/scripts" "$OBS_UNITS"
 install -m 0600 "$OBS_REPO/browser/observatory/index.html" "$OBS_REPO/browser/observatory/style.css" "$OBS_REPO/browser/observatory/app.js" "$OBS_HOME/observatory/"
+install -m 0600 "$OBS_REPO/browser/observatory/workbench.js" "$OBS_REPO/browser/observatory/workbench.css" "$OBS_HOME/observatory/"
+install -m 0700 "$OBS_REPO/scripts/interview_progress.py" "$OBS_REPO/scripts/english_srs.py" "$OBS_HOME/scripts/"
+if [[ -d "$OBS_HOME/profiles/english/scripts" ]]; then
+  install -m 0700 "$OBS_REPO/scripts/english_srs.py" "$OBS_HOME/profiles/english/scripts/english_srs.py"
+fi
 install -m 0700 "$OBS_REPO/scripts/observatory.py" "$OBS_HOME/scripts/observatory.py"
 python3 - "$OBS_HOME" "$OBS_UNITS" "$OBS_HOST" "$OBS_IP" <<'PY'
 import pathlib, sys

@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 # __author__ = 'David Choi (bestshoot21@gmail.com)'
-"""Read-only Hermes observatory: local HTTP UI over existing runtime records.
+"""Hermes observatory with explicit, validated study workspace actions.
 
-No Hermes imports, database migrations, model calls, or runtime writes. Bind to
+No Hermes imports, database migrations or model calls. Archive reads remain
+read-only; explicit study actions use existing locked helper CLIs. Bind to
 loopback and optionally the local Tailscale IP or use Tailscale Serve. Only explicit data sources and static
 assets are exposed; request dumps, auth files and private reasoning are excluded.
 """
@@ -11,6 +12,7 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timedelta
 import ipaddress
+import fcntl
 import json
 import mimetypes
 from pathlib import Path
@@ -19,6 +21,10 @@ import sqlite3
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import time
 import threading
+import subprocess
+import sys
+import os
+import tempfile
 from urllib.parse import parse_qs, urlsplit
 from zoneinfo import ZoneInfo
 
@@ -118,6 +124,196 @@ class Observatory:
                         and (path / 'state.db').exists()):
                     result[path.name] = path
         return result
+
+    def catalog_path(self):
+        return self.home / 'skills/career/interview-prep/references/coach_catalog.json'
+
+    def coach_state(self):
+        return read_json(self.home / 'data/interview/coach_state.json',
+                         {'assignments': {}, 'coding': [], 'system_design': []})
+
+    def notebook(self):
+        return read_json(self.home / 'data/observatory/workspace.json',
+                         {'revision': 0, 'notes': {}, 'papers': {}, 'events': []})
+
+    def pending_assignments(self):
+        state = self.coach_state()
+        latest = {}
+        for assignment in sorted(state['assignments'].values(), key=lambda a: a['date']):
+            if not assignment.get('completed'):
+                latest[(assignment['track'], assignment['item_id'])] = assignment
+        return list(latest.values())
+
+    def workbench(self, room):
+        allowed = {r[0] for r in ROOMS} | set(self.profiles())
+        if room not in allowed:
+            raise ValueError('알 수 없는 작업실입니다.')
+        today = datetime.now(TZ).date().isoformat()
+        notebook = self.notebook()
+        data = {'room': room, 'today': today, 'revision': notebook['revision'],
+                'note': notebook['notes'].get(room, ''),
+                'events': [e for e in reversed(notebook['events']) if e['room'] == room][:12]}
+        history = self.sessions(room=room, limit=5)
+        data['recent'] = history['items']
+        data['errors'] = history['errors']
+        if room in ('coding', 'design'):
+            track = 'coding' if room == 'coding' else 'system_design'
+            state = self.coach_state()
+            catalog = read_json(self.catalog_path(), {})
+            items = {p['id']: p for p in catalog.get('problems' if track == 'coding' else 'system_design', [])}
+            pending = [a for a in self.pending_assignments() if a['track'] == track]
+            pending.sort(key=lambda a: a['date'], reverse=True)
+            data.update(track=track, pending=[{**a, 'item': items.get(a['item_id'], {})} for a in pending],
+                        completed=sorted(state[track], key=lambda a: a['date'], reverse=True),
+                        today_assignment=state['assignments'].get(f'{track}:{today}'),
+                        catalog_available=bool(items))
+        elif room == 'english':
+            cards = list(read_json(self.home / 'data/english/srs_deck.json', {'cards': {}})['cards'].values())
+            due = sorted([c for c in cards if c['due'] <= today], key=lambda c: (c['box'], c['due']))
+            data.update(due=due[:30], due_count=len(due), total_cards=len(cards),
+                        weak=sorted(cards, key=lambda c: (c['box'], -c.get('wrong_reviews', 0)))[:5])
+        elif room == 'papers':
+            data['papers'] = self.library('papers', limit=12)['items']
+            data['reading_list'] = list(notebook['papers'].values())
+        elif room == 'hq':
+            data['pending'] = self.pending_assignments()
+            cards = read_json(self.home / 'data/english/srs_deck.json', {'cards': {}})['cards']
+            data['due_count'] = sum(c['due'] <= today for c in cards.values())
+            data['reading_count'] = sum(not p.get('read') for p in notebook['papers'].values())
+            data['events'] = list(reversed(notebook['events']))[:20]
+        elif room == 'interview':
+            data['drill'] = ''
+            for session in history['items']:
+                conn = self.connect(session['profile'])
+                try:
+                    found = conn.execute("SELECT content FROM messages WHERE session_id=? AND role='assistant' AND content IS NOT NULL AND trim(content) NOT IN ('','[SILENT]') ORDER BY id DESC LIMIT 1", (session['id'],)).fetchone()
+                finally:
+                    conn.close()
+                if found:
+                    data['drill'] = found['content']
+                    data['drill_session'] = session
+                    break
+        return data
+
+    def helper(self, name, arguments):
+        result = subprocess.run([sys.executable, str(Path(__file__).with_name(name)), *arguments],
+                                capture_output=True, text=True, timeout=20,
+                                env={**os.environ, 'TZ': str(TZ), 'HERMES_HOME': str(self.home)})
+        if result.returncode:
+            raise ValueError(result.stderr.strip().splitlines()[-1] if result.stderr else '저장하지 못했습니다.')
+        return json.loads(result.stdout)
+
+    def study_action(self, body):
+        """Allow only concrete study mutations. Never accept shell or model input."""
+        if not isinstance(body, dict):
+            raise ValueError('JSON 객체가 필요합니다.')
+        action = body.get('action')
+        today = datetime.now(TZ).date().isoformat()
+        if action in ('plan', 'feedback'):
+            track = body.get('track')
+            if track not in ('coding', 'system_design'):
+                raise ValueError('알 수 없는 학습 종류입니다.')
+            args = ['--state', str(self.home / 'data/interview/coach_state.json'),
+                    '--catalog', str(self.catalog_path()), '--date', today]
+            if action == 'plan':
+                args += ['plan', track, '--format', 'json']
+            else:
+                assignment = body.get('assignment')
+                row = self.coach_state()['assignments'].get(assignment)
+                if not row or row['track'] != track:
+                    raise ValueError('과제와 작업실이 일치하지 않습니다.')
+                feedback = body.get('feedback')
+                if not isinstance(feedback, dict):
+                    raise ValueError('실제 학습 결과를 입력하세요.')
+                def integer(key, maximum):
+                    value = feedback.get(key)
+                    if type(value) is not int or not (0 if key == 'hint_level' else 1) <= value <= maximum:
+                        raise ValueError(f'{key}: 유효한 정수를 입력하세요.')
+                    return str(value)
+                args += ['log-coding' if track == 'coding' else 'log-design',
+                         '--assignment', assignment, '--duration', integer('duration', 1440),
+                         '--confidence', integer('confidence', 5)]
+                if track == 'coding':
+                    for key in ('independent', 'solution_viewed'):
+                        if type(feedback.get(key)) is not bool:
+                            raise ValueError(f'{key}: 예 또는 아니오를 선택하세요.')
+                        args += ['--' + key.replace('_', '-'), 'yes' if feedback[key] else 'no']
+                    args += ['--hint-level', integer('hint_level', 3), '--lesson', self.text_field(feedback, 'lesson')]
+                else:
+                    for key in ('requirements', 'architecture', 'trade_off', 'failure_mode'):
+                        args += ['--' + key.replace('_', '-') + '-score', integer(key + '_score', 5)]
+                    args += ['--next-improvement', self.text_field(feedback, 'next_improvement')]
+            return {'saved': True, 'result': self.helper('interview_progress.py', args)}
+        if action == 'srs_review':
+            if body.get('result') not in ('correct', 'wrong') or type(body.get('expected_reviews')) is not int:
+                raise ValueError('카드 결과와 현재 복습 횟수가 필요합니다.')
+            card = body.get('card')
+            deck = read_json(self.home / 'data/english/srs_deck.json', {'cards': {}})
+            if not isinstance(card, str) or card not in deck['cards']:
+                raise ValueError('카드를 찾을 수 없습니다.')
+            return {'saved': True, 'result': self.helper('english_srs.py', [
+                '--deck', str(self.home / 'data/english/srs_deck.json'), '--date', today,
+                'review', '--id', card, '--result', body['result'],
+                '--expected-reviews', str(body['expected_reviews'])])}
+        if action in ('note', 'bookmark', 'paper_read'):
+            return self.save_notebook(body)
+        raise ValueError('허용되지 않은 동작입니다.')
+
+    @staticmethod
+    def text_field(body, key):
+        value = body.get(key)
+        if not isinstance(value, str) or not value.strip() or len(value) > 16000:
+            raise ValueError(f'{key}: 1~16000자의 내용을 입력하세요.')
+        return value.strip()
+
+    def save_notebook(self, body):
+        path = self.home / 'data/observatory/workspace.json'
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.with_suffix('.lock').open('a') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            book = self.notebook()
+            if type(body.get('revision')) is not int or body['revision'] != book['revision']:
+                raise ValueError('다른 화면에서 기록이 바뀌었습니다. 새로고침 후 다시 저장하세요.')
+            action = body['action']
+            room = body.get('room', 'papers')
+            if room not in {r[0] for r in ROOMS}:
+                raise ValueError('알 수 없는 작업실입니다.')
+            if action == 'note':
+                note = self.text_field(body, 'note')
+                book['notes'][room] = note
+            elif action == 'bookmark':
+                conn = sqlite3.connect((self.home / 'data/papers/papers.db').as_uri() + '?mode=ro', uri=True)
+                conn.row_factory = sqlite3.Row
+                try:
+                    paper = conn.execute('SELECT id,title,url FROM papers WHERE id=?', (body.get('paper'),)).fetchone()
+                finally:
+                    conn.close()
+                if not paper:
+                    raise ValueError('논문을 찾을 수 없습니다.')
+                book['papers'].setdefault(paper['id'], {**dict(paper), 'read': False})
+            else:
+                paper = book['papers'].get(body.get('paper'))
+                if not paper or type(body.get('read')) is not bool:
+                    raise ValueError('읽기 목록의 논문을 선택하세요.')
+                paper['read'] = body['read']
+            book['revision'] += 1
+            book['events'].append({'action': action, 'room': room, 'time': time.time(),
+                                   'paper': body.get('paper'), 'revision': book['revision'],
+                                   **({'note': book['notes'][room]} if action == 'note' else {})})
+            with tempfile.NamedTemporaryFile(mode='w', dir=path.parent, delete=False) as out:
+                temp = Path(out.name)
+                try:
+                    json.dump(book, out, ensure_ascii=False, indent=2)
+                    out.flush()
+                    os.fsync(out.fileno())
+                except BaseException:
+                    temp.unlink(missing_ok=True)
+                    raise
+            try:
+                temp.replace(path)
+            finally:
+                temp.unlink(missing_ok=True)
+            return {'saved': True, 'revision': book['revision']}
 
     def profile_home(self, profile):
         if profile not in self.profiles():
@@ -262,7 +458,11 @@ class Observatory:
     def library(self, kind, profile='david', q='', offset=0, limit=40):
         home = self.profile_home(profile)
         items = []
-        if kind == 'memory':
+        if kind == 'workspace':
+            for e in reversed(self.notebook()['events']):
+                items.append({'id': str(e['revision']), 'title': f"{e['room']} · {e['action']} · v{e['revision']}",
+                              'content': e.get('note') or json.dumps(e, ensure_ascii=False, indent=2), 'time': e['time']})
+        elif kind == 'memory':
             for filename in ('MEMORY.md', 'USER.md'):
                 path = home / 'memories' / filename
                 if path.exists():
@@ -353,13 +553,15 @@ def make_handler(store, assets: Path, hosts):
                 profile = args.get('profile', '')
                 if url.path == '/api/overview':
                     data = store.overview()
+                elif url.path == '/api/workbench':
+                    data = store.workbench(args.get('room', 'hq'))
                 elif url.path == '/api/sessions':
                     data = store.sessions(profile, q, args.get('room', ''), args.get('start', ''), args.get('end', ''), offset, limit)
                 elif url.path == '/api/messages':
                     data = store.messages(profile or 'david', args.get('session', ''), offset, limit, q)
                 elif url.path == '/api/library':
                     data = store.library(args.get('kind', ''), profile or 'david', q, offset, limit)
-                elif url.path in ('/', '/index.html', '/app.js', '/style.css'):
+                elif url.path in ('/', '/index.html', '/app.js', '/style.css', '/workbench.js', '/workbench.css'):
                     filename = 'index.html' if url.path == '/' else url.path[1:]
                     content = (assets / filename).read_bytes()
                     self.respond(200, content, mimetypes.guess_type(filename)[0] + '; charset=utf-8')
@@ -372,6 +574,29 @@ def make_handler(store, assets: Path, hosts):
                 self.respond(400, {'error': str(exc)})
             except (OSError, sqlite3.Error):
                 self.respond(503, {'error': '기록을 읽을 수 없습니다. 잠시 후 다시 시도하세요.'})
+
+        def do_POST(self):
+            host = self.headers.get('Host', '')
+            origin = urlsplit(self.headers.get('Origin', ''))
+            if (host.split(':')[0].lower() not in hosts or origin.netloc != host
+                    or origin.scheme not in ('http', 'https')
+                    or self.headers.get('Sec-Fetch-Site') == 'cross-site'
+                    or self.headers.get('X-Hermes-Action') != '1'):
+                self.respond(403, {'error': '같은 관제실 화면에서만 저장할 수 있습니다.'})
+                return
+            if self.path != '/api/action':
+                self.respond(404, {'error': '찾을 수 없습니다.'})
+                return
+            try:
+                length = int(self.headers.get('Content-Length', 0))
+                if not 0 < length <= 65536 or self.headers.get('Content-Type') != 'application/json':
+                    raise ValueError('64KB 이하의 JSON 요청이 필요합니다.')
+                body = json.loads(self.rfile.read(length))
+                self.respond(200, store.study_action(body))
+            except (ValueError, KeyError, TypeError) as exc:
+                self.respond(400, {'error': str(exc)})
+            except (OSError, sqlite3.Error, subprocess.TimeoutExpired):
+                self.respond(503, {'error': '저장 결과를 확인할 수 없습니다. 새로고침 후 기록을 확인하세요.'})
     return Handler
 
 

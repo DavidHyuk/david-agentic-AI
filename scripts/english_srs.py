@@ -19,8 +19,11 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import fcntl
 import json
 import os
+from pathlib import Path
+import tempfile
 from datetime import date, datetime, timedelta
 from typing import Sequence
 
@@ -50,11 +53,21 @@ def load_deck(deck_path: str) -> dict:
 
 
 def save_deck(deck_path: str, deck: dict) -> None:
-    os.makedirs(os.path.dirname(deck_path), exist_ok=True)
-    tmp = deck_path + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as fh:
-        json.dump(deck, fh, indent=2, sort_keys=True)
-    os.replace(tmp, deck_path)
+    path = Path(deck_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(mode='w', dir=path.parent, delete=False) as fh:
+        tmp = Path(fh.name)
+        try:
+            json.dump(deck, fh, indent=2, sort_keys=True)
+            fh.flush()
+            os.fsync(fh.fileno())
+        except BaseException:
+            tmp.unlink(missing_ok=True)
+            raise
+    try:
+        os.replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
 def add_card(
@@ -152,6 +165,7 @@ def format_drill(cards: Sequence[dict]) -> str:
 def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--deck", default=os.environ.get("ENGLISH_DECK_PATH", DEFAULT_DECK_PATH))
+    parser.add_argument('--date', default=None, help='Optional local review date YYYY-MM-DD')
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     p_add = sub.add_parser("add", help="add a correction card")
@@ -164,6 +178,8 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     p_rev = sub.add_parser("review", help="record a review result")
     p_rev.add_argument("--id", required=True)
     p_rev.add_argument("--result", choices=["correct", "wrong"], required=True)
+    p_rev.add_argument('--expected-reviews', type=int, default=None,
+                       help='Reject a stale or repeated UI review submission')
 
     p_weak = sub.add_parser(
         "weaknesses", help="print least-mastered cards for personalized coaching"
@@ -176,17 +192,30 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parse_args(argv)
+    if args.cmd in ('add', 'review'):
+        path = Path(args.deck)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.with_suffix('.lock').open('a') as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            # A malformed deck must never become an empty replacement on write.
+            deck = json.loads(path.read_text()) if path.exists() else {'cards': {}}
+            if not isinstance(deck, dict) or not isinstance(deck.get('cards'), dict):
+                raise ValueError('Invalid SRS deck; existing data preserved.')
+            if args.cmd == 'add':
+                deck, added = add_card(deck, args.wrong, args.correct, args.note, args.date)
+                output = 'added' if added else 'duplicate (skipped)'
+            else:
+                card = deck['cards'][args.id]
+                if args.expected_reviews is not None and card.get('reviews', 0) != args.expected_reviews:
+                    raise ValueError('Card already changed; refresh before reviewing again.')
+                review_card(deck, args.id, args.result == 'correct', args.date)
+                output = json.dumps(stats(deck, args.date))
+            save_deck(args.deck, deck)
+        print(output)
+        return 0
     deck = load_deck(args.deck)
-    if args.cmd == "add":
-        deck, added = add_card(deck, args.wrong, args.correct, args.note)
-        save_deck(args.deck, deck)
-        print("added" if added else "duplicate (skipped)")
-    elif args.cmd == "due":
+    if args.cmd == "due":
         print(format_drill(due_cards(deck)))
-    elif args.cmd == "review":
-        review_card(deck, args.id, args.result == "correct")
-        save_deck(args.deck, deck)
-        print(json.dumps(stats(deck), indent=2))
     elif args.cmd == "weaknesses":
         print(
             json.dumps(

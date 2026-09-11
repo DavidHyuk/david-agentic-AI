@@ -16,6 +16,7 @@ const names = {
   sessions: "대화 & 작업 기록",
   schedule: "알림 스케줄",
   library: "기록 보관소",
+  workbench: "작업실",
 };
 const esc = (value) =>
   String(value ?? "").replace(
@@ -161,10 +162,7 @@ function drawOverview() {
   document.querySelectorAll("[data-room]").forEach(
     (b) =>
       (b.onclick = () => {
-        clearFilters();
-        $("room-filter").value = b.dataset.room;
-        state.sessionsOffset = 0;
-        view("sessions");
+        openWorkbench(b.dataset.room);
       }),
   );
   $("recent").innerHTML =
@@ -324,6 +322,7 @@ async function loadMessages() {
   }
 }
 const libraryNotes = {
+  workspace: "작업실별 노트의 이전 버전과 논문 읽기 목록 변경을 조회합니다.",
   learning:
     "공유 학습 데이터 · 배정된 과제와 실제 완료 피드백을 구분합니다. SRS는 보관된 카드 전체를 조회합니다.",
   papers:
@@ -344,9 +343,12 @@ async function loadLibrary() {
   const request = ++state.libraryRequest;
   const kind = $("library-kind").value;
   $("library-note").textContent = libraryNotes[kind];
-  $("library-profile").disabled = ["learning", "papers", "lessons"].includes(
-    kind,
-  );
+  $("library-profile").disabled = [
+    "learning",
+    "papers",
+    "lessons",
+    "workspace",
+  ].includes(kind);
   try {
     const d = await api("library", {
       kind,
@@ -528,7 +530,13 @@ function clock() {
 }
 clock();
 setInterval(clock, 30000);
-refresh().then(() => view(location.hash.slice(1) || "office"));
+document.addEventListener("DOMContentLoaded", () => {
+  refresh().then(() => {
+    if (location.hash === "#workbench")
+      openWorkbench(localRead("hermes-last-room", "hq"));
+    else view(location.hash.slice(1) || "office");
+  });
+});
 setInterval(() => {
   if (!document.hidden && !state.replay) refresh();
 }, 10000);

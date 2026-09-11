@@ -3,6 +3,8 @@
 import json
 from pathlib import Path
 import sqlite3
+import shutil
+from concurrent.futures import ThreadPoolExecutor
 import threading
 from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
@@ -146,6 +148,140 @@ def test_http_blocks_untrusted_hosts_cross_site_and_arbitrary_files(store):
         assert 'frame-ancestors' in headers['Content-Security-Policy']
         assert request('/api/sessions?offset=bad')[0] == 400
         assert request('/')[0] == 200
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
+
+
+@pytest.fixture
+def study_store(store):
+    catalog = store.catalog_path()
+    catalog.parent.mkdir(parents=True)
+    shutil.copyfile(Path(__file__).resolve().parents[1] /
+                    'skills/career/interview-prep/references/coach_catalog.json', catalog)
+    folder = store.home / 'data/english'
+    folder.mkdir(parents=True)
+    (folder / 'srs_deck.json').write_text(json.dumps({'cards': {
+        key: {'id': key, 'wrong': 'I goes', 'correct': 'I go', 'box': 1,
+              'due': '2000-01-01', 'reviews': 0} for key in ('one', 'two')}}))
+    return store
+
+
+def test_workbench_get_never_assigns_or_completes(study_store):
+    for room in ('coding', 'design', 'english', 'hq', 'interview'):
+        data = study_store.workbench(room)
+        assert data['room'] == room
+    assert not (study_store.home / 'data/interview/coach_state.json').exists()
+    assert not (study_store.home / 'data/observatory/workspace.json').exists()
+
+
+def test_plan_feedback_and_retries_use_shared_coach_rules(study_store):
+    assignment = study_store.study_action({'action': 'plan', 'track': 'coding'})['result']
+    assert not assignment['completed']
+    again = study_store.study_action({'action': 'plan', 'track': 'coding'})['result']
+    assert again == assignment
+    assert study_store.workbench('coding')['pending'][0]['item']['name'] == 'Contains Duplicate'
+    request = {'action': 'feedback', 'track': 'coding', 'assignment': assignment['id'],
+               'feedback': {'duration': 25, 'confidence': 3, 'independent': False,
+                            'hint_level': 2, 'solution_viewed': False,
+                            'lesson': 'Used a set, checked empty input.'}}
+    response = study_store.study_action(request)
+    assert response['result']['hint_level'] == 2
+    assert study_store.study_action(request) == response
+    state = study_store.coach_state()
+    assert len(state['coding']) == 1
+    assert not study_store.workbench('coding')['pending']
+    assert state['coding'][0]['next_review_date'] > state['coding'][0]['date']
+
+
+def test_feedback_rejects_bad_track_values_and_changed_retries(study_store):
+    assignment = study_store.study_action({'action': 'plan', 'track': 'system_design'})['result']
+    request = {'action': 'feedback', 'track': 'system_design', 'assignment': assignment['id'],
+               'feedback': {'duration': 45, 'confidence': 3, 'requirements_score': 4,
+                            'architecture_score': 3, 'trade_off_score': 2,
+                            'failure_mode_score': 2, 'next_improvement': 'Explain queue failures.'}}
+    with pytest.raises(ValueError):
+        study_store.study_action({**request, 'track': 'coding'})
+    with pytest.raises(ValueError):
+        study_store.study_action({**request, 'feedback': {**request['feedback'], 'confidence': 99}})
+    study_store.study_action(request)
+    with pytest.raises(ValueError):
+        study_store.study_action({**request, 'feedback': {**request['feedback'], 'duration': 55}})
+    assert study_store.coach_state()['system_design'][0]['duration'] == 45
+
+
+def test_srs_review_stale_click_does_not_promote_twice(study_store):
+    request = {'action': 'srs_review', 'card': 'one', 'result': 'correct', 'expected_reviews': 0}
+    study_store.study_action(request)
+    with pytest.raises(ValueError, match='already changed'):
+        study_store.study_action(request)
+    deck = json.loads((study_store.home / 'data/english/srs_deck.json').read_text())
+    assert deck['cards']['one']['box'] == 2
+    assert deck['cards']['one']['reviews'] == 1
+    assert study_store.workbench('english')['due_count'] == 1
+
+
+def test_srs_concurrent_cards_preserve_both_reviews(study_store):
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(study_store.study_action, [
+            {'action': 'srs_review', 'card': card, 'result': 'wrong', 'expected_reviews': 0}
+            for card in ('one', 'two')]))
+    assert all(r['saved'] for r in results)
+    deck = json.loads((study_store.home / 'data/english/srs_deck.json').read_text())
+    assert [c['reviews'] for c in deck['cards'].values()] == [1, 1]
+
+
+def test_notes_preserve_versions_and_reject_stale_writes(store):
+    first = store.study_action({'action': 'note', 'room': 'interview', 'note': 'First answer', 'revision': 0})
+    assert first['revision'] == 1
+    with pytest.raises(ValueError, match='다른 화면'):
+        store.study_action({'action': 'note', 'room': 'interview', 'note': 'Stale answer', 'revision': 0})
+    store.study_action({'action': 'note', 'room': 'interview', 'note': 'Second answer', 'revision': 1})
+    assert store.workbench('interview')['note'] == 'Second answer'
+    archive = store.library('workspace')
+    assert archive['total'] == 2
+    assert archive['items'][1]['content'] == 'First answer'
+
+
+def test_bookmarks_require_catalog_paper_and_persist_read_status(store):
+    folder = store.home / 'data/papers'
+    folder.mkdir(parents=True)
+    conn = sqlite3.connect(folder / 'papers.db')
+    conn.executescript("CREATE TABLE papers(id TEXT,title TEXT,url TEXT); INSERT INTO papers VALUES('p1','Title','https://example.com/p1');")
+    conn.close()
+    store.study_action({'action': 'bookmark', 'paper': 'p1', 'revision': 0})
+    assert store.workbench('hq')['reading_count'] == 1
+    store.study_action({'action': 'paper_read', 'paper': 'p1', 'read': True, 'revision': 1})
+    assert store.workbench('hq')['reading_count'] == 0
+    with pytest.raises(ValueError):
+        store.study_action({'action': 'bookmark', 'paper': "p1' OR 1=1", 'revision': 2})
+
+
+def test_http_actions_require_same_origin_json_and_action_header(store):
+    assets = Path(__file__).resolve().parents[1] / 'browser/observatory'
+    server = ThreadingHTTPServer(('127.0.0.1', 0), make_handler(store, assets, {'127.0.0.1'}))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    origin = 'http://127.0.0.1:' + str(server.server_port)
+    payload = json.dumps({'action': 'note', 'room': 'hq', 'revision': 0, 'note': 'My next step'})
+    def request(headers):
+        conn = HTTPConnection(*server.server_address)
+        conn.request('POST', '/api/action', body=payload, headers=headers)
+        response = conn.getresponse()
+        status = response.status
+        response.read()
+        conn.close()
+        return status
+    base = {'Content-Type': 'application/json', 'X-Hermes-Action': '1', 'Origin': origin}
+    try:
+        assert request({**base, 'Origin': 'http://evil.example'}) == 403
+        assert request({**base, 'Origin': ''}) == 403
+        assert request({**base, 'X-Hermes-Action': ''}) == 403
+        assert request({**base, 'Content-Type': 'text/plain'}) == 400
+        assert not (store.home / 'data/observatory/workspace.json').exists()
+        assert request(base) == 200
+        assert store.notebook()['notes']['hq'] == 'My next step'
     finally:
         server.shutdown()
         server.server_close()

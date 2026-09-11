@@ -3,6 +3,7 @@
 from datetime import date, timedelta
 
 import english_srs as srs
+import pytest
 
 
 def test_add_card_dedup():
@@ -11,6 +12,14 @@ def test_add_card_dedup():
     deck, added2 = srs.add_card(deck, "I have 25 years", "I am 25 years old")
     assert added1 is True and added2 is False
     assert len(deck["cards"]) == 1
+
+
+def test_cli_preserves_malformed_deck_on_add(tmp_path):
+    path = tmp_path / 'deck.json'
+    path.write_text('{broken')
+    with pytest.raises(ValueError):
+        srs.main(['--deck', str(path), 'add', '--wrong', 'wrong', '--correct', 'right'])
+    assert path.read_text() == '{broken'
 
 
 def test_new_card_is_due_today():

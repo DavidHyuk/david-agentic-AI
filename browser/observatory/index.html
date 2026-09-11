@@ -8,6 +8,8 @@
     <title>Hermes HQ · Agent Observatory</title>
     <link rel="stylesheet" href="style.css" />
     <script src="app.js" defer></script>
+    <script src="workbench.js" defer></script>
+    <link rel="stylesheet" href="workbench.css" />
   </head>
   <body>
     <aside class="sidebar">
@@ -36,7 +38,7 @@
       <div class="sidebar-bottom">
         <span>◈ TAILSCALE</span>
         <p>내 에이전트들의 하루를<br />한눈에, 조금 더 즐겁게.</p>
-        <small>READ-ONLY OBSERVATORY · v1.5</small>
+        <small>PERSONAL WORKSPACE · v1.6</small>
       </div>
     </aside>
     <main>
@@ -109,6 +111,22 @@
             </div>
           </div>
         </section>
+        <section id="workbench-view" hidden>
+          <div class="page-heading">
+            <div>
+              <div class="eyebrow">ONE ROOM. ONE NEXT STEP.</div>
+              <h1 id="bench-title">작업실</h1>
+              <p id="bench-subtitle"></p>
+            </div>
+            <button class="outline" id="bench-home">← 캠퍼스</button>
+          </div>
+          <div class="bench-toolbar">
+            <button class="outline" id="bench-history">대화 & 작업 기록</button
+            ><button class="outline" id="bench-reload">↻ 다시 불러오기</button
+            ><span id="bench-status" role="status" aria-live="polite"></span>
+          </div>
+          <div id="bench-content"></div>
+        </section>
         <section id="sessions-view" hidden>
           <div class="page-heading">
             <div>
@@ -166,6 +184,7 @@
           <form id="library-form" class="filters">
             <select id="library-kind" aria-label="기록 종류">
               <option value="learning">학습 진도 & 영어 SRS</option>
+              <option value="workspace">캠퍼스 노트 · 읽기 활동</option>
               <option value="papers">논문 카탈로그</option>
               <option value="memory">에이전트 메모리</option>
               <option value="outputs">보관된 알림 본문</option>
