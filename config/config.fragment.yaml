@@ -51,6 +51,23 @@ cron:
   wrap_response: true
   max_parallel_jobs: 1
 
+# --- HQ multi-agent orchestration ------------------------------------------
+# The main gateway owns the dispatcher for every Kanban board. A single worker
+# at a time keeps the local vLLM endpoint responsive while preserving the task
+# graph, retries, and specialist handoffs in durable SQLite state.
+kanban:
+  dispatch_in_gateway: true
+  dispatch_interval_seconds: 10
+  auto_decompose: true
+  auto_decompose_per_tick: 1
+  auto_promote_children: true
+  max_spawn: 1
+  max_in_progress: 1
+  failure_limit: 2
+  dispatch_stale_timeout_seconds: 1800
+  orchestrator_profile: default
+  default_assignee: default
+
 # --- Skills: skills are staged into ~/.hermes/skills/ by stage.py.
 # No external_dirs needed — adding it alongside the staged copies causes
 # hermes to find two copies of every skill and fail with an ambiguity error.

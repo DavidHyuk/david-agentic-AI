@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 # __author__ = 'David Choi (bestshoot21@gmail.com)'
-"""Hermes observatory with explicit, validated study workspace actions.
+"""Hermes observatory with validated study and Kanban orchestration actions.
 
-No Hermes imports, database migrations or model calls. Archive reads remain
-read-only; explicit study actions use existing locked helper CLIs. Bind to
-loopback and optionally the local Tailscale IP or use Tailscale Serve. Only explicit data sources and static
-assets are exposed; request dumps, auth files and private reasoning are excluded.
+No Hermes imports or database migrations. Archive reads remain read-only;
+explicit study actions use locked helper CLIs and HQ missions use Hermes' own
+Kanban CLI. Bind to loopback and optionally the local Tailscale IP or use
+Tailscale Serve. Only explicit data sources and static assets are exposed;
+request dumps, auth files and private reasoning are excluded.
 """
 from __future__ import annotations
 
@@ -42,6 +43,13 @@ JOB_ROOMS = {'papers-digest': 'papers', 'interview-prep': 'interview',
              'weekly-review': 'hq', 'english-intake': 'english',
              'english-drill': 'english', 'english-weekly-review': 'english'}
 SECRET_KEY = re.compile(r'(token|secret|password|api[_-]?key|authorization|cookie|credential)', re.I)
+TASK_ID = re.compile(r't_[0-9a-f]{8}')
+REQUEST_ID = re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}', re.I)
+MISSION_BOARD = 'hermes-hq'
+SPECIALIST_ROOMS = {
+    'default': 'hq', 'papers': 'papers', 'interview': 'interview',
+    'coding': 'coding', 'design': 'design', 'english': 'english',
+}
 
 
 def redact(value):
@@ -110,9 +118,13 @@ def page(items, offset=0, limit=40):
 
 
 class Observatory:
-    def __init__(self, home: Path, lessons: Path | None = None):
+    def __init__(self, home: Path, lessons: Path | None = None,
+                 hermes_cli: Path | None = None, board: str = MISSION_BOARD):
         self.home = home.resolve()
         self.lessons = lessons or Path.home() / 'english-lessons'
+        self.hermes_cli = hermes_cli or Path(os.environ.get(
+            'HERMES_CLI', str(Path.home() / '.local/bin/hermes')))
+        self.board = board
 
     def profiles(self):
         result = {'david': self.home}
@@ -181,6 +193,7 @@ class Observatory:
             data['due_count'] = sum(c['due'] <= today for c in cards.values())
             data['reading_count'] = sum(not p.get('read') for p in notebook['papers'].values())
             data['events'] = list(reversed(notebook['events']))[:20]
+            data['orchestration'] = self.orchestration()
         elif room == 'interview':
             data['drill'] = ''
             for session in history['items']:
@@ -195,6 +208,49 @@ class Observatory:
                     break
         return data
 
+    def kanban(self, arguments, *, timeout=20, json_output=True):
+        """Call only fixed Hermes Kanban subcommands against the HQ board."""
+        if not self.hermes_cli.is_file():
+            raise OSError('Hermes CLI를 찾을 수 없습니다.')
+        result = subprocess.run(
+            [str(self.hermes_cli), 'kanban', '--board', self.board, *arguments],
+            capture_output=True, text=True, timeout=timeout,
+            env={**os.environ, 'HERMES_HOME': str(self.home)},
+        )
+        if result.returncode:
+            message = result.stderr.strip().splitlines()[-1] if result.stderr else 'Kanban 작업에 실패했습니다.'
+            raise ValueError(message)
+        if not json_output:
+            return {'message': result.stdout.strip()}
+        try:
+            return json.loads(result.stdout)
+        except json.JSONDecodeError as exc:
+            raise OSError('Kanban 응답을 읽을 수 없습니다.') from exc
+
+    def orchestration(self):
+        """Return a compact mission-board snapshot without failing the HQ desk."""
+        try:
+            tasks = self.kanban(['list', '--sort', 'updated', '--json'])[:100]
+            assignees = self.kanban(['assignees', '--json'])
+        except (OSError, ValueError, subprocess.TimeoutExpired) as exc:
+            return {'available': False, 'board': self.board, 'error': str(exc),
+                    'tasks': [], 'assignees': [], 'counts': {}}
+        counts = {}
+        for task in tasks:
+            counts[task['status']] = counts.get(task['status'], 0) + 1
+            task['room'] = SPECIALIST_ROOMS.get(task.get('assignee'), 'hq')
+        return {'available': True, 'board': self.board, 'tasks': tasks,
+                'assignees': [{**a, 'room': SPECIALIST_ROOMS.get(a['name'], 'hq')}
+                              for a in assignees], 'counts': counts,
+                'dispatcher_alive': self.gateway('david')['alive']}
+
+    def mission_detail(self, task_id):
+        if not isinstance(task_id, str) or not TASK_ID.fullmatch(task_id):
+            raise ValueError('올바른 작업 ID가 필요합니다.')
+        detail = self.kanban(['show', task_id, '--json'])
+        detail['task']['room'] = SPECIALIST_ROOMS.get(detail['task'].get('assignee'), 'hq')
+        return detail
+
     def helper(self, name, arguments):
         result = subprocess.run([sys.executable, str(Path(__file__).with_name(name)), *arguments],
                                 capture_output=True, text=True, timeout=20,
@@ -204,7 +260,7 @@ class Observatory:
         return json.loads(result.stdout)
 
     def study_action(self, body):
-        """Allow only concrete study mutations. Never accept shell or model input."""
+        """Allow only concrete study and mission mutations, never shell input."""
         if not isinstance(body, dict):
             raise ValueError('JSON 객체가 필요합니다.')
         action = body.get('action')
@@ -257,13 +313,71 @@ class Observatory:
                 '--expected-reviews', str(body['expected_reviews'])])}
         if action in ('note', 'bookmark', 'paper_read'):
             return self.save_notebook(body)
+        if isinstance(action, str) and action.startswith('mission_'):
+            return self.mission_action(body)
         raise ValueError('허용되지 않은 동작입니다.')
 
+    def mission_action(self, body):
+        """Create and manage HQ tasks through an exact Kanban CLI allowlist."""
+        action = body['action']
+        if action == 'mission_create':
+            goal = self.text_field(body, 'goal', maximum=200)
+            context = self.optional_text_field(body, 'context', maximum=4000)
+            request_id = body.get('request_id')
+            priority = body.get('priority', 50)
+            if not isinstance(request_id, str) or not REQUEST_ID.fullmatch(request_id):
+                raise ValueError('요청 ID가 올바르지 않습니다.')
+            if type(priority) is not int or not 0 <= priority <= 100:
+                raise ValueError('우선순위는 0~100 사이의 정수여야 합니다.')
+            task = self.kanban([
+                'create', goal, '--body', context or goal, '--assignee', 'default',
+                '--workspace', 'scratch', '--tenant', 'hermes-hq', '--priority', str(priority),
+                '--triage', '--created-by', 'hq-ui', '--idempotency-key', 'hq:' + request_id,
+                '--max-runtime', '20m', '--max-retries', '2', '--json',
+            ])
+            return {'saved': True, 'task': task,
+                    'message': '목표를 접수했습니다. HQ가 곧 작업 그래프로 나눕니다.'}
+        task_id = body.get('task')
+        detail = self.mission_detail(task_id)
+        status = detail['task']['status']
+        if action == 'mission_comment':
+            comment = self.text_field(body, 'comment', maximum=2000)
+            self.kanban(['comment', '--author', 'david', '--max-len', '2000',
+                         task_id, comment], json_output=False)
+        elif action == 'mission_block':
+            if status in ('done', 'archived'):
+                raise ValueError('완료된 작업은 중지할 수 없습니다.')
+            reason = self.text_field(body, 'reason', maximum=500)
+            self.kanban(['block', task_id, reason], json_output=False)
+        elif action == 'mission_unblock':
+            if status not in ('blocked', 'scheduled'):
+                raise ValueError('중단되거나 예약된 작업만 다시 실행할 수 있습니다.')
+            self.kanban(['unblock', task_id], json_output=False)
+        elif action == 'mission_assign':
+            if status == 'running':
+                raise ValueError('실행 중인 작업은 완료 또는 중지 후 재배정하세요.')
+            assignee = body.get('assignee')
+            available = {row['name'] for row in self.kanban(['assignees', '--json'])
+                         if row.get('on_disk')}
+            if assignee not in available or assignee not in SPECIALIST_ROOMS:
+                raise ValueError('설치된 캠퍼스 에이전트만 선택할 수 있습니다.')
+            self.kanban(['assign', task_id, assignee], json_output=False)
+        else:
+            raise ValueError('허용되지 않은 미션 동작입니다.')
+        return {'saved': True, 'detail': self.mission_detail(task_id)}
+
     @staticmethod
-    def text_field(body, key):
+    def text_field(body, key, maximum=16000):
         value = body.get(key)
-        if not isinstance(value, str) or not value.strip() or len(value) > 16000:
-            raise ValueError(f'{key}: 1~16000자의 내용을 입력하세요.')
+        if not isinstance(value, str) or not value.strip() or len(value) > maximum:
+            raise ValueError(f'{key}: 1~{maximum}자의 내용을 입력하세요.')
+        return value.strip()
+
+    @staticmethod
+    def optional_text_field(body, key, maximum=16000):
+        value = body.get(key, '')
+        if not isinstance(value, str) or len(value) > maximum:
+            raise ValueError(f'{key}: {maximum}자 이하의 내용을 입력하세요.')
         return value.strip()
 
     def save_notebook(self, body):
@@ -555,6 +669,8 @@ def make_handler(store, assets: Path, hosts):
                     data = store.overview()
                 elif url.path == '/api/workbench':
                     data = store.workbench(args.get('room', 'hq'))
+                elif url.path == '/api/mission':
+                    data = store.mission_detail(args.get('task', ''))
                 elif url.path == '/api/sessions':
                     data = store.sessions(profile, q, args.get('room', ''), args.get('start', ''), args.get('end', ''), offset, limit)
                 elif url.path == '/api/messages':
@@ -572,7 +688,7 @@ def make_handler(store, assets: Path, hosts):
                 self.respond(200, data)
             except ValueError as exc:
                 self.respond(400, {'error': str(exc)})
-            except (OSError, sqlite3.Error):
+            except (OSError, sqlite3.Error, subprocess.TimeoutExpired):
                 self.respond(503, {'error': '기록을 읽을 수 없습니다. 잠시 후 다시 시도하세요.'})
 
         def do_POST(self):

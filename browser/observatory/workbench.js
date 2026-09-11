@@ -146,8 +146,52 @@ function englishDesk(d) {
 function papersDesk(d) {
   return `<article class="desk-card"><h2>내 읽기 목록</h2>${d.reading_list.length ? d.reading_list.map((p, i) => `<div class="reading-row"><div><strong>${esc(p.title)}</strong><span>${p.read ? "읽음" : "읽기 대기"}</span></div><div>${safeLink(p.url, "원문")}<button class="outline" data-paper-read="${i}">${p.read ? "다시 읽기" : "읽음으로 표시"}</button></div></div>`).join("") : "<p>아래 논문에서 읽고 싶은 항목을 추가하세요.</p>"}</article><article class="desk-card"><h2>최신 논문에서 고르기</h2><p class="muted">현재 카탈로그의 최신 12편입니다. 전체 논문은 기록 보관소에서 검색할 수 있습니다.</p>${d.papers.map((p, i) => `<div class="reading-row"><div><strong>${esc(p.title)}</strong><p class="paper-excerpt">${esc(p.content)}</p></div><div>${safeLink(p.url, "원문")}<button class="outline" data-bookmark="${i}">${d.reading_list.some((x) => x.id === p.id) ? "목록에 있음" : "읽기 목록에 추가"}</button></div></div>`).join("")}</article>`;
 }
+const missionStatuses = {
+  triage: ["접수", "HQ가 작업을 나누는 중"],
+  todo: ["계획됨", "선행 작업 대기"],
+  ready: ["실행 대기", "담당 에이전트 호출 대기"],
+  running: ["작업 중", "에이전트가 실행 중"],
+  review: ["검토", "결과 검토 필요"],
+  blocked: ["막힘", "확인 또는 재시도 필요"],
+  scheduled: ["예약", "지정 시점까지 대기"],
+  done: ["완료", "결과 저장됨"],
+};
+function missionId() {
+  if (crypto.randomUUID) return crypto.randomUUID();
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 15) | 64;
+  bytes[8] = (bytes[8] & 63) | 128;
+  return [...bytes]
+    .map((byte, i) =>
+      [4, 6, 8, 10].includes(i)
+        ? `-${byte.toString(16).padStart(2, "0")}`
+        : byte.toString(16).padStart(2, "0"),
+    )
+    .join("");
+}
+function missionCard(task) {
+  const status = missionStatuses[task.status] || [task.status, ""];
+  return `<button class="mission-card" data-mission="${esc(task.id)}"><span class="mission-agent">${esc(roomIcon(task.room))} ${esc(deskTitles[task.room] || task.assignee || "HQ")}</span><strong>${esc(task.title)}</strong><small>${esc(task.id)} · ${when(task.created_at)}</small><span class="mission-state state-${esc(task.status)}">${esc(status[0])}</span>${task.result ? `<p>${esc(task.result.slice(0, 130))}</p>` : ""}</button>`;
+}
 function hqDesk(d) {
-  return `<article class="desk-card"><span class="tag">YOUR NEXT MOVE</span><h2>내가 확인할 일</h2><div class="pending-list">${d.pending.map((a) => `<button data-open-desk="${a.track === "coding" ? "coding" : "design"}"><span>${a.track === "coding" ? "⌨" : "🏗"} ${esc(a.item_id)}</span><small>${esc(a.date)} · 결과 미입력 →</small></button>`).join("")}<button data-open-desk="english"><span>💬 영어 복습 ${d.due_count}개</span><small>교정 문장 연습 →</small></button><button data-open-desk="papers"><span>🔭 읽기 대기 ${d.reading_count}편</span><small>논문 읽기 목록 →</small></button></div></article><article class="desk-card"><h2>이번 주의 집중 영역</h2><p>오른쪽 노트에 이번 주 우선순위와 막힌 부분을 남겨보세요. 과제 결과는 각 학습 작업실에서 저장하면 기존 주간 리뷰에서도 활용됩니다.</p><div class="desk-actions"><button class="outline" data-open-desk="interview">MLE 답변 연습</button><button class="outline" data-open-desk="design">설계 이어하기</button></div></article>`;
+  const o = d.orchestration;
+  if (!o.available)
+    return `<article class="desk-card mission-command"><span class="tag">COMMAND CENTER</span><h2>오케스트레이션을 준비할 수 없습니다</h2><p>${esc(o.error)}</p></article>`;
+  const columns = [
+    ["triage", "접수"],
+    ["todo,ready,scheduled", "계획 · 대기"],
+    ["running,review", "작업 · 검토"],
+    ["blocked", "막힘"],
+    ["done", "완료"],
+  ];
+  const draft = localRead("hermes-mission-draft", {});
+  return `<article class="desk-card mission-command"><span class="tag">COMMAND CENTER · ${esc(o.board)}</span><h2>HQ에 목표 맡기기</h2><p>목표를 접수하면 HQ가 전문 에이전트별 작업과 의존관계로 나누고 결과를 다시 종합합니다. 제출 즉시 실제 에이전트 실행 대기열에 들어갑니다.</p><form id="mission-form"><label class="desk-field">달성할 목표<input name="goal" maxlength="200" required placeholder="예: 이번 주 Anthropic MLE 면접 준비 계획과 연습 자료를 만들어줘" value="${esc(draft.goal || "")}"></label><label class="desk-field">배경·제약·원하는 결과<textarea name="context" maxlength="4000" rows="5" placeholder="마감, 지원 회사, 산출물 형태, 이미 시도한 내용 등을 적어주세요.">${esc(draft.context || "")}</textarea></label><label class="desk-field compact-field">우선순위<select name="priority"><option value="80" ${draft.priority === "80" ? "selected" : ""}>높음</option><option value="50" ${!draft.priority || draft.priority === "50" ? "selected" : ""}>보통</option><option value="20" ${draft.priority === "20" ? "selected" : ""}>낮음</option></select></label><button class="primary">계획 · 실행 시작</button></form></article>
+    <article class="desk-card"><div class="mission-heading"><div><span class="tag">LIVE MISSION BOARD</span><h2>에이전트 작업 흐름</h2></div><span class="dispatcher ${o.dispatcher_alive ? "on" : ""}">● ${o.dispatcher_alive ? "Dispatcher online" : "Dispatcher offline"}</span></div><div class="agent-roster">${o.assignees.map((a) => `<span>${esc(roomIcon(a.room))} ${esc(a.name)} <small>${Object.values(a.counts || {}).reduce((sum, n) => sum + n, 0)}</small></span>`).join("")}</div><div class="mission-board">${columns.map(([keys, title]) => {
+      const statuses = keys.split(","),
+        tasks = o.tasks.filter((task) => statuses.includes(task.status));
+      return `<section class="mission-column"><header><b>${esc(title)}</b><span>${tasks.length}</span></header>${tasks.map(missionCard).join("") || '<div class="mission-empty">비어 있음</div>'}</section>`;
+    }).join("")}</div></article><section id="mission-detail"></section>
+    <article class="desk-card"><span class="tag">YOUR NEXT MOVE</span><h2>직접 확인할 학습</h2><div class="pending-list">${d.pending.map((a) => `<button data-open-desk="${a.track === "coding" ? "coding" : "design"}"><span>${a.track === "coding" ? "⌨" : "🏗"} ${esc(a.item_id)}</span><small>${esc(a.date)} · 결과 미입력 →</small></button>`).join("")}<button data-open-desk="english"><span>💬 영어 복습 ${d.due_count}개</span><small>교정 문장 연습 →</small></button><button data-open-desk="papers"><span>🔭 읽기 대기 ${d.reading_count}편</span><small>논문 읽기 목록 →</small></button></div></article>`;
 }
 function renderWorkbench(d) {
   let body;
@@ -203,6 +247,7 @@ function renderWorkbench(d) {
   document
     .querySelectorAll("[data-open-desk]")
     .forEach((b) => (b.onclick = () => openWorkbench(b.dataset.openDesk)));
+  if (d.room === "hq" && d.orchestration?.available) wireHq(d);
   document.querySelectorAll("[data-srs]").forEach(
     (b) =>
       (b.onclick = () => {
@@ -256,6 +301,93 @@ function renderWorkbench(d) {
         "오늘의 과제를 확인했습니다.",
       );
   if ($("coach-feedback")) wireCoach(d);
+}
+function wireHq(d) {
+  const form = $("mission-form");
+  form.oninput = () => {
+    const saved = Object.fromEntries(new FormData(form));
+    saved.request_id = localRead("hermes-mission-draft", {}).request_id;
+    localWrite("hermes-mission-draft", saved);
+  };
+  form.onsubmit = async (event) => {
+    event.preventDefault();
+    const values = Object.fromEntries(new FormData(form));
+    const saved = localRead("hermes-mission-draft", {});
+    values.request_id = saved.request_id || missionId();
+    localWrite("hermes-mission-draft", values);
+    const ok = await deskAction(
+      {
+        action: "mission_create",
+        goal: values.goal,
+        context: values.context,
+        priority: Number(values.priority),
+        request_id: values.request_id,
+      },
+      "목표를 접수했습니다. HQ가 작업을 나누기 시작합니다.",
+    );
+    if (ok) {
+      localWrite("hermes-mission-draft", null);
+      await loadWorkbench();
+    }
+  };
+  document
+    .querySelectorAll("[data-mission]")
+    .forEach((button) =>
+      button.addEventListener("click", () => showMission(button.dataset.mission)),
+    );
+}
+async function showMission(taskId) {
+  const target = $("mission-detail");
+  if (!target) return;
+  target.innerHTML = '<article class="desk-card">실행 기록을 불러오는 중…</article>';
+  try {
+    const detail = await api("mission", { task: taskId }),
+      task = detail.task,
+      status = missionStatuses[task.status] || [task.status, task.status],
+      assignees = bench.data.orchestration.assignees;
+    target.innerHTML = `<article class="desk-card mission-detail-card"><div class="mission-heading"><div><span class="mission-state state-${esc(task.status)}">${esc(status[0])}</span><h2>${esc(task.title)}</h2></div><button class="text-button" id="mission-close">닫기</button></div><p class="mission-meta">${esc(task.id)} · ${esc(task.assignee || "미배정")} · ${when(task.created_at)}</p><div class="mission-body">${linkedText(task.body || "설명 없음")}</div>${detail.latest_summary || task.result ? `<section class="mission-result"><b>현재 결과</b><div>${linkedText(detail.latest_summary || task.result)}</div></section>` : ""}<div class="mission-relations">${detail.parents.length ? `<div><b>선행 작업</b>${detail.parents.map((id) => `<button data-related-mission="${esc(id)}">${esc(id)}</button>`).join("")}</div>` : ""}${detail.children.length ? `<div><b>하위 작업</b>${detail.children.map((id) => `<button data-related-mission="${esc(id)}">${esc(id)}</button>`).join("")}</div>` : ""}</div><details class="desk-help" ${detail.runs.length ? "open" : ""}><summary>실행 시도 ${detail.runs.length}개</summary>${detail.runs.map((run) => `<div class="mission-run"><b>${esc(run.profile)} · ${esc(run.outcome || run.status)}</b><small>${when(run.started_at)}${run.ended_at ? " → " + when(run.ended_at) : ""}</small>${run.summary ? `<p>${linkedText(run.summary)}</p>` : ""}${run.error ? `<p class="mission-error">${esc(run.error)}</p>` : ""}</div>`).join("") || '<p class="muted">아직 실행되지 않았습니다.</p>'}</details><details class="desk-help"><summary>댓글·이벤트 ${detail.comments.length + detail.events.length}개</summary>${detail.comments.map((comment) => `<div class="mission-run"><b>${esc(comment.author)}</b><small>${when(comment.created_at)}</small><p>${linkedText(comment.body)}</p></div>`).join("")}${detail.events.slice().reverse().map((item) => `<div class="mission-event"><span>${esc(item.kind)}</span><small>${when(item.created_at)}</small></div>`).join("")}</details><form id="mission-comment-form" class="mission-inline"><input name="comment" maxlength="2000" required placeholder="방향 수정이나 추가 정보를 남기세요"><button class="outline">댓글 추가</button></form>${!["running", "done", "archived"].includes(task.status) ? `<div class="mission-admin"><label>담당 에이전트<select id="mission-assignee">${assignees.map((a) => `<option value="${esc(a.name)}" ${a.name === task.assignee ? "selected" : ""}>${esc(a.name)}</option>`).join("")}</select></label><button class="outline" id="mission-assign">재배정</button>${task.status === "blocked" || task.status === "scheduled" ? '<button class="primary" id="mission-unblock">다시 실행</button>' : '<button class="outline danger" id="mission-block">중지</button>'}</div>` : ""}</article>`;
+    $("mission-close").onclick = () => target.replaceChildren();
+    target.querySelectorAll("[data-related-mission]").forEach(
+      (button) =>
+        (button.onclick = () => showMission(button.dataset.relatedMission)),
+    );
+    $("mission-comment-form").onsubmit = (event) => {
+      event.preventDefault();
+      const comment = new FormData(event.currentTarget).get("comment");
+      deskAction(
+        { action: "mission_comment", task: task.id, comment },
+        "작업에 댓글을 추가했습니다.",
+      );
+    };
+    if ($("mission-assign"))
+      $("mission-assign").onclick = () =>
+        deskAction(
+          {
+            action: "mission_assign",
+            task: task.id,
+            assignee: $("mission-assignee").value,
+          },
+          "담당 에이전트를 바꿨습니다.",
+        );
+    if ($("mission-unblock"))
+      $("mission-unblock").onclick = () =>
+        deskAction(
+          { action: "mission_unblock", task: task.id },
+          "작업을 실행 대기열로 돌려보냈습니다.",
+        );
+    if ($("mission-block"))
+      $("mission-block").onclick = () => {
+        const reason = prompt("중지 이유를 입력하세요.");
+        if (reason)
+          deskAction(
+            { action: "mission_block", task: task.id, reason },
+            "작업을 중지했습니다.",
+          );
+      };
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+  } catch (error) {
+    target.innerHTML = `<article class="desk-card"><p class="mission-error">${esc(error.message)}</p></article>`;
+  }
 }
 function wireCoach(d) {
   const assignment = d.pending[0],
@@ -341,3 +473,14 @@ $("bench-history").onclick = () => {
   state.sessionsOffset = 0;
   view("sessions");
 };
+window.hermesMissionRefresh = setInterval(() => {
+  const active = document.activeElement;
+  if (
+    bench.room === "hq" &&
+    state.view === "workbench" &&
+    !bench.busy &&
+    !["INPUT", "TEXTAREA", "SELECT"].includes(active?.tagName) &&
+    !$("mission-detail")?.children.length
+  )
+    loadWorkbench();
+}, 10000);
