@@ -5,11 +5,25 @@ set -euo pipefail
 OBS_REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OBS_HOME="${HERMES_HOME:-$HOME/.hermes}"
 OBS_UNITS="$HOME/.config/systemd/user"
+OBS_HERMES_CLI="$(command -v hermes)"
 OBS_HOST="${OBSERVATORY_HOST:-$(tailscale status --json | python3 -c 'import json,sys; print(json.load(sys.stdin)["Self"]["DNSName"].rstrip("."))')}"
 OBS_IP="$(tailscale ip -4)"
 if [[ ! "$OBS_HOST" =~ ^[a-zA-Z0-9.-]+$ ]]; then
   echo 'Invalid OBSERVATORY_HOST' >&2
   exit 1
+fi
+if [[ "$OBS_HERMES_CLI" != /* || ! -x "$OBS_HERMES_CLI" ]]; then
+  echo 'Hermes CLI must resolve to an executable absolute path' >&2
+  exit 1
+fi
+python3 "$OBS_REPO/bootstrap/stage.py"
+python3 "$OBS_REPO/bootstrap/stage_specialist_profiles.py"
+if ! hermes kanban boards list --json | python3 -c \
+  'import json,sys; raise SystemExit(not any(b.get("slug") == "hermes-hq" for b in json.load(sys.stdin)))'; then
+  hermes kanban boards create hermes-hq \
+    --name 'Hermes HQ Missions' \
+    --description 'Goals orchestrated by Hermes HQ across specialist agents.' \
+    --icon '✦' --color '#8da47e'
 fi
 install -d -m 0700 "$OBS_HOME/observatory" "$OBS_HOME/scripts" "$OBS_UNITS"
 install -m 0600 "$OBS_REPO/browser/observatory/index.html" "$OBS_REPO/browser/observatory/style.css" "$OBS_REPO/browser/observatory/app.js" "$OBS_HOME/observatory/"
@@ -19,9 +33,9 @@ if [[ -d "$OBS_HOME/profiles/english/scripts" ]]; then
   install -m 0700 "$OBS_REPO/scripts/english_srs.py" "$OBS_HOME/profiles/english/scripts/english_srs.py"
 fi
 install -m 0700 "$OBS_REPO/scripts/observatory.py" "$OBS_HOME/scripts/observatory.py"
-python3 - "$OBS_HOME" "$OBS_UNITS" "$OBS_HOST" "$OBS_IP" <<'PY'
+python3 - "$OBS_HOME" "$OBS_UNITS" "$OBS_HOST" "$OBS_IP" "$OBS_HERMES_CLI" <<'PY'
 import pathlib, sys
-home, units, host, tailnet_ip = sys.argv[1:]
+home, units, host, tailnet_ip, hermes_cli = sys.argv[1:]
 unit = f'''# Author: David Choi
 # Purpose: private Hermes observatory on loopback and the Tailscale interface.
 [Unit]
@@ -30,6 +44,7 @@ After=network.target
 
 [Service]
 Type=simple
+Environment=HERMES_CLI={hermes_cli}
 ExecStart=/usr/bin/python3 "{home}/scripts/observatory.py" --home "{home}" --assets "{home}/observatory" --allowed-host {host} --tailnet-ip {tailnet_ip}
 Restart=on-failure
 RestartSec=3
@@ -44,6 +59,9 @@ PY
 systemctl --user daemon-reload
 systemctl --user enable --now hermes-observatory.service
 systemctl --user restart hermes-observatory.service
+if systemctl --user is-active --quiet hermes-gateway.service; then
+  systemctl --user restart hermes-gateway.service
+fi
 python3 - <<'PY'
 import time, urllib.request
 for attempt in range(50):
