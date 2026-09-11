@@ -1,7 +1,7 @@
 ---
 name: interview-prep
-description: Drive David's Staff/Senior ML Engineer interview prep in Silicon Valley with a structured curriculum, daily focused drills, beginner NeetCode/LeetCode coding coaching, Hello Interview system design, and adaptive progress.
-version: 1.1.0
+description: Drive David's Staff/Senior ML Engineer interview prep in Silicon Valley with company-aware planning, focused drills, NeetCode/LeetCode foundations, practical coding strategy, Hello Interview system design, and adaptive progress.
+version: 1.2.0
 metadata:
   hermes:
     category: career
@@ -28,6 +28,9 @@ metadata:
 - The Coding Coach (Tue/Thu/Sat noon), System Design Coach (Sunday noon), or
   Sunday weekly review fires; David replies with attempts, hints, or study results.
 - David asks for a drill, a mock question, a topic explainer, or resources.
+- David asks how to prioritize LeetCode, practical coding, system design, or
+  preparation for a particular company. Read
+  `references/company-coding-strategy.md` before answering.
 - David shares feedback from a real interview to fold into the plan.
 
 ## Curriculum
@@ -106,6 +109,13 @@ NeetCode/LeetCode exercises from `references/coach_catalog.json`. This curated
 catalog is version controlled and copied with this skill by `bootstrap/stage.py`.
 No scraping, login cookies, or network calls are needed to choose a lesson.
 Browser/web tools may validate or refresh source links; never invent URLs.
+
+For company-specific preparation questions and the planned transition from
+LeetCode foundations to weekly 60-minute implementation exercises, read
+`references/company-coding-strategy.md`. Keep official hiring guidance separate
+from candidate anecdotes. The automated coach currently implements the LeetCode
+foundation phase; do not imply that a scheduled Practical Coding track is active
+until its catalog, progress tracking, and job have actually been added.
 
 1. Run `python3 ~/.hermes/scripts/interview_progress.py plan coding`.
 2. Send the returned study message as the scheduled Telegram response, preserving

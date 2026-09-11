@@ -3,6 +3,17 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.4.1 — 2026-09-11 (patch: add company-aware coding strategy)
+
+- Added durable interview-coach guidance that distinguishes official
+  OpenAI/Anthropic hiring information from role-dependent candidate anecdotes.
+- Recorded a company-family preparation heuristic and David's phased path from
+  NeetCode foundations to one weekly 60-minute Practical Coding session.
+- Defined readiness gates and incremental cache, crawler, queue, key-value-store,
+  debugging, concurrency, retry, persistence, and testing exercise families.
+- Kept the current automated schedule unchanged and documented that the future
+  Practical Coding catalog, progress tracking, and cron job are not active yet.
+
 ## v1.4.0 — 2026-09-11 (minor: isolate system-design coaching)
 
 - Moved `system-design-coach` out of the MLE Interview group and assigned it a

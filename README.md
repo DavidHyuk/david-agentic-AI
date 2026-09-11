@@ -70,6 +70,7 @@ Local DGX Spark (vLLM @ :8003, Qwen3.6 FP8, 128K ctx)
 | `scripts/papers_digest.py` | Read-only recommended/recent/trending paper digest |
 | `scripts/interview_progress.py` | Concrete study messages, feedback, hints, adaptive reviews, weekly metrics |
 | `skills/career/interview-prep/references/coach_catalog.json` | Curated NeetCode/LeetCode problems and Hello Interview lessons |
+| `skills/career/interview-prep/references/company-coding-strategy.md` | Company-aware LeetCode/practical-coding preparation strategy |
 | `browser/setup_browser.sh` | Pin agent-browser + install the local Chromium CDP service |
 | `browser/browser_smoke.py` | Verify browser navigation, click, DOM read, and snapshot |
 | `mcp/setup_google_calendar.py` | Securely configure Google's official Calendar MCP |
@@ -543,6 +544,16 @@ prerequisites, recommended order, and concrete study goals. It uses the
 LeetCode for practice, and Hello Interview for system design. Daily pushes are
 rendered locally from curated content; no scraping, login cookies, or live
 lookups are required. Web lookup is only for maintaining links.
+
+For company-specific questions, the coach reads
+[`company-coding-strategy.md`](skills/career/interview-prep/references/company-coding-strategy.md).
+It distinguishes official OpenAI/Anthropic guidance from anecdotal candidate
+reports and treats company-family differences as planning heuristics. David's
+current phase keeps three weekly LeetCode sessions; after roughly 8-12 weeks and
+an evidence-based readiness check, the intended next phase replaces one of those
+slots with a 60-minute Practical Coding exercise covering incremental features,
+state, concurrency, retries, debugging, and tests. That future scheduled track is
+not active until its catalog, progress tracking, and cron job are implemented.
 
 | Nominal week | Coding: Tue / Thu / Sat | System design: Sunday |
 |---|---|---|

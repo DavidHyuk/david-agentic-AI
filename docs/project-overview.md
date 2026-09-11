@@ -55,7 +55,7 @@ David-Agent/
 │   │   └── papers-digest/     # LLM/LVM 논문 소화
 │   ├── career/
 │   │   └── interview-prep/    # MLE 드릴 + Coding / System Design Coach
-│   │       └── references/    # 커리큘럼 + 질문 은행 + coach_catalog.json
+│   │       └── references/    # 커리큘럼 + 질문 은행 + 코치·회사별 전략
 │   └── productivity/
 │       └── calendar-assistant/ # 비활성; 추후 Google 캘린더 브리핑
 │
@@ -202,6 +202,14 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 | `english-drill` | 21:00 매일 | English bot: SRS 드릴 전달 |
 | `english-weekly-review` | 일요일 20:00 | English bot: tutor feedback + 취약 SRS 누적 복습 |
 | `weekly-review` | 18:00 일요일 | David bot: 논문 + MLE coverage + 코딩/설계 실측 진도·다음 주 집중 영역 |
+
+`interview-prep`은 회사별 코딩 준비 질문에
+`references/company-coding-strategy.md`를 읽습니다. OpenAI/Anthropic의 공식
+채용 안내와 공개 지원자 경험을 서로 다른 근거 수준으로 다루며, 현재
+LeetCode 기초 단계 이후에는 최근 10회 중 7회 독립 풀이 등 준비도 기준을
+확인한 뒤 주 1회 60분 Practical Coding으로 전환하는 계획을 제시합니다.
+Practical Coding 자동 알림은 아직 구현 전이며 현재 cron 일정은 LeetCode와
+시스템 디자인만 실행합니다.
 
 논문 수집은 Hermes cron이 아니라 별도 `hermes-papers-ingest.timer`가 매일
 08:00에 수행합니다. 따라서 모델이나 gateway가 일시적으로 내려가도
