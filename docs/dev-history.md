@@ -3,6 +3,25 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.6.0 — 2026-09-11 (minor: campus study workbenches)
+
+- Campus rooms now open actionable workbenches: coding and system-design
+  assignments, persistent timers and practice feedback; English SRS answers and
+  review actions; paper reading lists; saved MLE drills; and an HQ pending-work view.
+- Reused the existing coach and SRS helpers so submitted practice results affect
+  the same progress and review schedules used by Telegram. Added SRS file locking,
+  atomic writes, corrupt-deck protection and stale-review rejection. Browsing alone
+  leaves learning state unchanged.
+- Added server-side room notes with version history and paper reading activity,
+  notebook revision checks, browser draft recovery, and room reopening after refresh.
+  Agent histories remain read-only; web model calls and job dispatch are deferred.
+- Restricted writes to validated actions through same-origin JSON requests with
+  an explicit action header. The installer stages the workbench assets and shared
+  helpers, including the English profile's SRS helper.
+- Verified desktop/mobile workbenches and isolated browser flows for feedback,
+  SRS review and note persistence. Production learning files remained unchanged
+  during read checks. Full suite: `pytest -q` — **231 passed**.
+
 ## v1.5.0 — 2026-09-11 (minor: private Hermes HQ observatory)
 
 - Added a responsive pixel-campus UI backed by actual Hermes records: profile

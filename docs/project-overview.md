@@ -34,7 +34,8 @@ KakaoTalk Channel
         └── Open Builder → kakao_webhook.py → ~/english-lessons/
 
 Tailscale browser → Hermes HQ :8788 (tailnet IP + loopback)
-        └── read-only sessions / schedules / learning / memory / logs
+        ├── read-only sessions / schedules / memory / logs
+        └── study workbenches → coach feedback / SRS / notes / reading list
 ```
 
 ---
@@ -76,7 +77,7 @@ David-Agent/
 │   ├── english_srs.py         # Leitner SRS 덱 (추가/리뷰/통계/취약 카드)
 │   ├── agenda.py              # 캘린더 이벤트 포맷팅 + 충돌 감지
 │   ├── cron_health.py         # cron tick lock / jobs.json 건강 검사 (+ 선택적 gateway restart)
-│   ├── observatory.py         # 프로필 기록 읽기 전용 HTTP API + 관제실 서버
+│   ├── observatory.py         # 프로필 기록 조회 + 학습 작업 API·관제실 서버
 │   └── wait_for_vllm.py       # gateway 시작 전 /v1/models readiness gate
 │
 ├── .codex/                    # Codex 훅 (Stop 후 테스트·자동 git commit/push)
@@ -112,7 +113,7 @@ David-Agent/
 │   ├── restart_service.sh     # vLLM 서비스 재시작 및 API 준비 대기
 │
 ├── browser/                   # Built-in Browser 런타임 + 관제실 정적 UI
-│   ├── observatory/          # 픽셀 사무실·검색·기록·리플레이 HTML/CSS/JS
+│   ├── observatory/          # 픽셀 캠퍼스·검색·기록·리플레이·workbench.js/css
 │   ├── setup_browser.sh       # agent-browser 고정 설치 + user service 설치
 │   ├── hermes-browser.service # localhost-only Chromium CDP
 │   └── browser_smoke.py       # 탐색·클릭·DOM·snapshot E2E 검사
@@ -126,7 +127,7 @@ David-Agent/
 │   ├── Qwen/                  # Qwen 계열 모델
 │   └── MiniMax/               # MiniMax-M2.7 모델
 │
-├── tests/                     # pytest 테스트 (222개)
+├── tests/                     # pytest 테스트 (231개)
 │   ├── conftest.py
 │   ├── test_papers_ingest.py
 │   ├── test_papers_digest.py
@@ -140,7 +141,7 @@ David-Agent/
 │   ├── test_cron_jobs.py      # cron 스키마 검증
 │   ├── test_cron_health.py    # cron tick lock / jobs.json 건강 검사
 │   ├── test_cron_watchdog.py  # 자동 복구 systemd wiring 검증
-│   ├── test_observatory.py    # 읽기 전용 DB·검색·분류·개인정보·HTTP 경계
+│   ├── test_observatory.py    # 기록 조회·HTTP 경계·학습 저장·중복/동시 쓰기
 │   ├── test_auto_git_commit.py # stop 훅 안전 필터·커밋 메시지 검증
 │   └── test_stage.py          # stage.py 멱등성 검증
 │
@@ -311,9 +312,22 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
 ## 발전을 이끄는 핵심 기술
 
 ### Hermes HQ 관제실
-- `scripts/observatory.py` + `browser/observatory/{index.html,style.css,app.js}`:
+- `scripts/observatory.py` + `browser/observatory/`의 HTML/CSS/JavaScript
+  (`app.js`, `workbench.js`, `style.css`, `workbench.css`):
   Python 표준 라이브러리 HTTP 서버와 로컬 HTML/CSS/JavaScript. 추가 모델
   호출이나 CDN 없이 픽셀 작업실, 세션 날짜별 리플레이, 검색·페이지네이션 제공.
+- 캠퍼스 방 클릭으로 학습 작업실을 엽니다. 코딩·시스템 디자인은 미완료
+  과제 재개, 타이머, 실제 연습 결과 제출을 제공하고, English는 정답 확인과
+  SRS 채점, Papers는 읽기 목록과 읽음 표시를 제공합니다. MLE는 저장된
+  드릴과 답안 노트, HQ는 미완료 과제·복습 카드·읽을 논문을 모아 보여줍니다.
+- 명시적인 저장 요청만 기존 `interview_progress.py` / `english_srs.py`를
+  호출합니다. 피드백은 중복 완료를 방지하며 SRS는 파일 잠금·리뷰 횟수로
+  동시 저장과 오래된 채점을 보호합니다. 노트·읽기 활동은
+  `data/observatory/workspace.json`에 버전과 함께 저장하고, 이전 노트도
+  기록 보관소에서 조회합니다. 저장 API는 동일 출처·JSON·전용 헤더와 입력을
+  검증합니다. 초안·타이머는 브라우저에 남습니다.
+- 질문 복사는 Telegram에 전달할 문맥을 준비합니다. 웹 모델 호출·자동 채점·
+  에이전트 작업 실행은 아직 제공하지 않습니다.
 - 프로필별 `state.db`는 SQLite 읽기 전용으로 조회합니다. gateway PID와
   프로세스 시작 시각으로 가동 여부를 검사하고, 세션 종료 미기록을 실행 중으로
   간주하지 않습니다. cron ID가 바뀐 과거 작업은 저장된 요청으로 분류합니다.
@@ -325,7 +339,8 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   loopback + Tailscale IPv4의 8788 포트만 엽니다. Tailscale 연결 기기에서
   접속하며, 필요 시 별도 8443 HTTPS Serve를 추가할 수 있습니다. 기본 접근
   제어는 tailnet 정책이며 앱 로그인은 별도로 없습니다.
-- 10초 간격 조회. 별도 영구 이벤트 수집기는 없으며 기존 저장 기록을 사용합니다.
+- 캠퍼스는 10초 간격 조회. 웹에서 저장한 노트·읽기 활동은 이력을 남기지만,
+  에이전트 실행의 별도 영구 이벤트 수집기는 없으며 기존 세션 기록을 사용합니다.
 
 ### vLLM (고성능 LLM 서빙 엔진)
 - **PagedAttention**: KV 캐시를 페이지 단위로 관리 → 긴 컨텍스트에서 메모리 낭비 최소화

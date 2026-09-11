@@ -65,9 +65,11 @@ async function deskAction(body, success = "저장했습니다.") {
   const room = bench.room;
   bench.busy = true;
   $("bench-status").textContent = "저장 중…";
-  document
-    .querySelectorAll("#bench-content button")
-    .forEach((b) => (b.disabled = true));
+  const buttons = Array.from(
+    document.querySelectorAll("#bench-content button"),
+    (button) => ({ button, disabled: button.disabled }),
+  );
+  buttons.forEach(({ button }) => (button.disabled = true));
   try {
     const response = await fetch("api/action", {
       method: "POST",
@@ -83,13 +85,11 @@ async function deskAction(body, success = "저장했습니다.") {
     }
     return true;
   } catch (e) {
-    $("bench-status").textContent = e.message;
+    if (room === bench.room) $("bench-status").textContent = e.message;
     return false;
   } finally {
     bench.busy = false;
-    document
-      .querySelectorAll("#bench-content button")
-      .forEach((b) => (b.disabled = false));
+    buttons.forEach(({ button, disabled }) => (button.disabled = disabled));
   }
 }
 function field(label, name, kind = "number", extra = "") {

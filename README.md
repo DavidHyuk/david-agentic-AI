@@ -761,7 +761,8 @@ Review the [MiniMax-M2.7 license](https://github.com/MiniMax-AI/MiniMax-M2.7/blo
 
 ## Hermes HQ — private agent observatory
 
-Hermes HQ is a web app for watching your agents and browsing their saved records.
+Hermes HQ is a web app for watching your agents, browsing saved records, and
+continuing study tasks from room workbenches.
 The campus has separate paper, MLE, coding, system-design, English, and HQ rooms;
 other installed Hermes profiles also appear as independent rooms. Room animation
 is decorative; the explicitly labeled daily replay follows real session start
@@ -788,7 +789,28 @@ sudo tailscale serve --bg --https=8443 http://127.0.0.1:8788
 # Then open https://<machine-tailnet-DNS-name>:8443
 ```
 
-The first screen refreshes every ten seconds and links rooms to filtered history.
+The first screen refreshes every ten seconds. Click a campus room to open its
+workbench; its history button opens the room's saved conversations.
+
+- **LeetCode / System Design**: resume unfinished assignments, prepare today's
+  assignment, use a timer, and submit actual practice results. Coding feedback
+  records duration, confidence, hints and solution use; design feedback records
+  your self-assessment and improvement notes. These update the existing coach
+  state and review schedule. Opening a room alone does not assign or complete work.
+- **English**: reveal due-card answers and mark each attempt correct or needing
+  more practice. Results update the shared SRS deck used by Telegram drills.
+- **Papers**: browse recent catalog entries, save a reading list, and mark papers
+  read or unread. Original links open the source paper.
+- **MLE Interview**: reopen the latest saved drill and keep your answer in room
+  notes. **HQ** brings together unfinished assignments, due cards and unread papers.
+- **Room notes**: save notes on the server and browse earlier versions under
+  **기록 보관소 → 캠퍼스 노트 · 읽기 활동**. Unsaved note/form drafts, timer state,
+  and the last opened room are retained in that browser's local storage.
+
+This workbench uses existing saved content and deterministic study helpers.
+The question-copy button prepares context to paste into Telegram; web-based model
+generation, automatic grading and agent job dispatch are not implemented.
+
 Use **대화 & 작업 기록** to search message text, titles, or tool names, select a
 profile/room/date range, and page through transcripts and tool calls. An absent
 session end timestamp is shown as unknown, not as evidence of an active agent.
@@ -805,7 +827,13 @@ their external project databases are not integrated or modified.
 Sources are existing `state.db`, `sessions/sessions.json`, `gateway_state.json`,
 `cron/jobs.json`, `cron/output/`, `memories/{MEMORY,USER}.md`, shared paper/learning
 data and `~/english-lessons/`. SQLite connections use read-only/query-only mode.
-The app never sends Telegram messages or edits agent state. It excludes system
+The app never sends Telegram messages. Explicit study actions call the existing
+`interview_progress.py` and `english_srs.py` helpers; notes and reading activity
+are stored in `~/.hermes/data/observatory/workspace.json`. Writes require a
+same-origin JSON request with the action header and validated inputs. Coach
+feedback is idempotent; SRS reviews use locking and a review counter to reject
+stale retries; notebook revisions prevent stale overwrites across devices.
+The app excludes system
 message rows, private reasoning columns, request dumps, auth/config files, audio,
 compressed logs, and text attachments larger than 2 MB. Recognizable credentials
 are redacted and transcript text is rendered without executing HTML. Missing or
@@ -825,6 +853,8 @@ sudo tailscale serve --https=8443 off
 Re-run the installer after changing the UI, service settings, Tailscale address,
 or machine DNS name. `bootstrap/stage.py` copies the server alongside other
 standalone helpers; the observatory installer owns UI staging and service setup.
+It also stages the study helpers, including the SRS helper in the existing English
+profile, so web and scheduled reviews share the same locking behavior.
 
 ## Development
 ```bash
