@@ -25,6 +25,42 @@ def test_defaults_applied_deliver_telegram():
     assert all(j["deliver"] == "telegram" for j in jobs)
 
 
+def test_papers_digest_uses_dedicated_telegram_chat_from_environment():
+    jobs = {job["name"]: job for job in rc.load_jobs(JOBS)}
+    papers = jobs["papers-digest"]
+    assert papers["deliver_chat_id_env"] == "PAPERS_TELEGRAM_CHAT_ID"
+
+    cmd = rc.build_create_command(
+        papers,
+        environment={"PAPERS_TELEGRAM_CHAT_ID": "-1001234567890"},
+    )
+    assert cmd[cmd.index("--deliver") + 1] == "telegram:-1001234567890"
+
+
+def test_papers_digest_requires_valid_dedicated_chat_id():
+    jobs = {job["name"]: job for job in rc.load_jobs(JOBS)}
+    papers = jobs["papers-digest"]
+    with pytest.raises(ValueError, match="requires PAPERS_TELEGRAM_CHAT_ID"):
+        rc.build_create_command(papers, environment={})
+    with pytest.raises(ValueError, match="numeric Telegram chat ID"):
+        rc.build_create_command(
+            papers,
+            environment={"PAPERS_TELEGRAM_CHAT_ID": "papers-room"},
+        )
+
+
+def test_env_file_loader_supports_export_and_quotes(tmp_path):
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "# local routing\n"
+        "export PAPERS_TELEGRAM_CHAT_ID='-1001234567890'\n"
+        "INVALID LINE\n"
+    )
+    assert rc.load_env_file(env_file) == {
+        "PAPERS_TELEGRAM_CHAT_ID": "-1001234567890"
+    }
+
+
 def test_english_jobs_use_the_isolated_english_profile():
     jobs = {job["name"]: job for job in rc.load_jobs(JOBS)}
     assert jobs["english-intake"]["profile"] == "english"
@@ -112,9 +148,10 @@ def test_duplicate_names_raise(tmp_path):
 
 def test_register_dry_run_smoke(capsys):
     jobs = rc.load_jobs(JOBS)
-    rc.register(jobs, dry_run=True)
+    rc.register(jobs, dry_run=True, environment={})
     out = capsys.readouterr().out
     assert "hermes cron create" in out
+    assert "telegram:<PAPERS_TELEGRAM_CHAT_ID>" in out
 
 
 def test_interview_coaches_fill_noon_without_replacing_mle_drills():

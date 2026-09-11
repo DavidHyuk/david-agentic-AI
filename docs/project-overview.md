@@ -15,7 +15,8 @@ DGX Spark (128GB VRAM)
         └── Qwen3.6-35B-A3B-FP8 (128K 컨텍스트)
                 │
                 ├── David Hermes gateway ── David Telegram bot
-                │     ├── papers / interview / weekly review
+                │     ├── dedicated paper group: daily papers digest
+                │     ├── private chat: interview / weekly review
                 │     └── Chromium CDP :19222
                 │
                 └── English Hermes gateway ── English Telegram bot
@@ -116,7 +117,7 @@ David-Agent/
 │   ├── Qwen/                  # Qwen 계열 모델
 │   └── MiniMax/               # MiniMax-M2.7 모델
 │
-├── tests/                     # pytest 테스트 (207개)
+├── tests/                     # pytest 테스트 (210개)
 │   ├── conftest.py
 │   ├── test_papers_ingest.py
 │   ├── test_papers_digest.py
@@ -190,7 +191,7 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 
 | 잡 | 시간 | 내용 |
 |----|------|------|
-| `papers-digest` | 08:30 매일 | LLM/LVM 연구 시그널 |
+| `papers-digest` | 08:30 매일 | 전용 Telegram 논문 그룹: LLM/LVM 연구 시그널 |
 | `interview-prep` | 12:00 월/수/금 | 실시간 트렌드 기반 Staff 레벨 드릴 1개 |
 | `coding-coach` | 12:00 화/목/토 | 35분 문제·목표·NeetCode/LeetCode canonical URL |
 | `system-design-coach` | 12:00 일요일 | Hello Interview 주제·URL·45–60분 과제·설명 목표·Hermes 연결 |
@@ -203,6 +204,13 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 08:00에 수행합니다. 따라서 모델이나 gateway가 일시적으로 내려가도
 메타데이터 수집은 독립적으로 실행되며, 08:30 digest는 완성된 카탈로그만
 읽습니다.
+
+`papers-digest`의 전송 대상은 저장소에 chat ID를 기록하지 않고
+`~/.hermes/.env`의 `PAPERS_TELEGRAM_CHAT_ID`에서 읽습니다.
+`register_cron.py`가 이를 `telegram:<chat_id>`로 변환하며, 값이 없거나
+숫자가 아니면 등록을 중단해 기존 개인 채팅으로 잘못 전송되는 것을
+방지합니다. 논문·면접·코딩 진도를 함께 다루는 `weekly-review`는 David의
+기존 개인 채팅에 유지됩니다.
 
 `hermes-cron-watchdog.timer`는 5분마다 David와 설치된 English profile의
 tick lock과 다음 실행 시각을 각각 검사합니다. lock이 20분 넘게 유지되거나

@@ -3,6 +3,20 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.2.0 — 2026-09-11 (minor: route paper notifications to a dedicated chat)
+
+- Routed the daily `papers-digest` cron job to its own Telegram group using
+  Hermes' explicit `telegram:<chat_id>` delivery target. Interview coaching and
+  the combined Sunday weekly review remain in David's private chat.
+- Added `PAPERS_TELEGRAM_CHAT_ID` as a local-only routing setting. The cron
+  registrar reads it from `~/.hermes/.env`, validates the numeric Telegram ID,
+  and refuses live registration when it is missing instead of falling back to
+  the private chat.
+- Documented group creation, discovery, delivery verification, and registration,
+  with test coverage for env parsing, target resolution, invalid input, and safe
+  dry-run output.
+- Verified the full configuration suite: `pytest -q` — **210 passed**.
+
 ## v1.1.0 — 2026-09-05 (minor: proactive interview study coach)
 
 - Extended the existing `interview-prep` skill with beginner Coding Coach at noon

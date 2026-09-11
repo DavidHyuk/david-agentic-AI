@@ -15,6 +15,7 @@ jobs:
   - name: papers-digest
     schedule: "30 8 * * *"           # 08:30 daily, after the 08:00 ingestion timer
     skills: [papers-digest]
+    deliver_chat_id_env: PAPERS_TELEGRAM_CHAT_ID
     prompt: >
       Send my daily LLM/LVM research signal. Use the papers-digest skill: pull
       recommended papers from the last four days plus today's Hugging Face
