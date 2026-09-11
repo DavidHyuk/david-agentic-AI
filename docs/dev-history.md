@@ -3,6 +3,18 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.3.0 — 2026-09-11 (minor: split interview and coding notifications)
+
+- Routed `interview-prep` and `system-design-coach` to a dedicated Interview
+  Telegram group, and routed `coding-coach` to a separate LeetCode group.
+- Added local-only `INTERVIEW_TELEGRAM_CHAT_ID` and
+  `LEETCODE_TELEGRAM_CHAT_ID` settings using the existing validated per-job
+  delivery mechanism. The combined Sunday `weekly-review` remains in the main
+  private chat.
+- Expanded setup and routing documentation and added regression coverage for
+  every topic-to-chat mapping.
+- Verified the full configuration suite: `pytest -q` — **211 passed**.
+
 ## v1.2.0 — 2026-09-11 (minor: route paper notifications to a dedicated chat)
 
 - Routed the daily `papers-digest` cron job to its own Telegram group using

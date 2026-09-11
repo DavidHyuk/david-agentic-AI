@@ -127,9 +127,8 @@ Then complete the **interactive, one-time** steps `install.sh` prints:
   The English token is stored only in `~/.hermes/profiles/english/.env`.
 - `bash bootstrap/install_cron_watchdog.sh` → recover automatically from a
   permanently stuck cron worker.
-- Create a Telegram group for paper notifications, add the David bot, send one
-  message, and set its group ID as `PAPERS_TELEGRAM_CHAT_ID` in
-  `~/.hermes/.env` (details below).
+- Create Telegram groups for papers, interviews, and LeetCode practice; add the
+  David bot and set their IDs in `~/.hermes/.env` (details below).
 - `python3 bootstrap/register_cron.py` → schedule the Telegram briefs.
 - Follow [Kakao Channel setup](docs/kakao-channel-setup.md) to receive tutor feedback
   through the Channel chatbot, then turn it into Telegram drills.
@@ -471,43 +470,59 @@ cat ~/.hermes/data/english/kakao-skill-url.txt
 
 ## Scheduled Telegram notifications (`cron/jobs.yaml`)
 
-The daily paper digest uses a dedicated Telegram group while the interview and
-weekly notifications stay in David's existing private chat. Configure it once:
+David's scheduled notifications use three focused Telegram groups. The combined
+Sunday review stays in the existing private chat:
 
-1. Create a Telegram group such as **David Papers**, add the existing David bot,
-   and send a message in the group so Hermes observes it.
-2. Find the group's negative numeric ID:
+| Destination | Suggested name | Jobs |
+|---|---|---|
+| Research | **Frontier Radar** | `papers-digest` |
+| Interviews | **Interview Lab** | `interview-prep`, `system-design-coach` |
+| Coding | **LeetCode Gym** | `coding-coach` |
+| Main private chat | **Hermes HQ** | `weekly-review` |
+
+Configure each topic group once:
+
+1. Create the group, add `@David_agentic_ai_bot`, and send
+   `/start@David_agentic_ai_bot` so Hermes observes it.
+2. Find the group's negative numeric ID. `hermes send --list` shows established
+   destinations; a newly observed `/start` can instead appear only in the
+   gateway log:
 
    ```bash
    hermes send --list telegram
+   tail -200 ~/.hermes/logs/gateway.log | rg 'telegram:group'
    ```
 
-3. Add the ID to the local secret environment file (never to this repository):
+3. Add the IDs to the local secret environment file (never to this repository):
 
    ```dotenv
    # ~/.hermes/.env
    PAPERS_TELEGRAM_CHAT_ID=-1001234567890
+   INTERVIEW_TELEGRAM_CHAT_ID=-1001234567891
+   LEETCODE_TELEGRAM_CHAT_ID=-1001234567892
    ```
 
-4. Verify delivery, then register the declared jobs:
+4. Verify each delivery, then register the declared jobs:
 
    ```bash
    hermes send --to telegram:-1001234567890 "[Hermes E2E] paper room test"
+   hermes send --to telegram:-1001234567891 "[Hermes E2E] interview room test"
+   hermes send --to telegram:-1001234567892 "[Hermes E2E] LeetCode room test"
    python3 bootstrap/register_cron.py --dry-run
    python3 bootstrap/register_cron.py
    ```
 
-The registrar refuses to create `papers-digest` without a numeric group ID, so
-the job cannot silently fall back to the private chat. The Sunday
-`weekly-review` remains in the private chat because it combines paper highlights
-with interview, coding, and system-design progress.
+The registrar refuses to create a topic-routed job without its numeric group ID,
+so it cannot silently fall back to the private chat. The Sunday `weekly-review`
+remains in the private chat because it combines paper highlights with interview,
+coding, and system-design progress.
 
 | Job | When (local) | What |
 |---|---|---|
 | `papers-digest` | 08:30 daily | Dedicated paper group: LLM/LVM research signal after 08:00 ingestion |
-| `interview-prep` | 12:00 Mon/Wed/Fri | One focused Staff/Senior MLE drill |
-| `coding-coach` | 12:00 Tue/Thu/Sat | 35-minute beginner problem with canonical NeetCode + LeetCode links |
-| `system-design-coach` | 12:00 Sunday | Hello Interview topic, 45–60 minute task, explanation goals + Hermes connection |
+| `interview-prep` | 12:00 Mon/Wed/Fri | Interview group: one focused Staff/Senior MLE drill |
+| `coding-coach` | 12:00 Tue/Thu/Sat | LeetCode group: 35-minute beginner problem with canonical links |
+| `system-design-coach` | 12:00 Sunday | Interview group: Hello Interview system-design exercise |
 | `english-intake` | 20:00 Mon–Sat | Dedicated English bot: feedback analysis or weakness coaching |
 | `english-drill` | 21:00 daily | Dedicated English bot: tonight's spaced-repetition drill |
 | `english-weekly-review` | 20:00 Sunday | Dedicated English bot: tutor feedback + weak SRS cumulative review |

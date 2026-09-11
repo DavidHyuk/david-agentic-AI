@@ -30,6 +30,7 @@ jobs:
   - name: interview-prep
     schedule: "0 12 * * 1,3,5"      # 12:00 Mon/Wed/Fri
     skills: [interview-prep]
+    deliver_chat_id_env: INTERVIEW_TELEGRAM_CHAT_ID
     prompt: >
       Deliver today's Staff/Senior MLE interview drill. Use the interview-prep
       skill: read my progress log, pick ONE under-covered pillar, then run
@@ -42,6 +43,7 @@ jobs:
   - name: coding-coach
     schedule: "0 12 * * 2,4,6"      # 12:00 Tue/Thu/Sat
     skills: [interview-prep]
+    deliver_chat_id_env: LEETCODE_TELEGRAM_CHAT_ID
     prompt: >
       Deliver today's Coding Coach using the interview-prep skill's Coding Coach
       procedure. Run python3 ~/.hermes/scripts/interview_progress.py plan coding
@@ -55,6 +57,7 @@ jobs:
   - name: system-design-coach
     schedule: "0 12 * * 0"          # 12:00 Sunday
     skills: [interview-prep]
+    deliver_chat_id_env: INTERVIEW_TELEGRAM_CHAT_ID
     prompt: >
       Deliver today's System Design Coach using the interview-prep skill's System
       Design Coach procedure. Run python3 ~/.hermes/scripts/interview_progress.py
