@@ -23,8 +23,9 @@ semantic versioning (major.minor.patch).
   failed attempts before blocking.
 - Verified actual Qwen decomposition in an isolated Hermes home: one interview
   sprint became three parallel specialist tasks and one dependent synthesis task,
-  correctly routed to papers, coding, design, and interview. Full suite:
-  `pytest -q` — **235 passed**.
+  correctly routed to papers, coding, design, and interview. Dispatched the paper
+  child through the isolated worker and verified its completed run, structured
+  metadata, summary, and dependency handoff. Full suite: `pytest -q` — **236 passed**.
 
 ## v1.6.0 — 2026-09-11 (minor: campus study workbenches)
 

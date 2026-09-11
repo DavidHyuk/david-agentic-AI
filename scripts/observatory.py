@@ -240,8 +240,9 @@ class Observatory:
             counts[task['status']] = counts.get(task['status'], 0) + 1
             task['room'] = SPECIALIST_ROOMS.get(task.get('assignee'), 'hq')
         return {'available': True, 'board': self.board, 'tasks': tasks,
-                'assignees': [{**a, 'room': SPECIALIST_ROOMS.get(a['name'], 'hq')}
-                              for a in assignees], 'counts': counts,
+                'assignees': [{**a, 'room': SPECIALIST_ROOMS[a['name']]}
+                              for a in assignees if a['name'] in SPECIALIST_ROOMS],
+                'counts': counts,
                 'dispatcher_alive': self.gateway('david')['alive']}
 
     def mission_detail(self, task_id):
@@ -551,16 +552,17 @@ class Observatory:
                 errors.append({'profile': name, 'error': type(exc).__name__})
         sessions = self.sessions(limit=1000000)
         rooms = []
+        room_ids = {room[0] for room in ROOMS}
         definitions = ROOMS + [(n, n.title(), '독립 프로필', '📷', '#d2c3af')
-                               for n in self.profiles() if n not in ('david', 'english')]
+                               for n in self.profiles() if n not in room_ids | {'david'}]
         for key, title, subtitle, icon, color in definitions:
             history = [s for s in sessions['items'] if s['room'] == key]
             room_jobs = [j for j in jobs if j['room'] == key]
             latest = history[0] if history else None
             rooms.append({'id': key, 'title': title, 'subtitle': subtitle, 'icon': icon,
                           'color': color, 'sessions': len(history), 'latest': latest,
-                          'jobs': room_jobs, 'profile': 'david' if key in
-                          ('hq', 'papers', 'interview', 'coding', 'design') else key})
+                          'jobs': room_jobs,
+                          'profile': 'david' if key == 'hq' else key})
         today = datetime.now(TZ).strftime('%Y-%m-%d')
         today_start, _ = date_range(today)
         return {'now': time.time(), 'timezone': str(TZ), 'profiles': profiles, 'jobs': jobs,

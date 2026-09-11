@@ -126,6 +126,18 @@ def test_partial_database_failure_remains_visible(store):
     assert result['errors'][0]['profile'] == 'english'
 
 
+def test_specialist_profiles_merge_into_existing_campus_rooms(store):
+    for name in ('papers', 'coding'):
+        profile = store.home / 'profiles' / name
+        profile.mkdir(parents=True)
+        shutil.copyfile(store.home / 'state.db', profile / 'state.db')
+    rooms = store.overview()['rooms']
+    assert [room['id'] for room in rooms].count('papers') == 1
+    assert [room['id'] for room in rooms].count('coding') == 1
+    assert next(room for room in rooms if room['id'] == 'papers')['profile'] == 'papers'
+    assert next(room for room in rooms if room['id'] == 'hq')['profile'] == 'david'
+
+
 def test_http_blocks_untrusted_hosts_cross_site_and_arbitrary_files(store):
     assets = Path(__file__).resolve().parents[1] / 'browser/observatory'
     server = ThreadingHTTPServer(('127.0.0.1', 0), make_handler(store, assets, {'127.0.0.1'}))
@@ -302,7 +314,8 @@ def test_hq_orchestration_reads_board_and_maps_specialist_rooms(store, monkeypat
             output = [task]
         elif command[4] == 'assignees':
             output = [{'name': 'default', 'on_disk': True, 'counts': {}},
-                      {'name': 'papers', 'on_disk': True, 'counts': {'running': 1}}]
+                      {'name': 'papers', 'on_disk': True, 'counts': {'running': 1}},
+                      {'name': 'clawgram', 'on_disk': True, 'counts': {}}]
         else:
             raise AssertionError(command)
         return SimpleNamespace(returncode=0, stdout=json.dumps(output), stderr='')
@@ -312,6 +325,7 @@ def test_hq_orchestration_reads_board_and_maps_specialist_rooms(store, monkeypat
     assert board['available'] is True, board
     assert board['tasks'][0]['room'] == 'papers'
     assert board['counts'] == {'running': 1}
+    assert [row['name'] for row in board['assignees']] == ['default', 'papers']
 
 
 def test_hq_mission_actions_validate_and_use_fixed_cli_arguments(store, monkeypatch):
