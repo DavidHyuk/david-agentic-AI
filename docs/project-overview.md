@@ -196,6 +196,9 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 configuration·failure lifecycle을 실제로 분리해야 하는 근거가 없으면 가장 잘
 맞는 기존 profile의 별도 skill과 state path로 추가합니다. 기능 이름만 분리하기
 위해 새 gateway나 Telegram bot token을 만들지 않는 것이 기본 정책입니다.
+Chat destination은 별도로 판단합니다. 반복 콘텐츠가 상호작용형 대화를 묻거나
+history/search·알림 제어의 이점이 있으면 같은 bot을 별도 Telegram group에
+연결하고, 전용 chat ID가 없을 때 기본 채팅으로 조용히 fallback하지 않습니다.
 
 ### 4. `scripts/` — 결정론적 데이터 레이어
 스킬이 직접 DB 쿼리나 파일 파싱을 하지 않고, 헬퍼 스크립트를 CLI로 호출합니다.
@@ -231,6 +234,10 @@ configuration·failure lifecycle을 실제로 분리해야 하는 근거가 없�
 | `english-drill` | 21:00 매일 | English bot: SRS 드릴 전달 |
 | `english-weekly-review` | 일요일 20:00 | English bot: tutor feedback + 취약 SRS 누적 복습 |
 | `weekly-review` | 18:00 일요일 | David bot: 논문 + MLE coverage + 코딩/설계 실측 진도·다음 주 집중 영역 |
+
+Podcast 알림은 daily content feed이므로 기존 English bot을 유지하면서 Podcast
+전용 Telegram group으로만 destination을 분리하는 것이 권장 구조입니다. Tutor
+feedback/SRS와 profile memory는 공유하되 두 대화 기록과 알림은 섞지 않습니다.
 
 `interview-prep`은 회사별 코딩 준비 질문에
 `references/company-coding-strategy.md`를 읽습니다. OpenAI/Anthropic의 공식

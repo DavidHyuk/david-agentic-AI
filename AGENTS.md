@@ -124,10 +124,11 @@ reader to reconstruct it from git history.
 ## New Agent and Telegram Routing Policy
 
 When adding an agent-like capability, default to a new skill and cron job on the
-best-matching existing Hermes profile, Telegram bot, and chat. Keep its mutable
-state in a separate data path when that prevents coupling. Do not create a new
-profile, gateway, Telegram bot token, or parallel service merely to give the
-capability a distinct name.
+best-matching existing Hermes profile and Telegram bot. Decide the Telegram chat
+destination separately; reusing a profile or bot does not require mixing every
+workflow into one chat. Keep mutable state in a separate data path when that
+prevents coupling. Do not create a new profile, gateway, Telegram bot token, or
+parallel service merely to give the capability a distinct name.
 
 Create a separate profile or bot only when at least one concrete boundary
 requires it:
@@ -144,6 +145,26 @@ watchdog changes, and installation burden. Prefer the design with fewer runtime
 components when it provides equivalent behavior without side effects. Record
 the routing decision in `docs/dev-history.md` and keep
 `docs/project-overview.md` current.
+
+Evaluate chat-room separation independently from profile and bot isolation:
+
+- Use a separate chat or group when a recurring content feed would bury an
+  interactive workflow, the workflows have meaningfully different cadence or
+  response loops, separate history/search or notification controls add value,
+  or the user requests a topic boundary.
+- Reuse the same chat when messages are infrequent, form one continuous
+  conversation, or separation would fragment context without a practical UX
+  benefit.
+- Prefer one existing bot in multiple chats over multiple bots when identity,
+  memory, permissions, and ownership should remain shared.
+- Route a dedicated chat through a validated `deliver_chat_id_env` value. If a
+  dedicated destination is selected, fail closed when its numeric chat ID is
+  missing or invalid; never silently fall back to the bot's default chat.
+
+For the English Goal Podcast workflow, the preferred target is a dedicated
+Podcast English Telegram group served by the existing `english` profile and bot:
+daily podcast posts remain separate from tutor/SRS interaction while learner
+memory and credentials stay shared.
 
 ## Key external paths
 - Subscribe-Papers DB: `/home/david/workspace/Subscribe-Papers/data/papers.db`

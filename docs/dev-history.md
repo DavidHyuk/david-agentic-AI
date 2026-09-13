@@ -3,6 +3,19 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.9.1 — 2026-09-13 (patch: define chat-room routing policy)
+
+- Separated the decision to reuse a Hermes profile and Telegram bot from the
+  decision to reuse a chat destination.
+- Established criteria for dedicated topic rooms based on feed volume, cadence,
+  interaction loop, history/search clarity, notification control, and explicit
+  user preference, without requiring another bot token.
+- Required dedicated destinations to use validated chat IDs and fail closed
+  instead of silently falling back to a default chat.
+- Recorded a dedicated Podcast English group on the existing English bot as the
+  preferred routing for the daily podcast feed; runtime routing awaits that
+  group's chat ID.
+
 ## v1.9.0 — 2026-09-13 (minor: add transcript-backed podcast English agent)
 
 - Added a distinct `english-podcast-coach` skill to the existing English Hermes
