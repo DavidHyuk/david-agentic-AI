@@ -135,7 +135,13 @@ def stage_config(home: Path, repo: Path = REPO_ROOT) -> bool:
 
 
 def stage_data_dirs(home: Path) -> None:
-    for sub in ("data/english", "data/interview", "data/cron", "data/papers"):
+    for sub in (
+        "data/english",
+        "data/english-podcast",
+        "data/interview",
+        "data/cron",
+        "data/papers",
+    ):
         (home / sub).mkdir(parents=True, exist_ok=True)
 
 

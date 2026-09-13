@@ -1,9 +1,10 @@
 # 프로젝트 구조 개요 — david-agentic-ai
 
-David Choi의 David 및 English Hermes profile을 버전 관리하는 리포지토리입니다.
-이 저장소가 두 profile의 단일 진실 원천이며, `bootstrap/stage.py`는 David
-profile을 `~/.hermes`로, `stage_english_profile.py`는 English profile을
-`~/.hermes/profiles/english`로 동기화합니다.
+David Choi의 David, tutor-English, podcast-English Hermes profile을 버전
+관리하는 리포지토리입니다. 이 저장소가 세 profile의 단일 진실 원천이며,
+`bootstrap/stage.py`는 David profile을 `~/.hermes`로,
+`stage_english_profile.py`와 `stage_english_podcast_profile.py`는 두 English
+profile을 각각의 `~/.hermes/profiles/` 경로로 동기화합니다.
 
 ---
 
@@ -22,8 +23,10 @@ DGX Spark (128GB VRAM)
                 │     ├── private chat: combined weekly review
                 │     └── Chromium CDP :19222
                 │
-                └── English Hermes gateway ── English Telegram bot
-                      └── tutor feedback / SRS
+                ├── English Hermes gateway ── English Telegram bot
+                │     └── tutor feedback / SRS
+                └── English-podcast gateway ── Podcast English Telegram bot
+                      └── downloaded YouTube transcript / personalized lesson
 
 arXiv / Hugging Face
         │
@@ -66,6 +69,7 @@ David-Agent/
 │
 ├── profiles/                  # 격리된 English + headless 전문 에이전트 identity
 │   ├── english/               # 영어 전용 Telegram profile
+│   ├── english-podcast/       # YouTube podcast 영어 전용 Telegram profile
 │   ├── papers/                # 논문·연구 worker SOUL
 │   ├── interview/             # MLE interview worker SOUL
 │   ├── coding/                # coding worker SOUL
@@ -80,6 +84,7 @@ David-Agent/
 │   ├── kakao_webhook.py       # Kakao 채널 피드백 수신·발신자 allowlist·로컬 큐
 │   ├── english_intake.py      # 새 레슨 탐지 + 이번 주 세션 조회 + 처리 상태 관리
 │   ├── english_srs.py         # Leitner SRS 덱 (추가/리뷰/통계/취약 카드)
+│   ├── english_podcast.py     # 일일 영상 선택 + YouTube 자막/대본 저장
 │   ├── agenda.py              # 캘린더 이벤트 포맷팅 + 충돌 감지
 │   ├── cron_health.py         # cron tick lock / jobs.json 건강 검사 (+ 선택적 gateway restart)
 │   ├── observatory.py         # 기록·학습·Kanban orchestration API + 관제실
@@ -93,7 +98,7 @@ David-Agent/
 │   └── hooks.json             # `.codex/hooks/auto_git_commit.py` 위임
 │
 ├── cron/
-│   └── jobs.yaml              # 8개의 Telegram 알림 스케줄 정의 (영어 3개는 english profile)
+│   └── jobs.yaml              # 9개의 Telegram 알림 스케줄 정의 (English profile 2개 사용)
 │
 ├── bootstrap/                 # 설치 및 동기화 자동화
 │   ├── install.sh             # 원클릭 설치 (Hermes + 설정 + 모델)
@@ -103,8 +108,11 @@ David-Agent/
 │   ├── hermes-cron-watchdog.{service,timer}
 │   ├── hermes-gateway-cron-recovery.conf # gateway 종료 45초 상한
 │   ├── stage_english_profile.py # profile → ~/.hermes/profiles/english
+│   ├── stage_english_podcast_profile.py # profile → ~/.hermes/profiles/english-podcast
 │   ├── stage_specialist_profiles.py # headless 전문 profile staging
 │   ├── install_english_bot.sh # English Telegram bot gateway 설치
+│   ├── install_english_podcast_bot.sh # podcast bot + 자막 timer 설치
+│   ├── hermes-english-podcast-sync.{service,timer} # 08:30 대본 선다운로드
 │   ├── install_observatory.sh # 관제실 UI staging + Tailscale IP 전용 서비스
 │   ├── hermes-gateway-english-vllm.conf # 모델 readiness + 종료 제한
 │   ├── stage.py               # repo → ~/.hermes 멱등 동기화
@@ -133,7 +141,7 @@ David-Agent/
 │   ├── Qwen/                  # Qwen 계열 모델
 │   └── MiniMax/               # MiniMax-M2.7 모델
 │
-├── tests/                     # pytest 테스트 (241개)
+├── tests/                     # pytest 테스트 (252개)
 │   ├── conftest.py
 │   ├── test_papers_ingest.py
 │   ├── test_papers_digest.py
@@ -142,6 +150,8 @@ David-Agent/
 │   ├── test_interview_trends.py  # 트렌드 수집 (normalization, ranking, cache, network stub)
 │   ├── test_english_intake.py
 │   ├── test_english_srs.py
+│   ├── test_english_podcast.py # 자막 파싱·일일 배정·멱등 상태
+│   ├── test_english_podcast_service.py # 08:30 선다운로드 timer
 │   ├── test_agenda.py
 │   ├── test_skills.py         # 스킬 frontmatter 스키마 검증
 │   ├── test_cron_jobs.py      # cron 스키마 검증
@@ -150,6 +160,7 @@ David-Agent/
 │   ├── test_observatory.py    # 기록 조회·HTTP 경계·학습 저장·중복/동시 쓰기
 │   ├── test_auto_git_commit.py # stop 훅 안전 필터·커밋 메시지 검증
 │   ├── test_stage.py          # stage.py 멱등성 검증
+│   ├── test_stage_english_podcast_profile.py # podcast profile 격리·staging
 │   └── test_stage_specialist_profiles.py # 전문 profile 격리·재현성
 │
 └── docs/
@@ -183,6 +194,7 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 | `papers-digest` | research | 새 논문 카탈로그에서 LLM/LVM 후보를 뽑아 인터뷰 관련성과 항목별 원문 링크 제공 |
 | `interview-prep` | career | 월/수/금 Staff MLE 드릴 + 화/목/토 NeetCode/LeetCode 입문 코딩 + 일요일 Hello Interview 설계 코칭 |
 | `english-practice` | English profile / learning | 레슨 녹음/교정 파일 → SRS 카드 생성 + 전용 Telegram bot 매일 리뷰 |
+| `english-podcast-coach` | English-podcast profile / learning | 다운로드한 YouTube 대본 + tutor 취약점 → 09:00 듣기·표현 학습 |
 | `calendar-assistant` | productivity | **비활성/보존** — 추후 Google Calendar 브리핑 |
 
 ### 4. `scripts/` — 결정론적 데이터 레이어
@@ -199,12 +211,13 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 | `interview_trends.py` | HN·GitHub·논문 DB에서 실시간 인터뷰 트렌드 수집·캐시 |
 | `english_intake.py` | 새 레슨 탐지, Telegram 파일 저장, 이번 주 세션 조회, 처리 상태 관리 |
 | `english_srs.py` | Leitner SRS 덱 (카드 추가/리뷰/통계/취약 카드 랭킹) |
+| `english_podcast.py` | 최신 미학습 영상 일일 배정, 영문 JSON3 자막 및 타임스탬프 대본 저장, 전달 상태 관리 |
 | `agenda.py` | 캘린더 이벤트 포맷팅 + 충돌·여유 슬롯 감지 |
 | `cron_health.py` | cron tick lock 점유·`jobs.json` stale 감지, `--restart`로 gateway 복구 |
 | `wait_for_vllm.py` | 지정한 served model이 `/v1/models`에 나타날 때까지 gateway 시작 대기 |
 
 ### 5. `cron/jobs.yaml` — 선언형 스케줄
-8개의 Telegram 알림 잡이 YAML로 선언되어 있습니다. Calendar 연동을
+9개의 Telegram 알림 잡이 YAML로 선언되어 있습니다. Calendar 연동을
 재개할 때까지 `morning-brief`는 등록하지 않습니다.
 
 | 잡 | 시간 | 내용 |
@@ -213,6 +226,7 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 | `interview-prep` | 12:00 월/수/금 | 전용 Interview 그룹: 실시간 트렌드 기반 Staff 레벨 드릴 1개 |
 | `coding-coach` | 12:00 화/목/토 | 전용 LeetCode 그룹: 35분 문제·목표·canonical URL |
 | `system-design-coach` | 12:00 일요일 | 전용 System Design 그룹: Hello Interview 설계 과제 |
+| `english-podcast-daily` | 09:00 매일 | Podcast English bot: 다운로드된 대본 기반 개인화 학습 1편 |
 | `english-intake` | 월–토 20:00 | English bot: 새 피드백 분석 또는 취약 패턴 코칭 |
 | `english-drill` | 21:00 매일 | English bot: SRS 드릴 전달 |
 | `english-weekly-review` | 일요일 20:00 | English bot: tutor feedback + 취약 SRS 누적 복습 |
@@ -241,14 +255,14 @@ Design, Coding Coach는 각각 Interview, System Design, LeetCode 그룹을
 사용합니다. 모든 진도를 함께 다루는 `weekly-review`는 David의 기존 개인
 채팅에 유지됩니다.
 
-`hermes-cron-watchdog.timer`는 5분마다 David와 설치된 English profile의
+`hermes-cron-watchdog.timer`는 5분마다 David와 설치된 두 English profile의
 tick lock과 다음 실행 시각을 각각 검사합니다. lock이 20분 넘게 유지되거나
 다음 실행 시각이 지났으면 해당 profile의 gateway를 재시작하고,
 `hermes-gateway-cron-recovery.conf`가 멈춘 worker의 종료 대기를 45초로
 제한합니다. 따라서 하나의 agent job이 영구 대기해도 이후 스케줄 전체가
 며칠간 조용히 멈추지 않습니다.
 
-English profile의 skill은 저장소가 단일 진실 원천입니다. staging은
+두 English profile의 skill은 저장소가 단일 진실 원천입니다. staging은
 런타임에서 자동 생성된 관리 대상 외 skill을 제거하고,
 English profile에서는 background skill creation과 curator를 비활성화합니다.
 
@@ -303,8 +317,9 @@ Hermes가 고정된 `agent-browser 0.33.0`을 통해 연결합니다. 외부 클
 
 ### 방향 2 — 기억(Memory) 품질 향상
 
-David agent는 `~/.hermes/memories/`, English agent는
-`~/.hermes/profiles/english/memories/`에 독립적으로 기억을 누적합니다.
+David agent는 `~/.hermes/memories/`, 두 English agent는 각각
+`~/.hermes/profiles/english/memories/`와
+`~/.hermes/profiles/english-podcast/memories/`에 독립적으로 기억을 누적합니다.
 profile별 seed-only 정책이 기존 기억을 덮어쓰지 않아 재설치 후에도 누적된
 사용자 이해와 학습 맥락이 보존됩니다.
 
@@ -387,6 +402,16 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
 ### 스페이스드 리피티션(Leitner SRS)
 - `english_srs.py`의 Leitner 박스 알고리즘 → 맞힌 카드는 나중에, 틀린 카드는 다음날 재등장
 - 영어 교정 데이터를 단순 저장이 아닌 **점진적 장기 학습**으로 전환
+
+### 대본 기반 Podcast English
+- `english_podcast.py`는 고정 channel ID로 English Goal Podcast handle을
+  검증하고, 최신 미배정 영상 한 편의 영문 자막을 JSON3 원본과 타임스탬프
+  텍스트로 모두 로컬 보존합니다.
+- 08:30 systemd timer가 LLM과 독립적으로 대본을 먼저 준비하고, 09:00 Hermes
+  job은 같은 날짜 assignment를 재사용합니다. 따라서 cron 재시도도 같은 날
+  두 영상을 소비하지 않습니다.
+- podcast agent는 tutor SRS deck과 기존 English profile memory를 읽기 전용
+  개인화 근거로 사용하며, 근거가 없으면 취약점이라고 주장하지 않습니다.
 
 ### 인터뷰 학습 코치 (interview_progress.py)
 - 기존 `interview-prep` 스킬 안에서 동작하며, `stage.py`가 standalone helper와

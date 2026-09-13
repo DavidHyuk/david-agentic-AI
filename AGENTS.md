@@ -12,6 +12,8 @@ bot**. Calendar support is
 retained in source but intentionally deferred and disabled. English
 tutor feedback enters through the KakaoTalk Channel chatbot and is processed
 locally before the review and SRS drill are delivered through Telegram.
+An isolated podcast-English profile pre-downloads one English Goal Podcast
+transcript each morning and delivers a separate personalized 09:00 lesson.
 
 ## Layout
 - `config/soul/SOUL.md` — agent personality (staged to `$HERMES_HOME/SOUL.md`).
@@ -21,6 +23,9 @@ locally before the review and SRS drill are delivered through Telegram.
   isolated under `profiles/english/skills/`.
 - `profiles/english/` — isolated SOUL, memory, config, and English-practice
   skill, staged to `~/.hermes/profiles/english`.
+- `profiles/english-podcast/` — separate transcript-backed daily podcast coach,
+  staged to `~/.hermes/profiles/english-podcast` and personalized from shared
+  tutor evidence without modifying it.
 - `scripts/*.py` — standalone helpers staged to `$HERMES_HOME/scripts/` and unit-tested.
 - `cron/jobs.yaml` — declarative Telegram notification schedule.
 - `bootstrap/` — staging, cron registration, and systemd service installers,

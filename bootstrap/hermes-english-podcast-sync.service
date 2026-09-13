@@ -1,0 +1,18 @@
+# __author__ = 'David Choi (bestshoot21@gmail.com)'
+# Purpose: download the day's English Goal Podcast captions before coaching.
+[Unit]
+Description=Prepare today's English Goal Podcast transcript
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+Environment=ENGLISH_PODCAST_YT_DLP=%h/.local/bin/yt-dlp
+ExecStart=/usr/bin/python3 %h/.hermes/profiles/english-podcast/scripts/english_podcast.py prepare
+TimeoutStartSec=300
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/.hermes/data/english-podcast

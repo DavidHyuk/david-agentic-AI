@@ -2,12 +2,13 @@
 # Purpose: detect stalled David and English cron schedulers and recover their gateways.
 [Unit]
 Description=Hermes cron scheduler health check and recovery
-After=hermes-gateway.service hermes-gateway-english.service
+After=hermes-gateway.service hermes-gateway-english.service hermes-gateway-english-podcast.service
 
 [Service]
 Type=oneshot
 ExecStart=/usr/bin/python3 %h/.hermes/scripts/cron_health.py --lock-stale-minutes 20 --restart
 ExecStart=/usr/bin/python3 %h/.hermes/scripts/cron_health.py --hermes-home %h/.hermes/profiles/english --gateway-service hermes-gateway-english.service --skip-missing-home --lock-stale-minutes 20 --restart
-TimeoutStartSec=180
+ExecStart=/usr/bin/python3 %h/.hermes/scripts/cron_health.py --hermes-home %h/.hermes/profiles/english-podcast --gateway-service hermes-gateway-english-podcast.service --skip-missing-home --skip-missing-gateway --lock-stale-minutes 20 --restart
+TimeoutStartSec=270
 NoNewPrivileges=true
 PrivateTmp=true

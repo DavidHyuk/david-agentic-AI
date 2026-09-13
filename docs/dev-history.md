@@ -3,6 +3,24 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.9.0 — 2026-09-13 (minor: add transcript-backed podcast English agent)
+
+- Added a second isolated English Hermes profile and Telegram bot for daily
+  English Goal Podcast listening and expression coaching, separate from tutor
+  intake and nightly SRS drills.
+- Added an 08:30 systemd prefetch timer that selects one newest unassigned
+  channel video, preserves its English YouTube caption JSON3, and generates a
+  readable timestamped transcript before the 09:00 lesson.
+- Personalized each three-point lesson with read-only evidence from the existing
+  tutor SRS deck and English-profile memories, while forbidding fabricated
+  weaknesses or transcript-free recommendations.
+- Added retry-safe daily assignment/delivery state, profile staging and install
+  tooling, targeted single-job cron registration, and watchdog coverage for the
+  new gateway.
+- Verified live caption retrieval from the configured channel (2,126-word
+  transcript from the latest available episode) and the full suite:
+  `pytest -q` — **252 passed**.
+
 ## v1.8.1 — 2026-09-13 (patch: focus the paper digest)
 
 - Reduced the paper digest from daily delivery to Tuesday and Friday at 08:30,

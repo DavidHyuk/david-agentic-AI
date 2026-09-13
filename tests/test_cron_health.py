@@ -262,6 +262,22 @@ def test_main_can_skip_an_uninstalled_profile(tmp_path, monkeypatch, capsys):
     assert "not installed; skipping" in capsys.readouterr().out
 
 
+def test_main_can_skip_a_profile_without_gateway(hermes_home, monkeypatch, capsys):
+    monkeypatch.setattr(ch, "gateway_service_exists", lambda _service: False)
+    monkeypatch.setattr(
+        ch,
+        "assess_health",
+        lambda *_a, **_k: pytest.fail("missing gateway should not be assessed"),
+    )
+
+    assert ch.main([
+        "--hermes-home", str(hermes_home),
+        "--gateway-service", "hermes-gateway-english-podcast.service",
+        "--skip-missing-gateway",
+    ]) == 0
+    assert "gateway not installed; skipping" in capsys.readouterr().out
+
+
 def test_main_exit_codes(hermes_home, monkeypatch, capsys):
     jobs_path = hermes_home / "cron" / "jobs.json"
     jobs_path.parent.mkdir(parents=True, exist_ok=True)

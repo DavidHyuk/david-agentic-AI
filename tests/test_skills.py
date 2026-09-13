@@ -13,6 +13,7 @@ EXPECTED = {
     "papers-digest",
     "interview-prep",
     "english-practice",
+    "english-podcast-coach",
     "calendar-assistant",
 }
 
@@ -91,3 +92,20 @@ def test_english_skill_uses_the_staged_profile_script_path():
     assert "~/scripts" not in body
     assert "/home/david/.hermes/profiles/english/scripts/english_intake.py" in body
     assert "/home/david/.hermes/profiles/english/scripts/english_srs.py" in body
+
+
+def test_english_podcast_skill_requires_downloaded_transcript_and_tutor_evidence():
+    path = (
+        REPO
+        / "profiles"
+        / "english-podcast"
+        / "skills"
+        / "learning"
+        / "english-podcast-coach"
+        / "SKILL.md"
+    )
+    body = path.read_text()
+    assert "english_podcast.py prepare" in body
+    assert "srs_deck.json weaknesses --limit 8" in body
+    assert "exactly three short transcript moments" in body
+    assert "Never summarize or recommend an episode whose transcript was not downloaded" in body

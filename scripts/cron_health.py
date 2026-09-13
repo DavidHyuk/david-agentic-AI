@@ -195,6 +195,20 @@ def restart_gateway(
     return True, (result.stdout or "").strip() or f"{service} restarted"
 
 
+def gateway_service_exists(service: str) -> bool:
+    """Return whether systemd knows the profile's gateway unit."""
+    try:
+        result = subprocess.run(
+            ["systemctl", "--user", "show", service, "--property=LoadState", "--value"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except FileNotFoundError:
+        return False
+    return result.returncode == 0 and result.stdout.strip() not in {"", "not-found"}
+
+
 def _format_report(report: dict[str, Any]) -> str:
     lines: list[str] = []
     lock = report["lock"]
@@ -262,6 +276,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Exit successfully when --hermes-home does not exist",
     )
+    parser.add_argument(
+        "--skip-missing-gateway",
+        action="store_true",
+        help="Exit successfully when the selected systemd gateway is not installed",
+    )
     parser.add_argument("--json", action="store_true", help="Emit JSON report")
     return parser.parse_args(argv)
 
@@ -271,6 +290,9 @@ def main(argv: list[str] | None = None) -> int:
     home = Path(args.hermes_home).expanduser()
     if args.skip_missing_home and not home.exists():
         print(f"Hermes home not installed; skipping: {home}")
+        return 0
+    if args.skip_missing_gateway and not gateway_service_exists(args.gateway_service):
+        print(f"Hermes gateway not installed; skipping: {args.gateway_service}")
         return 0
     report = assess_health(
         home,

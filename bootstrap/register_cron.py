@@ -15,6 +15,7 @@ executing them.
 
 Usage:
   python bootstrap/register_cron.py --dry-run
+  python bootstrap/register_cron.py --name english-podcast-daily
   python bootstrap/register_cron.py
 """
 from __future__ import annotations
@@ -176,12 +177,25 @@ def _parse_args(argv=None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--jobs", default=str(DEFAULT_JOBS))
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--name",
+        action="append",
+        dest="names",
+        help="Register only this job name (repeatable)",
+    )
     return parser.parse_args(argv)
 
 
 def main(argv=None) -> int:
     args = _parse_args(argv)
     jobs = load_jobs(Path(args.jobs))
+    if args.names:
+        requested = set(args.names)
+        known = {job["name"] for job in jobs}
+        unknown = requested - known
+        if unknown:
+            raise SystemExit(f"Unknown cron job name(s): {', '.join(sorted(unknown))}")
+        jobs = [job for job in jobs if job["name"] in requested]
     print(f"Loaded {len(jobs)} cron jobs from {args.jobs}")
     register(jobs, dry_run=args.dry_run)
     return 0

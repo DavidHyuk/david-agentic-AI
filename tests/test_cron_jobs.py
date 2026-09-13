@@ -10,7 +10,7 @@ REPO = Path(__file__).resolve().parent.parent
 JOBS = REPO / "cron" / "jobs.yaml"
 EXPECTED_JOBS = {
     "papers-digest", "interview-prep", "english-intake", "english-drill",
-    "english-weekly-review", "weekly-review",
+    "english-weekly-review", "english-podcast-daily", "weekly-review",
 }
 
 
@@ -114,6 +114,16 @@ def test_english_jobs_use_the_isolated_english_profile():
     assert "english-practice" not in jobs["weekly-review"]["skills"]
 
 
+def test_english_podcast_job_is_daily_at_nine_in_its_own_profile():
+    jobs = {job["name"]: job for job in rc.load_jobs(JOBS)}
+    podcast = jobs["english-podcast-daily"]
+    assert podcast["schedule"] == "0 9 * * *"
+    assert podcast["profile"] == "english-podcast"
+    assert podcast["skills"] == ["english-podcast-coach"]
+    assert "transcript_path" in podcast["prompt"]
+    assert "exactly three short" in podcast["prompt"]
+
+
 def test_calendar_brief_is_not_scheduled_while_integration_is_deferred():
     jobs = rc.load_jobs(JOBS)
     assert "morning-brief" not in {job["name"] for job in jobs}
@@ -200,6 +210,14 @@ def test_register_dry_run_smoke(capsys):
     assert "telegram:<INTERVIEW_TELEGRAM_CHAT_ID>" in out
     assert "telegram:<LEETCODE_TELEGRAM_CHAT_ID>" in out
     assert "telegram:<SYSTEM_DESIGN_TELEGRAM_CHAT_ID>" in out
+
+
+def test_main_can_register_one_named_job(monkeypatch, capsys):
+    captured = []
+    monkeypatch.setattr(rc, "register", lambda jobs, dry_run=False: captured.extend(jobs))
+    assert rc.main(["--jobs", str(JOBS), "--name", "english-podcast-daily"]) == 0
+    assert [job["name"] for job in captured] == ["english-podcast-daily"]
+    assert "Loaded 1 cron jobs" in capsys.readouterr().out
 
 
 def test_interview_coaches_fill_noon_without_replacing_mle_drills():

@@ -70,6 +70,23 @@ jobs:
       access note/free supporting links. Do not log completion without my results.
       Never replace the study item with a generic reminder.
 
+  - name: english-podcast-daily
+    schedule: "0 9 * * *"           # 09:00 daily, after the 08:30 transcript sync
+    profile: english-podcast
+    skills: [english-podcast-coach]
+    prompt: >
+      Deliver today's transcript-grounded English Goal Podcast lesson using the
+      english-podcast-coach skill and Procedure A. First run english_podcast.py
+      prepare with python3 and continue only after confirming its transcript_path
+      exists. Read the shared tutor SRS weaknesses and existing English-profile
+      memories as evidence. Recommend exactly one episode and exactly three short
+      timestamped transcript moments: one honest weakness match when available,
+      one useful new expression, and one listening or natural-phrasing feature.
+      Include the visible clickable YouTube URL, concise Korean explanations,
+      generated examples clearly distinguished from exact excerpts, and a 5-minute
+      practice. Never invent a weakness or use an episode without a downloaded
+      transcript. Mark the assigned video only after composing the complete lesson.
+
   - name: english-intake
     schedule: "0 20 * * 1-6"        # 20:00 Mon-Sat coaching
     profile: english
