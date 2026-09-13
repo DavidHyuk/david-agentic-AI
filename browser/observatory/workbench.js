@@ -102,18 +102,30 @@ const yesNo = [
   ["true", "예"],
   ["false", "아니오"],
 ];
+function telegramComposer(d, suggested = "") {
+  const chat = d.telegram_chat;
+  if (!chat?.available) return "";
+  const key = `hermes-chat-draft:${d.room}`;
+  const draft = localRead(key, suggested);
+  const history = chat.history
+    .map(
+      (message) =>
+        `<div class="chat-bubble ${message.role}"><small>${message.role === "user" ? "나 · HQ" : "Hermes"}</small><p>${linkedText(message.content)}</p></div>`,
+    )
+    .join("");
+  return `<article class="desk-card telegram-chat"><span class="tag">DASHBOARD ↔ TELEGRAM</span><h2>Hermes에게 바로 질문하기</h2><p class="muted">여기서 질문하면 Hermes가 이 작업실 기록을 이어서 답하고, 질문과 답변이 해당 Telegram 그룹에도 표시됩니다.</p><div class="chat-history">${history || '<p class="muted">대시보드에서 시작한 대화가 아직 없습니다.</p>'}</div><form id="telegram-chat-form"><label class="desk-field">질문<textarea id="telegram-chat-message" rows="5" maxlength="4000" required placeholder="Hermes에게 물어볼 내용을 입력하세요.">${esc(draft || "")}</textarea></label><button class="primary">Hermes에게 보내기</button></form></article>`;
+}
 function coachDesk(d) {
   const a = d.pending[0];
   if (!a)
-    return `<article class="desk-card"><span class="tag">TODAY</span><h2>이어갈 미완료 과제가 없습니다</h2><p>학습 기록에 맞춰 오늘의 과제를 배정합니다. 과제 배정은 학습 완료로 기록되지 않습니다.</p><button id="desk-plan" class="primary" ${!d.catalog_available ? "disabled" : ""}>${d.today_assignment?.completed ? "오늘 완료한 과제 확인" : "오늘 과제 준비하기"}</button>${!d.catalog_available ? "<p>커리큘럼 카탈로그가 아직 설치되지 않았습니다.</p>" : ""}</article>`;
+    return `<article class="desk-card"><span class="tag">TODAY</span><h2>${d.today_assignment?.completed ? "오늘 과제를 완료했습니다" : "이어갈 미완료 과제가 없습니다"}</h2><p>${d.today_assignment?.completed ? "한 문제 더 풀고 싶다면 학습 기록에 맞는 다음 과제를 배정할 수 있습니다." : "학습 기록에 맞춰 오늘의 과제를 배정합니다."} 과제 배정은 학습 완료로 기록되지 않습니다.</p><button id="desk-plan" class="primary" ${!d.catalog_available ? "disabled" : ""}>${d.today_assignment?.completed ? "다음 과제 준비하기" : "오늘 과제 준비하기"}</button>${!d.catalog_available ? "<p>커리큘럼 카탈로그가 아직 설치되지 않았습니다.</p>" : ""}</article>`;
   const item = a.item,
     coding = d.track === "coding";
   return `<article class="desk-card mission"><span class="tag">이어하기 · ${esc(a.date)} 배정 · ${a.session_type === "review" ? "복습" : "새 과제"}</span><h2>${esc(item.name || a.item_id)}</h2><p>${esc(coding ? item.goal : item.exercise)}</p><div class="desk-tags"><span>${esc(item.pattern || "System design")}</span><span>목표 ${coding ? 35 : item.target_minutes}분</span><span>결과 미입력</span>${coding ? `<span>기록된 힌트 ${a.hint_level} / 3</span>` : ""}</div>
     <div class="desk-actions">${coding ? safeLink(item.leetcode_url, "LeetCode 문제") + safeLink(item.neetcode_url, "NeetCode 문제") : safeLink(item.url, "Hello Interview")}</div>
     ${coding ? '<p class="muted">먼저 20분 동안 스스로 시도하고, 경계 조건과 시간·공간 복잡도를 설명해 보세요.</p>' : `<ul class="desk-focus">${(item.focus || []).map((f) => `<li>${esc(f)}</li>`).join("")}</ul><p>${esc(item.hermes_connection || "")}</p>${item.access_note ? `<p class="muted">${esc(item.access_note)}</p>` : ""}`}
     <div class="study-timer"><span id="study-time">00:00</span><div><button class="outline" id="timer-toggle">타이머 시작</button><button class="text-button" id="timer-reset">초기화</button></div><small>이 브라우저에서 이어집니다 · 타이머 종료는 완료 처리되지 않습니다</small></div>
-    <details class="desk-help"><summary>Hermes에게 이어서 질문할 내용</summary><textarea id="coach-prompt" readonly>현재 ${esc(item.name || a.item_id)} 과제를 공부 중이야. 과제 ID는 ${esc(a.id)}야. ${coding ? "내 접근 방법을 먼저 물어보고, 요청하면 현재 힌트 단계 다음의 힌트 하나만 줘. 정답부터 보여주지 마." : "내 설계의 요구사항을 먼저 물어보고, 답변을 바탕으로 트레이드오프와 실패 시나리오를 질문해줘."}</textarea><button class="outline" id="copy-coach-prompt">질문 복사</button><small>복사한 내용을 해당 Telegram 방에서 보내면 됩니다.</small></details>
-  </article>
+  </article>${telegramComposer(d, `현재 ${item.name || a.item_id} 과제를 공부 중이야. 과제 ID는 ${a.id}야. ${coding ? "내 접근 방법을 먼저 물어보고, 요청하면 현재 힌트 단계 다음의 힌트 하나만 줘. 정답부터 보여주지 마." : "내 설계의 요구사항을 먼저 물어보고, 답변을 바탕으로 트레이드오프와 실패 시나리오를 질문해줘."}`)}
   <article class="desk-card"><h2>실제 학습 결과 남기기</h2><p class="muted">본인이 보고한 결과만 저장합니다. 저장하면 다음 복습과 주간 리뷰에 반영됩니다.</p><form id="coach-feedback"><div class="feedback-grid">
     ${field("공부한 시간 (분)", "duration", "number", 'min="1" max="1440"')}${selectField(
       "자신감",
@@ -206,6 +218,8 @@ function renderWorkbench(d) {
   else
     body =
       '<article class="desk-card"><h2>프로필 활동</h2><p>이 독립 프로필의 대화·작업 기록을 확인할 수 있습니다.</p></article>';
+  if (!["coding", "design"].includes(d.room) && d.telegram_chat?.available)
+    body += telegramComposer(d);
   const editable = Boolean(deskTitles[d.room]);
   const draft = localRead(draftKey(d.room), null);
   $("bench-content").innerHTML =
@@ -301,6 +315,7 @@ function renderWorkbench(d) {
         "오늘의 과제를 확인했습니다.",
       );
   if ($("coach-feedback")) wireCoach(d);
+  if ($("telegram-chat-form")) wireTelegramChat(d);
 }
 function wireHq(d) {
   const form = $("mission-form");
@@ -433,21 +448,49 @@ function wireCoach(d) {
     );
     if (ok) localWrite(key, null);
   };
-  $("copy-coach-prompt").onclick = async () => {
-    const el = $("coach-prompt");
-    el.focus();
-    el.select();
+  wireTimer(assignment.id);
+}
+function wireTelegramChat(d) {
+  const form = $("telegram-chat-form"),
+    field = $("telegram-chat-message"),
+    key = `hermes-chat-draft:${d.room}`;
+  field.oninput = () => localWrite(key, field.value);
+  form.onsubmit = async (event) => {
+    event.preventDefault();
+    if (bench.busy) return;
+    bench.busy = true;
+    form.querySelector("button").disabled = true;
+    $("bench-status").textContent =
+      "Hermes가 답변을 준비 중입니다. 로컬 모델은 몇 분 걸릴 수 있습니다…";
     try {
-      if (navigator.clipboard && isSecureContext)
-        await navigator.clipboard.writeText(el.value);
-      else if (!document.execCommand("copy")) throw new Error();
-      $("bench-status").textContent =
-        "질문을 복사했습니다. Telegram에서 보내세요.";
-    } catch {
-      $("bench-status").textContent = "선택된 질문을 직접 복사하세요.";
+      const response = await fetch("api/action", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Hermes-Action": "1",
+        },
+        body: JSON.stringify({
+          action: "room_chat",
+          room: d.room,
+          message: field.value,
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok)
+        throw new Error(result.error || "Hermes에게 질문하지 못했습니다.");
+      localWrite(key, null);
+      await loadWorkbench();
+      $("bench-status").textContent = result.delivered
+        ? "Hermes의 답변을 만들고 Telegram 그룹에도 전송했습니다."
+        : `답변은 저장했지만 Telegram 전송에 실패했습니다: ${result.delivery_error}`;
+    } catch (error) {
+      $("bench-status").textContent = error.message;
+    } finally {
+      bench.busy = false;
+      if ($("telegram-chat-form"))
+        $("telegram-chat-form").querySelector("button").disabled = false;
     }
   };
-  wireTimer(assignment.id);
 }
 function wireTimer(id) {
   const key = "hermes-timer:" + id;

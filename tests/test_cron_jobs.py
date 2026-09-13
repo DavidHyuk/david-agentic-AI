@@ -37,6 +37,13 @@ def test_papers_digest_uses_dedicated_telegram_chat_from_environment():
     assert cmd[cmd.index("--deliver") + 1] == "telegram:-1001234567890"
 
 
+def test_papers_digest_runs_twice_weekly_and_selects_three():
+    jobs = {job["name"]: job for job in rc.load_jobs(JOBS)}
+    papers = jobs["papers-digest"]
+    assert papers["schedule"] == "30 8 * * 2,5"
+    assert "exactly the three hottest high-signal papers" in papers["prompt"]
+
+
 def test_interview_system_design_and_leetcode_use_separate_topic_chats():
     jobs = {job["name"]: job for job in rc.load_jobs(JOBS)}
     assert jobs["interview-prep"]["deliver_chat_id_env"] == (
@@ -205,7 +212,7 @@ def test_interview_coaches_fill_noon_without_replacing_mle_drills():
         assert not jobs[name].get('profile')
         assert jobs[name]['deliver'] == 'telegram'
     assert 'interview_trends.py' in jobs['interview-prep']['prompt']
-    assert jobs['papers-digest']['schedule'] == '30 8 * * *'
+    assert jobs['papers-digest']['schedule'] == '30 8 * * 2,5'
     assert jobs['english-drill']['schedule'] == '0 21 * * *'
 
 

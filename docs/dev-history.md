@@ -3,6 +3,49 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.8.1 — 2026-09-13 (patch: focus the paper digest)
+
+- Reduced the paper digest from daily delivery to Tuesday and Friday at 08:30,
+  while retaining daily metadata ingestion so each run sees fresh candidates.
+- Limited each scheduled digest to exactly three hottest high-signal papers,
+  ranked using personal relevance, freshness, and Hugging Face popularity.
+- Verified cron, skill-frontmatter, and specialist-staging checks: **28 passed**.
+
+## v1.8.0 — 2026-09-13 (minor: dashboard-to-Telegram room chat)
+
+- Replaced the LeetCode/System Design copy-and-paste prompt with a persistent
+  dashboard composer and added the same direct chat surface to Papers and MLE
+  Interview rooms.
+- Added one durable Hermes API session per room. A submitted question runs under
+  that room's skill and coaching rules, remains visible in the existing session
+  archive, and sends the completed question/answer exchange to the room's fixed
+  Telegram group.
+- Enabled Hermes' official API server on loopback with an installer-generated
+  random key shared only by the gateway and observatory services. API keys,
+  Telegram tokens, and chat IDs stay server-side; browser writes retain the
+  existing Tailscale, same-origin, JSON, and explicit-action checks.
+- Made observatory installation single-writer, reused existing HQ board metadata
+  without a blocking CLI probe, and restart the gateway when its private API
+  service definition changes.
+- Added room routing, fixed-destination, persisted-session, delivery-failure, and
+  local API authentication coverage. Full suite: `pytest -q` — **241 passed**.
+
+## v1.7.1 — 2026-09-11 (patch: track additional same-day coach assignments)
+
+- Added an explicit retry-safe `plan <track> --next` path so a request for one
+  more LeetCode or system-design exercise after today's completion creates a
+  numbered assignment instead of returning the completed daily assignment.
+- Updated the LeetCode workbench to offer **다음 과제 준비하기** after a completed
+  session and to show the resulting assignment as pending. Telegram coaching
+  guidance now requires the same helper path rather than suggesting an untracked
+  problem conversationally.
+- Added the state-backed next-problem rule to the default Telegram identity and
+  coding specialist identity so it applies before either one names an exercise.
+- Made observatory installs single-writer and skip the blocking Hermes board-list
+  probe when the versioned HQ board metadata already exists.
+- Verified same-day sequencing, retry idempotency, workbench visibility, Python
+  compilation, JavaScript syntax, and the full suite: `pytest -q` — **237 passed**.
+
 ## v1.7.0 — 2026-09-11 (minor: HQ multi-agent orchestration)
 
 - Turned Hermes HQ into a real command center backed by Hermes' durable Kanban

@@ -26,7 +26,9 @@ import subprocess
 import sys
 import os
 import tempfile
+from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, urlsplit
+from urllib.request import Request, urlopen
 from zoneinfo import ZoneInfo
 
 TZ = ZoneInfo('America/Los_Angeles')
@@ -50,6 +52,19 @@ SPECIALIST_ROOMS = {
     'default': 'hq', 'papers': 'papers', 'interview': 'interview',
     'coding': 'coding', 'design': 'design', 'english': 'english',
     'clawgram': 'clawgram',
+}
+TELEGRAM_CHAT_ROOMS = frozenset({'papers', 'interview', 'coding', 'design'})
+ROOM_CHAT_INSTRUCTIONS = {
+    'papers': ('Use the papers-digest skill and answer as the Frontier Radar research specialist. '
+               'Do not send messages; the observatory delivers your final answer.'),
+    'interview': ('Use the interview-prep skill and coach at Staff/Senior MLE interview depth. '
+                  'Do not send messages; the observatory delivers your final answer.'),
+    'coding': ('Use the interview-prep Coding Coach procedure and its persisted assignment state. '
+               'Follow the hint ladder and never reveal a solution before an explicit request after hint 3. '
+               'Do not send messages; the observatory delivers your final answer.'),
+    'design': ('Use the interview-prep System Design Coach procedure. Ask about requirements first, '
+               'then coach trade-offs and failure scenarios from the persisted assignment state. '
+               'Do not send messages; the observatory delivers your final answer.'),
 }
 
 
@@ -83,6 +98,9 @@ def task_prompt(prompt):
 
 
 def room_for(profile, session_id, prompt, jobs):
+    dashboard = re.fullmatch(r'observatory_(papers|interview|coding|design)', session_id)
+    if profile == 'david' and dashboard:
+        return dashboard.group(1)
     if profile != 'david':
         return 'english' if profile == 'english' else profile
     for job in jobs:
@@ -120,12 +138,17 @@ def page(items, offset=0, limit=40):
 
 class Observatory:
     def __init__(self, home: Path, lessons: Path | None = None,
-                 hermes_cli: Path | None = None, board: str = MISSION_BOARD):
+                 hermes_cli: Path | None = None, board: str = MISSION_BOARD,
+                 agent_api_url: str = 'http://127.0.0.1:8642',
+                 agent_api_key: str | None = None):
         self.home = home.resolve()
         self.lessons = lessons or Path.home() / 'english-lessons'
         self.hermes_cli = hermes_cli or Path(os.environ.get(
             'HERMES_CLI', str(Path.home() / '.local/bin/hermes')))
         self.board = board
+        self.agent_api_url = agent_api_url.rstrip('/')
+        self.agent_api_key = (agent_api_key if agent_api_key is not None
+                              else os.environ.get('API_SERVER_KEY', '')).strip()
 
     def profiles(self):
         result = {'david': self.home}
@@ -176,9 +199,11 @@ class Observatory:
             items = {p['id']: p for p in catalog.get('problems' if track == 'coding' else 'system_design', [])}
             pending = [a for a in self.pending_assignments() if a['track'] == track]
             pending.sort(key=lambda a: a['date'], reverse=True)
+            today_assignments = [a for a in state['assignments'].values()
+                                 if a['track'] == track and a['date'] == today]
             data.update(track=track, pending=[{**a, 'item': items.get(a['item_id'], {})} for a in pending],
                         completed=sorted(state[track], key=lambda a: a['date'], reverse=True),
-                        today_assignment=state['assignments'].get(f'{track}:{today}'),
+                        today_assignment=today_assignments[-1] if today_assignments else None,
                         catalog_available=bool(items))
         elif room == 'english':
             cards = list(read_json(self.home / 'data/english/srs_deck.json', {'cards': {}})['cards'].values())
@@ -207,7 +232,120 @@ class Observatory:
                     data['drill'] = found['content']
                     data['drill_session'] = session
                     break
+        if room in TELEGRAM_CHAT_ROOMS:
+            data['telegram_chat'] = {
+                'available': bool(self.agent_api_key and self.telegram_target(room)),
+                'history': self.room_chat_history(room),
+                'session': self.dashboard_session_id(room),
+            }
         return data
+
+    @staticmethod
+    def dashboard_session_id(room):
+        if room not in TELEGRAM_CHAT_ROOMS:
+            raise ValueError('Telegram 대화를 지원하지 않는 작업실입니다.')
+        return 'observatory_' + room
+
+    def telegram_target(self, room):
+        """Resolve only the explicit Telegram destination registered for a room."""
+        if room not in TELEGRAM_CHAT_ROOMS:
+            return None
+        for job in self.jobs('david'):
+            target = str(job.get('deliver', ''))
+            if JOB_ROOMS.get(job.get('name')) == room and re.fullmatch(
+                    r'telegram:-?\d+(?::\d+)?', target):
+                return target
+        return None
+
+    def room_chat_history(self, room, limit=20):
+        """Read the compact user/assistant transcript for a dashboard room."""
+        session_id = self.dashboard_session_id(room)
+        try:
+            conn = self.connect('david')
+            try:
+                rows = conn.execute('''SELECT role,content,timestamp FROM messages
+                    WHERE session_id=? AND role IN ('user','assistant')
+                    AND content IS NOT NULL AND trim(content) != ''
+                    ORDER BY id DESC LIMIT ?''', (session_id, limit)).fetchall()
+            finally:
+                conn.close()
+        except sqlite3.Error:
+            return []
+        return [dict(row) for row in reversed(rows)]
+
+    def agent_api(self, method, path, payload=None, allow_status=()):
+        """Call the key-authenticated Hermes API over loopback only."""
+        if not self.agent_api_key:
+            raise OSError('Hermes 대화 API 키가 설치되지 않았습니다.')
+        body = json.dumps(payload).encode() if payload is not None else None
+        request = Request(self.agent_api_url + path, data=body, method=method, headers={
+            'Authorization': 'Bearer ' + self.agent_api_key,
+            'Content-Type': 'application/json',
+        })
+        try:
+            with urlopen(request, timeout=1200) as response:
+                return json.load(response)
+        except HTTPError as exc:
+            if exc.code in allow_status:
+                return {'_status': exc.code}
+            try:
+                message = json.loads(exc.read()).get('error', {}).get('message', '')
+            except (json.JSONDecodeError, AttributeError):
+                message = ''
+            raise ValueError(message or 'Hermes 대화 요청에 실패했습니다.') from exc
+        except URLError as exc:
+            raise OSError('Hermes 대화 API에 연결할 수 없습니다.') from exc
+
+    def ensure_dashboard_session(self, room):
+        session_id = self.dashboard_session_id(room)
+        found = self.agent_api('GET', '/api/sessions/' + session_id, allow_status=(404,))
+        if found.get('_status') == 404:
+            created = self.agent_api('POST', '/api/sessions', {
+                'id': session_id,
+                'title': dict((key, title) for key, title, *_ in ROOMS)[room] + ' · Dashboard chat',
+            }, allow_status=(409,))
+            if created.get('_status') not in (None, 409):
+                raise OSError('Hermes 대화 세션을 만들 수 없습니다.')
+        return session_id
+
+    def telegram_send(self, target, message):
+        """Deliver through Hermes so the Telegram session also receives a mirror."""
+        if not re.fullmatch(r'telegram:-?\d+(?::\d+)?', target or ''):
+            raise OSError('Telegram 대상을 찾을 수 없습니다.')
+        try:
+            result = subprocess.run(
+                [str(self.hermes_cli), 'send', '--to', target, '--quiet'],
+                input=message, capture_output=True, text=True, timeout=30,
+                env={**os.environ, 'HERMES_HOME': str(self.home)},
+            )
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise OSError('Telegram 그룹에 답변을 전송하지 못했습니다.') from exc
+        if result.returncode:
+            raise OSError('Telegram 그룹에 답변을 전송하지 못했습니다.')
+
+    def room_chat(self, body):
+        """Run one persisted Hermes turn and deliver the exchange to its group."""
+        room = body.get('room')
+        target = self.telegram_target(room)
+        if not target:
+            raise ValueError('이 작업실에 연결된 Telegram 그룹이 없습니다.')
+        message = self.text_field(body, 'message', maximum=4000)
+        session_id = self.ensure_dashboard_session(room)
+        result = self.agent_api('POST', f'/api/sessions/{session_id}/chat', {
+            'message': message,
+            'instructions': ROOM_CHAT_INSTRUCTIONS[room],
+        })
+        response = str(result.get('message', {}).get('content', '')).strip()
+        if not response:
+            raise OSError('Hermes가 답변을 만들지 못했습니다.')
+        delivery = f'🖥 HQ에서 보낸 질문\n{message}\n\n🤖 Hermes\n{response}'
+        try:
+            self.telegram_send(target, delivery)
+            delivered, delivery_error = True, ''
+        except OSError as exc:
+            delivered, delivery_error = False, str(exc)
+        return {'saved': True, 'session': session_id, 'response': response,
+                'delivered': delivered, 'delivery_error': delivery_error}
 
     def kanban(self, arguments, *, timeout=20, json_output=True):
         """Call only fixed Hermes Kanban subcommands against the HQ board."""
@@ -274,7 +412,7 @@ class Observatory:
             args = ['--state', str(self.home / 'data/interview/coach_state.json'),
                     '--catalog', str(self.catalog_path()), '--date', today]
             if action == 'plan':
-                args += ['plan', track, '--format', 'json']
+                args += ['plan', track, '--next', '--format', 'json']
             else:
                 assignment = body.get('assignment')
                 row = self.coach_state()['assignments'].get(assignment)
@@ -315,6 +453,8 @@ class Observatory:
                 '--expected-reviews', str(body['expected_reviews'])])}
         if action in ('note', 'bookmark', 'paper_read'):
             return self.save_notebook(body)
+        if action == 'room_chat':
+            return self.room_chat(body)
         if isinstance(action, str) and action.startswith('mission_'):
             return self.mission_action(body)
         raise ValueError('허용되지 않은 동작입니다.')

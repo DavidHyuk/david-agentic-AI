@@ -1,7 +1,7 @@
 ---
 name: interview-prep
 description: Drive David's Staff/Senior ML Engineer interview prep in Silicon Valley with company-aware planning, focused drills, NeetCode/LeetCode foundations, practical coding strategy, Hello Interview system design, and adaptive progress.
-version: 1.2.0
+version: 1.2.1
 metadata:
   hermes:
     category: career
@@ -28,6 +28,7 @@ metadata:
 - The Coding Coach (Tue/Thu/Sat noon), System Design Coach (Sunday noon), or
   Sunday weekly review fires; David replies with attempts, hints, or study results.
 - David asks for a drill, a mock question, a topic explainer, or resources.
+- David asks for another/new coding problem after completing today's assignment.
 - David asks how to prioritize LeetCode, practical coding, system design, or
   preparation for a particular company. Read
   `references/company-coding-strategy.md` before answering.
@@ -118,6 +119,12 @@ foundation phase; do not imply that a scheduled Practical Coding track is active
 until its catalog, progress tracking, and job have actually been added.
 
 1. Run `python3 ~/.hermes/scripts/interview_progress.py plan coding`.
+   If David explicitly asks for another/new problem after completing today's
+   assignment, run
+   `python3 ~/.hermes/scripts/interview_progress.py plan coding --next` instead.
+   This creates a numbered same-day assignment or returns the already-open next
+   assignment on retry. Never propose an untracked replacement problem from
+   memory or the catalog alone.
 2. Send the returned study message as the scheduled Telegram response, preserving
    the concrete problem, pattern, goal, 35-minute target, **both canonical URLs**,
    20-minute no-AI rule, and invitation to ask for a hint. It is actual study
@@ -157,7 +164,8 @@ For **all coding**, never reveal the solution first. Give one hint per request:
 
 For a coach assignment, get its ID with
 `python3 ~/.hermes/scripts/interview_progress.py plan coding --format json`.
-For a reply to an older push, use its `coding:YYYY-MM-DD` ID; inspect the state
+For a reply to an older push, use its `coding:YYYY-MM-DD` ID (or the numbered
+same-day form such as `coding:YYYY-MM-DD:2`); inspect the state
 file when the date is unclear and ask which attempt if necessary. Do not create
 an unrelated new assignment just to log old feedback.
 Before giving each hint, run:

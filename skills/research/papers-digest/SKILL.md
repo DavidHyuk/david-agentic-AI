@@ -1,7 +1,7 @@
 ---
 name: papers-digest
 description: Surface and analyze fresh arXiv and Hugging Face LLM/LVM research from David's local paper catalog, tying findings to his Staff/Senior MLE interview prep.
-version: 2.0.2
+version: 2.0.3
 platforms: [linux, macos]
 metadata:
   hermes:
@@ -17,7 +17,7 @@ metadata:
 # Papers Digest
 
 ## When to Use
-- The scheduled daily research brief fires.
+- The scheduled Tuesday/Friday research brief fires.
 - David asks "what's new in LLMs/LVMs", "anything worth reading", or about a
   specific recent paper.
 - You want to ground interview-prep topics in current research.
@@ -37,7 +37,9 @@ metadata:
    run `python3 ~/.hermes/scripts/papers_ingest.py --status`. State the last run
    status and latest paper date. Do not launch scrapers from an interactive agent
    session; the independent `hermes-papers-ingest.timer` owns collection.
-3. **Add value the script can't.** For the top 2–3 papers, write 1–2 lines on:
+3. **Add value the script can't.** For scheduled pushes, select exactly the top
+   three hottest high-signal papers using personal relevance, freshness, and
+   Hugging Face popularity. For those three papers, write 1–2 lines on:
    - the core idea / why it matters,
    - how it connects to a Staff/Senior MLE interview topic (system design,
      scaling, evaluation, multimodal serving, agents), and
@@ -47,7 +49,7 @@ metadata:
    legacy imported rows may also have an existing `pdf_path`.
 
 ## Output Format
-- Lead with a one-line "today's signal" takeaway.
+- Lead with a one-line "research signal" takeaway.
 - Then the digest list (title · upvotes · date · 1-line why-it-matters ·
   interview angle · canonical URL).
 - Include one explicit, clickable `https://...` URL for **every** paper. Put the
@@ -55,6 +57,8 @@ metadata:
   a paper item without its source URL.
 - Keep it skimmable for Telegram. Put long analysis behind a follow-up, not in the
   scheduled push.
+- Scheduled pushes contain exactly three papers. Interactive requests may use a
+  different count when David asks for one.
 
 ## Pitfalls
 - The `upvotes` column may be missing on old DBs — the helper already falls back to
@@ -71,3 +75,5 @@ metadata:
 - Every listed paper has a visible canonical URL copied from the helper output.
 - Ingestion freshness is visible from `papers_ingest.py --status`.
 - Each highlighted paper has an interview-relevance angle.
+- A scheduled digest contains exactly three papers when at least three eligible
+  fresh papers exist.

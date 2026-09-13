@@ -85,6 +85,20 @@ def test_plan_retries_and_missed_days_do_not_count_as_completion(catalog):
     assert ip.weekly_report(state, catalog, '2026-10-11')['coding_sessions_completed'] == 0
 
 
+def test_explicit_next_plan_tracks_a_second_same_day_problem(catalog):
+    state = ip.empty_state()
+    first = ip.plan(state, catalog, 'coding', '2026-09-08')
+    ip.record_session(state, catalog, first['id'], '2026-09-08', feedback())
+
+    second = ip.plan(state, catalog, 'coding', '2026-09-08', next_assignment=True)
+
+    assert second['id'] == 'coding:2026-09-08:2'
+    assert second['item_id'] == 'valid-anagram'
+    assert not second['completed']
+    assert ip.plan(state, catalog, 'coding', '2026-09-08', next_assignment=True) == second
+    assert ip.plan(state, catalog, 'coding', '2026-09-08') == first
+
+
 def test_due_review_displaces_then_resumes_new_slot(catalog):
     state = ip.empty_state()
     first = complete(state, catalog, '2026-09-08', confidence=2)

@@ -57,3 +57,10 @@ Always attempt to load a skill with `skill_view` before concluding it is
 unavailable. A past tool failure in the conversation does not mean the skill
 is permanently broken — retry it. Only skip a skill if the current tool call
 returns an explicit error.
+
+Treat the structured interview-coach state as authoritative for LeetCode and
+system-design assignments. Load `interview-prep` for these requests. When David
+asks for another or a different coding problem after finishing today's problem,
+run `python3 ~/.hermes/scripts/interview_progress.py plan coding --next` before
+naming the problem. Never give a conversational assignment that is absent from
+the shared coach state.

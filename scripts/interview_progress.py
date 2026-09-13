@@ -131,11 +131,30 @@ def select_item(state: dict, catalog: dict, track: str, today: str) -> dict:
             'session_type': 'review' if item_id in latest else 'new'}
 
 
-def plan(state: dict, catalog: dict, track: str, today: str) -> dict:
+def plan(state: dict, catalog: dict, track: str, today: str,
+         next_assignment: bool = False) -> dict:
+    """Return the daily assignment or open one more after today's completion.
+
+    Normal scheduled planning stays idempotent for the whole day.  An explicit
+    next-assignment request reuses any unfinished assignment from today and only
+    advances after every assignment for the track and date is complete.
+    """
     date.fromisoformat(today)
-    assignment_id = f'{track}:{today}'
-    if assignment_id in state['assignments']:
-        return state['assignments'][assignment_id]
+    daily_id = f'{track}:{today}'
+    if not next_assignment and daily_id in state['assignments']:
+        return state['assignments'][daily_id]
+    today_assignments = [assignment for assignment in state['assignments'].values()
+                         if assignment['track'] == track and assignment['date'] == today]
+    if next_assignment:
+        unfinished = [assignment for assignment in today_assignments
+                      if not assignment['completed']]
+        if unfinished:
+            return unfinished[-1]
+    assignment_id = daily_id
+    sequence = 2
+    while assignment_id in state['assignments']:
+        assignment_id = f'{daily_id}:{sequence}'
+        sequence += 1
     selection = select_item(state, catalog, track, today)
     # Preserve hint/solution exposure if an unfinished exercise is pushed again.
     previous = [a for a in state['assignments'].values()
@@ -297,6 +316,8 @@ def parse_args(argv=None) -> argparse.Namespace:
     sub = parser.add_subparsers(dest='command', required=True)
     select = sub.add_parser('plan')
     select.add_argument('track', choices=TRACKS)
+    select.add_argument('--next', action='store_true', dest='next_assignment',
+                        help="open another assignment after today's completed work")
     select.add_argument('--format', choices=('text', 'json'), default='text')
     for command in ('hint', 'solution'):
         assistance = sub.add_parser(command)
@@ -333,7 +354,7 @@ def main(argv=None) -> int:
             state = load_state(path)
             before = deepcopy(state)
             if args.command == 'plan':
-                result = plan(state, catalog, args.track, args.date)
+                result = plan(state, catalog, args.track, args.date, args.next_assignment)
                 output = render_message(result, catalog) if args.format == 'text' else json.dumps(result, indent=2)
             elif args.command in ('hint', 'solution'):
                 result = record_hint(state, args.assignment, args.command == 'solution')

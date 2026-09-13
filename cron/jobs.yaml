@@ -13,14 +13,15 @@ defaults:
 
 jobs:
   - name: papers-digest
-    schedule: "30 8 * * *"           # 08:30 daily, after the 08:00 ingestion timer
+    schedule: "30 8 * * 2,5"         # 08:30 Tue/Fri, after the daily 08:00 ingestion timer
     skills: [papers-digest]
     deliver_chat_id_env: PAPERS_TELEGRAM_CHAT_ID
     prompt: >
-      Send my daily LLM/LVM research signal. Use the papers-digest skill: pull
-      recommended papers from the last four days plus today's Hugging Face
-      popularity signal, lead with a one-line takeaway, then list at most five
-      items with a one-line why-it-matters and an interview-relevance angle for
+      Send my twice-weekly LLM/LVM research signal. Use the papers-digest skill:
+      pull recommended papers from the last four days plus today's Hugging Face
+      popularity signal, select exactly the three hottest high-signal papers,
+      lead with a one-line takeaway, then give each item a one-line
+      why-it-matters and an interview-relevance angle for
       Staff/Senior MLE. Include a visible clickable canonical https URL on its
       own Link line for every paper; never send a paper without its URL. If the
       catalog is stale, report its ingestion status instead of launching a

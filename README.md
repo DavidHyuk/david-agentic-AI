@@ -6,7 +6,7 @@ A personalized, always-on AI partner for **David Choi**, built on the
 with research and interview preparation delivered to the David **Telegram**
 bot, plus English feedback delivered to a dedicated English **Telegram** bot:
 
-1. **LLM/LVM research** — daily arXiv + Hugging Face ingestion and a personalized digest.
+1. **LLM/LVM research** — daily arXiv + Hugging Face ingestion and a personalized twice-weekly digest.
 2. **Staff/Senior MLE interview prep** — MLE drills plus beginner coding and system-design study delivered daily at noon.
 3. **English practice** — turns tutor recordings + corrections into spaced-repetition drills.
 
@@ -524,7 +524,7 @@ coding, and system-design progress.
 
 | Job | When (local) | What |
 |---|---|---|
-| `papers-digest` | 08:30 daily | Dedicated paper group: LLM/LVM research signal after 08:00 ingestion |
+| `papers-digest` | 08:30 Tue/Fri | Dedicated paper group: three hottest LLM/LVM papers after 08:00 ingestion |
 | `interview-prep` | 12:00 Mon/Wed/Fri | Interview group: one focused Staff/Senior MLE drill |
 | `coding-coach` | 12:00 Tue/Thu/Sat | LeetCode group: 35-minute beginner problem with canonical links |
 | `system-design-coach` | 12:00 Sunday | System-design group: Hello Interview exercise |
@@ -796,7 +796,8 @@ The first screen refreshes every ten seconds. Click a campus room to open its
 workbench; its history button opens the room's saved conversations.
 
 - **LeetCode / System Design**: resume unfinished assignments, prepare today's
-  assignment, use a timer, and submit actual practice results. Coding feedback
+  assignment, or open another same-day assignment after completing one; use a
+  timer and submit actual practice results. Coding feedback
   records duration, confidence, hints and solution use; design feedback records
   your self-assessment and improvement notes. These update the existing coach
   state and review schedule. Opening a room alone does not assign or complete work.
@@ -806,6 +807,10 @@ workbench; its history button opens the room's saved conversations.
   read or unread. Original links open the source paper.
 - **MLE Interview**: reopen the latest saved drill and keep your answer in room
   notes.
+- **Dashboard chat**: Papers, MLE Interview, LeetCode, and System Design each
+  have a persistent **Hermes에게 바로 질문하기** composer. Hermes answers with
+  that room's coaching rules, retains the dashboard conversation as a normal
+  session, and posts the question and answer to the matching Telegram group.
 - **HQ Command Center**: submit a goal with context and priority. Hermes' Kanban
   decomposer turns it into a dependency graph, routes work to the `papers`,
   `interview`, `coding`, `design`, `english`, or existing `clawgram` profile, and asks the default HQ
@@ -817,10 +822,11 @@ workbench; its history button opens the room's saved conversations.
   **기록 보관소 → 캠퍼스 노트 · 읽기 활동**. Unsaved note/form drafts, timer state,
   and the last opened room are retained in that browser's local storage.
 
-Study workbenches use existing saved content and deterministic helpers. The
-question-copy button prepares context to paste into Telegram. HQ missions are the
-explicit path that invokes models and agents; submitting **계획 · 실행 시작** places
-real work on the private `hermes-hq` board. Automatic grading is not used.
+Study workbenches use existing saved content and deterministic helpers. Sending
+a dashboard chat message explicitly invokes Hermes through its key-authenticated
+loopback API; the browser never receives that key or a Telegram token. HQ missions
+are the orchestration path; submitting **계획 · 실행 시작** places real work on the
+private `hermes-hq` board. Automatic grading is not used.
 
 Use **대화 & 작업 기록** to search message text, titles, or tool names, select a
 profile/room/date range, and page through transcripts and tool calls. An absent
@@ -837,8 +843,9 @@ their external project databases are not integrated or modified.
 
 Sources are existing `state.db`, `sessions/sessions.json`, `gateway_state.json`,
 `cron/jobs.json`, `cron/output/`, `memories/{MEMORY,USER}.md`, shared paper/learning
-data and `~/english-lessons/`. SQLite connections use read-only/query-only mode.
-The app never sends Telegram messages. Explicit study actions call the existing
+data and `~/english-lessons/`. SQLite archive connections use read-only/query-only
+mode. Explicit dashboard chat submissions are the only workbench action that runs
+Hermes and posts to a Telegram group. Other explicit study actions call the existing
 `interview_progress.py` and `english_srs.py` helpers; notes and reading activity
 are stored in `~/.hermes/data/observatory/workspace.json`. HQ tasks, dependencies,
 comments, worker attempts, failures, and results are retained by Hermes under
@@ -847,6 +854,14 @@ same-origin JSON request with the action header and validated inputs. Coach
 feedback is idempotent; SRS reviews use locking and a review counter to reject
 stale retries; notebook revisions prevent stale overwrites across devices. Mission
 creation also has an idempotency key so a network retry cannot duplicate a goal.
+
+The installer creates a private random API key at
+`~/.hermes/observatory/api.env`, enables Hermes' API server on
+`127.0.0.1:8642`, and gives only the gateway and observatory services access to
+that file. The browser connects only to the observatory on port 8788. Dashboard
+chat delivery is restricted to the four explicit Telegram destinations already
+registered by the cron configuration; chat IDs and bot credentials are not
+returned to the browser.
 The app excludes system
 message rows, private reasoning columns, request dumps, auth/config files, audio,
 compressed logs, and text attachments larger than 2 MB. Recognizable credentials

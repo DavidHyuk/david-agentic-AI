@@ -79,6 +79,7 @@ def test_recreated_cron_uses_task_not_injected_skill():
     assert room_for('david', 'cron_old_20260911', prompt, []) == 'coding'
     assert room_for('english', 'cron_old', prompt, []) == 'english'
     assert room_for('david', 'chat', prompt, []) == 'hq'
+    assert room_for('david', 'observatory_coding', '', []) == 'coding'
 
 
 def test_redaction_preserves_metrics_but_masks_credentials():
@@ -189,6 +190,66 @@ def test_workbench_get_never_assigns_or_completes(study_store):
     assert not (study_store.home / 'data/observatory/workspace.json').exists()
 
 
+def test_room_chat_uses_fixed_destination_and_persisted_agent_session(store, monkeypatch):
+    store.agent_api_key = 'local-secret'
+    calls = []
+    deliveries = []
+
+    def agent_api(method, path, payload=None, allow_status=()):
+        calls.append((method, path, payload, allow_status))
+        if method == 'GET':
+            return {'_status': 404}
+        if path == '/api/sessions':
+            return {'session': {'id': payload['id']}}
+        return {'message': {'role': 'assistant', 'content': '먼저 접근 방법을 설명해 주세요.'}}
+
+    monkeypatch.setattr(store, 'agent_api', agent_api)
+    monkeypatch.setattr(store, 'telegram_send', lambda target, text: deliveries.append((target, text)))
+    message = '현재 문제 접근을 봐줘; touch /tmp/never'
+    result = store.study_action({'action': 'room_chat', 'room': 'coding', 'message': message})
+
+    assert result['session'] == 'observatory_coding'
+    assert result['delivered'] is True
+    assert calls[1][2]['id'] == 'observatory_coding'
+    assert calls[2][1] == '/api/sessions/observatory_coding/chat'
+    assert calls[2][2]['message'] == message
+    assert 'hint ladder' in calls[2][2]['instructions']
+    assert deliveries[0][0] == 'telegram:-12'
+    assert message in deliveries[0][1] and result['response'] in deliveries[0][1]
+
+
+def test_room_chat_rejects_unmapped_rooms_and_preserves_answer_on_delivery_failure(store, monkeypatch):
+    store.agent_api_key = 'local-secret'
+    with pytest.raises(ValueError, match='연결된 Telegram'):
+        store.study_action({'action': 'room_chat', 'room': 'hq', 'message': 'hello'})
+    with pytest.raises(ValueError):
+        store.study_action({'action': 'room_chat', 'room': 'coding', 'message': ''})
+
+    monkeypatch.setattr(store, 'ensure_dashboard_session', lambda room: 'observatory_coding')
+    monkeypatch.setattr(store, 'agent_api', lambda *args, **kwargs: {
+        'message': {'content': 'Saved answer'}})
+    monkeypatch.setattr(store, 'telegram_send', lambda *args: (_ for _ in ()).throw(
+        OSError('Telegram 그룹에 답변을 전송하지 못했습니다.')))
+    result = store.room_chat({'room': 'coding', 'message': 'question'})
+    assert result['response'] == 'Saved answer'
+    assert result['delivered'] is False
+    assert '전송하지 못했습니다' in result['delivery_error']
+
+
+def test_dashboard_chat_history_and_fixed_telegram_target(store):
+    conn = sqlite3.connect(store.home / 'state.db')
+    conn.execute("INSERT INTO sessions VALUES('observatory_coding','api_server','Chat',1789152000,NULL,NULL,'local',2,0,1,1)")
+    conn.execute("INSERT INTO messages VALUES(5,'observatory_coding','user','question',NULL,NULL,1789152001,NULL)")
+    conn.execute("INSERT INTO messages VALUES(6,'observatory_coding','assistant','answer',NULL,NULL,1789152002,NULL)")
+    conn.commit()
+    conn.close()
+
+    assert [row['content'] for row in store.room_chat_history('coding')] == ['question', 'answer']
+    assert store.sessions(room='coding')['items'][0]['id'] == 'observatory_coding'
+    with pytest.raises(OSError, match='대상'):
+        store.telegram_send('telegram:not-a-chat', 'message')
+
+
 def test_plan_feedback_and_retries_use_shared_coach_rules(study_store):
     assignment = study_store.study_action({'action': 'plan', 'track': 'coding'})['result']
     assert not assignment['completed']
@@ -206,6 +267,14 @@ def test_plan_feedback_and_retries_use_shared_coach_rules(study_store):
     assert len(state['coding']) == 1
     assert not study_store.workbench('coding')['pending']
     assert state['coding'][0]['next_review_date'] > state['coding'][0]['date']
+
+    next_assignment = study_store.study_action({'action': 'plan', 'track': 'coding'})['result']
+    assert next_assignment['id'].endswith(':2')
+    assert next_assignment['item_id'] == 'valid-anagram'
+    bench = study_store.workbench('coding')
+    assert bench['pending'][0]['id'] == next_assignment['id']
+    assert bench['today_assignment'] == next_assignment
+    assert study_store.study_action({'action': 'plan', 'track': 'coding'})['result'] == next_assignment
 
 
 def test_feedback_rejects_bad_track_values_and_changed_retries(study_store):

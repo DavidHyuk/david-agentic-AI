@@ -130,6 +130,36 @@
   margin-top: 10px;
   min-height: 120px;
 }
+
+.telegram-chat {
+  margin-top: 18px;
+}
+
+.chat-history {
+  display: grid;
+  gap: 10px;
+  max-height: 420px;
+  margin: 16px 0;
+  overflow-y: auto;
+}
+
+.chat-bubble {
+  width: min(88%, 680px);
+  padding: 12px 14px;
+  border: 2px solid var(--ink);
+  background: #fffdf5;
+  box-shadow: 3px 3px 0 color-mix(in srgb, var(--ink) 25%, transparent);
+}
+
+.chat-bubble.user {
+  justify-self: end;
+  background: #e8f1dc;
+}
+
+.chat-bubble p {
+  margin: 5px 0 0;
+  white-space: pre-wrap;
+}
 .desk-help small {
   display: block;
   color: var(--muted);

@@ -15,7 +15,7 @@ DGX Spark (128GB VRAM)
         └── Qwen3.6-35B-A3B-FP8 (128K 컨텍스트)
                 │
                 ├── David Hermes gateway ── David Telegram bot
-                │     ├── dedicated paper group: daily papers digest
+                │     ├── dedicated paper group: Tue/Fri top-three papers digest
                 │     ├── dedicated interview group: Staff / MLE drill
                 │     ├── dedicated system-design group: architecture coach
                 │     ├── dedicated LeetCode group: coding coach
@@ -133,7 +133,7 @@ David-Agent/
 │   ├── Qwen/                  # Qwen 계열 모델
 │   └── MiniMax/               # MiniMax-M2.7 모델
 │
-├── tests/                     # pytest 테스트 (236개)
+├── tests/                     # pytest 테스트 (241개)
 │   ├── conftest.py
 │   ├── test_papers_ingest.py
 │   ├── test_papers_digest.py
@@ -209,7 +209,7 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 
 | 잡 | 시간 | 내용 |
 |----|------|------|
-| `papers-digest` | 08:30 매일 | 전용 Telegram 논문 그룹: LLM/LVM 연구 시그널 |
+| `papers-digest` | 08:30 화/금 | 전용 Telegram 논문 그룹: 가장 핫한 LLM/LVM 논문 3편 |
 | `interview-prep` | 12:00 월/수/금 | 전용 Interview 그룹: 실시간 트렌드 기반 Staff 레벨 드릴 1개 |
 | `coding-coach` | 12:00 화/목/토 | 전용 LeetCode 그룹: 35분 문제·목표·canonical URL |
 | `system-design-coach` | 12:00 일요일 | 전용 System Design 그룹: Hello Interview 설계 과제 |
@@ -327,6 +327,12 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   과제 재개, 타이머, 실제 연습 결과 제출을 제공하고, English는 정답 확인과
   SRS 채점, Papers는 읽기 목록과 읽음 표시를 제공합니다. MLE는 저장된
   드릴과 답안 노트, HQ는 미완료 과제·복습 카드·읽을 논문을 모아 보여줍니다.
+  오늘 과제를 완료한 뒤 한 문제를 더 요청하면 번호가 붙은 당일 과제로
+  저장되어 Telegram과 작업실이 같은 미완료 상태를 봅니다.
+- Papers, MLE Interview, LeetCode, System Design 작업실에는 방별 영속 세션을
+  사용하는 직접 대화 입력창이 있습니다. 로컬 Hermes API로 답을 만든 뒤
+  질문과 답을 해당 Telegram 그룹에도 기록합니다. 브라우저에는 API key,
+  bot token, chat ID를 노출하지 않습니다.
 - 명시적인 저장 요청만 기존 `interview_progress.py` / `english_srs.py`를
   호출합니다. 피드백은 중복 완료를 방지하며 SRS는 파일 잠금·리뷰 횟수로
   동시 저장과 오래된 채점을 보호합니다. 노트·읽기 활동은
@@ -340,8 +346,7 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   최종 결과를 종합합니다. 작업 카드에서 댓글, 재배정, 중지, 재시도가 가능합니다.
 - 전문 프로필은 repo의 SOUL과 허용 skill만 배포하는 headless agent이며 별도
   Telegram gateway를 실행하지 않습니다. 로컬 Qwen의 안정성을 위해 dispatcher는
-  동시 worker를 1개로 제한합니다. 질문 복사는 기존처럼 Telegram용 문맥만
-  준비하며 자동 채점은 하지 않습니다.
+  동시 worker를 1개로 제한합니다. 대시보드 대화 역시 자동 채점은 하지 않습니다.
 - 프로필별 `state.db`는 SQLite 읽기 전용으로 조회합니다. gateway PID와
   프로세스 시작 시각으로 가동 여부를 검사하고, 세션 종료 미기록을 실행 중으로
   간주하지 않습니다. cron ID가 바뀐 과거 작업은 저장된 요청으로 분류합니다.
@@ -352,7 +357,8 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
 - `install_observatory.sh`가 `hermes-observatory.service`를 설치하고
   loopback + Tailscale IPv4의 8788 포트만 엽니다. Tailscale 연결 기기에서
   접속하며, 필요 시 별도 8443 HTTPS Serve를 추가할 수 있습니다. 기본 접근
-  제어는 tailnet 정책이며 앱 로그인은 별도로 없습니다.
+  제어는 tailnet 정책이며 앱 로그인은 별도로 없습니다. Hermes agent API는
+  자동 생성 key로 인증하고 `127.0.0.1:8642`에만 열립니다.
 - 캠퍼스와 Mission Board는 10초 간격 조회. 일반 agent replay는 기존 세션
   기록을 사용하고, HQ orchestration은 Kanban DB에 task graph, comment, run,
   outcome을 별도로 보존합니다.
