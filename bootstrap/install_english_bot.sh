@@ -8,6 +8,12 @@ ENGLISH_PROFILE_HOME="$HOME/.hermes/profiles/english"
 ENGLISH_PROFILE_ENV="$ENGLISH_PROFILE_HOME/.env"
 ENGLISH_USER_UNIT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 
+if command -v uv >/dev/null 2>&1; then
+  uv tool install --upgrade 'yt-dlp>=2025.8.22'
+else
+  python3 -m pip install --quiet --user 'yt-dlp>=2025.8.22'
+fi
+
 if ! hermes profile show english >/dev/null 2>&1; then
   hermes profile create english --no-skills \
     --description "English tutor-feedback analysis and SRS coaching, delivered through its own Telegram bot."
@@ -17,6 +23,19 @@ fi
 # incoming messages to the main bot cannot invoke the English workflow.
 python3 "$ENGLISH_INSTALL_SCRIPT_DIR/stage.py"
 python3 "$ENGLISH_INSTALL_SCRIPT_DIR/stage_english_profile.py" --cleanup-default
+
+install -m 0644 \
+  "$ENGLISH_INSTALL_SCRIPT_DIR/hermes-english-podcast-sync.service" \
+  "$ENGLISH_USER_UNIT_DIR/hermes-english-podcast-sync.service"
+install -m 0644 \
+  "$ENGLISH_INSTALL_SCRIPT_DIR/hermes-english-podcast-sync.timer" \
+  "$ENGLISH_USER_UNIT_DIR/hermes-english-podcast-sync.timer"
+systemctl --user daemon-reload
+systemctl --user enable --now hermes-english-podcast-sync.timer
+if ! systemctl --user start hermes-english-podcast-sync.service; then
+  echo "Initial podcast transcript download failed; the 09:00 job will retry."
+  echo "Inspect with: journalctl --user -u hermes-english-podcast-sync.service -n 50"
+fi
 
 if [[ -f "$ENGLISH_PROFILE_ENV" ]] && grep -Eq '^TELEGRAM_BOT_TOKEN=.+$' "$ENGLISH_PROFILE_ENV"; then
   # Hermes currently asks two fixed Linux questions: start now and enable at login.
@@ -33,4 +52,4 @@ fi
 
 # Recreates same-named jobs, removing their prior root-profile versions.
 python3 "$ENGLISH_INSTALL_SCRIPT_DIR/register_cron.py"
-echo "English Telegram profile is staged; its cron jobs target profile=english."
+echo "English Telegram profile is staged with tutor and podcast coaching."

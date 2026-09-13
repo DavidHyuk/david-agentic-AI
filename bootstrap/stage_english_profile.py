@@ -36,6 +36,10 @@ def ensure_profile_environment(home: Path) -> Path:
         "ENGLISH_LESSONS_DIR": str(Path.home() / "english-lessons"),
         "ENGLISH_STATE_PATH": str(Path.home() / ".hermes" / "data" / "english" / "processed.json"),
         "ENGLISH_DECK_PATH": str(Path.home() / ".hermes" / "data" / "english" / "srs_deck.json"),
+        "ENGLISH_PODCAST_DATA_DIR": str(
+            Path.home() / ".hermes" / "data" / "english-podcast"
+        ),
+        "ENGLISH_PODCAST_YT_DLP": str(Path.home() / ".local" / "bin" / "yt-dlp"),
     }
     missing = {key: value for key, value in defaults.items() if key not in existing_keys}
     if not missing:

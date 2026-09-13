@@ -114,11 +114,11 @@ def test_english_jobs_use_the_isolated_english_profile():
     assert "english-practice" not in jobs["weekly-review"]["skills"]
 
 
-def test_english_podcast_job_is_daily_at_nine_in_its_own_profile():
+def test_english_podcast_job_is_daily_at_nine_in_existing_english_profile():
     jobs = {job["name"]: job for job in rc.load_jobs(JOBS)}
     podcast = jobs["english-podcast-daily"]
     assert podcast["schedule"] == "0 9 * * *"
-    assert podcast["profile"] == "english-podcast"
+    assert podcast["profile"] == "english"
     assert podcast["skills"] == ["english-podcast-coach"]
     assert "transcript_path" in podcast["prompt"]
     assert "exactly three short" in podcast["prompt"]

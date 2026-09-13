@@ -272,7 +272,7 @@ def test_main_can_skip_a_profile_without_gateway(hermes_home, monkeypatch, capsy
 
     assert ch.main([
         "--hermes-home", str(hermes_home),
-        "--gateway-service", "hermes-gateway-english-podcast.service",
+        "--gateway-service", "hermes-gateway-missing.service",
         "--skip-missing-gateway",
     ]) == 0
     assert "gateway not installed; skipping" in capsys.readouterr().out

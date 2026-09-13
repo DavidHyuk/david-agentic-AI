@@ -11,15 +11,24 @@ def test_stage_profile_includes_only_english_assets(tmp_path: Path) -> None:
     profile_home = tmp_path / "hermes" / "profiles" / "english"
     report = stage_english_profile.stage_profile(profile_home)
 
-    assert report["skills"] == ["learning/english-practice"]
+    assert sorted(report["skills"]) == [
+        "learning/english-podcast-coach",
+        "learning/english-practice",
+    ]
     assert "english_intake.py" in report["scripts"]
+    assert "english_podcast.py" in report["scripts"]
     assert (profile_home / "SOUL.md").exists()
     assert (profile_home / "skills" / "learning" / "english-practice" / "SKILL.md").exists()
+    assert (
+        profile_home / "skills" / "learning" / "english-podcast-coach" / "SKILL.md"
+    ).exists()
     environment = (profile_home / ".env").read_text()
     assert "TELEGRAM_BOT_TOKEN" not in environment
     assert "ENGLISH_LESSONS_DIR=" in environment
     assert "ENGLISH_STATE_PATH=" in environment
     assert "ENGLISH_DECK_PATH=" in environment
+    assert "ENGLISH_PODCAST_DATA_DIR=" in environment
+    assert "ENGLISH_PODCAST_YT_DLP=" in environment
     config = yaml.safe_load((profile_home / "config.yaml").read_text())
     assert config["skills"]["creation_nudge_interval"] == 0
     assert config["curator"]["enabled"] is False
@@ -36,6 +45,9 @@ def test_stage_profile_removes_runtime_created_skills(tmp_path: Path) -> None:
     assert report["removed_unmanaged_skills"] == ["english-coaching"]
     assert not generated.exists()
     assert (profile_home / "skills" / "learning" / "english-practice" / "SKILL.md").exists()
+    assert (
+        profile_home / "skills" / "learning" / "english-podcast-coach" / "SKILL.md"
+    ).exists()
 
 
 def test_stage_profile_removes_legacy_default_english_skill(tmp_path: Path) -> None:

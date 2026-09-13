@@ -1,10 +1,10 @@
 # 프로젝트 구조 개요 — david-agentic-ai
 
-David Choi의 David, tutor-English, podcast-English Hermes profile을 버전
-관리하는 리포지토리입니다. 이 저장소가 세 profile의 단일 진실 원천이며,
+David Choi의 David 및 English Hermes profile을 버전 관리하는
+리포지토리입니다. 이 저장소가 두 profile의 단일 진실 원천이며,
 `bootstrap/stage.py`는 David profile을 `~/.hermes`로,
-`stage_english_profile.py`와 `stage_english_podcast_profile.py`는 두 English
-profile을 각각의 `~/.hermes/profiles/` 경로로 동기화합니다.
+`stage_english_profile.py`는 tutor와 podcast skill을 함께 가진 English
+profile을 `~/.hermes/profiles/english`로 동기화합니다.
 
 ---
 
@@ -23,9 +23,8 @@ DGX Spark (128GB VRAM)
                 │     ├── private chat: combined weekly review
                 │     └── Chromium CDP :19222
                 │
-                ├── English Hermes gateway ── English Telegram bot
-                │     └── tutor feedback / SRS
-                └── English-podcast gateway ── Podcast English Telegram bot
+                └── English Hermes gateway ── English Telegram bot
+                      ├── tutor feedback / SRS
                       └── downloaded YouTube transcript / personalized lesson
 
 arXiv / Hugging Face
@@ -69,7 +68,6 @@ David-Agent/
 │
 ├── profiles/                  # 격리된 English + headless 전문 에이전트 identity
 │   ├── english/               # 영어 전용 Telegram profile
-│   ├── english-podcast/       # YouTube podcast 영어 전용 Telegram profile
 │   ├── papers/                # 논문·연구 worker SOUL
 │   ├── interview/             # MLE interview worker SOUL
 │   ├── coding/                # coding worker SOUL
@@ -108,10 +106,8 @@ David-Agent/
 │   ├── hermes-cron-watchdog.{service,timer}
 │   ├── hermes-gateway-cron-recovery.conf # gateway 종료 45초 상한
 │   ├── stage_english_profile.py # profile → ~/.hermes/profiles/english
-│   ├── stage_english_podcast_profile.py # profile → ~/.hermes/profiles/english-podcast
 │   ├── stage_specialist_profiles.py # headless 전문 profile staging
 │   ├── install_english_bot.sh # English Telegram bot gateway 설치
-│   ├── install_english_podcast_bot.sh # podcast bot + 자막 timer 설치
 │   ├── hermes-english-podcast-sync.{service,timer} # 08:30 대본 선다운로드
 │   ├── install_observatory.sh # 관제실 UI staging + Tailscale IP 전용 서비스
 │   ├── hermes-gateway-english-vllm.conf # 모델 readiness + 종료 제한
@@ -141,7 +137,7 @@ David-Agent/
 │   ├── Qwen/                  # Qwen 계열 모델
 │   └── MiniMax/               # MiniMax-M2.7 모델
 │
-├── tests/                     # pytest 테스트 (252개)
+├── tests/                     # pytest 테스트 (250개)
 │   ├── conftest.py
 │   ├── test_papers_ingest.py
 │   ├── test_papers_digest.py
@@ -160,7 +156,6 @@ David-Agent/
 │   ├── test_observatory.py    # 기록 조회·HTTP 경계·학습 저장·중복/동시 쓰기
 │   ├── test_auto_git_commit.py # stop 훅 안전 필터·커밋 메시지 검증
 │   ├── test_stage.py          # stage.py 멱등성 검증
-│   ├── test_stage_english_podcast_profile.py # podcast profile 격리·staging
 │   └── test_stage_specialist_profiles.py # 전문 profile 격리·재현성
 │
 └── docs/
@@ -194,8 +189,13 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 | `papers-digest` | research | 새 논문 카탈로그에서 LLM/LVM 후보를 뽑아 인터뷰 관련성과 항목별 원문 링크 제공 |
 | `interview-prep` | career | 월/수/금 Staff MLE 드릴 + 화/목/토 NeetCode/LeetCode 입문 코딩 + 일요일 Hello Interview 설계 코칭 |
 | `english-practice` | English profile / learning | 레슨 녹음/교정 파일 → SRS 카드 생성 + 전용 Telegram bot 매일 리뷰 |
-| `english-podcast-coach` | English-podcast profile / learning | 다운로드한 YouTube 대본 + tutor 취약점 → 09:00 듣기·표현 학습 |
+| `english-podcast-coach` | English profile / learning | 다운로드한 YouTube 대본 + tutor 취약점 → 같은 bot의 09:00 듣기·표현 학습 |
 | `calendar-assistant` | productivity | **비활성/보존** — 추후 Google Calendar 브리핑 |
+
+새 agent형 기능은 audience·credential·privacy·identity/memory·model/tool
+configuration·failure lifecycle을 실제로 분리해야 하는 근거가 없으면 가장 잘
+맞는 기존 profile의 별도 skill과 state path로 추가합니다. 기능 이름만 분리하기
+위해 새 gateway나 Telegram bot token을 만들지 않는 것이 기본 정책입니다.
 
 ### 4. `scripts/` — 결정론적 데이터 레이어
 스킬이 직접 DB 쿼리나 파일 파싱을 하지 않고, 헬퍼 스크립트를 CLI로 호출합니다.
@@ -226,7 +226,7 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 | `interview-prep` | 12:00 월/수/금 | 전용 Interview 그룹: 실시간 트렌드 기반 Staff 레벨 드릴 1개 |
 | `coding-coach` | 12:00 화/목/토 | 전용 LeetCode 그룹: 35분 문제·목표·canonical URL |
 | `system-design-coach` | 12:00 일요일 | 전용 System Design 그룹: Hello Interview 설계 과제 |
-| `english-podcast-daily` | 09:00 매일 | Podcast English bot: 다운로드된 대본 기반 개인화 학습 1편 |
+| `english-podcast-daily` | 09:00 매일 | English bot: 다운로드된 대본 기반 개인화 학습 1편 |
 | `english-intake` | 월–토 20:00 | English bot: 새 피드백 분석 또는 취약 패턴 코칭 |
 | `english-drill` | 21:00 매일 | English bot: SRS 드릴 전달 |
 | `english-weekly-review` | 일요일 20:00 | English bot: tutor feedback + 취약 SRS 누적 복습 |
@@ -255,14 +255,14 @@ Design, Coding Coach는 각각 Interview, System Design, LeetCode 그룹을
 사용합니다. 모든 진도를 함께 다루는 `weekly-review`는 David의 기존 개인
 채팅에 유지됩니다.
 
-`hermes-cron-watchdog.timer`는 5분마다 David와 설치된 두 English profile의
+`hermes-cron-watchdog.timer`는 5분마다 David와 설치된 English profile의
 tick lock과 다음 실행 시각을 각각 검사합니다. lock이 20분 넘게 유지되거나
 다음 실행 시각이 지났으면 해당 profile의 gateway를 재시작하고,
 `hermes-gateway-cron-recovery.conf`가 멈춘 worker의 종료 대기를 45초로
 제한합니다. 따라서 하나의 agent job이 영구 대기해도 이후 스케줄 전체가
 며칠간 조용히 멈추지 않습니다.
 
-두 English profile의 skill은 저장소가 단일 진실 원천입니다. staging은
+English profile의 두 skill은 저장소가 단일 진실 원천입니다. staging은
 런타임에서 자동 생성된 관리 대상 외 skill을 제거하고,
 English profile에서는 background skill creation과 curator를 비활성화합니다.
 
@@ -317,9 +317,10 @@ Hermes가 고정된 `agent-browser 0.33.0`을 통해 연결합니다. 외부 클
 
 ### 방향 2 — 기억(Memory) 품질 향상
 
-David agent는 `~/.hermes/memories/`, 두 English agent는 각각
-`~/.hermes/profiles/english/memories/`와
-`~/.hermes/profiles/english-podcast/memories/`에 독립적으로 기억을 누적합니다.
+David agent는 `~/.hermes/memories/`, English agent는
+`~/.hermes/profiles/english/memories/`에 독립적으로 기억을 누적합니다.
+Tutor와 podcast skill은 이 English memory를 공유하므로 같은 학습자 이해를
+중복 profile 없이 활용합니다.
 profile별 seed-only 정책이 기존 기억을 덮어쓰지 않아 재설치 후에도 누적된
 사용자 이해와 학습 맥락이 보존됩니다.
 
@@ -410,7 +411,7 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
 - 08:30 systemd timer가 LLM과 독립적으로 대본을 먼저 준비하고, 09:00 Hermes
   job은 같은 날짜 assignment를 재사용합니다. 따라서 cron 재시도도 같은 날
   두 영상을 소비하지 않습니다.
-- podcast agent는 tutor SRS deck과 기존 English profile memory를 읽기 전용
+- podcast skill은 tutor SRS deck과 기존 English profile memory를 읽기 전용
   개인화 근거로 사용하며, 근거가 없으면 취약점이라고 주장하지 않습니다.
 
 ### 인터뷰 학습 코치 (interview_progress.py)

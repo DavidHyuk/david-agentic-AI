@@ -72,7 +72,7 @@ jobs:
 
   - name: english-podcast-daily
     schedule: "0 9 * * *"           # 09:00 daily, after the 08:30 transcript sync
-    profile: english-podcast
+    profile: english
     skills: [english-podcast-coach]
     prompt: >
       Deliver today's transcript-grounded English Goal Podcast lesson using the

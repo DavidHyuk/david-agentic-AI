@@ -10,17 +10,16 @@ bot, plus English feedback delivered to a dedicated English **Telegram** bot:
 2. **Staff/Senior MLE interview prep** — MLE drills plus beginner coding and system-design study delivered daily at noon.
 3. **English practice** — turns tutor recordings + corrections into spaced-repetition drills.
 4. **Daily podcast English** — pre-downloads one English Goal Podcast transcript
-   and turns it into a personalized 09:00 listening/expression lesson in a second
-   English Telegram bot.
+   and turns it into a personalized 09:00 listening/expression lesson in the
+   existing English Telegram bot.
 
 Google Calendar support is retained for a later phase, but its skill, MCP
 connection, and scheduled brief are currently disabled.
 
-This repository is the **single source of truth** for the David, tutor-English,
-and podcast-English agent configurations. David-agent assets are synced into
-`~/.hermes` by `bootstrap/stage.py`; the English assets are synced into their
-own profiles by `bootstrap/stage_english_profile.py` and
-`bootstrap/stage_english_podcast_profile.py`.
+This repository is the **single source of truth** for the David and English
+agent configurations. David-agent assets are synced into `~/.hermes` by
+`bootstrap/stage.py`; both tutor and podcast English skills are synced into the
+existing English profile by `bootstrap/stage_english_profile.py`.
 
 ## Why a config repo instead of ad-hoc setup?
 Hermes stores skills, memory, personality, scripts, and cron jobs under `~/.hermes`.
@@ -43,12 +42,8 @@ Local DGX Spark (vLLM @ :8003, Qwen3.6 FP8, 128K ctx)
 
    English Hermes profile ─────────────────────────────────────► English Telegram bot
         │ isolated SOUL / memory / sessions / Telegram token
-        └─ english-practice ─ Kakao webhook → english_intake.py + english_srs.py
-                             → review + SRS drill (~/english-lessons)
-
-   English-podcast profile ─────────────────────────────────────► Podcast English bot
-        │ reads tutor weakness evidence without modifying it
-        └─ english-podcast-coach ─ 08:30 caption download → 09:00 daily lesson
+        ├─ english-practice ─ Kakao webhook → intake + SRS review/drill
+        └─ english-podcast-coach ─ 08:30 transcript → 09:00 personalized lesson
 
  arXiv + Hugging Face ── papers_ingest.py ── SQLite paper catalog
                               ▲
@@ -63,8 +58,7 @@ Local DGX Spark (vLLM @ :8003, Qwen3.6 FP8, 128K ctx)
 | `config/config.fragment.yaml` | Non-secret settings merged into `config.yaml` |
 | `config/env.example` | Template for `~/.hermes/.env` secrets |
 | `skills/<category>/<name>/SKILL.md` | Three David-agent skills (two active, Calendar disabled) |
-| `profiles/english/` | Isolated tutor-feedback English SOUL, memory, config, and skill |
-| `profiles/english-podcast/` | Isolated transcript-backed podcast English profile and skill |
+| `profiles/english/` | Isolated English SOUL, memory, config, tutor skill, and podcast skill |
 | `scripts/*.py` | Standalone, unit-tested helpers (→ `~/.hermes/scripts/`) |
 | `cron/jobs.yaml` | Declarative Telegram notification schedule |
 | `docs/kakao-channel-setup.md` | Kakao Channel chatbot and webhook setup |
@@ -75,8 +69,6 @@ Local DGX Spark (vLLM @ :8003, Qwen3.6 FP8, 128K ctx)
 | `bootstrap/install_cron_watchdog.sh` | Install automatic cron-stall detection and gateway recovery |
 | `bootstrap/stage_english_profile.py` | Stage only the isolated English-coaching Hermes profile |
 | `bootstrap/install_english_bot.sh` | Create/stage the English profile, install its gateway, and sync cron jobs |
-| `bootstrap/stage_english_podcast_profile.py` | Stage only the isolated podcast-English profile |
-| `bootstrap/install_english_podcast_bot.sh` | Install podcast profile, caption timer, gateway, and 09:00 cron |
 | `scripts/english_podcast.py` | Assign one unseen channel video and save JSON3 + timestamped transcript |
 | `scripts/papers_ingest.py` | Fetch and merge arXiv/Hugging Face paper metadata |
 | `scripts/papers_digest.py` | Read-only recommended/recent/trending paper digest |
@@ -137,19 +129,9 @@ Then complete the **interactive, one-time** steps `install.sh` prints:
   bash bootstrap/install_english_bot.sh
   ```
 
-  The English token is stored only in `~/.hermes/profiles/english/.env`.
-- Create a second English bot for daily podcast lessons, then configure it:
-
-  ```bash
-  bash bootstrap/install_english_podcast_bot.sh
-  hermes -p english-podcast gateway setup
-  # Choose Telegram, enter this bot's token, and message the bot once to pair it.
-  bash bootstrap/install_english_podcast_bot.sh
-  ```
-
-  Its token stays only in `~/.hermes/profiles/english-podcast/.env`. The installer
-  enables the independent 08:30 transcript-sync timer and registers only the
-  profile's 09:00 lesson job.
+  The English token is stored only in `~/.hermes/profiles/english/.env`. The same
+  installer enables the 08:30 podcast transcript timer and registers the 09:00
+  lesson in this existing bot; no second token is needed.
 - `bash bootstrap/install_cron_watchdog.sh` → recover automatically from a
   permanently stuck cron worker.
 - Create Telegram groups for papers, MLE interviews, system design, and LeetCode
@@ -552,7 +534,7 @@ coding, and system-design progress.
 | `interview-prep` | 12:00 Mon/Wed/Fri | Interview group: one focused Staff/Senior MLE drill |
 | `coding-coach` | 12:00 Tue/Thu/Sat | LeetCode group: 35-minute beginner problem with canonical links |
 | `system-design-coach` | 12:00 Sunday | System-design group: Hello Interview exercise |
-| `english-podcast-daily` | 09:00 daily | Podcast English bot: one downloaded transcript + personalized three-point lesson |
+| `english-podcast-daily` | 09:00 daily | Existing English bot: one downloaded transcript + personalized three-point lesson |
 | `english-intake` | 20:00 Mon–Sat | Dedicated English bot: feedback analysis or weakness coaching |
 | `english-drill` | 21:00 daily | Dedicated English bot: tonight's spaced-repetition drill |
 | `english-weekly-review` | 20:00 Sunday | Dedicated English bot: tutor feedback + weak SRS cumulative review |
@@ -686,7 +668,7 @@ bash bootstrap/install_english_bot.sh
 
 The first command stages the main and English profiles, removes the main profile's
 former English skill, and tells you to configure the bot when its token is absent.
-Re-running after setup installs the profile gateway and re-syncs the three English
+Re-running after setup installs the profile gateway and re-syncs the four English
 cron jobs with `--profile english`. Papers, interview prep, and the weekly review
 remain on the original bot.
 
@@ -695,36 +677,28 @@ runtime-created skills, while background skill creation and curator maintenance 
 disabled for this profile. Edit `profiles/english/` and stage again for durable
 changes.
 
-### Dedicated English podcast Telegram bot
+### Transcript-backed podcast coaching in the English bot
 
-The podcast coach is a separate Hermes profile and Telegram bot, so its daily
-listening thread does not mix with tutor intake or nightly SRS drills. Install it
-after creating another BotFather bot:
-
-```bash
-bash bootstrap/install_english_podcast_bot.sh
-hermes -p english-podcast gateway setup
-# Choose Telegram, enter the podcast bot token, and message it once.
-bash bootstrap/install_english_podcast_bot.sh
-```
-
-The first run installs `yt-dlp`, stages the profile, and enables
+Podcast coaching is a separate skill and data workflow inside the existing
+English profile. It deliberately reuses the same identity, accumulated learner
+memory, Telegram bot, and chat, so no second BotFather token or gateway is
+needed. `bootstrap/install_english_bot.sh` installs `yt-dlp` and enables
 `hermes-english-podcast-sync.timer`. At 08:30 local time the timer selects the
 newest channel video not previously assigned, preserves its English caption
 JSON3, and writes a timestamped text transcript under
 `~/.hermes/data/english-podcast/`. The 09:00 cron verifies that local transcript,
-reads weakness cards from `~/.hermes/data/english/srs_deck.json` plus the existing
-English profile memories, and sends exactly one episode with three short learning
-moments. It never edits the tutor deck and does not create a lesson if captions
-cannot be downloaded.
+reads weakness cards from `~/.hermes/data/english/srs_deck.json` plus the same
+English profile memory, and sends exactly one episode with three short learning
+moments to the existing English chat. It never edits the tutor deck and does not
+create a lesson if captions cannot be downloaded.
 
 Inspect or retry the deterministic preparation layer directly:
 
 ```bash
 systemctl --user status hermes-english-podcast-sync.timer
-python3 ~/.hermes/profiles/english-podcast/scripts/english_podcast.py status
-python3 ~/.hermes/profiles/english-podcast/scripts/english_podcast.py prepare
-hermes -p english-podcast cron list
+python3 ~/.hermes/profiles/english/scripts/english_podcast.py status
+python3 ~/.hermes/profiles/english/scripts/english_podcast.py prepare
+hermes -p english cron list
 ```
 
 ### Automatic cron recovery
@@ -735,8 +709,8 @@ Install the watchdog once after installing the Hermes gateway:
 bash bootstrap/install_cron_watchdog.sh
 ```
 
-`hermes-cron-watchdog.timer` checks the David profile and both installed English
-profile schedulers every five minutes. A stale next-run timestamp or cron tick lock held
+`hermes-cron-watchdog.timer` checks the David and installed English profile
+schedulers every five minutes. A stale next-run timestamp or cron tick lock held
 longer than 20 minutes triggers a restart of the matching gateway. The installed
 gateway drop-ins cap shutdown at 45 seconds, so a permanently blocked worker
 cannot prevent recovery indefinitely. An English profile or Telegram gateway
@@ -750,32 +724,26 @@ systemctl --user list-timers hermes-cron-watchdog.timer --all
 python3 scripts/cron_health.py
 python3 scripts/cron_health.py --hermes-home ~/.hermes/profiles/english \
   --gateway-service hermes-gateway-english.service
-python3 scripts/cron_health.py --hermes-home ~/.hermes/profiles/english-podcast \
-  --gateway-service hermes-gateway-english-podcast.service
 ```
 
 Check the scheduler and run a Telegram E2E without exposing its token:
 
 ```bash
 systemctl --user is-active \
-  hermes-vllm.service hermes-gateway.service hermes-gateway-english.service \
-  hermes-gateway-english-podcast.service
+  hermes-vllm.service hermes-gateway.service hermes-gateway-english.service
 python3 scripts/cron_health.py
 hermes send --to telegram "[Hermes E2E] Telegram 연결 테스트"
 hermes -p english send --to telegram "[English E2E] Telegram 연결 테스트"
-hermes -p english-podcast send --to telegram "[Podcast English E2E] Telegram 연결 테스트"
 hermes cron list
 hermes -p english cron list
-hermes -p english-podcast cron list
 hermes cron run <JOB_ID_FROM_LIST>
 hermes cron tick
 hermes -p english cron run <ENGLISH_JOB_ID_FROM_LIST>
 ```
 
 `hermes cron list` shows the David bot jobs; `hermes -p english cron list` shows
-the isolated tutor-English jobs; `hermes -p english-podcast cron list` shows the
-09:00 transcript-backed lesson. Run each profile's E2E message only after its
-Telegram bot has completed pairing.
+the isolated tutor-English jobs plus the 09:00 transcript-backed lesson. Run each
+profile's E2E message only after its Telegram bot has completed pairing.
 
 The gateway only starts after `/v1/models` contains
 `Qwen3.6-35B-A3B-FP8`. Calendar is not part of the active agent runtime.

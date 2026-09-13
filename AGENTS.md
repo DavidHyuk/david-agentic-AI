@@ -12,8 +12,9 @@ bot**. Calendar support is
 retained in source but intentionally deferred and disabled. English
 tutor feedback enters through the KakaoTalk Channel chatbot and is processed
 locally before the review and SRS drill are delivered through Telegram.
-An isolated podcast-English profile pre-downloads one English Goal Podcast
-transcript each morning and delivers a separate personalized 09:00 lesson.
+The existing English profile also pre-downloads one English Goal Podcast
+transcript each morning and delivers a personalized 09:00 lesson in the same
+English Telegram chat.
 
 ## Layout
 - `config/soul/SOUL.md` — agent personality (staged to `$HERMES_HOME/SOUL.md`).
@@ -23,9 +24,9 @@ transcript each morning and delivers a separate personalized 09:00 lesson.
   isolated under `profiles/english/skills/`.
 - `profiles/english/` — isolated SOUL, memory, config, and English-practice
   skill, staged to `~/.hermes/profiles/english`.
-- `profiles/english-podcast/` — separate transcript-backed daily podcast coach,
-  staged to `~/.hermes/profiles/english-podcast` and personalized from shared
-  tutor evidence without modifying it.
+- `profiles/english/skills/learning/english-podcast-coach/` — transcript-backed
+  daily podcast workflow that shares the existing English profile, memory, and
+  Telegram bot while keeping download state separate.
 - `scripts/*.py` — standalone helpers staged to `$HERMES_HOME/scripts/` and unit-tested.
 - `cron/jobs.yaml` — declarative Telegram notification schedule.
 - `bootstrap/` — staging, cron registration, and systemd service installers,
@@ -119,6 +120,30 @@ reader to reconstruct it from git history.
 - Prefer explicit over clever; clear small functions are preferred.
 - Name things by what they represent, not how they are implemented.
 - Avoid deep nesting and premature abstractions.
+
+## New Agent and Telegram Routing Policy
+
+When adding an agent-like capability, default to a new skill and cron job on the
+best-matching existing Hermes profile, Telegram bot, and chat. Keep its mutable
+state in a separate data path when that prevents coupling. Do not create a new
+profile, gateway, Telegram bot token, or parallel service merely to give the
+capability a distinct name.
+
+Create a separate profile or bot only when at least one concrete boundary
+requires it:
+
+- a different audience, credential, privacy, or delivery destination;
+- identity or memory isolation that would otherwise contaminate behavior;
+- incompatible model, tool, configuration, security, or lifecycle needs;
+- independent failure/restart isolation with a demonstrated operational value;
+- an explicit user request for a separate bot or profile.
+
+Before introducing a new profile or gateway, check for token polling conflicts,
+duplicate cron delivery, memory and state ownership, staging cleanup behavior,
+watchdog changes, and installation burden. Prefer the design with fewer runtime
+components when it provides equivalent behavior without side effects. Record
+the routing decision in `docs/dev-history.md` and keep
+`docs/project-overview.md` current.
 
 ## Key external paths
 - Subscribe-Papers DB: `/home/david/workspace/Subscribe-Papers/data/papers.db`

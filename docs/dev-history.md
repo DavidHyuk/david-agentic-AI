@@ -5,21 +5,25 @@ semantic versioning (major.minor.patch).
 
 ## v1.9.0 — 2026-09-13 (minor: add transcript-backed podcast English agent)
 
-- Added a second isolated English Hermes profile and Telegram bot for daily
-  English Goal Podcast listening and expression coaching, separate from tutor
-  intake and nightly SRS drills.
+- Added a distinct `english-podcast-coach` skill to the existing English Hermes
+  profile and Telegram chat, sharing its accumulated learner memory and bot token
+  while keeping podcast download state separate from tutor intake and SRS data.
 - Added an 08:30 systemd prefetch timer that selects one newest unassigned
   channel video, preserves its English YouTube caption JSON3, and generates a
   readable timestamped transcript before the 09:00 lesson.
-- Personalized each three-point lesson with read-only evidence from the existing
-  tutor SRS deck and English-profile memories, while forbidding fabricated
+- Personalized each three-point lesson with evidence from the tutor SRS deck and
+  shared English-profile memory, while forbidding fabricated
   weaknesses or transcript-free recommendations.
-- Added retry-safe daily assignment/delivery state, profile staging and install
-  tooling, targeted single-job cron registration, and watchdog coverage for the
-  new gateway.
+- Added retry-safe daily assignment/delivery state and integrated yt-dlp,
+  transcript prefetch, skill staging, and the 09:00 cron into the existing
+  English profile installer without another gateway or Telegram credential.
+- Established the repository-wide rule that new agent-like capabilities reuse a
+  compatible existing profile and bot by default; new profiles are reserved for
+  concrete privacy, identity, configuration, lifecycle, audience, or explicit
+  user-isolation requirements.
 - Verified live caption retrieval from the configured channel (2,126-word
   transcript from the latest available episode) and the full suite:
-  `pytest -q` — **252 passed**.
+  `pytest -q` — **250 passed**.
 
 ## v1.8.1 — 2026-09-13 (patch: focus the paper digest)
 
