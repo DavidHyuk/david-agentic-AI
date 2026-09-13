@@ -38,12 +38,15 @@ ROOMS = [
     ('coding', 'LeetCode Gym', '코딩 훈련', '⌨', '#efc783'),
     ('design', 'Design Studio', '시스템 디자인', '🏗', '#9bcad8'),
     ('english', 'English Lab', '영어 코칭 · SRS', '💬', '#e7b3c7'),
+    ('podcast', 'Morning Echo', '매일 듣기 · 표현 · 셰도잉', '🎧', '#f0b6a8'),
     ('hq', 'Hermes HQ', '대화 · 통합 리뷰', '✦', '#c4ccaa'),
 ]
 JOB_ROOMS = {'papers-digest': 'papers', 'interview-prep': 'interview',
              'coding-coach': 'coding', 'system-design-coach': 'design',
              'weekly-review': 'hq', 'english-intake': 'english',
-             'english-drill': 'english', 'english-weekly-review': 'english'}
+             'english-drill': 'english', 'english-weekly-review': 'english',
+             'english-podcast-daily': 'podcast'}
+ROOM_PROFILES = {'hq': 'david', 'podcast': 'english'}
 SECRET_KEY = re.compile(r'(token|secret|password|api[_-]?key|authorization|cookie|credential)', re.I)
 TASK_ID = re.compile(r't_[0-9a-f]{8}')
 REQUEST_ID = re.compile(r'[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}', re.I)
@@ -101,11 +104,19 @@ def room_for(profile, session_id, prompt, jobs):
     dashboard = re.fullmatch(r'observatory_(papers|interview|coding|design)', session_id)
     if profile == 'david' and dashboard:
         return dashboard.group(1)
-    if profile != 'david':
-        return 'english' if profile == 'english' else profile
     for job in jobs:
         if session_id.startswith('cron_' + job['id'] + '_'):
-            return JOB_ROOMS.get(job['name'], 'hq')
+            fallback = 'english' if profile == 'english' else profile
+            return JOB_ROOMS.get(job['name'], 'hq' if profile == 'david' else fallback)
+    if profile != 'david':
+        if profile == 'english':
+            prompt_text = task_prompt(prompt).lower()
+            if any(needle in prompt_text for needle in (
+                    'english-podcast-coach', 'english goal podcast',
+                    'podcast lesson')):
+                return 'podcast'
+            return 'english'
+        return profile
     # Old cron IDs are replaced by the registrar; their stored first prompt
     # remains evidence for classification. General chats default to HQ.
     if not session_id.startswith('cron_'):
@@ -210,6 +221,32 @@ class Observatory:
             due = sorted([c for c in cards if c['due'] <= today], key=lambda c: (c['box'], c['due']))
             data.update(due=due[:30], due_count=len(due), total_cards=len(cards),
                         weak=sorted(cards, key=lambda c: (c['box'], -c.get('wrong_reviews', 0)))[:5])
+        elif room == 'podcast':
+            root = self.home / 'data/english-podcast'
+            state = read_json(root / 'state.json', {'assignments': {}})
+            episodes = []
+            for lesson_date, assignment in sorted(
+                    state.get('assignments', {}).items(), reverse=True):
+                video_id = str(assignment.get('video_id', ''))
+                metadata = {}
+                valid_video_id = bool(re.fullmatch(r'[A-Za-z0-9_-]{6,20}', video_id))
+                if valid_video_id:
+                    metadata = read_json(root / 'metadata' / f'{video_id}.json', {})
+                transcript = root / 'transcripts' / f'{video_id}.txt' if valid_video_id else None
+                episodes.append({
+                    'lesson_date': lesson_date,
+                    'video_id': video_id,
+                    'title': assignment.get('title', ''),
+                    'url': assignment.get('url', ''),
+                    'prepared_at': assignment.get('prepared_at'),
+                    'delivered_at': assignment.get('delivered_at'),
+                    'word_count': metadata.get('word_count', 0),
+                    'caption_kind': metadata.get('caption_kind', ''),
+                    'transcript_available': bool(transcript and transcript.is_file()),
+                })
+            data.update(episodes=episodes[:30], episode_count=len(episodes),
+                        transcript_count=sum(episode['transcript_available'] for episode in episodes),
+                        latest_episode=episodes[0] if episodes else None)
         elif room == 'papers':
             data['papers'] = self.library('papers', limit=12)['items']
             data['reading_list'] = list(notebook['papers'].values())
@@ -708,7 +745,7 @@ class Observatory:
             rooms.append({'id': key, 'title': title, 'subtitle': subtitle, 'icon': icon,
                           'color': color, 'sessions': len(history), 'latest': latest,
                           'jobs': room_jobs,
-                          'profile': 'david' if key == 'hq' else key})
+                          'profile': ROOM_PROFILES.get(key, key)})
         today = datetime.now(TZ).strftime('%Y-%m-%d')
         today_start, _ = date_range(today)
         return {'now': time.time(), 'timezone': str(TZ), 'profiles': profiles, 'jobs': jobs,

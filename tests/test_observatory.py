@@ -82,6 +82,14 @@ def test_recreated_cron_uses_task_not_injected_skill():
     assert room_for('david', 'observatory_coding', '', []) == 'coding'
 
 
+def test_podcast_cron_uses_its_own_room_on_shared_english_profile():
+    jobs = [{'id': 'pod', 'name': 'english-podcast-daily'}]
+    prompt = 'Use the english-podcast-coach skill for the English Goal Podcast lesson.'
+    assert room_for('english', 'cron_pod_20260913', prompt, jobs) == 'podcast'
+    assert room_for('english', 'cron_old_20260912', prompt, []) == 'podcast'
+    assert room_for('english', 'telegram_chat', 'Review my correction.', jobs) == 'english'
+
+
 def test_redaction_preserves_metrics_but_masks_credentials():
     data = {'input_tokens': 123, 'api_key': 'something', 'body':
             'bot123456789:ABCDEFGHIJKLMNOPQRSTUVWXYZ_123456789\nPASSWORD=abc\nBearer abcdef'}
@@ -139,6 +147,22 @@ def test_specialist_profiles_merge_into_existing_campus_rooms(store):
     assert next(room for room in rooms if room['id'] == 'hq')['profile'] == 'david'
 
 
+def test_podcast_room_reuses_english_profile_and_lists_its_schedule(store):
+    profile = store.home / 'profiles' / 'english'
+    profile.mkdir(parents=True)
+    shutil.copyfile(store.home / 'state.db', profile / 'state.db')
+    (profile / 'cron').mkdir()
+    (profile / 'cron/jobs.json').write_text(json.dumps({'jobs': [{
+        'id': 'pod', 'name': 'english-podcast-daily', 'enabled': True,
+        'schedule_display': '0 9 * * *', 'deliver': 'telegram:-99',
+    }]}))
+
+    room = next(room for room in store.overview()['rooms'] if room['id'] == 'podcast')
+    assert room['title'] == 'Morning Echo'
+    assert room['profile'] == 'english'
+    assert [job['name'] for job in room['jobs']] == ['english-podcast-daily']
+
+
 def test_http_blocks_untrusted_hosts_cross_site_and_arbitrary_files(store):
     assets = Path(__file__).resolve().parents[1] / 'browser/observatory'
     server = ThreadingHTTPServer(('127.0.0.1', 0), make_handler(store, assets, {'127.0.0.1'}))
@@ -183,11 +207,35 @@ def study_store(store):
 
 
 def test_workbench_get_never_assigns_or_completes(study_store):
-    for room in ('coding', 'design', 'english', 'hq', 'interview'):
+    for room in ('coding', 'design', 'english', 'podcast', 'hq', 'interview'):
         data = study_store.workbench(room)
         assert data['room'] == room
     assert not (study_store.home / 'data/interview/coach_state.json').exists()
     assert not (study_store.home / 'data/observatory/workspace.json').exists()
+
+
+def test_podcast_workbench_reports_downloaded_transcripts_without_exposing_paths(store):
+    root = store.home / 'data/english-podcast'
+    (root / 'metadata').mkdir(parents=True)
+    (root / 'transcripts').mkdir()
+    video_id = 'abc123XYZ00'
+    (root / 'state.json').write_text(json.dumps({'assignments': {
+        '2026-09-13': {'video_id': video_id, 'title': 'Speak with Confidence',
+                       'url': 'https://youtube.com/watch?v=' + video_id,
+                       'prepared_at': 1, 'delivered_at': None},
+    }}))
+    (root / 'metadata' / f'{video_id}.json').write_text(json.dumps({
+        'word_count': 1420, 'caption_kind': 'auto',
+        'transcript_path': '/private/path/that/must/not/be/exposed',
+    }))
+    (root / 'transcripts' / f'{video_id}.txt').write_text('transcript')
+
+    result = store.workbench('podcast')
+    assert result['episode_count'] == 1
+    assert result['transcript_count'] == 1
+    assert result['latest_episode']['title'] == 'Speak with Confidence'
+    assert result['latest_episode']['transcript_available'] is True
+    assert 'transcript_path' not in result['latest_episode']
 
 
 def test_room_chat_uses_fixed_destination_and_persisted_agent_session(store, monkeypatch):

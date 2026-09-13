@@ -38,6 +38,7 @@ KakaoTalk Channel
 Tailscale browser → Hermes HQ :8788 (tailnet IP + loopback)
         ├── read-only sessions / schedules / memory / logs
         ├── study workbenches → coach feedback / SRS / notes / reading list
+        ├── Morning Echo → podcast assignment / transcript / delivery status
         └── HQ mission → Kanban graph → specialist workers → HQ synthesis
 ```
 
@@ -137,7 +138,7 @@ David-Agent/
 │   ├── Qwen/                  # Qwen 계열 모델
 │   └── MiniMax/               # MiniMax-M2.7 모델
 │
-├── tests/                     # pytest 테스트 (250개)
+├── tests/                     # pytest 테스트 (253개)
 │   ├── conftest.py
 │   ├── test_papers_ingest.py
 │   ├── test_papers_digest.py
@@ -348,7 +349,8 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   픽셀 작업실, 세션 날짜별 리플레이, 검색·페이지네이션 제공.
 - 캠퍼스 방 클릭으로 학습 작업실을 엽니다. 코딩·시스템 디자인은 미완료
   과제 재개, 타이머, 실제 연습 결과 제출을 제공하고, English는 정답 확인과
-  SRS 채점, Papers는 읽기 목록과 읽음 표시를 제공합니다. MLE는 저장된
+  SRS 채점, Morning Echo는 일일 podcast 배정·대본 준비·전달 상태,
+  Papers는 읽기 목록과 읽음 표시를 제공합니다. MLE는 저장된
   드릴과 답안 노트, HQ는 미완료 과제·복습 카드·읽을 논문을 모아 보여줍니다.
   오늘 과제를 완료한 뒤 한 문제를 더 요청하면 번호가 붙은 당일 과제로
   저장되어 Telegram과 작업실이 같은 미완료 상태를 봅니다.
@@ -420,6 +422,9 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   두 영상을 소비하지 않습니다.
 - podcast skill은 tutor SRS deck과 기존 English profile memory를 읽기 전용
   개인화 근거로 사용하며, 근거가 없으면 취약점이라고 주장하지 않습니다.
+- Observatory의 `Morning Echo`는 별도 UX·세션·일정 경계이지만 소유 profile은
+  `english`입니다. 따라서 대본과 전달 상태를 독립적으로 확인하면서도 새
+  gateway, bot token, 중복 memory를 만들지 않습니다.
 
 ### 인터뷰 학습 코치 (interview_progress.py)
 - 기존 `interview-prep` 스킬 안에서 동작하며, `stage.py`가 standalone helper와

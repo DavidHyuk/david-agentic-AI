@@ -7,6 +7,7 @@ const deskTitles = {
   coding: "LeetCode Gym",
   design: "Design Studio",
   english: "English Lab",
+  podcast: "Morning Echo",
   hq: "Hermes HQ",
 };
 const deskSubtitles = {
@@ -15,6 +16,7 @@ const deskSubtitles = {
   coding: "풀던 문제를 이어서. 실제 풀이 결과로 다음 과제를 준비합니다.",
   design: "요구사항부터 실패 시나리오까지, 설명할 수 있는 설계로.",
   english: "실제 교정 문장을 복습하고 다음 복습 날짜를 정합니다.",
+  podcast: "오늘의 대본과 내 취약점을 연결해 듣고 따라 말합니다.",
   hq: "내가 확인할 일과 다음 행동을 한곳에서.",
 };
 const draftKey = (room) => `hermes-draft:${room}`;
@@ -155,6 +157,18 @@ function coachDesk(d) {
 function englishDesk(d) {
   return `<div class="desk-metrics"><div><b>${d.due_count}</b><span>오늘 복습할 카드</span></div><div><b>${d.total_cards}</b><span>전체 교정 카드</span></div></div><article class="desk-card"><h2>오늘의 영어 복습</h2><p class="muted">먼저 문장을 고쳐 말해보세요. 정답은 각 문장 바로 아래에 있습니다. 자기 채점 결과를 저장하면 다음 복습일이 바뀝니다.</p>${d.due.length ? d.due.map((c, i) => `<section class="srs-card"><span class="tag">${i + 1} · Box ${c.box} · ${esc(c.due)}</span><h3>${esc(c.wrong)}</h3><p class="srs-answer"><b>정답</b> ${esc(c.correct)}</p><p class="muted">${esc(c.note || "")}</p><div class="desk-actions"><button class="outline" data-srs="${i}" data-result="wrong">다시 연습할래요</button><button class="primary" data-srs="${i}" data-result="correct">맞혔어요</button></div></section>`).join("") : '<div class="empty">오늘 복습할 카드를 모두 마쳤습니다.</div>'}${d.due_count > 30 ? "<p>한 번에 30개씩 표시합니다. 복습하면 다음 카드가 나타납니다.</p>" : ""}</article>`;
 }
+function podcastDesk(d) {
+  const episode = d.latest_episode;
+  const caption = String(episode?.caption_kind || "").startsWith("auto")
+    ? "자동 생성 자막"
+    : episode?.caption_kind
+      ? "게시자 자막"
+      : "자막 유형 미확인";
+  const transcript = episode?.transcript_available
+    ? `대본 ${Number(episode.word_count || 0).toLocaleString()}단어 · ${caption}`
+    : "대본 준비 대기";
+  return `<div class="desk-metrics"><div><b>${d.episode_count}</b><span>준비된 에피소드</span></div><div><b>${d.transcript_count}</b><span>저장된 대본</span></div></div><article class="desk-card"><span class="tag">TODAY'S ECHO${episode ? " · " + esc(episode.lesson_date) : ""}</span><h2>${episode ? esc(episode.title || episode.video_id) : "아직 준비된 에피소드가 없습니다"}</h2>${episode ? `<p class="muted">${transcript} · ${episode.delivered_at ? "수업 전달 완료" : "수업 전달 대기"}</p><div class="desk-actions">${safeLink(episode.url, "YouTube에서 듣기")}</div>` : '<p>08:30 대본 동기화가 완료되면 오늘의 에피소드가 이곳에 나타납니다.</p>'}</article>${d.episodes.length > 1 ? `<article class="desk-card"><h2>최근 에피소드</h2>${d.episodes.slice(1, 8).map((item) => `<div class="reading-row"><div><strong>${esc(item.title || item.video_id)}</strong><span>${esc(item.lesson_date)} · ${item.transcript_available ? "대본 저장됨" : "대본 없음"}</span></div><div>${safeLink(item.url, "듣기")}</div></div>`).join("")}</article>` : ""}`;
+}
 function papersDesk(d) {
   return `<article class="desk-card"><h2>내 읽기 목록</h2>${d.reading_list.length ? d.reading_list.map((p, i) => `<div class="reading-row"><div><strong>${esc(p.title)}</strong><span>${p.read ? "읽음" : "읽기 대기"}</span></div><div>${safeLink(p.url, "원문")}<button class="outline" data-paper-read="${i}">${p.read ? "다시 읽기" : "읽음으로 표시"}</button></div></div>`).join("") : "<p>아래 논문에서 읽고 싶은 항목을 추가하세요.</p>"}</article><article class="desk-card"><h2>최신 논문에서 고르기</h2><p class="muted">현재 카탈로그의 최신 12편입니다. 전체 논문은 기록 보관소에서 검색할 수 있습니다.</p>${d.papers.map((p, i) => `<div class="reading-row"><div><strong>${esc(p.title)}</strong><p class="paper-excerpt">${esc(p.content)}</p></div><div>${safeLink(p.url, "원문")}<button class="outline" data-bookmark="${i}">${d.reading_list.some((x) => x.id === p.id) ? "목록에 있음" : "읽기 목록에 추가"}</button></div></div>`).join("")}</article>`;
 }
@@ -211,6 +225,7 @@ function renderWorkbench(d) {
   let body;
   if (["coding", "design"].includes(d.room)) body = coachDesk(d);
   else if (d.room === "english") body = englishDesk(d);
+  else if (d.room === "podcast") body = podcastDesk(d);
   else if (d.room === "papers") body = papersDesk(d);
   else if (d.room === "hq") body = hqDesk(d);
   else if (d.room === "interview")

@@ -681,8 +681,12 @@ changes.
 
 Podcast coaching is a separate skill and data workflow inside the existing
 English profile. It deliberately reuses the same identity, accumulated learner
-memory, Telegram bot, and chat, so no second BotFather token or gateway is
-needed. `bootstrap/install_english_bot.sh` installs `yt-dlp` and enables
+memory and Telegram bot, so no second BotFather token or gateway is needed. A
+dedicated `🎧 Morning Echo` Telegram group is preferred for this daily feed;
+until its validated chat ID is configured, the current job continues to use the
+English bot's existing destination. The Observatory room is already separate
+regardless of Telegram routing. `bootstrap/install_english_bot.sh` installs
+`yt-dlp` and enables
 `hermes-english-podcast-sync.timer`. At 08:30 local time the timer selects the
 newest channel video not previously assigned, preserves its English caption
 JSON3, and writes a timestamped text transcript under
@@ -794,8 +798,10 @@ Review the [MiniMax-M2.7 license](https://github.com/MiniMax-AI/MiniMax-M2.7/blo
 
 Hermes HQ is a web app for watching your agents, browsing saved records, and
 continuing study tasks from room workbenches.
-The campus has separate paper, MLE, coding, system-design, English, and HQ rooms;
-other installed Hermes profiles also appear as independent rooms. Room animation
+The campus has separate paper, MLE, coding, system-design, English, Morning Echo,
+and HQ rooms; other installed Hermes profiles also appear as independent rooms.
+Morning Echo is a separate podcast workspace owned by the existing English
+profile, not a separate bot or gateway. Room animation
 is decorative; the explicitly labeled daily replay follows real session start
 times. Gateway process availability is checked separately from session history.
 
@@ -834,6 +840,10 @@ workbench; its history button opens the room's saved conversations.
   state and review schedule. Opening a room alone does not assign or complete work.
 - **English**: reveal due-card answers and mark each attempt correct or needing
   more practice. Results update the shared SRS deck used by Telegram drills.
+- **Morning Echo**: see the latest assigned English Goal Podcast episode,
+  transcript readiness and delivery state, then open the source video. Its
+  schedule and session history remain separate from tutor/SRS activity while it
+  shares the English profile's learner memory.
 - **Papers**: browse recent catalog entries, save a reading list, and mark papers
   read or unread. Original links open the source paper.
 - **MLE Interview**: reopen the latest saved drill and keep your answer in room

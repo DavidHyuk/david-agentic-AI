@@ -3,6 +3,20 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.10.0 — 2026-09-13 (minor: add Morning Echo observatory room)
+
+- Added `🎧 Morning Echo` as a dedicated Hermes Personal Observatory room for
+  the transcript-backed podcast workflow while retaining the existing English
+  profile, memory, gateway, and bot ownership.
+- Classified current and historical podcast cron sessions independently from
+  tutor/SRS sessions and associated the 09:00 schedule with the new room.
+- Added a podcast workbench showing the latest episode, YouTube link, transcript
+  readiness, caption type, word count, delivery state, and recent assignments
+  without exposing local transcript paths.
+- Required every future user-visible agent workflow to be registered in the
+  Observatory with explicit ownership, routing, useful state, tests, and living
+  documentation; purely internal helpers remain exempt from empty-room creation.
+
 ## v1.9.1 — 2026-09-13 (patch: define chat-room routing policy)
 
 - Separated the decision to reuse a Hermes profile and Telegram bot from the

@@ -166,6 +166,18 @@ Podcast English Telegram group served by the existing `english` profile and bot:
 daily podcast posts remain separate from tutor/SRS interaction while learner
 memory and credentials stay shared.
 
+Every new user-visible agent or agent-like workflow must also be registered in
+Hermes Personal Observatory in the same change. Treat an Observatory room as a
+UX and history boundary, not as evidence that a separate Hermes profile, gateway,
+or bot is required. Reuse the owning profile while giving a distinct workflow
+its own room when that improves schedule visibility, session classification,
+source-state inspection, or interaction. Update the room definition, cron and
+current/historical session routing, owning-profile mapping, useful workbench
+state, tests, `README.md`, `docs/project-overview.md`, and
+`docs/dev-history.md`. Do not add an empty room for a purely internal helper
+that has no user-facing schedule, history, state, or action; record that reason
+instead.
+
 ## Key external paths
 - Subscribe-Papers DB: `/home/david/workspace/Subscribe-Papers/data/papers.db`
 - Hermes paper catalog: `~/.hermes/data/papers/papers.db`
