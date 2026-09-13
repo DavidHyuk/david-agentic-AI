@@ -25,7 +25,7 @@ DGX Spark (128GB VRAM)
                 │
                 └── English Hermes gateway ── English Telegram bot
                       ├── tutor feedback / SRS
-                      └── downloaded YouTube transcript / personalized lesson
+                      └── Morning Echo group: downloaded YouTube transcript / personalized lesson
 
 arXiv / Hugging Face
         │
@@ -97,7 +97,7 @@ David-Agent/
 │   └── hooks.json             # `.codex/hooks/auto_git_commit.py` 위임
 │
 ├── cron/
-│   └── jobs.yaml              # 9개의 Telegram 알림 스케줄 정의 (English profile 2개 사용)
+│   └── jobs.yaml              # 9개의 Telegram 알림 스케줄 정의 (English profile 4개 사용)
 │
 ├── bootstrap/                 # 설치 및 동기화 자동화
 │   ├── install.sh             # 원클릭 설치 (Hermes + 설정 + 모델)
@@ -230,7 +230,7 @@ history/search·알림 제어의 이점이 있으면 같은 bot을 별도 Telegr
 | `interview-prep` | 12:00 월/수/금 | 전용 Interview 그룹: 실시간 트렌드 기반 Staff 레벨 드릴 1개 |
 | `coding-coach` | 12:00 화/목/토 | 전용 LeetCode 그룹: 35분 문제·목표·canonical URL |
 | `system-design-coach` | 12:00 일요일 | 전용 System Design 그룹: Hello Interview 설계 과제 |
-| `english-podcast-daily` | 09:00 매일 | English bot: 다운로드된 대본 기반 개인화 학습 1편 |
+| `english-podcast-daily` | 09:00 매일 | 기존 English bot의 `🎧 Morning Echo` 전용 그룹: 다운로드된 대본 기반 개인화 학습 1편 |
 | `english-intake` | 월–토 20:00 | English bot: 새 피드백 분석 또는 취약 패턴 코칭 |
 | `english-drill` | 21:00 매일 | English bot: SRS 드릴 전달 |
 | `english-weekly-review` | 일요일 20:00 | English bot: tutor feedback + 취약 SRS 누적 복습 |

@@ -478,7 +478,7 @@ cat ~/.hermes/data/english/kakao-skill-url.txt
 
 ## Scheduled Telegram notifications (`cron/jobs.yaml`)
 
-David's scheduled notifications use three focused Telegram groups. The combined
+David's scheduled notifications use focused Telegram groups. The combined
 Sunday review stays in the existing private chat:
 
 | Destination | Suggested name | Jobs |
@@ -487,6 +487,7 @@ Sunday review stays in the existing private chat:
 | MLE interviews | **Interview Lab** | `interview-prep` |
 | System design | **System Design Studio** | `system-design-coach` |
 | Coding | **LeetCode Gym** | `coding-coach` |
+| Podcast English | **🎧 Morning Echo** | `english-podcast-daily` |
 | Main private chat | **Hermes HQ** | `weekly-review` |
 
 Configure each topic group once:
@@ -510,6 +511,7 @@ Configure each topic group once:
    INTERVIEW_TELEGRAM_CHAT_ID=-1001234567891
    LEETCODE_TELEGRAM_CHAT_ID=-1001234567892
    SYSTEM_DESIGN_TELEGRAM_CHAT_ID=-1001234567893
+   ENGLISH_PODCAST_TELEGRAM_CHAT_ID=-1001234567894
    ```
 
 4. Verify each delivery, then register the declared jobs:
@@ -519,6 +521,7 @@ Configure each topic group once:
    hermes send --to telegram:-1001234567891 "[Hermes E2E] interview room test"
    hermes send --to telegram:-1001234567892 "[Hermes E2E] LeetCode room test"
    hermes send --to telegram:-1001234567893 "[Hermes E2E] system-design room test"
+   hermes -p english send --to telegram:-1001234567894 "[Hermes E2E] Morning Echo test"
    python3 bootstrap/register_cron.py --dry-run
    python3 bootstrap/register_cron.py
    ```
@@ -534,7 +537,7 @@ coding, and system-design progress.
 | `interview-prep` | 12:00 Mon/Wed/Fri | Interview group: one focused Staff/Senior MLE drill |
 | `coding-coach` | 12:00 Tue/Thu/Sat | LeetCode group: 35-minute beginner problem with canonical links |
 | `system-design-coach` | 12:00 Sunday | System-design group: Hello Interview exercise |
-| `english-podcast-daily` | 09:00 daily | Existing English bot: one downloaded transcript + personalized three-point lesson |
+| `english-podcast-daily` | 09:00 daily | `🎧 Morning Echo` group on the existing English bot: one downloaded transcript + personalized three-point lesson |
 | `english-intake` | 20:00 Mon–Sat | Dedicated English bot: feedback analysis or weakness coaching |
 | `english-drill` | 21:00 daily | Dedicated English bot: tonight's spaced-repetition drill |
 | `english-weekly-review` | 20:00 Sunday | Dedicated English bot: tutor feedback + weak SRS cumulative review |
@@ -681,11 +684,11 @@ changes.
 
 Podcast coaching is a separate skill and data workflow inside the existing
 English profile. It deliberately reuses the same identity, accumulated learner
-memory and Telegram bot, so no second BotFather token or gateway is needed. A
-dedicated `🎧 Morning Echo` Telegram group is preferred for this daily feed;
-until its validated chat ID is configured, the current job continues to use the
-English bot's existing destination. The Observatory room is already separate
-regardless of Telegram routing. `bootstrap/install_english_bot.sh` installs
+memory and Telegram bot, so no second BotFather token or gateway is needed. The
+daily feed is delivered to a dedicated `🎧 Morning Echo` Telegram group through
+`ENGLISH_PODCAST_TELEGRAM_CHAT_ID`; the registrar rejects a missing or invalid
+ID rather than sending it to the tutor/SRS chat. The Observatory room is also
+separate regardless of Telegram routing. `bootstrap/install_english_bot.sh` installs
 `yt-dlp` and enables
 `hermes-english-podcast-sync.timer`. At 08:30 local time the timer selects the
 newest channel video not previously assigned, preserves its English caption

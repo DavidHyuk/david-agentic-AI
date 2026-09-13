@@ -3,6 +3,14 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.10.1 — 2026-09-13 (patch: route podcast delivery to Morning Echo)
+
+- Added the fail-closed `ENGLISH_PODCAST_TELEGRAM_CHAT_ID` routing contract for
+  `english-podcast-daily`, so only the dedicated Morning Echo group receives
+  the daily feed while tutor/SRS delivery remains in its existing chat.
+- Documented group setup, secret-environment configuration, and a profile-aware
+  delivery smoke test for the existing English bot.
+
 ## v1.10.0 — 2026-09-13 (minor: add Morning Echo observatory room)
 
 - Added `🎧 Morning Echo` as a dedicated Hermes Personal Observatory room for

@@ -119,9 +119,15 @@ def test_english_podcast_job_is_daily_at_nine_in_existing_english_profile():
     podcast = jobs["english-podcast-daily"]
     assert podcast["schedule"] == "0 9 * * *"
     assert podcast["profile"] == "english"
+    assert podcast["deliver_chat_id_env"] == "ENGLISH_PODCAST_TELEGRAM_CHAT_ID"
     assert podcast["skills"] == ["english-podcast-coach"]
     assert "transcript_path" in podcast["prompt"]
     assert "exactly three short" in podcast["prompt"]
+
+    command = rc.build_create_command(
+        podcast, environment={"ENGLISH_PODCAST_TELEGRAM_CHAT_ID": "-1001234567894"}
+    )
+    assert command[command.index("--deliver") + 1] == "telegram:-1001234567894"
 
 
 def test_calendar_brief_is_not_scheduled_while_integration_is_deferred():
