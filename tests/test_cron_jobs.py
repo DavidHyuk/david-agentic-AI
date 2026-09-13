@@ -188,6 +188,76 @@ def test_build_remove_command_targets_the_same_profile():
     ]
 
 
+def test_build_edit_command_preserves_the_existing_job_id():
+    job = {
+        "name": "papers-digest",
+        "schedule": "30 8 * * 2,5",
+        "prompt": "Send  my digest",
+        "skills": ["papers-digest"],
+        "deliver": "telegram",
+    }
+    command = rc.build_edit_command("job-123", job)
+    assert command[:4] == ["hermes", "cron", "edit", "job-123"]
+    assert command[command.index("--prompt") + 1] == "Send my digest"
+    assert command[command.index("--skill") + 1] == "papers-digest"
+
+
+def test_register_keeps_an_unchanged_job_and_its_runtime_state(tmp_path, monkeypatch, capsys):
+    job = {
+        "name": "papers-digest",
+        "schedule": "30 8 * * 2,5",
+        "prompt": "Send my digest",
+        "skills": ["papers-digest"],
+        "deliver": "telegram",
+    }
+    jobs_path = tmp_path / "cron" / "jobs.json"
+    jobs_path.parent.mkdir()
+    jobs_path.write_text(
+        '{"jobs": [{"id": "existing", "name": "papers-digest", '
+        '"schedule": {"expr": "30 8 * * 2,5"}, "prompt": "Send my digest", '
+        '"skills": ["papers-digest"], "deliver": "telegram", '
+        '"last_run_at": "2026-09-13T08:30:00-07:00"}]}',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(rc.shutil, "which", lambda _name: "/usr/bin/hermes")
+    monkeypatch.setattr(
+        rc.subprocess, "run", lambda *_args, **_kwargs: pytest.fail("unchanged job must not be recreated"),
+    )
+
+    rc.register([job], environment={}, hermes_home=tmp_path)
+
+    assert "papers-digest: unchanged" in capsys.readouterr().out
+
+
+def test_register_edits_changed_job_in_place(tmp_path, monkeypatch):
+    job = {
+        "name": "papers-digest",
+        "schedule": "30 8 * * 2,5",
+        "prompt": "Send updated digest",
+        "skills": ["papers-digest"],
+        "deliver": "telegram",
+    }
+    jobs_path = tmp_path / "cron" / "jobs.json"
+    jobs_path.parent.mkdir()
+    jobs_path.write_text(
+        '{"jobs": [{"id": "existing", "name": "papers-digest", '
+        '"schedule": {"expr": "30 8 * * 2,5"}, "prompt": "Old digest", '
+        '"skills": ["papers-digest"], "deliver": "telegram"}]}',
+        encoding="utf-8",
+    )
+    commands = []
+    monkeypatch.setattr(rc.shutil, "which", lambda _name: "/usr/bin/hermes")
+    monkeypatch.setattr(
+        rc.subprocess,
+        "run",
+        lambda command, **_kwargs: (commands.append(command) or type("Result", (), {"returncode": 0, "stderr": ""})()),
+    )
+
+    rc.register([job], environment={}, hermes_home=tmp_path)
+
+    assert commands[0][:4] == ["hermes", "cron", "edit", "existing"]
+
+
 def test_missing_required_field_raises(tmp_path):
     bad = tmp_path / "bad.yaml"
     bad.write_text("jobs:\n  - name: x\n    schedule: '* * * * *'\n")  # no prompt

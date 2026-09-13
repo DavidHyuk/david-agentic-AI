@@ -4,9 +4,10 @@
 
 Purpose
 -------
-Detects the two failure modes that silently stop Telegram cron alerts:
+Detects failure modes that silently stop Telegram cron alerts:
   1. ``~/.hermes/cron/.tick.lock`` held longer than a threshold (stuck tick).
   2. ``jobs.json`` last_run timestamps older than expected (scheduler idle).
+  3. a cron job with a failed terminal status (one bounded retry per run).
 
 Standalone CLI for manual checks or cron/systemd watchdog use. A caller can
 target a profile home and its matching systemd gateway service. Exit 0 when
@@ -27,6 +28,8 @@ DEFAULT_LOCK_STALE_MINUTES = 30
 DEFAULT_JOB_STALE_HOURS = 36
 DEFAULT_GATEWAY_SERVICE = "hermes-gateway.service"
 DEFAULT_RESTART_TIMEOUT_SECONDS = 75
+DEFAULT_CRON_RUN_TIMEOUT_SECONDS = 20
+FAILED_STATUSES = frozenset({"failed", "error", "timeout", "cancelled", "canceled"})
 
 SECRET_PATTERNS = (".env", "credentials", "secret", "token", "auth.json")
 
@@ -96,6 +99,25 @@ def _enabled_jobs(doc: dict) -> list[dict]:
     return [j for j in jobs if j.get("enabled", True)]
 
 
+def _failed_jobs(doc: dict) -> list[dict[str, Any]]:
+    """Return enabled jobs whose most recent execution reached a failed status."""
+    failures: list[dict[str, Any]] = []
+    for job in _enabled_jobs(doc):
+        status = str(job.get("last_status") or "").strip().lower()
+        if status not in FAILED_STATUSES:
+            continue
+        failures.append(
+            {
+                "id": str(job.get("id") or ""),
+                "name": str(job.get("name") or job.get("id") or "?"),
+                "last_run_at": job.get("last_run_at"),
+                "last_status": status,
+                "last_error": str(job.get("last_error") or ""),
+            }
+        )
+    return failures
+
+
 def check_jobs_stale(
     jobs_path: Path,
     *,
@@ -148,6 +170,7 @@ def check_jobs_stale(
         "stale_jobs": stale_jobs,
         "healthy": not stale_jobs,
         "stale_hours": stale_hours,
+        "failed_jobs": _failed_jobs(doc),
     }
 
 
@@ -239,7 +262,93 @@ def _format_report(report: dict[str, Any]) -> str:
             )
     else:
         lines.append("cron jobs: last_run timestamps look current")
+    if jobs.get("failed_jobs"):
+        lines.append("failed cron jobs:")
+        for item in jobs["failed_jobs"]:
+            lines.append(
+                f"  - {item['name']}: {item['last_status']} at "
+                f"{item['last_run_at'] or 'unknown time'}"
+            )
     return "\n".join(lines)
+
+
+def _retry_key(job: dict[str, Any]) -> str:
+    """Identify one specific failed execution, not merely a recurring job."""
+    return f"{job['id']}:{job.get('last_run_at') or 'unknown'}"
+
+
+def load_retry_state(path: Path) -> set[str]:
+    """Read previously queued retry keys; invalid runtime state is ignored."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return set()
+    return {str(key) for key in data.get("retried", [])}
+
+
+def save_retry_state(path: Path, retried: set[str]) -> None:
+    """Persist retry keys atomically under the profile's mutable cron state."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(".tmp")
+    temporary.write_text(
+        json.dumps({"retried": sorted(retried)}, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    temporary.replace(path)
+
+
+def run_cron_job(
+    job_id: str,
+    *,
+    profile: str | None = None,
+    timeout: int = DEFAULT_CRON_RUN_TIMEOUT_SECONDS,
+) -> tuple[bool, str]:
+    """Queue one job for its next scheduler tick without waiting for its result."""
+    command = ["hermes"]
+    if profile:
+        command += ["--profile", profile]
+    command += ["cron", "run", job_id]
+    try:
+        result = subprocess.run(
+            command, capture_output=True, text=True, check=False, timeout=timeout,
+        )
+    except FileNotFoundError:
+        return False, "hermes CLI not found on PATH"
+    except subprocess.TimeoutExpired:
+        return False, f"cron run timed out after {timeout}s"
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or "").strip()
+        return False, detail or f"exit {result.returncode}"
+    return True, (result.stdout or "").strip() or f"queued {job_id}"
+
+
+def retry_failed_jobs_once(
+    hermes_home: Path,
+    failed_jobs: list[dict[str, Any]],
+    *,
+    profile: str | None = None,
+    retry_state_path: Path | None = None,
+) -> list[dict[str, str]]:
+    """Queue at most one retry for each failed execution and record the attempt."""
+    state_path = retry_state_path or hermes_home / "cron" / "retry-state.json"
+    retried = load_retry_state(state_path)
+    outcomes: list[dict[str, str]] = []
+    for job in failed_jobs:
+        key = _retry_key(job)
+        if not job["id"] or key in retried:
+            continue
+        ok, detail = run_cron_job(job["id"], profile=profile)
+        outcomes.append({"name": job["name"], "result": "queued" if ok else "failed", "detail": detail})
+        if ok:
+            retried.add(key)
+    save_retry_state(state_path, retried)
+    return outcomes
+
+
+def retryable_failed_jobs(hermes_home: Path, failed_jobs: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Exclude executions that have already consumed their single retry."""
+    retried = load_retry_state(hermes_home / "cron" / "retry-state.json")
+    return [job for job in failed_jobs if job.get("id") and _retry_key(job) not in retried]
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -248,6 +357,15 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--hermes-home",
         default=str(DEFAULT_HERMES_HOME),
         help="Hermes home directory (default: ~/.hermes)",
+    )
+    parser.add_argument(
+        "--profile",
+        help="Hermes profile name when retrying a profile-local cron job",
+    )
+    parser.add_argument(
+        "--retry-failed-once",
+        action="store_true",
+        help="Restart then queue one retry for each newly failed cron execution",
     )
     parser.add_argument(
         "--lock-stale-minutes",
@@ -304,17 +422,35 @@ def main(argv: list[str] | None = None) -> int:
     else:
         print(_format_report(report))
 
-    if report["critical"]:
+    failures = report["jobs"].get("failed_jobs", [])
+    retryable_failures = retryable_failed_jobs(home, failures)
+    should_recover = report["critical"] or (
+        args.retry_failed_once and bool(retryable_failures)
+    )
+    if should_recover:
         if args.restart:
             ok, msg = restart_gateway(service=args.gateway_service)
             if ok:
                 print("gateway restart: ok")
                 if msg:
                     print(msg)
+                if args.retry_failed_once and retryable_failures:
+                    outcomes = retry_failed_jobs_once(
+                        home, retryable_failures, profile=args.profile,
+                    )
+                    for outcome in outcomes:
+                        print(
+                            f"cron retry {outcome['result']}: "
+                            f"{outcome['name']} ({outcome['detail']})"
+                        )
+                    if any(outcome["result"] == "failed" for outcome in outcomes):
+                        return 2
                 return 0
             print(f"gateway restart failed: {msg}")
             return 2
         return 2
+    if failures:
+        return 1
     return 0
 
 

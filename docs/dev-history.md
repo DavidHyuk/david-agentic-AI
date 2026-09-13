@@ -3,6 +3,18 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.11.0 — 2026-09-13 (minor: make cron delivery recovery stateful)
+
+- Changed cron registration from delete-and-recreate to compare-and-preserve:
+  unchanged jobs retain their pending execution time, last status, and runtime
+  state; changed definitions are updated in place.
+- Extended the five-minute David/English watchdog to detect a failed terminal
+  cron run, restart the owning gateway, and queue exactly one profile-aware
+  retry. Persistent retry keys prevent both repeated restarts and duplicate
+  Telegram delivery.
+- Added regression coverage for in-place registration, failed-status detection,
+  profile-scoped retry commands, and retry idempotency.
+
 ## v1.10.1 — 2026-09-13 (patch: route podcast delivery to Morning Echo)
 
 - Added the fail-closed `ENGLISH_PODCAST_TELEGRAM_CHAT_ID` routing contract for

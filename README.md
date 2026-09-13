@@ -720,8 +720,12 @@ bash bootstrap/install_cron_watchdog.sh
 schedulers every five minutes. A stale next-run timestamp or cron tick lock held
 longer than 20 minutes triggers a restart of the matching gateway. The installed
 gateway drop-ins cap shutdown at 45 seconds, so a permanently blocked worker
-cannot prevent recovery indefinitely. An English profile or Telegram gateway
-that has not yet been installed is skipped cleanly.
+cannot prevent recovery indefinitely. A job whose latest run is marked failed is
+also restarted and queued once again; the retry state is stored per profile, so a
+persistently bad run does not create duplicate Telegram posts or restart loops.
+Unchanged `register_cron.py` jobs are kept in place to preserve their pending run
+time and this runtime state. An English profile or Telegram gateway that has not
+yet been installed is skipped cleanly.
 
 Inspect it without changing state:
 

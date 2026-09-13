@@ -4,9 +4,9 @@
 
 Purpose
 -------
-Reads the version-controlled schedule (cron/jobs.yaml) and creates the corresponding
-Hermes cron jobs via the `hermes cron create` CLI. Idempotent-ish: it removes any
-existing job with the same name first so re-running syncs the schedule to the file.
+Reads the version-controlled schedule (cron/jobs.yaml) and creates or updates the
+corresponding Hermes cron jobs via the `hermes cron` CLI. Unchanged jobs are left
+in place so their next-run time, failure status, and retry history are retained.
 
 Requires the Hermes CLI on PATH and the gateway configured (cron runs in the
 gateway daemon). Per-job Telegram chat IDs are read from ~/.hermes/.env so they
@@ -35,6 +35,7 @@ except ImportError as exc:  # pragma: no cover
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_JOBS = REPO_ROOT / "cron" / "jobs.yaml"
 DEFAULT_ENV_FILE = Path.home() / ".hermes" / ".env"
+DEFAULT_HERMES_HOME = Path.home() / ".hermes"
 
 REQUIRED_FIELDS = ("name", "schedule", "prompt")
 ENV_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -149,15 +150,82 @@ def build_remove_command(name: str, profile: str | None = None) -> list[str]:
     return cmd + ["cron", "remove", name]
 
 
+def build_edit_command(
+    job_id: str,
+    job: dict,
+    environment: dict[str, str] | None = None,
+) -> list[str]:
+    """Build an in-place update command without resetting run state."""
+    prompt = " ".join(str(job["prompt"]).split())
+    cmd = [
+        "hermes", "cron", "edit", job_id,
+        "--schedule", str(job["schedule"]),
+        "--prompt", prompt,
+        "--name", job["name"],
+    ]
+    for skill in job.get("skills", []) or []:
+        cmd += ["--skill", skill]
+    delivery = resolve_delivery(job, environment or {})
+    if delivery:
+        cmd += ["--deliver", delivery]
+    if job.get("workdir"):
+        cmd += ["--workdir", str(job["workdir"])]
+    if job.get("profile"):
+        cmd += ["--profile", str(job["profile"])]
+    return cmd
+
+
+def job_store_path(job: dict, hermes_home: Path = DEFAULT_HERMES_HOME) -> Path:
+    """Return the scheduler store used by a root or named profile job."""
+    profile = job.get("profile")
+    home = hermes_home / "profiles" / str(profile) if profile else hermes_home
+    return home / "cron" / "jobs.json"
+
+
+def load_registered_jobs(
+    jobs_path: Path,
+) -> dict[str, dict]:
+    """Load registered jobs by name; an absent/corrupt store is treated as empty."""
+    try:
+        doc = yaml.safe_load(jobs_path.read_text()) or {}
+    except (OSError, yaml.YAMLError):
+        return {}
+    return {
+        str(job["name"]): job
+        for job in doc.get("jobs", []) or []
+        if job.get("name") and job.get("id")
+    }
+
+
+def registered_job_matches(
+    registered: dict,
+    job: dict,
+    environment: dict[str, str],
+) -> bool:
+    """Compare only declarative fields; runtime fields must be preserved."""
+    schedule = registered.get("schedule") or {}
+    registered_schedule = schedule.get("expr") or registered.get("schedule_display")
+    expected_delivery = resolve_delivery(job, environment)
+    return (
+        registered_schedule == str(job["schedule"])
+        and " ".join(str(registered.get("prompt", "")).split())
+        == " ".join(str(job["prompt"]).split())
+        and list(registered.get("skills") or []) == list(job.get("skills") or [])
+        and registered.get("deliver") == expected_delivery
+        and (registered.get("workdir") or None) == (job.get("workdir") or None)
+    )
+
+
 def register(
     jobs: list[dict],
     dry_run: bool = False,
     environment: dict[str, str] | None = None,
+    hermes_home: Path = DEFAULT_HERMES_HOME,
 ) -> None:
     environment = runtime_environment() if environment is None else environment
     have_cli = shutil.which("hermes") is not None
     for job in jobs:
-        remove_cmd = build_remove_command(job["name"], job.get("profile"))
+        registered = load_registered_jobs(job_store_path(job, hermes_home)).get(job["name"])
         create_cmd = build_create_command(
             job,
             environment=environment,
@@ -167,8 +235,15 @@ def register(
             prefix = "[dry-run]" if dry_run else "[no hermes CLI on PATH]"
             print(prefix, " ".join(repr(c) if " " in c else c for c in create_cmd))
             continue
-        subprocess.run(remove_cmd, capture_output=True, text=True)  # best-effort
-        result = subprocess.run(create_cmd, capture_output=True, text=True)
+        if registered and registered_job_matches(registered, job, environment):
+            print(f"  {job['name']}: unchanged")
+            continue
+        command = (
+            build_edit_command(str(registered["id"]), job, environment)
+            if registered
+            else create_cmd
+        )
+        result = subprocess.run(command, capture_output=True, text=True)
         status = "ok" if result.returncode == 0 else f"FAILED: {result.stderr.strip()}"
         print(f"  {job['name']}: {status}")
 

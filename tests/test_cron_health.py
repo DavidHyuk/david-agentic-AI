@@ -154,6 +154,81 @@ def test_check_jobs_stale_accepts_old_last_run_when_next_run_is_future(hermes_ho
     assert report["stale_jobs"] == []
 
 
+def test_check_jobs_stale_reports_a_failed_execution(hermes_home):
+    now = datetime(2026, 6, 10, 12, 0, tzinfo=PACIFIC)
+    jobs_path = hermes_home / "cron" / "jobs.json"
+    jobs_path.write_text(
+        json.dumps(
+            {
+                "jobs": [
+                    {
+                        "id": "failed-id",
+                        "name": "papers-digest",
+                        "enabled": True,
+                        "last_run_at": _iso(now - timedelta(minutes=5)),
+                        "next_run_at": _iso(now + timedelta(days=2)),
+                        "last_status": "failed",
+                        "last_error": "stream stalled",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    report = ch.check_jobs_stale(jobs_path, now=now)
+
+    assert report["healthy"] is True
+    assert report["failed_jobs"] == [
+        {
+            "id": "failed-id",
+            "name": "papers-digest",
+            "last_run_at": _iso(now - timedelta(minutes=5)),
+            "last_status": "failed",
+            "last_error": "stream stalled",
+        }
+    ]
+
+
+def test_retry_failed_jobs_queues_only_one_retry_per_execution(hermes_home, monkeypatch):
+    failed = {
+        "id": "failed-id",
+        "name": "papers-digest",
+        "last_run_at": "2026-06-10T11:55:00-07:00",
+        "last_status": "failed",
+        "last_error": "stream stalled",
+    }
+    calls = []
+    monkeypatch.setattr(
+        ch,
+        "run_cron_job",
+        lambda job_id, **kwargs: (calls.append((job_id, kwargs)) is None, "queued"),
+    )
+
+    first = ch.retry_failed_jobs_once(hermes_home, [failed], profile="english")
+    second = ch.retry_failed_jobs_once(hermes_home, [failed], profile="english")
+
+    assert first == [{"name": "papers-digest", "result": "queued", "detail": "queued"}]
+    assert second == []
+    assert calls == [("failed-id", {"profile": "english"})]
+    assert ch.retryable_failed_jobs(hermes_home, [failed]) == []
+
+
+def test_run_cron_job_uses_the_target_profile(monkeypatch):
+    calls = []
+
+    def fake_run(command, **kwargs):
+        calls.append((command, kwargs))
+        return SimpleNamespace(returncode=0, stdout="queued", stderr="")
+
+    monkeypatch.setattr(ch.subprocess, "run", fake_run)
+
+    assert ch.run_cron_job("job-123", profile="english") == (True, "queued")
+    assert calls[0][0] == [
+        "hermes", "--profile", "english", "cron", "run", "job-123",
+    ]
+
+
 def test_assess_health_critical_when_lock_stale(hermes_home, monkeypatch):
     lock = hermes_home / "cron" / ".tick.lock"
     lock.parent.mkdir(parents=True, exist_ok=True)
