@@ -10,8 +10,6 @@ const state = {
   request: 0,
   libraryRequest: 0,
   replay: null,
-  ambient: {},
-  ambientTimers: [],
 };
 const names = {
   office: "사무실",
@@ -161,6 +159,7 @@ function view(name) {
   history.replaceState(null, "", "#" + state.view);
   if (state.view === "sessions") loadSessions();
   if (state.view === "library") loadLibrary();
+  window.sharedOffice?.visibility();
 }
 function pager(id, data, callback) {
   const container = $(id);
@@ -193,77 +192,6 @@ function nextRoomJob(room) {
   return room.jobs
     .filter((job) => job.enabled && job.next_run_at)
     .sort((a, b) => a.next_run_at.localeCompare(b.next_run_at))[0];
-}
-function clearAmbientOffice() {
-  state.ambientTimers.forEach(clearTimeout);
-  state.ambientTimers = [];
-}
-function startAmbientOffice() {
-  clearAmbientOffice();
-  document.querySelectorAll(".office-agent").forEach((agent) => {
-    const room = agent.dataset.room,
-      cast = officeCast[room],
-      label = agent.querySelector("[data-ambient-label]"),
-      body = agent.querySelector(".agent-body");
-    if (!cast || agent.dataset.presence !== "ambient") return;
-    const cycle = () => {
-      let choice = cast.activities[Math.floor(Math.random() * cast.activities.length)];
-      if (cast.activities.length > 1 && state.ambient[room]?.[0] === choice[0])
-        choice = cast.activities[(cast.activities.indexOf(choice) + 1) % cast.activities.length];
-      state.ambient[room] = choice;
-      label.textContent = choice[0];
-      body.className = `agent-body motion-${choice[1]}`;
-      state.ambientTimers.push(
-        setTimeout(cycle, 7000 + Math.floor(Math.random() * 9000)),
-      );
-    };
-    const saved = state.ambient[room] || cast.activities[0];
-    label.textContent = saved[0];
-    body.className = `agent-body motion-${saved[1]}`;
-    state.ambientTimers.push(
-      setTimeout(cycle, 2500 + Math.floor(Math.random() * 7000)),
-    );
-  });
-}
-function renderLivingOffice(rooms) {
-  const featured = rooms.filter((room) => officeCast[room.id]);
-  const extras = rooms.filter((room) => !officeCast[room.id]);
-  const zones = featured
-    .map(
-      (room) =>
-        `<div class="office-zone zone-${esc(room.id)}" style="--room-color:${esc(room.color)}"><span>${esc(room.icon)} ${esc(room.title)}</span></div>`,
-    )
-    .join("");
-  const agents = featured
-    .map((room) => {
-      const cast = officeCast[room.id],
-        presence = room.presence || {
-          mode: "ambient",
-          label: "일상 활동",
-          source: "ambient",
-        },
-        next = nextRoomJob(room),
-        detail =
-          presence.mode === "ambient"
-            ? state.ambient[room.id]?.[0] || cast.activities[0][0]
-            : presence.task || presence.label,
-        status =
-          presence.mode === "working"
-            ? "LIVE"
-            : presence.mode === "blocked"
-              ? "BLOCKED"
-              : "AMBIENT";
-      return `<button class="office-agent agent-${esc(room.id)} presence-${esc(presence.mode)}" data-room="${esc(room.id)}" data-presence="${esc(presence.mode)}" style="--agent-index:${cast.index};--room-color:${esc(room.color)}" aria-label="${esc(`${room.title} 작업실 열기, ${presence.label}`)}"><span class="agent-callout"><b data-ambient-label>${esc(detail)}</b><small>${next ? `다음 일정 ${when(next.next_run_at)}` : room.latest ? `최근 ${relative(room.latest.started_at)}` : "예약된 작업 없음"}</small></span><span class="agent-body ${presence.mode === "working" ? "motion-focus" : presence.mode === "blocked" ? "motion-observe" : `motion-${esc((state.ambient[room.id] || cast.activities[0])[1])}`}"><span class="agent-shadow"></span><span class="agent-sprite"><img src="assets/hermes-agent-cast.png" alt="" /></span><span class="agent-spark" aria-hidden="true">✦</span></span><span class="agent-nameplate"><strong>${esc(cast.name)}</strong><small>${esc(cast.role)}</small></span><span class="agent-presence"><i></i>${status}</span></button>`;
-    })
-    .join("");
-  const annex = extras.length
-    ? `<div class="office-annex"><b>ANNEX</b>${extras.map((room) => `<button data-room="${esc(room.id)}">${esc(room.icon)} ${esc(room.title)}</button>`).join("")}</div>`
-    : "";
-  $("rooms").innerHTML = `<div class="living-office"><div class="office-light"></div><div class="office-wall wall-a"></div><div class="office-wall wall-b"></div><div class="office-lounge"><span>☕</span><i></i><i></i></div><div class="office-table"><span>✦</span></div><div class="office-mail"><span>✉</span><small>TELEGRAM</small></div><div class="office-plants" aria-hidden="true">✿ ✿</div>${zones}${agents}${annex}<div class="office-legend"><span><i class="legend-ambient"></i>AMBIENT · 일상 연출</span><span><i class="legend-live"></i>LIVE · 실제 작업</span><span><i class="legend-blocked"></i>BLOCKED</span></div></div>`;
-  document.querySelectorAll("[data-room]").forEach(
-    (button) => (button.onclick = () => openWorkbench(button.dataset.room)),
-  );
-  startAmbientOffice();
 }
 function drawOverview() {
   const d = state.overview;
@@ -301,7 +229,7 @@ function drawOverview() {
         `<div class="team-item" title="${esc(`gateway 보고 시각: ${when(p.updated_at)}`)}"><span class="dot ${p.alive ? "on" : ""}"></span>${esc(p.profile === "david" ? "David / Hermes" : p.profile)}<small>${p.alive ? (p.active_agents ? `작업 ${p.active_agents}개` : "대기") : "확인 필요"}</small></div>`,
     )
     .join("");
-  renderLivingOffice(d.rooms);
+  window.sharedOffice.render(d.rooms);
   $("recent").innerHTML =
     d.recent
       .slice(0, 7)

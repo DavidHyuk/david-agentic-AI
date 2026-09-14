@@ -138,7 +138,7 @@ David-Agent/
 │   ├── Qwen/                  # Qwen 계열 모델
 │   └── MiniMax/               # MiniMax-M2.7 모델
 │
-├── tests/                     # pytest 테스트 (260개)
+├── tests/                     # pytest 테스트 (270개)
 │   ├── conftest.py
 │   ├── test_papers_ingest.py
 │   ├── test_papers_digest.py
@@ -348,18 +348,24 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
 
 ### Hermes HQ 관제실
 - `scripts/observatory.py` + `browser/observatory/`의 HTML/CSS/JavaScript
-  (`app.js`, `workbench.js`, `style.css`, `workbench.css`):
+  (`app.js`, `workbench.js`, `office.js`, `style.css`, `workbench.css`, `office.css`):
   Python 표준 라이브러리 HTTP 서버와 로컬 HTML/CSS/JavaScript. CDN 없이
   애니메이션 에이전트 오피스, 세션 날짜별 리플레이, 검색·페이지네이션 제공.
 - 메인 오피스는 여성 3명, 남성 3명, 중성적인 Hermes 1명의 통일된 SD
   애니메이션 캐스트를 사용합니다. 투명 캐릭터 시트는
   `browser/observatory/assets/hermes-agent-cast.png`에 보관하고 installer가
-  정적 UI와 함께 staging합니다. 데스크톱은 공용 오피스, 모바일은 2열
-  캐릭터 roster로 반응형 전환합니다.
-- cron 사이에도 읽기, 산책, 듣기, 대화 같은 브라우저 전용 일상 동작을
-  엇갈린 주기로 실행합니다. 이 동작은 `AMBIENT`로 명시하며 gateway 또는
+  정적 UI와 함께 staging합니다. 데스크톱과 모바일 모두 하나의 큰 사무실을
+  공유하며 모바일에서는 좌우 스크롤과 캐릭터 선택 버튼을 제공합니다.
+- 일곱 캐릭터는 책상·커피 공간·소파·창가 사이의 통로를 실제로 이동합니다.
+  위치는 10초 갱신에도 유지되고, 캐릭터 선택·일시정지·동작 감소 설정 및
+  숨겨진 탭에서는 이동을 멈춥니다. 일상 동작은 브라우저 연출이며 gateway 또는
   read-only Kanban DB에서 확인된 작업만 `LIVE`, 막힌 Kanban 임무만
   `BLOCKED`로 표시하여 장식과 운영 상태를 혼동하지 않습니다.
+- 캐릭터 클릭은 사무실 위 초상화·대화 패널을 열며 작업실에서도 같은 대화를
+  이어갑니다. 웹 전용 대화는 기존 HQ API의 `office_<room>` 세션에 보존하고
+  각 Observatory room으로 기록을 분류합니다. 이는 HQ의 시각적 역할이며
+  English profile의 개인 학습 메모리를 자동 공유하지 않습니다. 모델 호출은
+  사용자의 전송 시에만 발생합니다. 새 profile·bot·gateway·cron은 없습니다.
 - 캠퍼스 방 클릭으로 학습 작업실을 엽니다. 코딩·시스템 디자인은 미완료
   과제 재개, 타이머, 실제 연습 결과 제출을 제공하고, English는 정답 확인과
   SRS 채점, Morning Echo는 일일 podcast 배정·대본 준비·전달 상태,

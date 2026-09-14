@@ -74,6 +74,7 @@ EOF
 OBS_GATEWAY_API_AFTER="$(sha256sum "$OBS_GATEWAY_API_DROPIN" | cut -d ' ' -f 1)"
 install -m 0600 "$OBS_REPO/browser/observatory/index.html" "$OBS_REPO/browser/observatory/style.css" "$OBS_REPO/browser/observatory/app.js" "$OBS_HOME/observatory/"
 install -m 0600 "$OBS_REPO/browser/observatory/workbench.js" "$OBS_REPO/browser/observatory/workbench.css" "$OBS_HOME/observatory/"
+install -m 0600 "$OBS_REPO/browser/observatory/office.js" "$OBS_REPO/browser/observatory/office.css" "$OBS_HOME/observatory/"
 install -m 0600 "$OBS_REPO/browser/observatory/assets/hermes-agent-cast.png" "$OBS_HOME/observatory/assets/"
 install -m 0700 "$OBS_REPO/scripts/interview_progress.py" "$OBS_REPO/scripts/english_srs.py" "$OBS_HOME/scripts/"
 if [[ -d "$OBS_HOME/profiles/english/scripts" ]]; then

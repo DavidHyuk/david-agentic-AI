@@ -3,6 +3,21 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.13.0 — 2026-09-13 (minor: roam a shared office and talk to the cast)
+
+- Replaced fixed character bays with one open office: seven 2D characters follow
+  aisle routes between desks, coffee, lounge and windows. Polling preserves their
+  positions; pause, reduced motion and hidden-view suspension control animation.
+- Added portrait conversations inside the office and character companions in
+  workbenches. All seven cast members use web-only, persisted HQ API sessions,
+  with separate drafts, pending indicators, history reload and concurrent-turn guards.
+- Mapped current and historical `office_<room>` sessions into the existing seven
+  rooms. These are visual personas hosted by HQ, not additional specialist profiles;
+  English learner memory, original cron routing and Telegram conversations remain
+  with their existing owners. No new bot, gateway, cron job or room is introduced.
+- Mobile retains the shared office via horizontal scrolling and character shortcuts.
+  Existing generated art is reused; no new binary asset is required.
+
 ## v1.12.0 — 2026-09-13 (minor: add the living anime agent office)
 
 - Replaced the Observatory's static pixel-room cards with a shared animated

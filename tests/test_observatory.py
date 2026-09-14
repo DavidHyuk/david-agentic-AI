@@ -119,6 +119,60 @@ def test_gateway_pid_absent_is_not_live(store):
     assert store.gateway('david')['active_agents'] == 0
 
 
+@pytest.mark.parametrize('room', ['hq', 'papers', 'interview', 'coding', 'design', 'english', 'podcast'])
+def test_office_chat_persists_separate_session_without_delivery(store, monkeypatch, room):
+    calls = []
+    def agent_api(method, path, payload=None, **kwargs):
+        calls.append((method, path, payload))
+        if method == 'GET':
+            return {'_status': 404}
+        return {'message': {'content': '안녕하세요!'}}
+    monkeypatch.setattr(store, 'agent_api', agent_api)
+    monkeypatch.setattr(store, 'telegram_send', lambda *args: pytest.fail('Office chat must not send Telegram'))
+    result = store.study_action({'action': 'office_chat', 'room': room, 'message': '안녕'})
+    assert result['response'] == '안녕하세요!'
+    assert calls[1][2]['id'] == 'office_' + room
+    assert calls[2][1] == '/api/sessions/office_' + room + '/chat'
+    assert 'Do not modify' in calls[2][2]['instructions']
+    assert room_for('david', 'office_' + room, '', []) == room
+    assert not store.office_locks[room].locked()
+
+
+def test_office_read_is_inert_and_room_validation_is_closed(store, monkeypatch):
+    monkeypatch.setattr(store, 'agent_api', lambda *args, **kwargs: pytest.fail('Read invoked model'))
+    assert store.office_conversation('english')['history'] == []
+    for room in ('../../', 'unknown', [], None):
+        with pytest.raises(ValueError):
+            store.office_conversation(room)
+        with pytest.raises(ValueError):
+            store.office_chat({'room': room, 'message': 'hi'})
+
+
+def test_office_chat_lock_released_after_model_failure(store, monkeypatch):
+    def fail(*args, **kwargs):
+        raise OSError('offline')
+    monkeypatch.setattr(store, 'agent_api', fail)
+    with pytest.raises(OSError):
+        store.office_chat({'room': 'hq', 'message': 'hi'})
+    assert not store.office_locks['hq'].locked()
+    store.office_locks['hq'].acquire()
+    try:
+        with pytest.raises(ValueError, match='답변 중'):
+            store.office_chat({'room': 'hq', 'message': 'hi'})
+    finally:
+        store.office_locks['hq'].release()
+
+
+def test_office_history_excludes_system_and_other_characters(store):
+    conn = sqlite3.connect(store.home / 'state.db')
+    conn.execute("INSERT INTO messages VALUES(11,'office_english','assistant','Hello!',NULL,NULL,2,NULL)")
+    conn.execute("INSERT INTO messages VALUES(12,'office_english','system','hidden',NULL,NULL,3,NULL)")
+    conn.execute("INSERT INTO messages VALUES(13,'office_podcast','assistant','Other',NULL,NULL,4,NULL)")
+    conn.commit()
+    conn.close()
+    assert [row['content'] for row in store.office_conversation('english')['history']] == ['Hello!']
+
+
 def test_room_presence_distinguishes_ambient_live_and_blocked(store):
     board = store.home / 'kanban/boards/hermes-hq'
     board.mkdir(parents=True)

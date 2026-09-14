@@ -46,6 +46,7 @@ async function openWorkbench(room) {
   $("bench-subtitle").textContent =
     deskSubtitles[room] || "프로필 활동과 기록을 살펴보세요.";
   $("bench-status").textContent = "";
+  window.sharedOffice?.workbench(room);
   $("bench-content").innerHTML =
     '<div class="empty">작업실을 준비하는 중…</div>';
   await loadWorkbench();

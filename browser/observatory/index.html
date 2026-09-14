@@ -10,6 +10,8 @@
     <script src="app.js" defer></script>
     <script src="workbench.js" defer></script>
     <link rel="stylesheet" href="workbench.css" />
+    <link rel="stylesheet" href="office.css" />
+    <script src="office.js" defer></script>
   </head>
   <body>
     <aside class="sidebar">
@@ -38,7 +40,7 @@
       <div class="sidebar-bottom">
         <span>◈ TAILSCALE</span>
         <p>내 에이전트들의 하루를<br />한눈에, 조금 더 즐겁게.</p>
-        <small>PERSONAL WORKSPACE · v1.12</small>
+        <small>PERSONAL WORKSPACE · v1.13</small>
       </div>
     </aside>
     <main>
@@ -66,8 +68,8 @@
           <div class="office-layout">
             <div>
               <div class="section-heading">
-                <h2>작업실 둘러보기</h2>
-                <span>캐릭터를 클릭해 해당 작업실을 열어보세요 ↗</span>
+                <h2>우리의 사무실</h2>
+                <span>캐릭터를 누르면 그 자리에서 대화가 시작됩니다</span>
               </div>
               <div class="replay-controls">
                 <input
@@ -77,12 +79,14 @@
                 /><button id="replay-start">▷ 하루 리플레이</button
                 ><button id="replay-stop" hidden>■ 멈추기</button
                 ><span id="replay-label">저장된 세션을 시간순으로 재생</span>
+                <button id="office-motion" aria-pressed="false">움직임 멈추기</button>
               </div>
               <div class="office-floor">
                 <div class="floor-label">
-                  <span>✦ HERMES CAMPUS</span><span>01 / WORKROOMS</span>
+                  <span>✦ HERMES OFFICE</span><span>ONE ROOM · SEVEN MINDS</span>
                 </div>
                 <div class="rooms" id="rooms"></div>
+                <div id="office-roster" aria-label="캐릭터 바로 선택"></div>
                 <div class="floor-bottom">
                   <span>🌿 A quiet place to make progress.</span
                   ><span>AMBIENT + 실제 상태 · 10초 갱신</span>
@@ -125,6 +129,7 @@
             ><button class="outline" id="bench-reload">↻ 다시 불러오기</button
             ><span id="bench-status" role="status" aria-live="polite"></span>
           </div>
+          <div id="bench-character"></div>
           <div id="bench-content"></div>
         </section>
         <section id="sessions-view" hidden>

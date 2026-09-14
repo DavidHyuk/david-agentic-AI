@@ -839,15 +839,28 @@ sudo tailscale serve --bg --https=8443 http://127.0.0.1:8788
 # Then open https://<machine-tailnet-DNS-name>:8443
 ```
 
-The first screen refreshes every ten seconds. Click a campus room to open its
-workbench; its history button opens the room's saved conversations.
+The first screen refreshes every ten seconds while preserving character positions.
+All seven characters walk through the same open office, visiting the coffee bar,
+lounge, windows and desks. Click a character to open a portrait and conversation
+panel over the office. Use **작업실 열기** for their study workbench, where the same
+character remains present and **대화 이어가기** opens the conversation in place.
+**움직임 멈추기** pauses roaming; reduced-motion preferences also stop movement.
 
 The office uses one repository-owned transparent character sheet under
 `browser/observatory/assets/`. `bootstrap/install_observatory.sh` stages it with
-the rest of the UI. On desktop the cast occupies a shared office floor; on small
-screens it becomes a two-column character roster. Browser-only ambient routines
-change at staggered intervals even when Hermes is idle, while state badges retain
-the source-of-truth distinction above.
+the rest of the UI. The 2D cast moves over a room with shaded furniture. Mobile
+keeps this same room in a horizontally scrollable viewport, with named character
+shortcuts beneath it. Browser-only ambient routes run even when Hermes is idle;
+hidden tabs and other views suspend animation.
+
+Office conversations use separate persisted `office_<room>` sessions on the
+existing HQ API, classified into their matching Observatory rooms. They are
+web-only conversations with the visual personas, not separate agent profiles and
+not the English profile's private learner-memory sessions. The English and
+podcast characters ask for relevant lesson text when needed. Existing dedicated
+profile workbenches and Telegram coaching retain their original ownership.
+Opening a character never invokes a model; pressing **보내기** does. The existing
+four workbench Telegram composers remain separately labeled.
 
 - **LeetCode / System Design**: resume unfinished assignments, prepare today's
   assignment, or open another same-day assignment after completing one; use a

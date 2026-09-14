@@ -57,6 +57,15 @@ SPECIALIST_ROOMS = {
     'clawgram': 'clawgram',
 }
 TELEGRAM_CHAT_ROOMS = frozenset({'papers', 'interview', 'coding', 'design'})
+OFFICE_CHARACTERS = {
+    'hq': ('Hermes', 'a thoughtful team lead'),
+    'papers': ('Iris', 'a calm research analyst'),
+    'interview': ('Theo', 'a supportive ML interview coach'),
+    'coding': ('Jun', 'an energetic coding coach who offers hints before solutions'),
+    'design': ('Mina', 'a precise systems architect'),
+    'english': ('Evan', 'a friendly English conversation tutor'),
+    'podcast': ('Rina', 'an enthusiastic listening and podcast coach'),
+}
 ROOM_CHAT_INSTRUCTIONS = {
     'papers': ('Use the papers-digest skill and answer as the Frontier Radar research specialist. '
                'Do not send messages; the observatory delivers your final answer.'),
@@ -101,6 +110,9 @@ def task_prompt(prompt):
 
 
 def room_for(profile, session_id, prompt, jobs):
+    office = re.fullmatch(r'office_(hq|papers|interview|coding|design|english|podcast)', session_id)
+    if profile == 'david' and office:
+        return office.group(1)
     dashboard = re.fullmatch(r'observatory_(papers|interview|coding|design)', session_id)
     if profile == 'david' and dashboard:
         return dashboard.group(1)
@@ -160,6 +172,7 @@ class Observatory:
         self.agent_api_url = agent_api_url.rstrip('/')
         self.agent_api_key = (agent_api_key if agent_api_key is not None
                               else os.environ.get('API_SERVER_KEY', '')).strip()
+        self.office_locks = {room: threading.Lock() for room in OFFICE_CHARACTERS}
 
     def profiles(self):
         result = {'david': self.home}
@@ -309,6 +322,60 @@ class Observatory:
         except sqlite3.Error:
             return []
         return [dict(row) for row in reversed(rows)]
+
+    def office_conversation(self, room):
+        """Read HQ-hosted character conversations without triggering a model."""
+        if not isinstance(room, str) or room not in OFFICE_CHARACTERS:
+            raise ValueError('알 수 없는 캐릭터입니다.')
+        conn = self.connect('david')
+        try:
+            rows = conn.execute("""SELECT role,content,timestamp FROM messages
+                WHERE session_id=? AND role IN ('user','assistant')
+                AND content IS NOT NULL AND trim(content) != ''
+                ORDER BY id DESC LIMIT 40""", ('office_' + room,)).fetchall()
+        finally:
+            conn.close()
+        return {'room': room, 'available': bool(self.agent_api_key),
+                'history': [dict(row) for row in reversed(rows)],
+                'busy': self.office_locks[room].locked()}
+
+    def office_chat(self, body):
+        """Persist a web-only character conversation on the existing HQ API."""
+        room = body.get('room')
+        if not isinstance(room, str) or room not in OFFICE_CHARACTERS:
+            raise ValueError('알 수 없는 캐릭터입니다.')
+        message = self.text_field(body, 'message', maximum=4000)
+        if not self.office_locks[room].acquire(blocking=False):
+            raise ValueError('이 캐릭터가 답변 중입니다. 잠시 후 대화 기록을 확인하세요.')
+        try:
+            session = 'office_' + room
+            name, role = OFFICE_CHARACTERS[room]
+            found = self.agent_api('GET', '/api/sessions/' + session, allow_status=(404,))
+            if found.get('_status') == 404:
+                self.agent_api('POST', '/api/sessions', {
+                    'id': session, 'title': name + ' · Office conversation',
+                }, allow_status=(409,))
+            instructions = (
+                f'You are {name}, {role}, a visual persona in David’s Hermes office. '
+                'Respond warmly and concisely, normally in Korean unless practicing English. '
+                'This is a web-only conversation hosted by Hermes HQ. '
+                'Do not send messages to Telegram or other external services. '
+                'Do not modify files, memories, schedules or study progress. '
+                'Ambient animations are fictional decoration, not completed work. '
+                'Do not claim to have read private learner memories or podcast transcripts '
+                'unless actually provided in this conversation. Ask for the relevant text '
+                'when necessary. For execution or saved study actions, direct the user to '
+                'the existing workbench. Give coding hints before revealing solutions.'
+            )
+            result = self.agent_api('POST', f'/api/sessions/{session}/chat', {
+                'message': message, 'instructions': instructions,
+            })
+            response = str(result.get('message', {}).get('content', '')).strip()
+            if not response:
+                raise OSError('답변을 확인하지 못했습니다. 대화 기록을 다시 불러오세요.')
+            return {'saved': True, 'response': response, 'room': room, 'session': session}
+        finally:
+            self.office_locks[room].release()
 
     def agent_api(self, method, path, payload=None, allow_status=()):
         """Call the key-authenticated Hermes API over loopback only."""
@@ -492,6 +559,8 @@ class Observatory:
             return self.save_notebook(body)
         if action == 'room_chat':
             return self.room_chat(body)
+        if action == 'office_chat':
+            return self.office_chat(body)
         if isinstance(action, str) and action.startswith('mission_'):
             return self.mission_action(body)
         raise ValueError('허용되지 않은 동작입니다.')
@@ -904,6 +973,8 @@ def make_handler(store, assets: Path, hosts):
                 profile = args.get('profile', '')
                 if url.path == '/api/overview':
                     data = store.overview()
+                elif url.path == '/api/office-chat':
+                    data = store.office_conversation(args.get('room', 'hq'))
                 elif url.path == '/api/workbench':
                     data = store.workbench(args.get('room', 'hq'))
                 elif url.path == '/api/mission':
@@ -915,7 +986,7 @@ def make_handler(store, assets: Path, hosts):
                 elif url.path == '/api/library':
                     data = store.library(args.get('kind', ''), profile or 'david', q, offset, limit)
                 elif url.path in ('/', '/index.html', '/app.js', '/style.css', '/workbench.js', '/workbench.css',
-                                       '/assets/hermes-agent-cast.png'):
+                                       '/office.js', '/office.css', '/assets/hermes-agent-cast.png'):
                     filename = 'index.html' if url.path == '/' else url.path[1:]
                     content = (assets / filename).read_bytes()
                     media_type = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
