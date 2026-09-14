@@ -840,8 +840,8 @@ sudo tailscale serve --bg --https=8443 http://127.0.0.1:8788
 ```
 
 The first screen refreshes every ten seconds while preserving character positions.
-All seven characters walk through the same open office, visiting the coffee bar,
-lounge, windows and desks. Click a character to open a portrait and conversation
+Specialists remain at their meaningful workstations while idle; Hermes periodically
+visits a teammate for a short, decorative check-in. Click a character to open a portrait and conversation
 panel over the office. Use **작업실 열기** for their study workbench, where the same
 character remains present and **대화 이어가기** opens the conversation in place.
 The workbench companion is rendered as a complete, uncropped figure. Workbench
@@ -856,11 +856,12 @@ the rest of the UI. The 2D cast moves through a zoned studio with paired desks,
 research and review boards, an archive shelf, collaboration commons, coaching
 lounge, coffee bar, and audio desk. Mobile
 keeps this same room in a horizontally scrollable viewport, with named character
-shortcuts beneath it. Browser-only ambient routes run even when Hermes is idle;
-hidden tabs and other views suspend animation. Roaming is intentionally sparse:
-each character follows a deterministic role-specific circuit and displays its
-current purpose below its name. Characters normally remain at each location for
-roughly 75–140 seconds, with staggered initial departures. Speech cycles among real recent cron-notification
+shortcuts and visible next-action cards beneath it. Browser-only animation is
+intentionally sparse: idle specialists stay in their work areas, while Hermes
+makes periodic leadership rounds. Every room displays an evidence-backed next
+action such as due English reviews, unread papers, or an unfinished assignment;
+clicking it opens the matching workbench. Hidden tabs and other views suspend animation.
+Speech cycles among real recent cron-notification
 excerpts, next-schedule fallbacks, short role-specific lines, and paired agent-to-agent
 exchanges only when the pair is physically near each other. A nearby pair speaks
 first; later bubbles wait 14–24 seconds after the previous exchange. Recent-notification bubbles come from stored assistant output and are

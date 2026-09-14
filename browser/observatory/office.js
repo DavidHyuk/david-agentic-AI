@@ -47,6 +47,17 @@ window.sharedOffice = (() => {
       {point: [850, 410], label: "녹음 확인"},
     ],
   };
+  // Hermes is the only ambient walker. His visits make leadership presence
+  // legible without turning every idle specialist into background motion.
+  const leaderVisits = [
+    {room: "papers", point: [245, 345], label: "Iris와 연구 이야기"},
+    {room: "interview", point: [455, 345], label: "Theo와 잠깐 이야기"},
+    {room: "coding", point: [555, 345], label: "Jun과 진행 확인"},
+    {room: "design", point: [765, 345], label: "Mina와 설계 이야기"},
+    {room: "english", point: [285, 440], label: "Ellie와 잠깐 이야기"},
+    {room: "podcast", point: [675, 440], label: "Rina와 잠깐 이야기"},
+    {room: "hq", point: homes.hq, label: "전체 흐름 정리"},
+  ];
   // Scripted small talk is decorative, never a model call or a work-status report.
   const ambientLines = {
     hq: ["필요하면 언제든 불러주세요.", "오늘의 흐름을 같이 정리해볼까요?", "천천히, 하나씩 해도 괜찮아요."],
@@ -64,6 +75,14 @@ window.sharedOffice = (() => {
     ["hq", "papers", "Iris, 요즘 어떤 주제가 눈에 띄나요?", "추론과 에이전트 흐름을 보고 있어요."],
     ["interview", "design", "Mina, 이 답변의 약점도 봐줄래요?", "실패 시나리오를 하나 더 붙여봐요."],
   ];
+  const leaderSmallTalk = {
+    papers: ["Iris, 커피는 챙겼어요?", "네, 논문보다 따뜻해요."],
+    interview: ["Theo, 오늘 질문이 너무 어렵진 않죠?", "좋은 질문은 조금 어려워야죠."],
+    coding: ["Jun, 키보드 소리만 들려도 든든하네요.", "버그도 그 소리를 들으면 도망가면 좋겠어요."],
+    design: ["Mina, 화이트보드 자리가 아직 남았나요?", "좋은 생각 하나만 가져오시면요."],
+    english: ["Ellie, 오늘도 한 문장 배워볼까요?", "물론이죠. 부담 없이 시작해요."],
+    podcast: ["Rina, 음악은 너무 크게 틀지 말아줘요.", "좋은 부분만 살짝 들려드릴게요!"],
+  };
   const jobLabels = {
     "papers-digest": "연구 다이제스트", "interview-prep": "MLE 면접 드릴",
     "coding-coach": "코딩 훈련", "system-design-coach": "시스템 디자인 훈련",
@@ -100,14 +119,14 @@ window.sharedOffice = (() => {
         <div class="wall-board research-board" aria-hidden="true"><b>RESEARCH PULSE</b><i></i><i></i><i></i></div>
         <div class="wall-board systems-board" aria-hidden="true"><b>SYSTEM MAP</b><i></i><i></i><i></i></div>
         <div class="zone-rug collaboration-zone" aria-hidden="true"><span>COLLABORATION COMMONS</span></div>
-        <div class="furniture desk-island desk-one"><i></i><i></i><span>RESEARCH / INTERVIEW</span></div>
-        <div class="furniture desk-island desk-two"><i></i><i></i><span>CODE / DESIGN</span></div>
+        <div class="furniture desk-island desk-one"><b>RESEARCH / INTERVIEW</b><i></i><i></i><em>FIELD NOTES · QUESTION LAB</em><div class="zone-actions" id="research-actions"></div></div>
+        <div class="furniture desk-island desk-two"><b>CODE / DESIGN</b><i></i><i></i><em>BUILD · REVIEW · SYSTEM MAP</em><div class="zone-actions" id="engineering-actions"></div></div>
         <div class="furniture archive-shelf" aria-hidden="true"><b>FIELD NOTES</b><i></i><i></i><i></i><span>ARCHIVE</span></div>
         <div class="furniture review-board" aria-hidden="true"><b>REVIEW</b><i></i><i></i><span></span></div>
-        <div class="furniture coffee-bar"><b>☕</b><span>COFFEE CLUB</span><i></i></div>
-        <div class="furniture sofa"><span>TAKE A BREATH</span><i></i><i></i><i></i></div>
-        <div class="furniture meeting-table"><i></i><span>✦</span><i></i></div>
-        <div class="furniture sound-desk"><span>ON AIR</span><b>▥ ▥ ▥</b></div>
+        <div class="furniture coffee-bar"><b>☕</b><span>COFFEE CLUB · ENGLISH CORNER</span><i></i><div class="zone-actions" id="english-actions"></div></div>
+        <div class="furniture sofa"><span>TAKE A BREATH · QUIET LOUNGE</span><i></i><i></i><i></i><b>✦</b></div>
+        <div class="furniture meeting-table"><i></i><span>✦</span><i></i><div class="zone-actions" id="hq-actions"></div></div>
+        <div class="furniture sound-desk"><span>ON AIR · LISTENING STUDIO</span><b>▥ ▥ ▥</b><i></i><div class="zone-actions" id="podcast-actions"></div></div>
         <div class="furniture green-plant plant-one">✺</div><div class="furniture green-plant plant-two">✺</div>
         <div class="walking-floor" id="walking-floor"></div>
         <div class="shared-floor-caption">일상 연출 <span>캐릭터를 클릭해 이야기해 보세요</span></div>
@@ -193,7 +212,7 @@ window.sharedOffice = (() => {
         button.addEventListener("pointerleave", () => button.classList.remove("is-hovering"));
         $("walking-floor").append(button);
         actor = {node: button, x: homes[room.id][0], y: homes[room.id][1], route: [],
-          wait: 18 + officeCast[room.id].index * 18, routineIndex: 1,
+          wait: room.id === "hq" ? 55 : Infinity, routineIndex: 0, visitRoom: null,
           pendingPurpose: "", purpose: routines[room.id][0].label, mode: "ambient"};
         actors.set(room.id, actor);
         setPurpose(actor, actor.purpose);
@@ -201,11 +220,10 @@ window.sharedOffice = (() => {
       const mode = room.presence?.mode || "ambient";
       if (actor.mode !== mode) {
         actor.route = [];
-        if (mode !== "ambient") route(actor, homes[room.id], room.presence?.label || "실제 작업 확인");
-        else {
-          actor.routineIndex = 1;
-          route(actor, homes[room.id], routines[room.id][0].label);
-        }
+        actor.visitRoom = null;
+        setPurpose(actor, mode !== "ambient"
+          ? room.presence?.label || "실제 작업 확인"
+          : routines[room.id][0].label);
       }
       actor.mode = mode;
       actor.node.dataset.presence = mode;
@@ -214,22 +232,45 @@ window.sharedOffice = (() => {
       paint(actor);
     }
     // Stable actor nodes retain positions, keyboard focus and animation on polling.
-    if (!$("office-roster").children.length) {
-      $("office-roster").innerHTML = rooms.map(room =>
-        `<button class="outline" data-cast="${esc(room.id)}">${esc(officeCast[room.id]?.name || room.title)}<small>${esc(room.subtitle)}</small></button>`).join("");
-      $("office-roster").querySelectorAll("[data-cast]").forEach(button => {
-        button.onclick = () => officeCast[button.dataset.cast] ? select(button.dataset.cast) : openWorkbench(button.dataset.cast);
+    renderUserActions(rooms);
+    $("office-roster").innerHTML = rooms.map(room => {
+      const action = room.action || {title: "다음 행동", detail: "작업실 열기"};
+      return `<button class="outline" data-cast="${esc(room.id)}"><b>${esc(officeCast[room.id]?.name || room.title)}</b><small>${esc(room.subtitle)}</small><span class="roster-action"><strong>${esc(action.title)}</strong><em>${esc(action.detail)}</em></span></button>`;
+    }).join("");
+    $("office-roster").querySelectorAll("[data-cast]").forEach(button => {
+      button.onclick = () => officeCast[button.dataset.cast] ? select(button.dataset.cast) : openWorkbench(button.dataset.cast);
+    });
+    visibility();
+  }
+  function renderUserActions(rooms) {
+    const byId = new Map(rooms.map(room => [room.id, room]));
+    const slots = {
+      "research-actions": ["papers", "interview"],
+      "engineering-actions": ["coding", "design"],
+      "english-actions": ["english"],
+      "hq-actions": ["hq"],
+      "podcast-actions": ["podcast"],
+    };
+    for (const [slotId, roomIds] of Object.entries(slots)) {
+      const slot = $(slotId);
+      if (!slot) continue;
+      slot.innerHTML = roomIds.map((roomId) => {
+        const room = byId.get(roomId), action = room?.action || {title: "다음 행동", detail: "작업실 열기"};
+        return `<button data-action-room="${esc(roomId)}" title="${esc(room?.title || roomId)} 작업실 열기"><b>${esc(room?.icon || "✦")} ${esc(action.title)}</b><small>${esc(action.detail)}</small></button>`;
+      }).join("");
+      slot.querySelectorAll("[data-action-room]").forEach(button => {
+        button.onclick = () => openWorkbench(button.dataset.actionRoom);
       });
     }
-    visibility();
   }
   function setPurpose(actor, purpose) {
     actor.purpose = purpose;
     actor.node.querySelector(".walk-purpose").textContent = purpose;
   }
-  function route(actor, target, purpose) {
+  function route(actor, target, purpose, visitRoom = null) {
     actor.route = [[actor.x, 345], [target[0], 345], target];
     actor.pendingPurpose = purpose;
+    actor.visitRoom = visitRoom;
     setPurpose(actor, purpose + " · 이동 중");
   }
   function paint(actor) {
@@ -250,14 +291,17 @@ window.sharedOffice = (() => {
           if (!actor.route.length && actor.pendingPurpose) {
             setPurpose(actor, actor.pendingPurpose);
             actor.pendingPurpose = "";
+            const visitRoom = actor.visitRoom;
+            actor.visitRoom = null;
+            if (room === "hq" && visitRoom) startLeaderSmallTalk(visitRoom);
           }
         } else { actor.x += dx / distance * step; actor.y += dy / distance * step; }
-      } else if (!held && actor.mode === "ambient") {
+      } else if (!held && room === "hq" && actor.mode === "ambient") {
         actor.wait -= delta;
         if (actor.wait <= 0) {
-          const routine = routines[room][actor.routineIndex++ % routines[room].length];
-          route(actor, routine.point, routine.label);
-          actor.wait = 75 + officeCast[room].index * 7 + (actor.routineIndex % 3) * 12;
+          const visit = leaderVisits[actor.routineIndex++ % leaderVisits.length];
+          route(actor, visit.point, visit.label, visit.room === "hq" ? null : visit.room);
+          actor.wait = 115 + (actor.routineIndex % 3) * 18;
         }
       }
       actor.node.classList.toggle("is-walking", !held && actor.route.length > 0);
@@ -271,7 +315,7 @@ window.sharedOffice = (() => {
     const stop = paused || reduced.matches || document.hidden || state.view !== "office";
     document.querySelector(".shared-floor")?.classList.toggle("motion-paused", stop);
     if ($("office-motion")) {
-      $("office-motion").textContent = paused ? "움직임 재개" : "움직임 멈추기";
+      $("office-motion").textContent = paused ? "팀장 이동 재개" : "팀장 이동 멈추기";
       $("office-motion").setAttribute("aria-pressed", String(paused));
     }
     previous = 0;
@@ -355,6 +399,14 @@ window.sharedOffice = (() => {
     }
     speakNotification();
   }
+  function startLeaderSmallTalk(partner) {
+    const lines = leaderSmallTalk[partner];
+    if (!lines || selected || state.replay || document.hidden || state.view !== "office") return;
+    stopTalk();
+    showBubble("hq", lines[0], "dialogue");
+    replyTimer = setTimeout(() => showBubble(partner, lines[1], "dialogue"), 1600);
+    finishTalk(7600);
+  }
   function speakAmbient() {
     const rooms = [...actors.keys()].filter((room) => room !== selected);
     if (!rooms.length) return;
@@ -393,6 +445,7 @@ window.sharedOffice = (() => {
     speak(room, "불러주셨나요?", 4200, "greeting");
     if (!insideWorkbench) actor?.node.scrollIntoView({block: "nearest", inline: "center", behavior: "smooth"});
     $("conversation-portrait").innerHTML = sprite(room, "portrait-art");
+    $("office-conversation").dataset.character = room;
     $("conversation-role").textContent = cast.role;
     $("conversation-name").textContent = cast.name;
     const data = roomData.find(item => item.id === room), job = data && nextRoomJob(data);

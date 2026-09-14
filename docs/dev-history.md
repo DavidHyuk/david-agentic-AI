@@ -3,6 +3,17 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.15.2 — 2026-09-13 (patch: make the office purpose-led and actionable)
+
+- Stopped idle specialist roaming. Hermes alone makes calm periodic rounds to
+  nearby teammates and starts a visibly decorative leadership check-in.
+- Rebuilt the shared floor into denser research/interview and engineering studios,
+  an Espresso Coffee Club, Quiet Lounge, collaboration table and Listening Studio.
+- Added evidence-backed, clickable next-action cards for every room using saved
+  assignments, reading-list, English SRS and podcast state. Updated companion
+  framing so Ellie has matched office, portrait and workbench proportions, and
+  vertically centered each workbench's copy beside its character.
+
 ## v1.15.1 — 2026-09-13 (patch: fix workbench companion framing and Back navigation)
 
 - Enlarged each workbench companion's frame so the complete figure, including

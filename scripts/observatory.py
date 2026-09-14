@@ -883,6 +883,35 @@ class Observatory:
                 }
         return presence
 
+    def office_actions(self):
+        """Return small, evidence-backed next actions for the office floor."""
+        today = datetime.now(TZ).date().isoformat()
+        pending = self.pending_assignments()
+        notebook = self.notebook()
+        reading = sum(not item.get('read') for item in notebook['papers'].values())
+        cards = list(read_json(self.home / 'data/english/srs_deck.json', {'cards': {}})['cards'].values())
+        due = sum(card.get('due', '') <= today for card in cards)
+        coding = next((item for item in pending if item.get('track') == 'coding'), None)
+        design = next((item for item in pending if item.get('track') == 'system_design'), None)
+        podcast = read_json(self.home / 'data/english-podcast/state.json', {'assignments': {}})
+        assignments = podcast.get('assignments', {})
+        latest = assignments.get(max(assignments), {}) if assignments else {}
+        return {
+            'hq': {'title': '오늘의 우선순위',
+                   'detail': f'미완료 학습 {len(pending)}개' if pending else '팀의 다음 흐름 확인'},
+            'papers': {'title': '읽기 목록',
+                       'detail': f'읽기 대기 {reading}편' if reading else '관심 논문 고르기'},
+            'interview': {'title': '답변 연습', 'detail': '최근 드릴을 소리 내어 답하기'},
+            'coding': {'title': '코딩 과제',
+                       'detail': coding.get('item_id', '다음 과제 준비') if coding else '다음 과제 준비'},
+            'design': {'title': '설계 과제',
+                       'detail': design.get('item_id', '다음 과제 준비') if design else '다음 과제 준비'},
+            'english': {'title': '영어 복습',
+                        'detail': f'오늘 복습 {due}개' if due else '새 표현 한 문장'},
+            'podcast': {'title': '오늘의 듣기',
+                        'detail': latest.get('title', '') or '에피소드 준비 상태 확인'},
+        }
+
     def overview(self):
         profiles, jobs, errors = [], [], []
         for name in self.profiles():
@@ -897,6 +926,7 @@ class Observatory:
                 errors.append({'profile': name, 'error': type(exc).__name__})
         sessions = self.sessions(limit=1000000)
         presence = self.room_presence(profiles)
+        actions = self.office_actions()
         rooms = []
         room_ids = {room[0] for room in ROOMS}
         definitions = ROOMS + [(n, n.title(), '독립 프로필', '📷', '#d2c3af')
@@ -908,6 +938,7 @@ class Observatory:
             rooms.append({'id': key, 'title': title, 'subtitle': subtitle, 'icon': icon,
                           'color': color, 'sessions': len(history), 'latest': latest,
                           'jobs': room_jobs, 'notice': self.recent_notification(history),
+                          'action': actions.get(key, {'title': '다음 행동', 'detail': '작업실 열기'}),
                           'profile': ROOM_PROFILES.get(key, key),
                           'presence': presence.get(key, {
                               'mode': 'ambient', 'label': '일상 활동',

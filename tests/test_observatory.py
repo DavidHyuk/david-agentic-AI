@@ -115,8 +115,10 @@ def test_notification_excerpt_uses_first_meaningful_line_and_stays_compact():
 def test_overview_exposes_actual_cron_response_as_room_notice(store):
     hq = next(room for room in store.overview()['rooms'] if room['id'] == 'hq')
     assert hq['notice']['text'] == 'Hello English'
+    assert hq['action'] == {'title': '오늘의 우선순위', 'detail': '팀의 다음 흐름 확인'}
     coding = next(room for room in store.overview()['rooms'] if room['id'] == 'coding')
     assert coding['notice'] is None
+    assert coding['action']['title'] == '코딩 과제'
 
 
 def test_missing_sources_are_empty_and_db_is_readonly(store):
