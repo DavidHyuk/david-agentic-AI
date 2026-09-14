@@ -667,22 +667,26 @@ The token is entered through a hidden prompt and is stored only at
 separate, safe-to-read snapshot is
 `~/.hermes/data/interview/leetcode_history.json`.
 
-After logging into LeetCode in your own browser, copy the `LEETCODE_SESSION`
-cookie value and run the following on the Hermes host. Do not put the value on a
-command line, in a shell history, or in a `.env` file.
+The preferred setup signs in through the existing local headless Chromium. It
+asks for the login and password interactively; the password remains only in
+memory while the browser signs in. Do not place either value in a command line,
+shell history, or `.env` file.
 
 ```bash
-python3 ~/.hermes/scripts/leetcode_sync.py connect --username <your-leetcode-handle>
+python3 ~/.hermes/scripts/leetcode_sync.py login --username <your-leetcode-handle>
 python3 ~/.hermes/scripts/leetcode_sync.py sync
 python3 ~/.hermes/scripts/leetcode_sync.py status
 ```
 
-The first command verifies that the session belongs to the supplied handle. A
-read-only `leetcode-history-sync` cron then refreshes the snapshot every four
-hours, and `coding-coach` refreshes it again before each scheduled coding
-lesson. The LeetCode Gym Observatory room shows only the safe snapshot; it never
-returns the session cookie. To stop future account access while retaining the
-already saved progress snapshot, run:
+The first command verifies that the session belongs to the supplied handle. If
+LeetCode presents CAPTCHA, MFA, or an OAuth confirmation, the headless command
+fails closed; sign in in a normal browser and use the `connect` command to paste
+only the `LEETCODE_SESSION` cookie into its hidden prompt instead. A read-only
+`leetcode-history-sync` cron then refreshes the snapshot every four hours, and
+`coding-coach` refreshes it again before each scheduled coding lesson. The
+LeetCode Gym Observatory room shows only the safe snapshot; it never returns the
+session cookie. To stop future account access while retaining the already saved
+progress snapshot, run:
 
 ```bash
 python3 ~/.hermes/scripts/leetcode_sync.py disconnect
@@ -806,10 +810,12 @@ python3 download_model.py Qwen/Qwen3.6-35B-A3B-FP8
 
 ## Browser note
 
-Hermes's own browser tool is used; this project does not add direct Playwright
-code. `agent-browser` is pinned to `0.33.0` and connects to a Chromium service
-bound only to `127.0.0.1:19222`. The explicit CDP service avoids a Snap Chromium
-auto-launch hang observed on the DGX Spark's ARM64 environment.
+Hermes's own browser tool uses pinned `agent-browser` and a Chromium service
+bound only to `127.0.0.1:19222`. The opt-in LeetCode helper additionally uses
+Playwright only to attach to that same local CDP browser for an interactive,
+headless password login; it neither launches a cloud browser nor saves a
+password. The explicit CDP service avoids a Snap Chromium auto-launch hang
+observed on the DGX Spark's ARM64 environment.
 
 ### Switching to MiniMax-M2.7 (DGX Spark)
 ```bash

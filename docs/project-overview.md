@@ -139,7 +139,7 @@ David-Agent/
 │   ├── Qwen/                  # Qwen 계열 모델
 │   └── MiniMax/               # MiniMax-M2.7 모델
 │
-├── tests/                     # pytest 테스트 (282개)
+├── tests/                     # pytest 테스트 (284개)
 │   ├── conftest.py
 │   ├── test_papers_ingest.py
 │   ├── test_papers_digest.py
@@ -213,7 +213,7 @@ history/search·알림 제어의 이점이 있으면 같은 bot을 별도 Telegr
 | `papers_ingest.py` | arXiv 4개 카테고리 + HF Daily Papers 메타데이터 수집, source/run provenance 저장 |
 | `papers_digest.py` | SQLite 카탈로그 읽기 전용 조회 → 추천/최신/인기 digest |
 | `interview_progress.py` | curated catalog → 실제 학습 메시지, 힌트 단계, 결과 저장, 2/7/21일 복습, 주간 통계 |
-| `leetcode_sync.py` | 숨김 세션 입력·검증, owner-only 저장, LeetCode solved/최근 정답의 읽기 전용 snapshot 갱신 |
+| `leetcode_sync.py` | 로컬 headless Chromium 로그인 또는 숨김 세션 입력·검증, owner-only 저장, LeetCode solved/최근 정답 snapshot 갱신 |
 | `interview_trends.py` | HN·GitHub·논문 DB에서 실시간 인터뷰 트렌드 수집·캐시 |
 | `english_intake.py` | 새 레슨 탐지, Telegram 파일 저장, 이번 주 세션 조회, 처리 상태 관리 |
 | `english_srs.py` | Leitner SRS 덱 (카드 추가/리뷰/통계/취약 카드 랭킹) |
@@ -500,10 +500,12 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
 - Python 표준 라이브러리만 사용하며 runtime scraping/cookies/network 의존성이 없습니다.
   파일 잠금 + atomic replace로 저장하고 동일 assignment 결과 재시도는 중복 기록하지
   않습니다. 기존 MLE `progress.md`와 트렌드 cache는 계속 유지합니다.
-- 선택적으로 `leetcode_sync.py`가 `LEETCODE_SESSION`을 숨김 프롬프트/표준입력에서만
-  받고 `0600` 세션 파일과 별도 `0600` 풀이 snapshot을 만듭니다. 비밀번호 저장·코드
-  제출·계정 변경은 없으며, 4시간 cron과 Coding Coach 직전 동기화가 최근 정답/난이도별
-  해결 수를 갱신합니다. LeetCode Gym Observatory는 snapshot의 안전한 필드만 읽습니다.
+- 선택적으로 `leetcode_sync.py login`이 기존 localhost-only headless Chromium에
+  Playwright로 연결해 로그인·비밀번호를 대화형으로만 입력받고, 비밀번호는 저장하지
+  않습니다. CAPTCHA/MFA/OAuth 확인은 우회하지 않고 실패하며, 이때 숨김 세션 입력
+  `connect`가 fallback입니다. `0600` 세션 파일과 별도 `0600` 풀이 snapshot을 만들며
+  코드 제출·계정 변경은 없습니다. 4시간 cron과 Coding Coach 직전 동기화가 최근
+  정답/난이도별 해결 수를 갱신하고 LeetCode Gym Observatory는 안전한 필드만 읽습니다.
 - 일요일 18시 보고서는 월요일부터의 완료 세션, 신규/복습, 평균 시간, 힌트/해설 사용,
   최신 취약 패턴, 설계 주제, 최저 설계 차원과 다음 주 집중 영역을 논문 리뷰에 합칩니다.
   CLI 배포/기록 예시는 README의 Interview study coach 절을 참조합니다.

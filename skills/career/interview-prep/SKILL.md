@@ -121,7 +121,10 @@ status` before claiming it is connected. A linked session is refreshed with
 session file and writes a separate owner-only history snapshot. Never request,
 print, transmit, or place `LEETCODE_SESSION` in a command line, Telegram message,
 memory, source file, or Observatory response. The helper is read-only: no code
-submission, profile edit, or account setting change is allowed.
+submission, profile edit, or account setting change is allowed. The optional
+`login --username <handle>` command uses the local headless browser and hidden
+terminal prompts only; it never stores a password. CAPTCHA, MFA, and OAuth
+confirmation are not bypassed and require the cookie-link fallback.
 
 For company-specific preparation questions and the planned transition from
 LeetCode foundations to weekly 60-minute implementation exercises, read

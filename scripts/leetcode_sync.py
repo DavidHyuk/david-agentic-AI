@@ -26,6 +26,7 @@ from pathlib import Path
 import re
 import sys
 import tempfile
+import time
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -33,6 +34,7 @@ API_URL = 'https://leetcode.com/graphql/'
 USER_AGENT = 'david-agentic-ai/leetcode-sync (personal read-only coach)'
 USERNAME_RE = re.compile(r'^[A-Za-z0-9_-]{1,64}$')
 MAX_HISTORY = 100
+DEFAULT_CDP_URL = 'http://127.0.0.1:19222'
 
 USER_STATUS_QUERY = '''query userStatus { userStatus { username } }'''
 HISTORY_QUERY = '''query history($username: String!, $limit: Int!) {
@@ -222,6 +224,75 @@ def read_session_from_terminal(stdin: bool) -> str:
     return validate_session(getpass.getpass('Paste LEETCODE_SESSION (input hidden): '))
 
 
+def _cookie_value(cookies: list[dict], name: str) -> str:
+    for cookie in cookies:
+        if cookie.get('name') == name and isinstance(cookie.get('value'), str):
+            return cookie['value']
+    return ''
+
+
+def login_with_browser(cdp_url: str, username: str, login: str, password: str) -> dict:
+    """Use the existing local headless Chromium only to obtain a fresh session.
+
+    Credentials remain in memory for this function's lifetime. CAPTCHA, MFA, and
+    changed login forms deliberately fail closed rather than attempting a bypass.
+    """
+    try:
+        from playwright.sync_api import Error as PlaywrightError, sync_playwright
+    except ImportError as exc:
+        raise LeetCodeSyncError(
+            'Playwright is not installed. Run python3 -m pip install -r requirements.txt.'
+        ) from exc
+    try:
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.connect_over_cdp(cdp_url, timeout=15_000)
+            try:
+                if not browser.contexts:
+                    raise LeetCodeSyncError('The local Chromium browser has no usable context.')
+                context = browser.contexts[0]
+                existing = _cookie_value(context.cookies('https://leetcode.com'), 'LEETCODE_SESSION')
+                if existing:
+                    candidate = {'username': username, 'session': existing, 'csrf_token': '', 'linked_at': ''}
+                    verify_connection(candidate)
+                    return {'session': existing, 'csrf_token': _cookie_value(
+                        context.cookies('https://leetcode.com'), 'csrftoken')}
+                page = context.new_page()
+                try:
+                    page.goto('https://leetcode.com/accounts/login/', wait_until='domcontentloaded', timeout=20_000)
+                    login_field = page.locator('input[name="login"], #id_login, input[type="email"]').first
+                    password_field = page.locator('input[name="password"], #id_password, input[type="password"]').first
+                    if login_field.count() != 1 or password_field.count() != 1:
+                        raise LeetCodeSyncError(
+                            'LeetCode login form was not available. Complete CAPTCHA/MFA in a normal browser, then use connect.'
+                        )
+                    login_field.fill(login)
+                    password_field.fill(password)
+                    submit = page.locator('button[type="submit"], input[type="submit"]').first
+                    if submit.count() != 1:
+                        raise LeetCodeSyncError('LeetCode login submit control was not found; use connect instead.')
+                    submit.click()
+                    deadline = time.monotonic() + 25
+                    while time.monotonic() < deadline:
+                        cookies = context.cookies('https://leetcode.com')
+                        session = _cookie_value(cookies, 'LEETCODE_SESSION')
+                        if session:
+                            candidate = {'username': username, 'session': session, 'csrf_token': '', 'linked_at': ''}
+                            verify_connection(candidate)
+                            return {'session': session, 'csrf_token': _cookie_value(cookies, 'csrftoken')}
+                        page.wait_for_timeout(250)
+                    raise LeetCodeSyncError(
+                        'LeetCode did not issue a session. CAPTCHA, MFA, or an invalid login may require the connect fallback.'
+                    )
+                finally:
+                    page.close()
+            finally:
+                browser.close()
+    except LeetCodeSyncError:
+        raise
+    except PlaywrightError as exc:
+        raise LeetCodeSyncError('Could not use the local headless Chromium; run browser/setup_browser.sh --check.') from exc
+
+
 def parse_args(argv=None) -> argparse.Namespace:
     home = default_home()
     parser = argparse.ArgumentParser(description=__doc__)
@@ -231,6 +302,9 @@ def parse_args(argv=None) -> argparse.Namespace:
     connect = sub.add_parser('connect', help='verify and store a LeetCode browser session')
     connect.add_argument('--username', required=True)
     connect.add_argument('--stdin', action='store_true', help='read LEETCODE_SESSION from standard input')
+    login = sub.add_parser('login', help='sign in through local headless Chromium; passwords are never stored')
+    login.add_argument('--username', required=True)
+    login.add_argument('--cdp-url', default=os.environ.get('HERMES_BROWSER_CDP_URL', DEFAULT_CDP_URL))
     syncing = sub.add_parser('sync', help='refresh the read-only history snapshot')
     syncing.add_argument('--limit', type=int, default=MAX_HISTORY)
     sub.add_parser('status', help='show connection and snapshot metadata without secrets')
@@ -251,6 +325,23 @@ def main(argv=None) -> int:
                               'session': read_session_from_terminal(args.stdin),
                               'csrf_token': os.environ.get('LEETCODE_CSRF_TOKEN', '').strip(),
                               'linked_at': utc_now()}
+                verified_username = verify_connection(connection)
+                connection['username'] = verified_username
+                save_private_json(session_path, connection)
+                output = {'linked': True, 'username': verified_username,
+                          'session_file': str(session_path), 'next': 'Run sync to fetch history.'}
+            elif args.command == 'login':
+                username = validate_username(args.username)
+                if not sys.stdin.isatty():
+                    raise LeetCodeSyncError('The login command requires an interactive terminal.')
+                login = input('LeetCode email or username: ').strip()
+                if not login:
+                    raise LeetCodeSyncError('LeetCode email or username is required.')
+                password = getpass.getpass('LeetCode password (input hidden): ')
+                if not password:
+                    raise LeetCodeSyncError('LeetCode password is required.')
+                credentials = login_with_browser(args.cdp_url, username, login, password)
+                connection = {'version': 1, 'username': username, **credentials, 'linked_at': utc_now()}
                 verified_username = verify_connection(connection)
                 connection['username'] = verified_username
                 save_private_json(session_path, connection)

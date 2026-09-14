@@ -69,6 +69,34 @@ def test_connect_uses_environment_session_without_printing_it(tmp_path, monkeypa
     assert stat.S_IMODE(session_path.stat().st_mode) == 0o600
 
 
+def test_headless_login_prompts_without_storing_or_printing_password(tmp_path, monkeypatch, capsys):
+    session_path = tmp_path / 'session.json'
+    snapshot_path = tmp_path / 'history.json'
+    monkeypatch.setattr(ls.sys.stdin, 'isatty', lambda: True)
+    monkeypatch.setattr('builtins.input', lambda prompt: 'david@example.com')
+    monkeypatch.setattr(ls.getpass, 'getpass', lambda prompt: 'not-persisted-password')
+    monkeypatch.setattr(ls, 'login_with_browser', lambda cdp, username, login, password: {
+        'session': 'y' * 32, 'csrf_token': 'csrf-value',
+    })
+    monkeypatch.setattr(ls, 'verify_connection', lambda value: value['username'])
+
+    assert ls.main(['--session-file', str(session_path), '--snapshot-file', str(snapshot_path),
+                    'login', '--username', 'david_choi']) == 0
+
+    output = capsys.readouterr().out
+    saved = json.loads(session_path.read_text())
+    assert 'not-persisted-password' not in output
+    assert 'not-persisted-password' not in session_path.read_text()
+    assert saved['session'] == 'y' * 32
+    assert saved['csrf_token'] == 'csrf-value'
+
+
+def test_cookie_value_selects_only_the_requested_cookie():
+    cookies = [{'name': 'csrftoken', 'value': 'csrf'}, {'name': 'LEETCODE_SESSION', 'value': 'session'}]
+    assert ls._cookie_value(cookies, 'LEETCODE_SESSION') == 'session'
+    assert ls._cookie_value(cookies, 'missing') == ''
+
+
 def test_status_never_exposes_saved_session(tmp_path):
     session_path = tmp_path / 'session.json'
     snapshot_path = tmp_path / 'history.json'

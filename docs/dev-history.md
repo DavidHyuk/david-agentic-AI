@@ -10,6 +10,10 @@ semantic versioning (major.minor.patch).
   owner-only local file, and writes a separate read-only snapshot containing
   solved totals, difficulty counts, and recent accepted submissions. It neither
   stores passwords nor submits code or edits the LeetCode account.
+- Added `leetcode_sync.py login`, which attaches Playwright to the existing
+  localhost-only headless Chromium and asks for the account login/password only
+  through terminal prompts. CAPTCHA, MFA, OAuth, and unexpected login forms fail
+  closed; a browser-cookie connection remains the secure fallback.
 - Added a no-delivery four-hour `leetcode-history-sync` job on the existing
   David profile and a pre-lesson refresh in the existing `coding-coach` job.
   The existing LeetCode Gym Telegram room, profile, bot, and gateway remain the
