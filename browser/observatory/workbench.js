@@ -490,8 +490,14 @@ function wireTelegramChat(d) {
   form.onsubmit = async (event) => {
     event.preventDefault();
     if (bench.busy) return;
+    const message = field.value.trim();
+    if (!message) return;
     bench.busy = true;
     form.querySelector("button").disabled = true;
+    // Clear at the moment the user sends. A model turn may take minutes, so
+    // waiting for its reply makes a successfully submitted draft look unsent.
+    localWrite(key, null);
+    field.value = "";
     $("bench-status").textContent =
       "Hermes가 답변을 준비 중입니다. 로컬 모델은 몇 분 걸릴 수 있습니다…";
     try {
@@ -504,14 +510,12 @@ function wireTelegramChat(d) {
         body: JSON.stringify({
           action: "room_chat",
           room: d.room,
-          message: field.value,
+          message,
         }),
       });
       const result = await response.json();
       if (!response.ok)
         throw new Error(result.error || "Hermes에게 질문하지 못했습니다.");
-      localWrite(key, null);
-      field.value = "";
       await loadWorkbench();
       $("bench-status").textContent = result.delivered
         ? "Hermes의 답변을 만들고 Telegram 그룹에도 전송했습니다."

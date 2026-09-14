@@ -144,10 +144,13 @@ def test_observatory_chats_clear_sent_drafts_and_support_shift_enter():
     office = (root / 'office.js').read_text()
     assert 'event.key === "Enter" && event.shiftKey' in workbench
     assert 'field.value = "";' in workbench
+    assert 'const message = field.value.trim();' in workbench
+    assert 'message,' in workbench
     assert 'form.requestSubmit();' in workbench
     assert 'event.key === "Enter" && event.shiftKey' in office
     assert '$("office-chat-form").requestSubmit();' in office
     assert 'localWrite("office-draft:" + room, null)' in office
+    assert '$("office-message").value = "";' in office
 
 
 def test_completion_lesson_display_preserves_saved_line_breaks():

@@ -512,6 +512,10 @@ window.sharedOffice = (() => {
     historyRequest++;
     chat.busy = true; chat.error = "";
     chat.history.push({role: "user", content: message});
+    // The send action has started; do not leave a duplicate in the composer
+    // while the local model works through a potentially long response.
+    localWrite("office-draft:" + room, null);
+    $("office-message").value = "";
     showConversation(room);
     try {
       const response = await fetch("api/action", {
@@ -521,9 +525,6 @@ window.sharedOffice = (() => {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || "답변을 확인하지 못했습니다.");
       chat.history.push({role: "assistant", content: result.response});
-      if (String(localRead("office-draft:" + room, "")).trim() === message)
-        localWrite("office-draft:" + room, null);
-      if (selected === room && $("office-message").value.trim() === message) $("office-message").value = "";
     } catch (err) {
       chat.error = err.message + " 기록을 새로고침해 저장 여부를 확인해 주세요.";
     } finally { chat.busy = false; showConversation(room); }

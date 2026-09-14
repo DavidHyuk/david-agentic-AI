@@ -3,6 +3,12 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.16.7 — 2026-09-14 (patch: clear chat composer on submission)
+
+- Changed both Observatory chat composers to capture and send the message, then
+  clear their local draft and visible textarea immediately. The user no longer
+  has to delete a duplicate while a local model response is pending.
+
 ## v1.16.6 — 2026-09-14 (minor: ground coding recall in submitted source)
 
 - Extended opt-in LeetCode sync with the latest verified Accepted source for up
