@@ -7,7 +7,8 @@ semantic versioning (major.minor.patch).
 
 - Added paired, visibly labeled `TEAM CHAT` exchanges between complementary
   office characters when physically near each other, without invoking a model
-  or representing fictional work. Passive bubbles now wait 24–42 seconds.
+  or representing fictional work. A nearby pair speaks first and later passive
+  bubbles wait 14–24 seconds, making the behavior visible without chatter stacking.
 - Added rotating `RECENT NOTICE` bubbles for every character. They use a compact
   excerpt of the room's newest stored cron response and fall back to the room's
   next scheduled notification when no response exists.
@@ -16,8 +17,14 @@ semantic versioning (major.minor.patch).
 - Replaced arbitrary roaming targets with deterministic role-specific circuits,
   visible purpose labels and a more detailed zoned studio containing research,
   review, archive, collaboration, coaching and audio areas.
+- Increased character name and purpose-card contrast and type size. Added 50–140%
+  whole-office zoom with buttons and two-finger pinch support for mobile.
 - Added regression coverage for safe notification excerpts and their read-only
   Observatory room exposure. No profile, bot, cron or routing changes were made.
+- Fixed office conversations hanging silently when the loopback Hermes API stops
+  responding: session setup now fails clearly within 15 seconds while active
+  model turns retain a bounded ten-minute window. Persona instructions also
+  reflect that Calendar access is currently disabled.
 
 ## v1.14.0 — 2026-09-13 (minor: calm the office and rebalance the cast)
 

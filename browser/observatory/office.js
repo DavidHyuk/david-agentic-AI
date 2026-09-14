@@ -75,6 +75,7 @@ window.sharedOffice = (() => {
   const conversations = new Map();
   const reduced = matchMedia("(prefers-reduced-motion: reduce)");
   let selected = null, paused = localRead("office-paused", false);
+  let officeZoom = Math.min(1.4, Math.max(0.5, Number(localRead("office-zoom", 1)) || 1));
   let previous = 0, frame = 0, roomData = [], historyRequest = 0;
   let talkTimer = 0, replyTimer = 0, talkTurn = 0, noticeTurn = 0;
   let dialogueTurn = 0, ambientTurn = 0;
@@ -134,6 +135,46 @@ window.sharedOffice = (() => {
       localWrite("office-paused", paused);
       visibility();
     };
+    $("office-zoom-out").onclick = () => setOfficeZoom(officeZoom - 0.1);
+    $("office-zoom-in").onclick = () => setOfficeZoom(officeZoom + 0.1);
+    const viewport = document.querySelector(".office-viewport");
+    let pinchDistance = 0, pinchZoom = officeZoom;
+    viewport.addEventListener("touchstart", (event) => {
+      if (event.touches.length !== 2) return;
+      pinchDistance = Math.hypot(event.touches[0].clientX - event.touches[1].clientX,
+        event.touches[0].clientY - event.touches[1].clientY);
+      pinchZoom = officeZoom;
+    }, {passive: true});
+    viewport.addEventListener("touchmove", (event) => {
+      if (event.touches.length !== 2 || !pinchDistance) return;
+      event.preventDefault();
+      const distance = Math.hypot(event.touches[0].clientX - event.touches[1].clientX,
+        event.touches[0].clientY - event.touches[1].clientY);
+      const center = (event.touches[0].clientX + event.touches[1].clientX) / 2 - viewport.getBoundingClientRect().left;
+      setOfficeZoom(pinchZoom * distance / pinchDistance, center, false);
+    }, {passive: false});
+    const finishPinch = () => {
+      if (pinchDistance) localWrite("office-zoom", officeZoom);
+      pinchDistance = 0;
+    };
+    viewport.addEventListener("touchend", finishPinch, {passive: true});
+    viewport.addEventListener("touchcancel", finishPinch, {passive: true});
+    setOfficeZoom(officeZoom, null, false);
+  }
+
+  function setOfficeZoom(value, focusX = null, persist = true) {
+    const viewport = document.querySelector(".office-viewport"), floor = document.querySelector(".shared-floor");
+    if (!viewport || !floor) return;
+    const previousZoom = officeZoom;
+    officeZoom = Math.round(Math.min(1.4, Math.max(0.5, value)) * 20) / 20;
+    const center = focusX ?? viewport.clientWidth / 2;
+    const contentPoint = (viewport.scrollLeft + center) / previousZoom;
+    floor.style.zoom = String(officeZoom);
+    viewport.scrollLeft = Math.max(0, contentPoint * officeZoom - center);
+    $("office-zoom-label").textContent = Math.round(officeZoom * 100) + "%";
+    $("office-zoom-out").disabled = officeZoom <= 0.5;
+    $("office-zoom-in").disabled = officeZoom >= 1.4;
+    if (persist) localWrite("office-zoom", officeZoom);
   }
 
   function render(rooms) {
@@ -307,11 +348,11 @@ window.sharedOffice = (() => {
     talkTimer = setTimeout(() => {
       talkTimer = 0;
       if (document.hidden || state.view !== "office" || state.replay) return;
-      const event = ["notice", "dialogue", "notice", "ambient"][talkTurn++ % 4];
+      const event = ["dialogue", "notice", "dialogue", "ambient"][talkTurn++ % 4];
       if (event === "notice") speakNotification();
       else if (event === "dialogue") speakDialogue();
       else speakAmbient();
-    }, 24000 + Math.random() * 18000);
+    }, 14000 + Math.random() * 10000);
   }
   function close() {
     const last = selected;
@@ -413,5 +454,5 @@ window.sharedOffice = (() => {
   }
   document.addEventListener("visibilitychange", visibility);
   reduced.addEventListener("change", visibility);
-  return {render, visibility, select, workbench};
+  return {render, visibility, select, workbench, setZoom: setOfficeZoom};
 })();

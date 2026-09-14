@@ -66,6 +66,12 @@ OFFICE_CHARACTERS = {
     'english': ('Ellie', 'a friendly female English conversation tutor'),
     'podcast': ('Rina', 'an enthusiastic listening and podcast coach'),
 }
+
+
+class AgentAPIUnavailable(OSError):
+    """The loopback Hermes API did not become responsive in time."""
+
+
 ROOM_CHAT_INSTRUCTIONS = {
     'papers': ('Use the papers-digest skill and answer as the Frontier Radar research specialist. '
                'Do not send messages; the observatory delivers your final answer.'),
@@ -377,6 +383,7 @@ class Observatory:
                 'Do not send messages to Telegram or other external services. '
                 'Do not modify files, memories, schedules or study progress. '
                 'Ambient animations are fictional decoration, not completed work. '
+                'Calendar integration is currently disabled; never claim you can read it. '
                 'Do not claim to have read private learner memories or podcast transcripts '
                 'unless actually provided in this conversation. Ask for the relevant text '
                 'when necessary. For execution or saved study actions, direct the user to '
@@ -384,7 +391,7 @@ class Observatory:
             )
             result = self.agent_api('POST', f'/api/sessions/{session}/chat', {
                 'message': message, 'instructions': instructions,
-            })
+            }, timeout=600)
             response = str(result.get('message', {}).get('content', '')).strip()
             if not response:
                 raise OSError('답변을 확인하지 못했습니다. 대화 기록을 다시 불러오세요.')
@@ -392,7 +399,7 @@ class Observatory:
         finally:
             self.office_locks[room].release()
 
-    def agent_api(self, method, path, payload=None, allow_status=()):
+    def agent_api(self, method, path, payload=None, allow_status=(), timeout=15):
         """Call the key-authenticated Hermes API over loopback only."""
         if not self.agent_api_key:
             raise OSError('Hermes 대화 API 키가 설치되지 않았습니다.')
@@ -402,7 +409,7 @@ class Observatory:
             'Content-Type': 'application/json',
         })
         try:
-            with urlopen(request, timeout=1200) as response:
+            with urlopen(request, timeout=timeout) as response:
                 return json.load(response)
         except HTTPError as exc:
             if exc.code in allow_status:
@@ -412,8 +419,10 @@ class Observatory:
             except (json.JSONDecodeError, AttributeError):
                 message = ''
             raise ValueError(message or 'Hermes 대화 요청에 실패했습니다.') from exc
-        except URLError as exc:
-            raise OSError('Hermes 대화 API에 연결할 수 없습니다.') from exc
+        except (TimeoutError, URLError) as exc:
+            raise AgentAPIUnavailable(
+                'Hermes gateway가 응답하지 않습니다. 잠시 후 다시 시도해 주세요.'
+            ) from exc
 
     def ensure_dashboard_session(self, room):
         session_id = self.dashboard_session_id(room)
@@ -453,7 +462,7 @@ class Observatory:
         result = self.agent_api('POST', f'/api/sessions/{session_id}/chat', {
             'message': message,
             'instructions': ROOM_CHAT_INSTRUCTIONS[room],
-        })
+        }, timeout=600)
         response = str(result.get('message', {}).get('content', '')).strip()
         if not response:
             raise OSError('Hermes가 답변을 만들지 못했습니다.')
@@ -1061,6 +1070,8 @@ def make_handler(store, assets: Path, hosts):
                 self.respond(200, store.study_action(body))
             except (ValueError, KeyError, TypeError) as exc:
                 self.respond(400, {'error': str(exc)})
+            except AgentAPIUnavailable as exc:
+                self.respond(503, {'error': str(exc)})
             except (OSError, sqlite3.Error, subprocess.TimeoutExpired):
                 self.respond(503, {'error': '저장 결과를 확인할 수 없습니다. 새로고침 후 기록을 확인하세요.'})
     return Handler

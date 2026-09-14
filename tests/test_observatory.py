@@ -12,6 +12,7 @@ from http.server import ThreadingHTTPServer
 
 import pytest
 
+import observatory as observatory_module
 from observatory import (Observatory, date_range, make_handler,
                          notification_excerpt, redact, room_for)
 
@@ -183,6 +184,19 @@ def test_office_chat_lock_released_after_model_failure(store, monkeypatch):
         store.office_locks['hq'].release()
 
 
+def test_agent_api_fails_fast_with_a_clear_gateway_error(store, monkeypatch):
+    store.agent_api_key = 'local-secret'
+    seen = {}
+
+    def timeout(request, timeout):
+        seen['timeout'] = timeout
+        raise TimeoutError
+    monkeypatch.setattr(observatory_module, 'urlopen', timeout)
+    with pytest.raises(OSError, match='gateway가 응답하지 않습니다'):
+        store.agent_api('GET', '/health')
+    assert seen['timeout'] == 15
+
+
 def test_office_history_excludes_system_and_other_characters(store):
     conn = sqlite3.connect(store.home / 'state.db')
     conn.execute("INSERT INTO messages VALUES(11,'office_english','assistant','Hello!',NULL,NULL,2,NULL)")
@@ -348,8 +362,8 @@ def test_room_chat_uses_fixed_destination_and_persisted_agent_session(store, mon
     calls = []
     deliveries = []
 
-    def agent_api(method, path, payload=None, allow_status=()):
-        calls.append((method, path, payload, allow_status))
+    def agent_api(method, path, payload=None, allow_status=(), **kwargs):
+        calls.append((method, path, payload, allow_status, kwargs))
         if method == 'GET':
             return {'_status': 404}
         if path == '/api/sessions':
@@ -367,6 +381,7 @@ def test_room_chat_uses_fixed_destination_and_persisted_agent_session(store, mon
     assert calls[2][1] == '/api/sessions/observatory_coding/chat'
     assert calls[2][2]['message'] == message
     assert 'hint ladder' in calls[2][2]['instructions']
+    assert calls[2][4]['timeout'] == 600
     assert deliveries[0][0] == 'telegram:-12'
     assert message in deliveries[0][1] and result['response'] in deliveries[0][1]
 

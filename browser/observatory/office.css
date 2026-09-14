@@ -115,14 +115,14 @@
 .portrait-art[data-character="english"] { width: 200px; }
 .walking-agent .cast-art { height: 146px; width: 66px; margin: auto; transform-origin: bottom center; animation: office-idle 4s ease-in-out infinite; filter: drop-shadow(0 2px 1px #66593c2a); }
 .walk-name {
-  position: absolute; left: 50%; bottom: -10px; transform: translateX(-50%); width: 112px;
+  position: absolute; left: 50%; bottom: -13px; transform: translateX(-50%); width: 132px;
   display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 1px 5px;
-  background: #fffbedf2; padding: 4px 8px; border: 1px solid #d1d5c5; border-radius: 7px;
-  color: #435748; text-align: left;
+  background: #fffdf7f7; padding: 5px 9px; border: 1px solid #bdc9b7; border-radius: 8px;
+  box-shadow: 0 3px 8px #5d68431c; color: #30483a; text-align: left;
 }
-.walk-name b { font-size: 10px; font-weight: 650; }
-.walk-name small { grid-column: 1 / -1; overflow: hidden; color: #7d8878; font-size: 6.5px; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
-.walk-name i { grid-column: 2; grid-row: 1; width: 5px; height: 5px; background: #a1ad96; border-radius: 50%; }
+.walk-name b { font-size: 13px; font-weight: 750; line-height: 1.1; }
+.walk-name small { grid-column: 1 / -1; overflow: hidden; color: #536653; font-size: 9px; font-weight: 600; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.walk-name i { grid-column: 2; grid-row: 1; width: 6px; height: 6px; background: #a1ad96; border-radius: 50%; }
 [data-presence="working"] .walk-name i { background: #40a660; box-shadow: 0 0 0 3px #64b17533; }
 [data-presence="blocked"] .walk-name i { background: #c37b5d; }
 .walk-bubble {
@@ -150,6 +150,9 @@
 #office-roster { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
 #office-roster button { flex: 1; min-width: 95px; text-align: left; }
 #office-roster small { display: block; margin-top: 4px; font-size: 8px; color: #798473; }
+.office-zoom-controls { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; }
+.office-zoom-controls button { min-width: 30px; padding: 6px 8px; font-size: 14px; line-height: 1; }
+.office-zoom-controls output { min-width: 42px; color: #65745f; font-size: 9px; text-align: center; }
 .office-conversation {
   position: absolute; bottom: 14px; right: 14px; width: min(740px, calc(100% - 28px)); z-index: 1200;
   display: grid; grid-template-columns: 190px minmax(0, 1fr); overflow: hidden;
@@ -197,6 +200,7 @@
   .office-floor { padding: 9px; }
   .shared-floor { min-width: 780px; }
   .office-viewport { max-height: none; }
+  .office-zoom-controls { margin-left: 0; }
   .office-conversation { grid-template-columns: 88px minmax(0, 1fr); }
   .office-conversation { position: relative; inset: auto; width: 100%; margin-top: 10px; }
   .conversation-main { padding: 12px; }

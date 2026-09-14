@@ -859,11 +859,13 @@ each character follows a deterministic role-specific circuit and displays its
 current purpose below its name. Characters normally remain at each location for
 roughly 75–140 seconds, with staggered initial departures. Speech cycles among real recent cron-notification
 excerpts, next-schedule fallbacks, short role-specific lines, and paired agent-to-agent
-exchanges only when the pair is physically near each other. Bubbles appear at a
-restrained 24–42 second interval. Recent-notification bubbles come from stored assistant output and are
+exchanges only when the pair is physically near each other. A nearby pair speaks
+first; later bubbles wait 14–24 seconds after the previous exchange. Recent-notification bubbles come from stored assistant output and are
 visually labeled; ambient team exchanges are scripted and never presented as actual
 work. Selecting a character produces an immediate greeting. Passive bubbles do not
 invoke the model or play audio. Hidden views and historical replay suspend small talk.
+Character name/purpose cards use high-contrast type. The `−/＋` controls and a
+two-finger pinch scale the complete office, furniture and cast from 50–140% on mobile.
 
 Office conversations use separate persisted `office_<room>` sessions on the
 existing HQ API, classified into their matching Observatory rooms. They are
@@ -873,6 +875,8 @@ podcast characters ask for relevant lesson text when needed. Existing dedicated
 profile workbenches and Telegram coaching retain their original ownership.
 Opening a character never invokes a model; pressing **보내기** does. The existing
 four workbench Telegram composers remain separately labeled.
+Session setup fails with a visible gateway error after 15 seconds instead of
+hanging indefinitely; an active local-model turn may run for up to ten minutes.
 
 - **LeetCode / System Design**: resume unfinished assignments, prepare today's
   assignment, or open another same-day assignment after completing one; use a
