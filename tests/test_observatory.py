@@ -138,6 +138,14 @@ def test_coding_workbench_exposes_only_safe_leetcode_snapshot(store):
     assert 'session' not in history
 
 
+def test_completion_lesson_display_preserves_saved_line_breaks():
+    root = Path(__file__).resolve().parents[1] / 'browser/observatory'
+    assert 'class="completion-lesson"' in (root / 'workbench.js').read_text()
+    css = (root / 'workbench.css').read_text()
+    assert '.completion-lesson' in css
+    assert 'white-space: pre-wrap' in css
+
+
 def test_missing_sources_are_empty_and_db_is_readonly(store):
     assert store.library('learning')['total'] == 0
     assert store.library('memory')['total'] == 0

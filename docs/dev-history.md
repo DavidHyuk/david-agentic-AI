@@ -3,6 +3,12 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.16.3 — 2026-09-14 (patch: preserve completion-record formatting)
+
+- Fixed LeetCode Gym's completed-record display to preserve saved line breaks
+  and numbered notes. The underlying coach state already retained the full
+  lesson text; the browser had collapsed its whitespace while rendering it.
+
 ## v1.16.2 — 2026-09-14 (minor: separate new Coding work from reviews)
 
 - Made LeetCode Gym's **작업 이어가기 · 새 문제** an unconditional new-problem

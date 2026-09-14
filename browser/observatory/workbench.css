@@ -126,6 +126,10 @@
   cursor: pointer;
   font-weight: 600;
 }
+.completion-lesson {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .desk-help textarea {
   margin-top: 10px;
   min-height: 120px;

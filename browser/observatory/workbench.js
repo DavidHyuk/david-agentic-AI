@@ -250,7 +250,7 @@ function renderWorkbench(d) {
               .slice(0, 5)
               .map(
                 (r) =>
-                  `<details class="desk-help"><summary>${esc(r.problem || r.topic)} · ${esc(r.date)}</summary><p>${esc(r.lesson || r.next_improvement)}</p><p>${r.duration}분 · 자신감 ${r.confidence}/5 · 다음 복습 ${esc(r.next_review_date)}</p></details>`,
+                  `<details class="desk-help"><summary>${esc(r.problem || r.topic)} · ${esc(r.date)}</summary><p class="completion-lesson">${esc(r.lesson || r.next_improvement)}</p><p>${r.duration}분 · 자신감 ${r.confidence}/5 · 다음 복습 ${esc(r.next_review_date)}</p></details>`,
               )
               .join("") ||
             '<p class="muted">풀이 결과를 제출하면 여기에 표시됩니다.</p>'
