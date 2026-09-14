@@ -37,11 +37,11 @@ function safeLink(url, label) {
     ? `<a class="outline desk-link" href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(label)} ↗</a>`
     : "";
 }
-async function openWorkbench(room) {
+async function openWorkbench(room, historyMode = "push") {
   localWrite("hermes-last-room", room);
   bench.room = room;
   bench.data = null;
-  view("workbench");
+  view("workbench", historyMode, { room });
   $("bench-title").textContent = deskTitles[room] || roomName(room);
   $("bench-subtitle").textContent =
     deskSubtitles[room] || "프로필 활동과 기록을 살펴보세요.";

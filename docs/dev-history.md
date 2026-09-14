@@ -3,6 +3,16 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.15.1 — 2026-09-13 (patch: fix workbench companion framing and Back navigation)
+
+- Enlarged each workbench companion's frame so the complete figure, including
+  head and legs, remains visible on desktop and mobile instead of being clipped.
+- Added stateful Observatory view history, including the selected workbench room.
+  Browser Back and Forward now move between the office, workbench and other
+  Observatory screens rather than leaving for the previously visited website.
+- Hovering a character now reveals its next notification turn (or its latest
+  notification when no schedule exists), without overwriting a `TEAM CHAT` exchange.
+
 ## v1.15.0 — 2026-09-13 (minor: add team exchanges and notification bubbles)
 
 - Added paired, visibly labeled `TEAM CHAT` exchanges between complementary

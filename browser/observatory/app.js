@@ -147,16 +147,21 @@ function roomName(id) {
 function roomIcon(id) {
   return state.overview?.rooms.find((r) => r.id === id)?.icon || "✦";
 }
-function view(name) {
+function view(name, historyMode = "push", route = {}) {
   state.view = names[name] ? name : "office";
   Object.keys(names).forEach((k) => ($(k + "-view").hidden = k !== state.view));
   document
     .querySelectorAll("nav button")
     .forEach((b) =>
       b.classList.toggle("active", b.dataset.view === state.view),
-    );
+  );
   $("breadcrumb").textContent = names[state.view];
-  history.replaceState(null, "", "#" + state.view);
+  const query = state.view === "workbench" && route.room
+    ? `?room=${encodeURIComponent(route.room)}`
+    : "";
+  const historyState = { view: state.view, room: route.room || null };
+  if (historyMode === "push") history.pushState(historyState, "", "#" + state.view + query);
+  else if (historyMode === "replace") history.replaceState(historyState, "", "#" + state.view + query);
   if (state.view === "sessions") loadSessions();
   if (state.view === "library") loadLibrary();
   window.sharedOffice?.visibility();
@@ -599,10 +604,19 @@ clock();
 setInterval(clock, 30000);
 document.addEventListener("DOMContentLoaded", () => {
   refresh().then(() => {
-    if (location.hash === "#workbench")
-      openWorkbench(localRead("hermes-last-room", "hq"));
-    else view(location.hash.slice(1) || "office");
+    const route = new URLSearchParams(location.hash.slice(1).split("?")[1] || "");
+    const name = location.hash.slice(1).split("?")[0] || "office";
+    if (name === "workbench")
+      openWorkbench(route.get("room") || localRead("hermes-last-room", "hq"), "replace");
+    else view(name, "replace");
   });
+});
+window.addEventListener("popstate", () => {
+  const route = new URLSearchParams(location.hash.slice(1).split("?")[1] || "");
+  const name = location.hash.slice(1).split("?")[0] || "office";
+  if (name === "workbench")
+    openWorkbench(route.get("room") || localRead("hermes-last-room", "hq"), "none");
+  else view(name, "none");
 });
 setInterval(() => {
   if (!document.hidden && !state.replay) refresh();

@@ -844,6 +844,9 @@ All seven characters walk through the same open office, visiting the coffee bar,
 lounge, windows and desks. Click a character to open a portrait and conversation
 panel over the office. Use **작업실 열기** for their study workbench, where the same
 character remains present and **대화 이어가기** opens the conversation in place.
+The workbench companion is rendered as a complete, uncropped figure. Workbench
+navigation is part of browser history, so Back returns to the prior Observatory
+screen instead of leaving the site.
 **움직임 멈추기** pauses roaming; reduced-motion preferences also stop movement.
 
 The office uses a repository-owned transparent character sheet plus Ellie's
@@ -864,6 +867,8 @@ first; later bubbles wait 14–24 seconds after the previous exchange. Recent-no
 visually labeled; ambient team exchanges are scripted and never presented as actual
 work. Selecting a character produces an immediate greeting. Passive bubbles do not
 invoke the model or play audio. Hidden views and historical replay suspend small talk.
+Hovering a character shows its next scheduled notification (or most recent notice
+when no schedule is available) without interrupting an active team exchange.
 Character name/purpose cards use high-contrast type. The `−/＋` controls and a
 two-finger pinch scale the complete office, furniture and cast from 50–140% on mobile.
 

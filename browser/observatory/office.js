@@ -189,6 +189,8 @@ window.sharedOffice = (() => {
         button.dataset.room = room.id;
         button.innerHTML = `<span class="walk-bubble" aria-hidden="true"></span>${sprite(room.id)}<span class="walk-name"><b>${officeCast[room.id].name}</b><small class="walk-purpose"></small><i></i></span>`;
         button.onclick = () => select(room.id);
+        button.addEventListener("pointerenter", () => showHoverNotice(room.id));
+        button.addEventListener("pointerleave", () => button.classList.remove("is-hovering"));
         $("walking-floor").append(button);
         actor = {node: button, x: homes[room.id][0], y: homes[room.id][1], route: [],
           wait: 18 + officeCast[room.id].index * 18, routineIndex: 1,
@@ -311,6 +313,23 @@ window.sharedOffice = (() => {
     const job = data && nextRoomJob(data);
     if (job) return `다음 알림 · ${jobLabels[job.name] || job.name} ${when(job.next_run_at)}`;
     return "최근 알림 · 아직 새 소식은 없어요.";
+  }
+  function hoverNoticeLine(room) {
+    const data = roomData.find((item) => item.id === room);
+    const job = data && nextRoomJob(data);
+    if (job)
+      return `다음 할 일 · ${jobLabels[job.name] || job.name} ${when(job.next_run_at)}`;
+    if (data?.notice?.text) return `최근 알림 · ${data.notice.text}`;
+    return "다음 알림을 준비하고 있어요.";
+  }
+  function showHoverNotice(room) {
+    if (state.replay) return;
+    const actor = actors.get(room);
+    if (!actor || actor.node.classList.contains("is-speaking")) return;
+    const bubble = actor.node.querySelector(".walk-bubble");
+    bubble.textContent = hoverNoticeLine(room);
+    bubble.dataset.kind = "notice";
+    actor.node.classList.add("is-hovering");
   }
   function speakNotification() {
     const rooms = [...actors.keys()];
