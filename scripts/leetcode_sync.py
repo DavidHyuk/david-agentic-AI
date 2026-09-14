@@ -35,6 +35,7 @@ USER_AGENT = 'david-agentic-ai/leetcode-sync (personal read-only coach)'
 USERNAME_RE = re.compile(r'^[A-Za-z0-9_-]{1,64}$')
 MAX_HISTORY = 100
 DEFAULT_CDP_URL = 'http://127.0.0.1:19222'
+DEFAULT_CHROMIUM_EXECUTABLE = '/snap/bin/chromium'
 
 USER_STATUS_QUERY = '''query userStatus { userStatus { username } }'''
 HISTORY_QUERY = '''query history($username: String!, $limit: Int!) {
@@ -320,6 +321,60 @@ def login_with_browser(cdp_url: str, username: str, login: str, password: str) -
         raise LeetCodeSyncError('Could not use the local headless Chromium; run browser/setup_browser.sh --check.') from exc
 
 
+def login_in_headed_browser(username: str, executable: str, timeout_seconds: int,
+                            profile_parent: Path) -> dict:
+    """Open a temporary local GUI browser for user-completed verification.
+
+    The user, not automation, enters credentials and completes Cloudflare/MFA.
+    The temporary Chromium profile is deleted after extracting the session.
+    """
+    if timeout_seconds < 30 or timeout_seconds > 900:
+        raise LeetCodeSyncError('Headed login timeout must be between 30 and 900 seconds.')
+    if not (os.environ.get('DISPLAY') or os.environ.get('WAYLAND_DISPLAY')):
+        raise LeetCodeSyncError(
+            'Headed login requires a local graphical display. Run it in a desktop terminal or use connect.'
+        )
+    browser_path = Path(executable).expanduser()
+    if not browser_path.is_file() or not os.access(browser_path, os.X_OK):
+        raise LeetCodeSyncError(f'Chromium executable is unavailable: {browser_path}')
+    try:
+        from playwright.sync_api import Error as PlaywrightError, sync_playwright
+    except ImportError as exc:
+        raise LeetCodeSyncError(
+            'Playwright is not installed. Run python3 -m pip install -r requirements.txt.'
+        ) from exc
+    profile_parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    profile_parent.chmod(0o700)
+    try:
+        with tempfile.TemporaryDirectory(prefix='leetcode-login-', dir=profile_parent) as profile:
+            os.chmod(profile, 0o700)
+            with sync_playwright() as playwright:
+                context = playwright.chromium.launch_persistent_context(
+                    profile, executable_path=str(browser_path), headless=False,
+                    args=['--no-first-run', '--no-default-browser-check'],
+                )
+                try:
+                    page = context.pages[0] if context.pages else context.new_page()
+                    page.goto('https://leetcode.com/accounts/login/', wait_until='domcontentloaded', timeout=20_000)
+                    print('Complete LeetCode sign-in and any browser verification in the opened window.', flush=True)
+                    deadline = time.monotonic() + timeout_seconds
+                    while time.monotonic() < deadline:
+                        cookies = context.cookies('https://leetcode.com')
+                        session = _cookie_value(cookies, 'LEETCODE_SESSION')
+                        if session:
+                            candidate = {'username': username, 'session': session, 'csrf_token': '', 'linked_at': ''}
+                            verify_connection(candidate)
+                            return {'session': session, 'csrf_token': _cookie_value(cookies, 'csrftoken')}
+                        page.wait_for_timeout(500)
+                    raise LeetCodeSyncError('Timed out waiting for a LeetCode session; no credentials were saved.')
+                finally:
+                    context.close()
+    except LeetCodeSyncError:
+        raise
+    except PlaywrightError as exc:
+        raise LeetCodeSyncError('Could not open local Chromium; verify the graphical desktop and browser path.') from exc
+
+
 def parse_args(argv=None) -> argparse.Namespace:
     home = default_home()
     parser = argparse.ArgumentParser(description=__doc__)
@@ -332,6 +387,11 @@ def parse_args(argv=None) -> argparse.Namespace:
     login = sub.add_parser('login', help='sign in through local headless Chromium; passwords are never stored')
     login.add_argument('--username', required=True)
     login.add_argument('--cdp-url', default=os.environ.get('HERMES_BROWSER_CDP_URL', DEFAULT_CDP_URL))
+    login.add_argument('--headed', action='store_true',
+                       help='open a temporary local GUI Chromium for manual Cloudflare/MFA completion')
+    login.add_argument('--browser-executable', default=os.environ.get(
+        'HERMES_CHROMIUM_EXECUTABLE', DEFAULT_CHROMIUM_EXECUTABLE))
+    login.add_argument('--timeout-seconds', type=int, default=300)
     syncing = sub.add_parser('sync', help='refresh the read-only history snapshot')
     syncing.add_argument('--limit', type=int, default=MAX_HISTORY)
     sub.add_parser('status', help='show connection and snapshot metadata without secrets')
@@ -359,15 +419,19 @@ def main(argv=None) -> int:
                           'session_file': str(session_path), 'next': 'Run sync to fetch history.'}
             elif args.command == 'login':
                 username = validate_username(args.username)
-                if not sys.stdin.isatty():
-                    raise LeetCodeSyncError('The login command requires an interactive terminal.')
-                login = input('LeetCode email or username: ').strip()
-                if not login:
-                    raise LeetCodeSyncError('LeetCode email or username is required.')
-                password = getpass.getpass('LeetCode password (input hidden): ')
-                if not password:
-                    raise LeetCodeSyncError('LeetCode password is required.')
-                credentials = login_with_browser(args.cdp_url, username, login, password)
+                if args.headed:
+                    credentials = login_in_headed_browser(
+                        username, args.browser_executable, args.timeout_seconds, session_path.parent)
+                else:
+                    if not sys.stdin.isatty():
+                        raise LeetCodeSyncError('The login command requires an interactive terminal.')
+                    login = input('LeetCode email or username: ').strip()
+                    if not login:
+                        raise LeetCodeSyncError('LeetCode email or username is required.')
+                    password = getpass.getpass('LeetCode password (input hidden): ')
+                    if not password:
+                        raise LeetCodeSyncError('LeetCode password is required.')
+                    credentials = login_with_browser(args.cdp_url, username, login, password)
                 connection = {'version': 1, 'username': username, **credentials, 'linked_at': utc_now()}
                 verified_username = verify_connection(connection)
                 connection['username'] = verified_username

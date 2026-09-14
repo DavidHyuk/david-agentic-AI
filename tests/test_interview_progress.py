@@ -99,6 +99,22 @@ def test_explicit_next_plan_tracks_a_second_same_day_problem(catalog):
     assert ip.plan(state, catalog, 'coding', '2026-09-08') == first
 
 
+def test_explicit_next_plan_skips_due_review_for_next_unseen_problem(catalog):
+    state = ip.empty_state()
+    complete(state, catalog, '2026-09-08')
+    complete(state, catalog, '2026-09-09')
+    complete(state, catalog, '2026-09-10')
+    # A weak earlier attempt is due, but asking for another problem is an
+    # explicit request for a new curriculum item rather than a review slot.
+    state['coding'][0].update(confidence=1, next_review_date='2026-09-10')
+
+    next_assignment = ip.plan(state, catalog, 'coding', '2026-09-10', next_assignment=True)
+
+    assert next_assignment['item_id'] == 'valid-palindrome'
+    assert next_assignment['reason'] == 'next new curriculum item'
+    assert next_assignment['session_type'] == 'new'
+
+
 def test_due_review_displaces_then_resumes_new_slot(catalog):
     state = ip.empty_state()
     first = complete(state, catalog, '2026-09-08', confidence=2)

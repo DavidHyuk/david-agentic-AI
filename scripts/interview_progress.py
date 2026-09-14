@@ -94,8 +94,9 @@ def curriculum_cursor(state: dict, track: str, today: str) -> int:
     return cursor
 
 
-def select_item(state: dict, catalog: dict, track: str, today: str) -> dict:
-    """Due weak items first; interrupted new slots resume after the review."""
+def select_item(state: dict, catalog: dict, track: str, today: str,
+                prefer_new: bool = False) -> dict:
+    """Choose a scheduled item, or the next unseen curriculum item on request."""
     latest = latest_sessions(state, track, today)
     items = catalog['problems' if track == 'coding' else 'system_design']
     by_id = {p['id']: p for p in items}
@@ -103,6 +104,21 @@ def select_item(state: dict, catalog: dict, track: str, today: str) -> dict:
     curriculum = catalog['coding_curriculum'] if track == 'coding' else [
         {'problem': p['id']} for p in items]
     slot = curriculum[cursor] if cursor < len(curriculum) else None
+    if prefer_new:
+        completed_slots = {s['curriculum_slot'] for s in state[track]
+                           if s['date'] <= today and s['curriculum_slot'] is not None}
+        next_new = next(((index, candidate) for index, candidate in enumerate(curriculum)
+                         if candidate.get('problem') and index not in completed_slots), None)
+        if next_new:
+            slot_index, candidate = next_new
+            item_id = candidate['problem']
+            missing = [p for p in by_id[item_id]['prerequisites'] if p not in latest]
+            if missing:
+                item_id, reason, slot_index = missing[0], 'prerequisite practice', None
+            else:
+                reason = 'next new curriculum item'
+            return {'item_id': item_id, 'reason': reason, 'curriculum_slot': slot_index,
+                    'session_type': 'review' if item_id in latest else 'new'}
     ranked = sorted(latest.values(), key=lambda s: (
         weakness(s, track), s['next_review_date'], by_id[s['item_id']].get('recommended_order', 0)))
     due = [s for s in ranked if s['next_review_date'] <= today]
@@ -155,7 +171,7 @@ def plan(state: dict, catalog: dict, track: str, today: str,
     while assignment_id in state['assignments']:
         assignment_id = f'{daily_id}:{sequence}'
         sequence += 1
-    selection = select_item(state, catalog, track, today)
+    selection = select_item(state, catalog, track, today, prefer_new=next_assignment)
     # Preserve hint/solution exposure if an unfinished exercise is pushed again.
     previous = [a for a in state['assignments'].values()
                 if a['track'] == track and a['item_id'] == selection['item_id']

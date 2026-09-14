@@ -3,6 +3,17 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.16.1 — 2026-09-14 (patch: make Coding follow-up assignments new)
+
+- Fixed the LeetCode Gym's post-completion follow-up path: it now selects the
+  next uncompleted curriculum problem instead of reopening a due review of a
+  problem David already solved. Scheduled Coding Coach runs still prioritize
+  weak due reviews, so spaced repetition remains intact.
+- Renamed the completed-workbench action to **새 문제 준비하기** and made its
+  selection behavior explicit in the workbench, README, and project overview.
+- Added regression coverage for a due historical problem alongside a newly
+  completed current problem.
+
 ## v1.16.0 — 2026-09-14 (minor: connect the Coding Coach to LeetCode history)
 
 - Added the standalone `leetcode_sync.py` helper. It verifies an opt-in
@@ -19,6 +30,10 @@ semantic versioning (major.minor.patch).
 - Detect LeetCode's actual Cloudflare interstitial before submitting credentials
   and report that the headless path is blocked rather than suggesting a password
   or MFA problem. The helper does not attempt to evade browser verification.
+- Added `login --headed`: a one-time local GUI Chromium session with a temporary
+  owner-only browser profile, where David completes Cloudflare/MFA himself. On
+  success it extracts and stores only the verified session; the temporary profile
+  and any browser-saved password/session state are removed on exit.
 - Added a no-delivery four-hour `leetcode-history-sync` job on the existing
   David profile and a pre-lesson refresh in the existing `coding-coach` job.
   The existing LeetCode Gym Telegram room, profile, bot, and gateway remain the

@@ -91,6 +91,30 @@ def test_headless_login_prompts_without_storing_or_printing_password(tmp_path, m
     assert saved['csrf_token'] == 'csrf-value'
 
 
+def test_headed_login_uses_manual_browser_session_without_terminal_password(tmp_path, monkeypatch):
+    session_path = tmp_path / 'session.json'
+    snapshot_path = tmp_path / 'history.json'
+    called = {}
+    monkeypatch.setattr(ls, 'login_in_headed_browser', lambda username, executable, timeout, parent: (
+        called.update(username=username, executable=executable, timeout=timeout, parent=parent)
+        or {'session': 'z' * 32, 'csrf_token': ''}
+    ))
+    monkeypatch.setattr(ls, 'verify_connection', lambda value: value['username'])
+
+    assert ls.main(['--session-file', str(session_path), '--snapshot-file', str(snapshot_path),
+                    'login', '--username', 'david_choi', '--headed', '--timeout-seconds', '120']) == 0
+
+    assert called == {'username': 'david_choi', 'executable': '/snap/bin/chromium',
+                      'timeout': 120, 'parent': tmp_path}
+    assert json.loads(session_path.read_text())['session'] == 'z' * 32
+
+
+def test_headed_login_rejects_an_unbounded_wait_before_opening_browser(tmp_path, monkeypatch):
+    monkeypatch.setenv('DISPLAY', ':0')
+    with pytest.raises(ls.LeetCodeSyncError, match='between 30 and 900'):
+        ls.login_in_headed_browser('david_choi', '/snap/bin/chromium', 901, tmp_path)
+
+
 def test_cookie_value_selects_only_the_requested_cookie():
     cookies = [{'name': 'csrftoken', 'value': 'csrf'}, {'name': 'LEETCODE_SESSION', 'value': 'session'}]
     assert ls._cookie_value(cookies, 'LEETCODE_SESSION') == 'session'

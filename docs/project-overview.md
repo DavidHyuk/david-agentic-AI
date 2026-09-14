@@ -139,7 +139,7 @@ David-Agent/
 │   ├── Qwen/                  # Qwen 계열 모델
 │   └── MiniMax/               # MiniMax-M2.7 모델
 │
-├── tests/                     # pytest 테스트 (288개)
+├── tests/                     # pytest 테스트 (290개)
 │   ├── conftest.py
 │   ├── test_papers_ingest.py
 │   ├── test_papers_digest.py
@@ -403,7 +403,8 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   Papers는 읽기 목록과 읽음 표시를 제공합니다. MLE는 저장된
   드릴과 답안 노트, HQ는 미완료 과제·복습 카드·읽을 논문을 모아 보여줍니다.
   오늘 과제를 완료한 뒤 한 문제를 더 요청하면 번호가 붙은 당일 과제로
-  저장되어 Telegram과 작업실이 같은 미완료 상태를 봅니다.
+  저장되어 Telegram과 작업실이 같은 미완료 상태를 봅니다. Coding 작업실의
+  추가 과제 요청은 이전 due 복습 대신 다음 미해결 커리큘럼 문제를 고릅니다.
 - Papers, MLE Interview, LeetCode, System Design 작업실에는 방별 영속 세션을
   사용하는 직접 대화 입력창이 있습니다. 로컬 Hermes API로 답을 만든 뒤
   질문과 답을 해당 Telegram 그룹에도 기록합니다. 브라우저에는 API key,
@@ -494,18 +495,21 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   개선점을 기록하며 점수는 1–5입니다.
 - 해설 열람/자신감 ≤2 → 2일, 힌트 2/3 또는 자신감 3 → 7일, 독립 해결/자신감 ≥4 →
   21일. 취약 due 복습을 새 문제보다 우선하며 강한 문제는 지정 복습/통합 슬롯에서
-  다룹니다. 설계는 최저 차원 점수/자신감으로 같은 간격을 적용하고 일요일에 전달합니다.
+  다룹니다. 단, Coding 작업실에서 완료 후 명시적으로 새 과제를 요청하면 다음
+  미해결 커리큘럼 문제를 먼저 배정합니다. 설계는 최저 차원 점수/자신감으로 같은
+  간격을 적용하고 일요일에 전달합니다.
 - 힌트는 관찰 → 알고리즘/자료구조 → 의사코드 순서로 요청당 하나씩 제공합니다.
   전체 해설은 3단계 이후 다시 명시적으로 요청해야 합니다.
 - Python 표준 라이브러리만 사용하며 runtime scraping/cookies/network 의존성이 없습니다.
   파일 잠금 + atomic replace로 저장하고 동일 assignment 결과 재시도는 중복 기록하지
   않습니다. 기존 MLE `progress.md`와 트렌드 cache는 계속 유지합니다.
-- 선택적으로 `leetcode_sync.py login`이 기존 localhost-only headless Chromium에
-  Playwright로 연결해 로그인·비밀번호를 대화형으로만 입력받고, 비밀번호는 저장하지
-  않습니다. CAPTCHA/MFA/OAuth 확인은 우회하지 않고 실패하며, 이때 숨김 세션 입력
-  `connect`가 fallback입니다. `0600` 세션 파일과 별도 `0600` 풀이 snapshot을 만들며
-  코드 제출·계정 변경은 없습니다. 4시간 cron과 Coding Coach 직전 동기화가 최근
-  정답/난이도별 해결 수를 갱신하고 LeetCode Gym Observatory는 안전한 필드만 읽습니다.
+- 선택적으로 `leetcode_sync.py login --headed`이 임시 local GUI Chromium을 열어
+  사용자가 Cloudflare/MFA와 로그인을 직접 완료하도록 합니다. 임시 profile은 삭제되고
+  비밀번호는 저장하지 않습니다. headless 로그인은 Cloudflare를 우회하지 않고 차단을
+  명시하며, GUI가 없을 때 숨김 세션 입력 `connect`가 fallback입니다. `0600` 세션 파일과
+  별도 `0600` 풀이 snapshot을 만들며 코드 제출·계정 변경은 없습니다. 4시간 cron과
+  Coding Coach 직전 동기화가 최근 정답/난이도별 해결 수를 갱신하고 LeetCode Gym
+  Observatory는 안전한 필드만 읽습니다.
 - 일요일 18시 보고서는 월요일부터의 완료 세션, 신규/복습, 평균 시간, 힌트/해설 사용,
   최신 취약 패턴, 설계 주제, 최저 설계 차원과 다음 주 집중 영역을 논문 리뷰에 합칩니다.
   CLI 배포/기록 예시는 README의 Interview study coach 절을 참조합니다.

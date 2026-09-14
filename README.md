@@ -667,26 +667,27 @@ The token is entered through a hidden prompt and is stored only at
 separate, safe-to-read snapshot is
 `~/.hermes/data/interview/leetcode_history.json`.
 
-The preferred setup signs in through the existing local headless Chromium. It
-asks for the login and password interactively; the password remains only in
-memory while the browser signs in. Do not place either value in a command line,
-shell history, or `.env` file.
+The preferred setup opens a one-time local GUI Chromium window. Complete the
+LeetCode login, Cloudflare check, and any MFA yourself; the temporary browser
+profile is deleted afterward and only the issued session is stored. Run this in
+a terminal attached to the DGX desktop (not a headless SSH-only shell):
 
 ```bash
-python3 ~/.hermes/scripts/leetcode_sync.py login --username <your-leetcode-handle>
+python3 ~/.hermes/scripts/leetcode_sync.py login --headed --username <your-leetcode-handle>
 python3 ~/.hermes/scripts/leetcode_sync.py sync
 python3 ~/.hermes/scripts/leetcode_sync.py status
 ```
 
-The first command verifies that the session belongs to the supplied handle. If
-LeetCode presents CAPTCHA, MFA, or an OAuth confirmation, the headless command
-fails closed; sign in in a normal browser and use the `connect` command to paste
-only the `LEETCODE_SESSION` cookie into its hidden prompt instead. A read-only
-`leetcode-history-sync` cron then refreshes the snapshot every four hours, and
-`coding-coach` refreshes it again before each scheduled coding lesson. The
-LeetCode Gym Observatory room shows only the safe snapshot; it never returns the
-session cookie. To stop future account access while retaining the already saved
-progress snapshot, run:
+The first command verifies that the session belongs to the supplied handle. The
+plain `login` command remains headless and asks for a login/password through
+hidden terminal input, but LeetCode currently blocks that route with Cloudflare.
+If no local GUI is available, sign in in a normal browser and use `connect` to
+paste only the `LEETCODE_SESSION` cookie into its hidden prompt instead. A
+read-only `leetcode-history-sync` cron then refreshes the snapshot every four
+hours, and `coding-coach` refreshes it again before each scheduled coding lesson.
+The LeetCode Gym Observatory room shows only the safe snapshot; it never returns
+the session cookie. To stop future account access while retaining the already
+saved progress snapshot, run:
 
 ```bash
 python3 ~/.hermes/scripts/leetcode_sync.py disconnect
@@ -930,7 +931,10 @@ Session setup fails with a visible gateway error after 15 seconds instead of
 hanging indefinitely; an active local-model turn may run for up to ten minutes.
 
 - **LeetCode / System Design**: resume unfinished assignments, prepare today's
-  assignment, or open another same-day assignment after completing one; use a
+  assignment, or open another same-day assignment after completing one. The
+  follow-up Coding action selects the next uncompleted curriculum problem rather
+  than resurfacing a due review; scheduled sessions still prioritize weak due
+  reviews. Use a
   timer and submit actual practice results. Coding feedback
   records duration, confidence, hints and solution use; design feedback records
   your self-assessment and improvement notes. These update the existing coach
