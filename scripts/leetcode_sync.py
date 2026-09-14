@@ -4,8 +4,10 @@
 
 LeetCode does not publish a personal-history API.  This standalone helper uses
 the account's ``LEETCODE_SESSION`` cookie only for read-only GraphQL requests;
-it never submits code, changes profile data, or stores a password.  The session
-is entered through a hidden terminal prompt (or standard input), not a command
+it never submits code, changes profile data, or stores a password.  It saves
+the latest accepted source for recent problems in an owner-only local snapshot
+so the Coding Coach can discuss David's actual implementation. The session is
+entered through a hidden terminal prompt (or standard input), not a command
 argument, and is written with owner-only permissions.
 
 Usage:
@@ -34,6 +36,8 @@ API_URL = 'https://leetcode.com/graphql/'
 USER_AGENT = 'david-agentic-ai/leetcode-sync (personal read-only coach)'
 USERNAME_RE = re.compile(r'^[A-Za-z0-9_-]{1,64}$')
 MAX_HISTORY = 100
+MAX_SOLUTION_SNAPSHOTS = 20
+MAX_SOLUTION_CODE_CHARS = 200_000
 DEFAULT_CDP_URL = 'http://127.0.0.1:19222'
 DEFAULT_CHROMIUM_EXECUTABLE = '/snap/bin/chromium'
 
@@ -43,6 +47,18 @@ HISTORY_QUERY = '''query history($username: String!, $limit: Int!) {
     submitStatsGlobal { acSubmissionNum { difficulty count submissions } }
   }
   recentAcSubmissionList(username: $username, limit: $limit) { title titleSlug timestamp }
+}'''
+RECENT_SUBMISSIONS_QUERY = '''query recentSubmissions($username: String!, $limit: Int!) {
+  recentSubmissionList(username: $username, limit: $limit) {
+    id title titleSlug timestamp statusDisplay lang
+  }
+}'''
+SUBMISSION_DETAILS_QUERY = '''query submissionDetails($submissionId: Int!) {
+  submissionDetails(submissionId: $submissionId) {
+    code timestamp statusCode
+    lang { name verboseName }
+    question { title titleSlug }
+  }
 }'''
 
 
@@ -191,12 +207,74 @@ def normalize_history(data: dict, username: str) -> dict:
     }
 
 
+def accepted_submission_candidates(data: dict) -> list[dict]:
+    """Keep the newest Accepted submission for each recent problem.
+
+    The list endpoint is newest-first. Keeping one code sample per slug avoids
+    retaining failed attempts or needless duplicate source snapshots.
+    """
+    candidates: list[dict] = []
+    seen_slugs: set[str] = set()
+    for row in data.get('recentSubmissionList') or []:
+        if not isinstance(row, dict) or row.get('statusDisplay') != 'Accepted':
+            continue
+        submission_id = str(row.get('id') or '')
+        title, slug = row.get('title'), row.get('titleSlug')
+        if (not submission_id.isdigit() or not isinstance(title, str)
+                or not isinstance(slug, str) or not slug or slug in seen_slugs):
+            continue
+        seen_slugs.add(slug)
+        candidates.append({
+            'submission_id': int(submission_id), 'title': title, 'slug': slug,
+            'accepted_at': _timestamp(row.get('timestamp')),
+            'language': str(row.get('lang') or ''),
+        })
+        if len(candidates) >= MAX_SOLUTION_SNAPSHOTS:
+            break
+    return candidates
+
+
+def fetch_accepted_solutions(connection: dict, recent_submissions: dict) -> list[dict]:
+    """Fetch actual source only for latest recent Accepted submissions."""
+    solutions: list[dict] = []
+    for candidate in accepted_submission_candidates(recent_submissions):
+        data = graphql(
+            SUBMISSION_DETAILS_QUERY,
+            {'submissionId': candidate['submission_id']},
+            connection,
+        )
+        details = data.get('submissionDetails')
+        if not isinstance(details, dict):
+            raise LeetCodeSyncError('LeetCode did not return a submitted solution.')
+        question = details.get('question') or {}
+        code = details.get('code')
+        if (details.get('statusCode') != 10 or not isinstance(code, str) or not code
+                or len(code) > MAX_SOLUTION_CODE_CHARS
+                or question.get('titleSlug') != candidate['slug']):
+            raise LeetCodeSyncError('LeetCode returned an invalid accepted solution.')
+        language = details.get('lang') or {}
+        solutions.append({
+            'title': str(question.get('title') or candidate['title']),
+            'slug': candidate['slug'],
+            'accepted_at': _timestamp(details.get('timestamp')) or candidate['accepted_at'],
+            'language': str(language.get('verboseName') or language.get('name') or candidate['language']),
+            'code': code,
+        })
+    return solutions
+
+
 def sync(connection_path: Path, snapshot_path: Path, limit: int = MAX_HISTORY) -> dict:
     if not 1 <= limit <= MAX_HISTORY:
         raise LeetCodeSyncError(f'History limit must be between 1 and {MAX_HISTORY}.')
     connection = load_connection(connection_path)
     data = graphql(HISTORY_QUERY, {'username': connection['username'], 'limit': limit}, connection)
     snapshot = normalize_history(data, connection['username'])
+    recent_submissions = graphql(
+        RECENT_SUBMISSIONS_QUERY,
+        {'username': connection['username'], 'limit': limit},
+        connection,
+    )
+    snapshot['accepted_solutions'] = fetch_accepted_solutions(connection, recent_submissions)
     save_private_json(snapshot_path, snapshot)
     return snapshot
 

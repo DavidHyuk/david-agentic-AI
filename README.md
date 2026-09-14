@@ -661,12 +661,15 @@ without a subscription. The coach does not claim access to gated content.
 
 ### LeetCode account history (optional, read-only)
 
-The Coding Coach can use your solved totals and recent accepted submissions as
-supplementary context. It never treats that history as a completed coach
-assignment, submits code, edits your LeetCode profile, or stores a password.
+The Coding Coach can use your solved totals, recent accepted submissions, and
+the latest actual Accepted source for each recent problem as supplementary
+context. This lets it answer questions such as “How did I solve Anagram?” from
+your submitted code rather than a generic solution. It never treats that
+history as a completed coach assignment, submits code, edits your LeetCode
+profile, or stores a password.
 The token is entered through a hidden prompt and is stored only at
 `~/.hermes/data/interview/leetcode_session.json` with `0600` permissions; the
-separate, safe-to-read snapshot is
+separate owner-only snapshot (including submitted source code) is
 `~/.hermes/data/interview/leetcode_history.json`.
 
 The preferred setup opens a one-time local GUI Chromium window. Complete the

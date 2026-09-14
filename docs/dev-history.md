@@ -3,6 +3,14 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.16.6 — 2026-09-14 (minor: ground coding recall in submitted source)
+
+- Extended opt-in LeetCode sync with the latest verified Accepted source for up
+  to 20 recent problems. Source remains in the existing `0600` local snapshot,
+  never includes the session cookie, and is not exposed by the Observatory data
+  API. Coding recall now instructs Hermes to explain that source rather than
+  infer an answer from only a problem title or coaching note.
+
 ## v1.16.5 — 2026-09-14 (patch: shorten stalled-chat recovery)
 
 - Changed the lightweight loopback liveness watchdog from five-minute to

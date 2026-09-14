@@ -112,8 +112,12 @@ The catalog remains the fallback when LeetCode is not linked. When
 `~/.hermes/data/interview/leetcode_history.json` exists, treat its read-only
 solved totals and recent accepted problems as supplementary evidence: avoid
 assigning a recently accepted catalog problem and surface an obvious pattern
-gap. Never infer a completion from the snapshot; the structured coach state
-remains the source of truth for curriculum completion and reviews.
+gap. When David asks how he previously solved a LeetCode problem, first read
+the matching `accepted_solutions` entry in that owner-only snapshot and explain
+the actual submitted source (language, approach, and key lines). Never invent
+or substitute a canonical answer when no matching source is saved. Never infer
+a completion from the snapshot; the structured coach state remains the source
+of truth for curriculum completion and reviews.
 
 LeetCode linking is opt-in. Run `python3 ~/.hermes/scripts/leetcode_sync.py
 status` before claiming it is connected. A linked session is refreshed with

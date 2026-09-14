@@ -27,6 +27,23 @@ def history_data():
     ]}
 
 
+def recent_submissions_data():
+    return {'recentSubmissionList': [
+        {'id': '101', 'title': 'Two Sum', 'titleSlug': 'two-sum',
+         'timestamp': '1789387200', 'statusDisplay': 'Accepted', 'lang': 'python3'},
+        {'id': '100', 'title': 'Two Sum', 'titleSlug': 'two-sum',
+         'timestamp': '1789387100', 'statusDisplay': 'Wrong Answer', 'lang': 'python3'},
+    ]}
+
+
+def submission_details_data():
+    return {'submissionDetails': {
+        'code': 'class Solution:\n    pass\n', 'timestamp': '1789387200', 'statusCode': 10,
+        'lang': {'name': 'python3', 'verboseName': 'Python3'},
+        'question': {'title': 'Two Sum', 'titleSlug': 'two-sum'},
+    }}
+
+
 def test_normalize_history_keeps_only_read_only_progress_fields():
     snapshot = ls.normalize_history(history_data(), 'david_choi')
     assert snapshot['username'] == 'david_choi'
@@ -38,17 +55,50 @@ def test_normalize_history_keeps_only_read_only_progress_fields():
     assert 'session' not in snapshot
 
 
+def test_accepted_submission_candidates_keep_latest_accepted_source_per_problem():
+    candidates = ls.accepted_submission_candidates(recent_submissions_data())
+
+    assert candidates == [{
+        'submission_id': 101, 'title': 'Two Sum', 'slug': 'two-sum',
+        'accepted_at': '2026-09-14T12:00:00+00:00', 'language': 'python3',
+    }]
+
+
+def test_fetch_accepted_solutions_keeps_only_verified_accepted_code(monkeypatch):
+    monkeypatch.setattr(ls, 'graphql', lambda query, *_args: (
+        submission_details_data() if query == ls.SUBMISSION_DETAILS_QUERY else recent_submissions_data()
+    ))
+
+    solutions = ls.fetch_accepted_solutions(connection(), recent_submissions_data())
+
+    assert solutions == [{
+        'title': 'Two Sum', 'slug': 'two-sum',
+        'accepted_at': '2026-09-14T12:00:00+00:00', 'language': 'Python3',
+        'code': 'class Solution:\n    pass\n',
+    }]
+
+
 def test_sync_writes_an_owner_only_snapshot_without_session(tmp_path, monkeypatch):
     session_path = tmp_path / 'leetcode_session.json'
     snapshot_path = tmp_path / 'leetcode_history.json'
     ls.save_private_json(session_path, connection())
-    monkeypatch.setattr(ls, 'graphql', lambda *args, **kwargs: history_data())
+    def fake_graphql(query, *_args, **_kwargs):
+        if query == ls.HISTORY_QUERY:
+            return history_data()
+        if query == ls.RECENT_SUBMISSIONS_QUERY:
+            return recent_submissions_data()
+        if query == ls.SUBMISSION_DETAILS_QUERY:
+            return submission_details_data()
+        pytest.fail('unexpected query')
+
+    monkeypatch.setattr(ls, 'graphql', fake_graphql)
 
     snapshot = ls.sync(session_path, snapshot_path, limit=10)
 
     persisted = json.loads(snapshot_path.read_text())
     assert persisted == snapshot
     assert 'session' not in snapshot_path.read_text()
+    assert snapshot['accepted_solutions'][0]['code'] == 'class Solution:\n    pass\n'
     assert stat.S_IMODE(snapshot_path.stat().st_mode) == 0o600
     assert stat.S_IMODE(snapshot_path.parent.stat().st_mode) == 0o700
 
@@ -134,12 +184,15 @@ def test_status_never_exposes_saved_session(tmp_path):
     session_path = tmp_path / 'session.json'
     snapshot_path = tmp_path / 'history.json'
     ls.save_private_json(session_path, connection())
-    ls.save_private_json(snapshot_path, ls.normalize_history(history_data(), 'david_choi'))
+    snapshot = ls.normalize_history(history_data(), 'david_choi')
+    snapshot['accepted_solutions'] = [{'slug': 'two-sum', 'code': 'private submitted source'}]
+    ls.save_private_json(snapshot_path, snapshot)
 
     status = ls.public_status(session_path, snapshot_path)
 
     assert status['linked']['username'] == 'david_choi'
     assert 'session' not in json.dumps(status)
+    assert 'private submitted source' not in json.dumps(status)
     assert status['snapshot']['total_solved'] == 12
 
 

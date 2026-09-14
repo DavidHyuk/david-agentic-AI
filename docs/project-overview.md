@@ -139,7 +139,7 @@ David-Agent/
 │   ├── Qwen/                  # Qwen 계열 모델
 │   └── MiniMax/               # MiniMax-M2.7 모델
 │
-├── tests/                     # pytest 테스트 (298개)
+├── tests/                     # pytest 테스트 (300개)
 │   ├── conftest.py
 │   ├── test_papers_ingest.py
 │   ├── test_papers_digest.py
@@ -213,7 +213,7 @@ history/search·알림 제어의 이점이 있으면 같은 bot을 별도 Telegr
 | `papers_ingest.py` | arXiv 4개 카테고리 + HF Daily Papers 메타데이터 수집, source/run provenance 저장 |
 | `papers_digest.py` | SQLite 카탈로그 읽기 전용 조회 → 추천/최신/인기 digest |
 | `interview_progress.py` | curated catalog → 실제 학습 메시지, 힌트 단계, 결과 저장, 2/7/21일 복습, 주간 통계 |
-| `leetcode_sync.py` | 로컬 headless Chromium 로그인 또는 숨김 세션 입력·검증, owner-only 저장, LeetCode solved/최근 정답 snapshot 갱신 |
+| `leetcode_sync.py` | 로컬 headless Chromium 로그인 또는 숨김 세션 입력·검증, owner-only 저장, LeetCode solved/최근 정답·최근 문제별 실제 Accepted 코드 snapshot 갱신 |
 | `interview_trends.py` | HN·GitHub·논문 DB에서 실시간 인터뷰 트렌드 수집·캐시 |
 | `english_intake.py` | 새 레슨 탐지, Telegram 파일 저장, 이번 주 세션 조회, 처리 상태 관리 |
 | `english_srs.py` | Leitner SRS 덱 (카드 추가/리뷰/통계/취약 카드 랭킹) |
@@ -509,7 +509,8 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   않습니다. 기존 MLE `progress.md`와 트렌드 cache는 계속 유지합니다.
 - 선택적으로 `leetcode_sync.py login --headed`이 임시 local GUI Chromium을 열어
   사용자가 Cloudflare/MFA와 로그인을 직접 완료하도록 합니다. 임시 profile은 삭제되고
-  비밀번호는 저장하지 않습니다. headless 로그인은 Cloudflare를 우회하지 않고 차단을
+  비밀번호는 저장하지 않습니다. snapshot은 최근 문제별 최신 Accepted 실제 코드도
+  owner-only로 보관해 과거 풀이 설명에 쓰며, headless 로그인은 Cloudflare를 우회하지 않고 차단을
   명시하며, GUI가 없을 때 숨김 세션 입력 `connect`가 fallback입니다. `0600` 세션 파일과
   별도 `0600` 풀이 snapshot을 만들며 코드 제출·계정 변경은 없습니다. 4시간 cron과
   Coding Coach 직전 동기화가 최근 정답/난이도별 해결 수를 갱신하고 LeetCode Gym
