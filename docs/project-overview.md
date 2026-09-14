@@ -266,7 +266,7 @@ Design, Coding Coach는 각각 Interview, System Design, LeetCode 그룹을
 사용합니다. 모든 진도를 함께 다루는 `weekly-review`는 David의 기존 개인
 채팅에 유지됩니다.
 
-`hermes-cron-watchdog.timer`는 5분마다 David와 설치된 English profile의
+`hermes-cron-watchdog.timer`는 1분마다 David와 설치된 English profile의
 tick lock과 다음 실행 시각을 각각 검사합니다. lock이 20분 넘게 유지되거나
 다음 실행 시각이 지났으면 해당 profile의 gateway를 재시작하고,
 `hermes-gateway-cron-recovery.conf`가 멈춘 worker의 종료 대기를 45초로

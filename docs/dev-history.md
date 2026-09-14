@@ -3,6 +3,13 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.16.5 — 2026-09-14 (patch: shorten stalled-chat recovery)
+
+- Changed the lightweight loopback liveness watchdog from five-minute to
+  one-minute runs after observing that a new Observatory chat could stall the
+  gateway between checks. The probe remains local and credential-free; only an
+  unresponsive gateway takes the bounded restart path.
+
 ## v1.16.4 — 2026-09-14 (patch: recover stalled Observatory chat requests)
 
 - Extended the five-minute David watchdog with a credential-free loopback API

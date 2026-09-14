@@ -21,8 +21,8 @@ def test_watchdog_checks_frequently_and_recovers_stale_locks():
     assert "--gateway-service hermes-gateway-english.service" in service
     assert "--skip-missing-home" in service
     assert "TimeoutStartSec=180" in service
-    assert "OnBootSec=5min" in timer
-    assert "OnUnitActiveSec=5min" in timer
+    assert "OnBootSec=1min" in timer
+    assert "OnUnitActiveSec=1min" in timer
 
 
 def test_gateway_shutdown_is_bounded_for_stuck_workers():
