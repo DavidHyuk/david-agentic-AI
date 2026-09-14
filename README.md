@@ -864,14 +864,16 @@ clicking it opens the matching workbench. Hidden tabs and other views suspend an
 Speech cycles among real recent cron-notification
 excerpts, next-schedule fallbacks, short role-specific lines, and paired agent-to-agent
 exchanges only when the pair is physically near each other. A nearby pair speaks
-first; later bubbles wait 14–24 seconds after the previous exchange. Recent-notification bubbles come from stored assistant output and are
+first; each scene continues for four short turns, and later bubbles wait 7–14
+seconds after the previous exchange. Recent-notification bubbles come from stored assistant output and are
 visually labeled; ambient team exchanges are scripted and never presented as actual
 work. Selecting a character produces an immediate greeting. Passive bubbles do not
 invoke the model or play audio. Hidden views and historical replay suspend small talk.
-Hovering a character shows its next scheduled notification (or most recent notice
-when no schedule is available) without interrupting an active team exchange.
+Hovering a character shows its most recent recorded work and David's next action
+for that room without interrupting an active team exchange.
 Character name/purpose cards use high-contrast type. The `−/＋` controls and a
-two-finger pinch scale the complete office, furniture and cast from 50–140% on mobile.
+two-finger pinch scale the complete office, furniture and cast from 60–140% on mobile;
+the smaller mobile floor keeps a full-room overview readable on narrow screens.
 
 Office conversations use separate persisted `office_<room>` sessions on the
 existing HQ API, classified into their matching Observatory rooms. They are

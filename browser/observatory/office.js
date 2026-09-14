@@ -5,7 +5,7 @@ window.sharedOffice = (() => {
   // through the open aisle; furniture stays outside that aisle.
   const homes = {
     papers: [145, 265], interview: [365, 265], coding: [625, 265],
-    design: [855, 265], english: [185, 490], hq: [495, 420], podcast: [735, 455],
+    design: [855, 265], english: [185, 490], hq: [495, 420], podcast: [680, 455],
   };
   // Each role follows a small, deterministic work routine instead of choosing
   // arbitrary floor coordinates. Points are feet positions on the shared floor.
@@ -94,9 +94,10 @@ window.sharedOffice = (() => {
   const conversations = new Map();
   const reduced = matchMedia("(prefers-reduced-motion: reduce)");
   let selected = null, paused = localRead("office-paused", false);
-  let officeZoom = Math.min(1.4, Math.max(0.5, Number(localRead("office-zoom", 1)) || 1));
+  let officeZoom = Math.min(1.4, Math.max(0.6, Number(localRead("office-zoom", 1)) || 1));
   let previous = 0, frame = 0, roomData = [], historyRequest = 0;
-  let talkTimer = 0, replyTimer = 0, talkTurn = 0, noticeTurn = 0;
+  let talkTimer = 0, replyTimer = 0, followupTimer = 0, closingTimer = 0;
+  let talkTurn = 0, noticeTurn = 0;
   let dialogueTurn = 0, ambientTurn = 0;
   const speakingRooms = new Set();
   const conversation = (room) => {
@@ -123,7 +124,7 @@ window.sharedOffice = (() => {
         <div class="furniture desk-island desk-two"><b>CODE / DESIGN</b><i></i><i></i><em>BUILD · REVIEW · SYSTEM MAP</em><div class="zone-actions" id="engineering-actions"></div></div>
         <div class="furniture archive-shelf" aria-hidden="true"><b>FIELD NOTES</b><i></i><i></i><i></i><span>ARCHIVE</span></div>
         <div class="furniture review-board" aria-hidden="true"><b>REVIEW</b><i></i><i></i><span></span></div>
-        <div class="furniture coffee-bar"><b>☕</b><span>COFFEE CLUB · ENGLISH CORNER</span><i></i><div class="zone-actions" id="english-actions"></div></div>
+        <div class="furniture coffee-bar"><b>☕</b><span>COFFEE CLUB</span><i></i><div class="zone-actions" id="english-actions"></div></div>
         <div class="furniture sofa"><span>TAKE A BREATH · QUIET LOUNGE</span><i></i><i></i><i></i><b>✦</b></div>
         <div class="furniture meeting-table"><i></i><span>✦</span><i></i><div class="zone-actions" id="hq-actions"></div></div>
         <div class="furniture sound-desk"><span>ON AIR · LISTENING STUDIO</span><b>▥ ▥ ▥</b><i></i><div class="zone-actions" id="podcast-actions"></div></div>
@@ -185,13 +186,13 @@ window.sharedOffice = (() => {
     const viewport = document.querySelector(".office-viewport"), floor = document.querySelector(".shared-floor");
     if (!viewport || !floor) return;
     const previousZoom = officeZoom;
-    officeZoom = Math.round(Math.min(1.4, Math.max(0.5, value)) * 20) / 20;
+    officeZoom = Math.round(Math.min(1.4, Math.max(0.6, value)) * 20) / 20;
     const center = focusX ?? viewport.clientWidth / 2;
     const contentPoint = (viewport.scrollLeft + center) / previousZoom;
     floor.style.zoom = String(officeZoom);
     viewport.scrollLeft = Math.max(0, contentPoint * officeZoom - center);
     $("office-zoom-label").textContent = Math.round(officeZoom * 100) + "%";
-    $("office-zoom-out").disabled = officeZoom <= 0.5;
+    $("office-zoom-out").disabled = officeZoom <= 0.6;
     $("office-zoom-in").disabled = officeZoom >= 1.4;
     if (persist) localWrite("office-zoom", officeZoom);
   }
@@ -326,8 +327,12 @@ window.sharedOffice = (() => {
   function stopTalk() {
     clearTimeout(talkTimer);
     clearTimeout(replyTimer);
+    clearTimeout(followupTimer);
+    clearTimeout(closingTimer);
     talkTimer = 0;
     replyTimer = 0;
+    followupTimer = 0;
+    closingTimer = 0;
     for (const room of speakingRooms) actors.get(room)?.node.classList.remove("is-speaking");
     speakingRooms.clear();
   }
@@ -360,11 +365,9 @@ window.sharedOffice = (() => {
   }
   function hoverNoticeLine(room) {
     const data = roomData.find((item) => item.id === room);
-    const job = data && nextRoomJob(data);
-    if (job)
-      return `다음 할 일 · ${jobLabels[job.name] || job.name} ${when(job.next_run_at)}`;
-    if (data?.notice?.text) return `최근 알림 · ${data.notice.text}`;
-    return "다음 알림을 준비하고 있어요.";
+    const recent = data?.notice?.text || data?.latest?.title || "최근 기록이 아직 없어요.";
+    const action = data?.action || {title: "다음 행동", detail: "작업실에서 확인하기"};
+    return `최근 · ${recent}\nDavid 다음 · ${action.title} · ${action.detail}`;
   }
   function showHoverNotice(room) {
     if (state.replay) return;
@@ -394,7 +397,9 @@ window.sharedOffice = (() => {
       stopTalk();
       showBubble(scene[0], scene[2], "dialogue");
       replyTimer = setTimeout(() => showBubble(scene[1], scene[3], "dialogue"), 1700);
-      finishTalk(8600);
+      followupTimer = setTimeout(() => showBubble(scene[0], "좋아요, 핵심만 하나 더 맞춰볼까요?", "dialogue"), 3400);
+      closingTimer = setTimeout(() => showBubble(scene[1], "네, 그 정도면 다음에 이어가기 좋겠어요.", "dialogue"), 5100);
+      finishTalk(9000);
       return;
     }
     speakNotification();
@@ -405,7 +410,9 @@ window.sharedOffice = (() => {
     stopTalk();
     showBubble("hq", lines[0], "dialogue");
     replyTimer = setTimeout(() => showBubble(partner, lines[1], "dialogue"), 1600);
-    finishTalk(7600);
+    followupTimer = setTimeout(() => showBubble("hq", "좋아요. 너무 급하게 하진 말아요.", "dialogue"), 3200);
+    closingTimer = setTimeout(() => showBubble(partner, "네, 다음에 진행도 같이 알려드릴게요.", "dialogue"), 4800);
+    finishTalk(8800);
   }
   function speakAmbient() {
     const rooms = [...actors.keys()].filter((room) => room !== selected);
@@ -423,7 +430,7 @@ window.sharedOffice = (() => {
       if (event === "notice") speakNotification();
       else if (event === "dialogue") speakDialogue();
       else speakAmbient();
-    }, 14000 + Math.random() * 10000);
+    }, 7000 + Math.random() * 7000);
   }
   function close() {
     const last = selected;

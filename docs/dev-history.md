@@ -3,6 +3,18 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.15.3 — 2026-09-14 (patch: prioritize legibility and coherent conversation)
+
+- Separated floor furniture from actionable content so character art never hides
+  a user task. Moved the readable per-room next-action information into the
+  roster cards and raised workstation signs above the character plane.
+- Moved Rina away from the Listening Studio and removed the Field Notes/action-card
+  collision. Enlarged office text and made the narrow-screen full-room view fit
+  at 60% zoom rather than requiring an unreadable 50% scale.
+- Hover bubbles now show the room's recent recorded work plus David's next action,
+  not a future schedule. Decorative paired conversations now continue for four
+  quick turns and recur after 7–14 seconds.
+
 ## v1.15.2 — 2026-09-13 (patch: make the office purpose-led and actionable)
 
 - Stopped idle specialist roaming. Hermes alone makes calm periodic rounds to
