@@ -667,6 +667,10 @@ context. This lets it answer questions such as “How did I solve Anagram?” fr
 your submitted code rather than a generic solution. It never treats that
 history as a completed coach assignment, submits code, edits your LeetCode
 profile, or stores a password.
+In the LeetCode workbench chat, the referenced problem (including a follow-up
+that refers to the immediately preceding problem) automatically provides only
+that matching local submission to the coach; the reply and its Telegram mirror
+therefore explain the submitted implementation rather than a guessed template.
 The token is entered through a hidden prompt and is stored only at
 `~/.hermes/data/interview/leetcode_session.json` with `0600` permissions; the
 separate owner-only snapshot (including submitted source code) is

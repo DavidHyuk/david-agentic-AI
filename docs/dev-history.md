@@ -3,6 +3,15 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.16.8 — 2026-09-14 (patch: inject matched source into Coding chat)
+
+- Fixed the missing final connection between the synced Accepted-source snapshot
+  and the Coding workbench chat. A problem-reference request now supplies only
+  the matching private submission to the local coach, including follow-up turns
+  whose problem is named in the immediately preceding conversation.
+- The coach is explicitly instructed to explain that exact implementation and
+  not replace it with generic hints or claim no submission was recorded.
+
 ## v1.16.7 — 2026-09-14 (patch: clear chat composer on submission)
 
 - Changed both Observatory chat composers to capture and send the message, then

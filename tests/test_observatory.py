@@ -428,6 +428,33 @@ def test_room_chat_uses_fixed_destination_and_persisted_agent_session(store, mon
     assert message in deliveries[0][1] and result['response'] in deliveries[0][1]
 
 
+def test_coding_chat_includes_matching_accepted_submission_as_evidence(store, monkeypatch):
+    store.agent_api_key = 'local-secret'
+    path = store.home / 'data/interview/leetcode_history.json'
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps({'version': 1, 'accepted_solutions': [{
+        'title': 'Valid Anagram', 'slug': 'valid-anagram', 'accepted_at': '2026-09-11T22:56:59+00:00',
+        'language': 'Python3', 'code': 'class Solution:\n    def isAnagram(self, s, t):\n        return {}\n',
+    }]}))
+    calls = []
+    def agent_api(method, path, payload=None, allow_status=(), **kwargs):
+        calls.append((method, path, payload))
+        if method == 'GET':
+            return {'_status': 404}
+        if path == '/api/sessions':
+            return {'session': {'id': payload['id']}}
+        return {'message': {'content': '실제 제출 코드를 설명합니다.'}}
+    monkeypatch.setattr(store, 'agent_api', agent_api)
+    monkeypatch.setattr(store, 'telegram_send', lambda *_args: None)
+
+    store.room_chat({'room': 'coding', 'message': 'Anagram을 어떻게 풀었더라?'})
+
+    instructions = calls[-1][2]['instructions']
+    assert 'authoritative LeetCode evidence' in instructions
+    assert 'Valid Anagram' in instructions
+    assert 'def isAnagram' in instructions
+
+
 def test_room_chat_rejects_unmapped_rooms_and_preserves_answer_on_delivery_failure(store, monkeypatch):
     store.agent_api_key = 'local-secret'
     with pytest.raises(ValueError, match='연결된 Telegram'):
