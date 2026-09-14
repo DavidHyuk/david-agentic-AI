@@ -22,10 +22,9 @@ def history_data():
             {'difficulty': 'Medium', 'count': 6, 'submissions': 10},
             {'difficulty': 'Hard', 'count': 1, 'submissions': 2},
         ]},
-        'recentAcSubmissionList': [
-            {'title': 'Two Sum', 'titleSlug': 'two-sum', 'timestamp': '1789387200'},
-        ],
-    }}
+    }, 'recentAcSubmissionList': [
+        {'title': 'Two Sum', 'titleSlug': 'two-sum', 'timestamp': '1789387200'},
+    ]}
 
 
 def test_normalize_history_keeps_only_read_only_progress_fields():

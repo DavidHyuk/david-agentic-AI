@@ -47,6 +47,9 @@ semantic versioning (major.minor.patch).
   owner-only browser profile, where David completes Cloudflare/MFA himself. On
   success it extracts and stores only the verified session; the temporary profile
   and any browser-saved password/session state are removed on exit.
+- Updated the history query after validating LeetCode's live GraphQL schema:
+  recent accepted submissions now come from the root-level query field while
+  solved totals remain on the matched-user record.
 - Added a no-delivery four-hour `leetcode-history-sync` job on the existing
   David profile and a pre-lesson refresh in the existing `coding-coach` job.
   The existing LeetCode Gym Telegram room, profile, bot, and gateway remain the

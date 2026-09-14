@@ -41,8 +41,8 @@ USER_STATUS_QUERY = '''query userStatus { userStatus { username } }'''
 HISTORY_QUERY = '''query history($username: String!, $limit: Int!) {
   matchedUser(username: $username) {
     submitStatsGlobal { acSubmissionNum { difficulty count submissions } }
-    recentAcSubmissionList(limit: $limit) { title titleSlug timestamp }
   }
+  recentAcSubmissionList(username: $username, limit: $limit) { title titleSlug timestamp }
 }'''
 
 
@@ -176,7 +176,7 @@ def normalize_history(data: dict, username: str) -> dict:
         if isinstance(row, dict) and row.get('difficulty') in totals and isinstance(row.get('count'), int):
             totals[row['difficulty']] = row['count']
     recent = []
-    for row in user.get('recentAcSubmissionList') or []:
+    for row in data.get('recentAcSubmissionList') or []:
         if not isinstance(row, dict):
             continue
         title, slug = row.get('title'), row.get('titleSlug')
