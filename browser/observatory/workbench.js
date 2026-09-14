@@ -481,6 +481,12 @@ function wireTelegramChat(d) {
     field = $("telegram-chat-message"),
     key = `hermes-chat-draft:${d.room}`;
   field.oninput = () => localWrite(key, field.value);
+  field.onkeydown = (event) => {
+    if (event.key === "Enter" && event.shiftKey && !event.isComposing) {
+      event.preventDefault();
+      form.requestSubmit();
+    }
+  };
   form.onsubmit = async (event) => {
     event.preventDefault();
     if (bench.busy) return;
@@ -505,6 +511,7 @@ function wireTelegramChat(d) {
       if (!response.ok)
         throw new Error(result.error || "Hermes에게 질문하지 못했습니다.");
       localWrite(key, null);
+      field.value = "";
       await loadWorkbench();
       $("bench-status").textContent = result.delivered
         ? "Hermes의 답변을 만들고 Telegram 그룹에도 전송했습니다."

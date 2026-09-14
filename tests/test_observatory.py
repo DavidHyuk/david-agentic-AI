@@ -138,6 +138,18 @@ def test_coding_workbench_exposes_only_safe_leetcode_snapshot(store):
     assert 'session' not in history
 
 
+def test_observatory_chats_clear_sent_drafts_and_support_shift_enter():
+    root = Path(__file__).resolve().parents[1] / 'browser/observatory'
+    workbench = (root / 'workbench.js').read_text()
+    office = (root / 'office.js').read_text()
+    assert 'event.key === "Enter" && event.shiftKey' in workbench
+    assert 'field.value = "";' in workbench
+    assert 'form.requestSubmit();' in workbench
+    assert 'event.key === "Enter" && event.shiftKey' in office
+    assert '$("office-chat-form").requestSubmit();' in office
+    assert 'localWrite("office-draft:" + room, null)' in office
+
+
 def test_completion_lesson_display_preserves_saved_line_breaks():
     root = Path(__file__).resolve().parents[1] / 'browser/observatory'
     assert 'class="completion-lesson"' in (root / 'workbench.js').read_text()

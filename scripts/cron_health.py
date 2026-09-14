@@ -4,10 +4,11 @@
 
 Purpose
 -------
-Detects failure modes that silently stop Telegram cron alerts:
+Detects failure modes that silently stop Telegram cron alerts or Observatory chat:
   1. ``~/.hermes/cron/.tick.lock`` held longer than a threshold (stuck tick).
   2. ``jobs.json`` last_run timestamps older than expected (scheduler idle).
   3. a cron job with a failed terminal status (one bounded retry per run).
+  4. the local Observatory HTTP API accepting TCP connections but not responding.
 
 Standalone CLI for manual checks or cron/systemd watchdog use. A caller can
 target a profile home and its matching systemd gateway service. Exit 0 when
@@ -19,6 +20,8 @@ import argparse
 import json
 import os
 import subprocess
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -29,6 +32,8 @@ DEFAULT_JOB_STALE_HOURS = 36
 DEFAULT_GATEWAY_SERVICE = "hermes-gateway.service"
 DEFAULT_RESTART_TIMEOUT_SECONDS = 75
 DEFAULT_CRON_RUN_TIMEOUT_SECONDS = 20
+DEFAULT_API_HEALTH_URL = "http://127.0.0.1:8642/health"
+DEFAULT_API_HEALTH_TIMEOUT_SECONDS = 5
 FAILED_STATUSES = frozenset({"failed", "error", "timeout", "cancelled", "canceled"})
 
 SECRET_PATTERNS = (".env", "credentials", "secret", "token", "auth.json")
@@ -174,11 +179,44 @@ def check_jobs_stale(
     }
 
 
+def check_api_health(
+    *,
+    url: str = DEFAULT_API_HEALTH_URL,
+    timeout_seconds: int = DEFAULT_API_HEALTH_TIMEOUT_SECONDS,
+) -> dict[str, Any]:
+    """Probe the loopback API without reading or exposing its API credential.
+
+    An authorization failure is healthy for this purpose: it proves aiohttp
+    accepted and processed the request. Server errors and transport timeouts
+    indicate that Observatory chat cannot be served.
+    """
+    request = Request(url, headers={"User-Agent": "hermes-cron-watchdog/1"})
+    try:
+        with urlopen(request, timeout=timeout_seconds) as response:
+            status = response.status
+    except HTTPError as error:
+        status = error.code
+    except (OSError, TimeoutError, URLError) as error:
+        return {
+            "url": url,
+            "healthy": False,
+            "status": None,
+            "error": f"{type(error).__name__}: {error}",
+        }
+    return {
+        "url": url,
+        "healthy": status < 500,
+        "status": status,
+        "error": None if status < 500 else f"HTTP {status}",
+    }
+
+
 def assess_health(
     hermes_home: Path,
     *,
     lock_stale_minutes: int = DEFAULT_LOCK_STALE_MINUTES,
     job_stale_hours: int = DEFAULT_JOB_STALE_HOURS,
+    check_api: bool = False,
     now: datetime | None = None,
 ) -> dict[str, Any]:
     """Combine lock + jobs checks into one report."""
@@ -190,8 +228,16 @@ def assess_health(
         stale_hours=job_stale_hours,
         now=now,
     )
-    critical = lock["stale"] or (not jobs.get("healthy", True))
-    return {"lock": lock, "jobs": jobs, "critical": critical}
+    api = check_api_health() if check_api else None
+    critical = (
+        lock["stale"]
+        or (not jobs.get("healthy", True))
+        or (api is not None and not api["healthy"])
+    )
+    report = {"lock": lock, "jobs": jobs, "critical": critical}
+    if api is not None:
+        report["api"] = api
+    return report
 
 
 def restart_gateway(
@@ -268,6 +314,15 @@ def _format_report(report: dict[str, Any]) -> str:
             lines.append(
                 f"  - {item['name']}: {item['last_status']} at "
                 f"{item['last_run_at'] or 'unknown time'}"
+            )
+    api = report.get("api")
+    if api is not None:
+        if api["healthy"]:
+            lines.append(f"Observatory API: responsive (HTTP {api['status']})")
+        else:
+            lines.append(
+                "Observatory API: unresponsive"
+                + (f" ({api['error']})" if api.get("error") else "")
             )
     return "\n".join(lines)
 
@@ -385,6 +440,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Restart the gateway when health check is critical",
     )
     parser.add_argument(
+        "--check-api",
+        action="store_true",
+        help="Treat an unresponsive local Observatory API as a critical gateway fault",
+    )
+    parser.add_argument(
         "--gateway-service",
         default=DEFAULT_GATEWAY_SERVICE,
         help=f"systemd user service to restart (default: {DEFAULT_GATEWAY_SERVICE})",
@@ -416,6 +476,7 @@ def main(argv: list[str] | None = None) -> int:
         home,
         lock_stale_minutes=args.lock_stale_minutes,
         job_stale_hours=args.job_stale_hours,
+        check_api=args.check_api,
     )
     if args.json:
         print(json.dumps(report, indent=2))

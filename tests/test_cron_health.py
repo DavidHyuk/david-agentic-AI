@@ -7,6 +7,7 @@ import subprocess
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
+from urllib.error import HTTPError
 
 import pytest
 
@@ -259,6 +260,42 @@ def test_assess_health_critical_when_lock_stale(hermes_home, monkeypatch):
 
     report = ch.assess_health(hermes_home, now=now)
     assert report["critical"] is True
+
+
+def test_check_api_health_accepts_a_fast_unauthorized_response(monkeypatch):
+    def unauthorized(*_args, **_kwargs):
+        raise HTTPError(ch.DEFAULT_API_HEALTH_URL, 401, "Unauthorized", {}, None)
+
+    monkeypatch.setattr(ch, "urlopen", unauthorized)
+
+    report = ch.check_api_health()
+
+    assert report["healthy"] is True
+    assert report["status"] == 401
+
+
+def test_check_api_health_flags_a_timeout(monkeypatch):
+    monkeypatch.setattr(ch, "urlopen", lambda *_args, **_kwargs: (_ for _ in ()).throw(TimeoutError("timed out")))
+
+    report = ch.check_api_health()
+
+    assert report["healthy"] is False
+    assert report["status"] is None
+    assert "TimeoutError" in report["error"]
+
+
+def test_assess_health_marks_unresponsive_api_critical(hermes_home, monkeypatch):
+    (hermes_home / "cron" / "jobs.json").write_text('{"jobs": []}', encoding="utf-8")
+    monkeypatch.setattr(
+        ch,
+        "check_api_health",
+        lambda: {"url": "http://127.0.0.1:8642/health", "healthy": False, "status": None, "error": "timeout"},
+    )
+
+    report = ch.assess_health(hermes_home, check_api=True)
+
+    assert report["critical"] is True
+    assert report["api"]["healthy"] is False
 
 
 def test_restart_gateway_uses_bounded_systemd_restart(monkeypatch):

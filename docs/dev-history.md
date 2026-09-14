@@ -3,6 +3,15 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.16.4 — 2026-09-14 (patch: recover stalled Observatory chat requests)
+
+- Extended the five-minute David watchdog with a credential-free loopback API
+  liveness probe. A gateway that still owns port 8642 but no longer processes
+  Observatory HTTP requests is now treated as critical and restarted within the
+  existing bounded recovery path; English profile routing remains unchanged.
+- Added regression coverage for responsive unauthorized replies, timeouts, and
+  API-driven recovery classification.
+
 ## v1.16.3 — 2026-09-14 (patch: preserve completion-record formatting)
 
 - Fixed LeetCode Gym's completed-record display to preserve saved line breaks
@@ -56,6 +65,9 @@ semantic versioning (major.minor.patch).
 - Updated the history query after validating LeetCode's live GraphQL schema:
   recent accepted submissions now come from the root-level query field while
   solved totals remain on the matched-user record.
+- Cleared successful Observatory chat drafts immediately and added `Shift+Enter`
+  submission for both workbench-to-Hermes and office-character conversations;
+  failed sends retain the draft for a safe retry.
 - Added a no-delivery four-hour `leetcode-history-sync` job on the existing
   David profile and a pre-lesson refresh in the existing `coding-coach` job.
   The existing LeetCode Gym Telegram room, profile, bot, and gateway remain the

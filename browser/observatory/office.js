@@ -153,6 +153,12 @@ window.sharedOffice = (() => {
     $("conversation-reload").onclick = () => { if (selected) loadHistory(selected); };
     $("office-chat-form").onsubmit = send;
     $("office-message").oninput = () => { if (selected) localWrite("office-draft:" + selected, $("office-message").value); };
+    $("office-message").onkeydown = (event) => {
+      if (event.key === "Enter" && event.shiftKey && !event.isComposing) {
+        event.preventDefault();
+        $("office-chat-form").requestSubmit();
+      }
+    };
     $("office-conversation").onkeydown = (event) => { if (event.key === "Escape") close(); };
     $("office-motion").onclick = () => {
       paused = !paused;

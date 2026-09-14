@@ -756,8 +756,10 @@ bash bootstrap/install_cron_watchdog.sh
 ```
 
 `hermes-cron-watchdog.timer` checks the David and installed English profile
-schedulers every five minutes. A stale next-run timestamp or cron tick lock held
-longer than 20 minutes triggers a restart of the matching gateway. The installed
+schedulers every five minutes. The David watchdog also makes a credential-free
+loopback probe of the Observatory chat API; a TCP listener that has stopped
+serving HTTP requests is restarted as well. A stale next-run timestamp or cron
+tick lock held longer than 20 minutes triggers a restart of the matching gateway. The installed
 gateway drop-ins cap shutdown at 45 seconds, so a permanently blocked worker
 cannot prevent recovery indefinitely. A job whose latest run is marked failed is
 also restarted and queued once again; the retry state is stored per profile, so a

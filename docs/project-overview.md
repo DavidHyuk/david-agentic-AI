@@ -139,7 +139,7 @@ David-Agent/
 │   ├── Qwen/                  # Qwen 계열 모델
 │   └── MiniMax/               # MiniMax-M2.7 모델
 │
-├── tests/                     # pytest 테스트 (293개)
+├── tests/                     # pytest 테스트 (298개)
 │   ├── conftest.py
 │   ├── test_papers_ingest.py
 │   ├── test_papers_digest.py
@@ -219,7 +219,7 @@ history/search·알림 제어의 이점이 있으면 같은 bot을 별도 Telegr
 | `english_srs.py` | Leitner SRS 덱 (카드 추가/리뷰/통계/취약 카드 랭킹) |
 | `english_podcast.py` | 최신 미학습 영상 일일 배정, 영문 JSON3 자막 및 타임스탬프 대본 저장, 전달 상태 관리 |
 | `agenda.py` | 캘린더 이벤트 포맷팅 + 충돌·여유 슬롯 감지 |
-| `cron_health.py` | cron tick lock·stale·마지막 실행 실패 감지, profile별 단발 재시도와 gateway 복구 |
+| `cron_health.py` | cron tick lock·stale·마지막 실행 실패와 David Observatory API 응답 정지 감지, profile별 단발 재시도와 gateway 복구 |
 | `wait_for_vllm.py` | 지정한 served model이 `/v1/models`에 나타날 때까지 gateway 시작 대기 |
 
 ### 5. `cron/jobs.yaml` — 선언형 스케줄
@@ -274,7 +274,9 @@ tick lock과 다음 실행 시각을 각각 검사합니다. lock이 20분 넘�
 며칠간 조용히 멈추지 않습니다. 마지막 실행 상태가 실패이면 gateway를
 재시작한 뒤 해당 실행을 profile별로 한 번만 다시 queue하며, 재시도 키는
 런타임 `cron/retry-state.json`에 저장해 반복 재시작·중복 Telegram 발송을
-막습니다. `register_cron.py`는 동일한 선언의 기존 job을 삭제하지 않고
+막습니다. David gateway는 자격증명을 읽지 않는 loopback Observatory API
+응답 검사도 함께 수행하므로, 포트만 열고 HTTP 요청을 처리하지 못하는 상태도
+다음 watchdog 주기에 재시작합니다. `register_cron.py`는 동일한 선언의 기존 job을 삭제하지 않고
 보존하므로 배포 중 pending 실행 시각과 실패/재시도 상태도 유지됩니다.
 
 English profile의 두 skill은 저장소가 단일 진실 원천입니다. staging은

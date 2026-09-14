@@ -6,7 +6,7 @@ After=hermes-gateway.service hermes-gateway-english.service
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/python3 %h/.hermes/scripts/cron_health.py --lock-stale-minutes 20 --restart --retry-failed-once
+ExecStart=/usr/bin/python3 %h/.hermes/scripts/cron_health.py --lock-stale-minutes 20 --check-api --restart --retry-failed-once
 ExecStart=/usr/bin/python3 %h/.hermes/scripts/cron_health.py --hermes-home %h/.hermes/profiles/english --profile english --gateway-service hermes-gateway-english.service --skip-missing-home --lock-stale-minutes 20 --restart --retry-failed-once
 TimeoutStartSec=180
 NoNewPrivileges=true

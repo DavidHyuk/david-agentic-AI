@@ -14,7 +14,7 @@ def test_watchdog_checks_frequently_and_recovers_stale_locks():
     service = SERVICE.read_text()
     timer = TIMER.read_text()
 
-    assert "cron_health.py --lock-stale-minutes 20 --restart" in service
+    assert "cron_health.py --lock-stale-minutes 20 --check-api --restart" in service
     assert "--retry-failed-once" in service
     assert "--hermes-home %h/.hermes/profiles/english" in service
     assert "--profile english" in service
