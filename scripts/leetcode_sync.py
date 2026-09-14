@@ -235,6 +235,10 @@ def login_failure_reason(page_text: str) -> str | None:
     """Turn known public login-page messages into an actionable safe error."""
     text = ' '.join((page_text or '').lower().split())
     if any(phrase in text for phrase in (
+            'cloudflare', 'just a moment', 'checking your browser', '보안 확인 수행 중')):
+        return ('Cloudflare blocked the headless browser before the LeetCode login form. '
+                'Use a normal browser to sign in, then use connect; this helper will not bypass it.')
+    if any(phrase in text for phrase in (
             'incorrect password', 'incorrect username', 'invalid password',
             'invalid username', 'invalid credentials', 'wrong password',
             'username or password is incorrect')):
@@ -279,8 +283,11 @@ def login_with_browser(cdp_url: str, username: str, login: str, password: str) -
                     login_field = page.locator('input[name="login"], #id_login, input[type="email"]').first
                     password_field = page.locator('input[name="password"], #id_password, input[type="password"]').first
                     if login_field.count() != 1 or password_field.count() != 1:
+                        reason = login_failure_reason(page.locator('body').inner_text(timeout=1_000))
+                        if reason:
+                            raise LeetCodeSyncError(reason)
                         raise LeetCodeSyncError(
-                            'LeetCode login form was not available. Complete CAPTCHA/MFA in a normal browser, then use connect.'
+                            'LeetCode login form was not available. Complete browser verification, then use connect.'
                         )
                     login_field.fill(login)
                     password_field.fill(password)

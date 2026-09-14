@@ -99,6 +99,7 @@ def test_cookie_value_selects_only_the_requested_cookie():
 
 @pytest.mark.parametrize(('page_text', 'expected'), [
     ('Your username or password is incorrect.', 'rejected the login ID or password'),
+    ('Just a moment... Cloudflare 보안 확인 수행 중', 'Cloudflare blocked the headless browser'),
     ('Please complete the CAPTCHA to continue.', 'requires CAPTCHA verification'),
     ('Enter your two-factor verification code.', 'requires MFA verification'),
 ])

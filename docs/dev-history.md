@@ -16,6 +16,9 @@ semantic versioning (major.minor.patch).
   closed; a browser-cookie connection remains the secure fallback.
 - Refined headless-login errors so a rejected login ID/password is not
   misreported as CAPTCHA or MFA; browser-verification messages remain explicit.
+- Detect LeetCode's actual Cloudflare interstitial before submitting credentials
+  and report that the headless path is blocked rather than suggesting a password
+  or MFA problem. The helper does not attempt to evade browser verification.
 - Added a no-delivery four-hour `leetcode-history-sync` job on the existing
   David profile and a pre-lesson refresh in the existing `coding-coach` job.
   The existing LeetCode Gym Telegram room, profile, bot, and gateway remain the
