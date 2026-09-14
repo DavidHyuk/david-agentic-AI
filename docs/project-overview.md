@@ -351,12 +351,17 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   (`app.js`, `workbench.js`, `office.js`, `style.css`, `workbench.css`, `office.css`):
   Python 표준 라이브러리 HTTP 서버와 로컬 HTML/CSS/JavaScript. CDN 없이
   애니메이션 에이전트 오피스, 세션 날짜별 리플레이, 검색·페이지네이션 제공.
-- 메인 오피스는 여성 3명, 남성 3명, 중성적인 Hermes 1명의 통일된 SD
+- 메인 오피스는 여성 4명, 남성 2명, 중성적인 Hermes 1명의 통일된 SD
   애니메이션 캐스트를 사용합니다. 투명 캐릭터 시트는
-  `browser/observatory/assets/hermes-agent-cast.png`에 보관하고 installer가
+  `browser/observatory/assets/hermes-agent-cast.png`와 여성 English tutor
+  `ellie-english-tutor.png`에 보관하고 installer가
   정적 UI와 함께 staging합니다. 데스크톱과 모바일 모두 하나의 큰 사무실을
   공유하며 모바일에서는 좌우 스크롤과 캐릭터 선택 버튼을 제공합니다.
 - 일곱 캐릭터는 책상·커피 공간·소파·창가 사이의 통로를 실제로 이동합니다.
+  각 장소에서 보통 60–140초 머무르고 출발 시점도 분산합니다. 한 번에 한
+  캐릭터가 역할별 짧은 말을 주기적으로 표시하고, 선택 시 즉시 인사합니다.
+  말풍선은 모델 호출 없는 사전 작성된 일상 대사이며 실제 작업 보고나 음성
+  재생이 아닙니다. 숨겨진 화면과 기록 리플레이에서는 대사를 중단합니다.
   위치는 10초 갱신에도 유지되고, 캐릭터 선택·일시정지·동작 감소 설정 및
   숨겨진 탭에서는 이동을 멈춥니다. 일상 동작은 브라우저 연출이며 gateway 또는
   read-only Kanban DB에서 확인된 작업만 `LIVE`, 막힌 Kanban 임무만

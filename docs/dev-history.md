@@ -3,6 +3,18 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.14.0 — 2026-09-13 (minor: calm the office and rebalance the cast)
+
+- Reduced ambient roaming to staggered departures followed by 60–140 second
+  location stays, keeping occasional movement without constant circulation.
+- Added periodic role-specific speech bubbles and an immediate greeting when a
+  character is selected.
+- Replaced Evan with Ellie, a female English tutor rendered as a dedicated
+  transparent cutout. The current cast is four women, two men and an
+  androgynous Hermes lead; all existing conversation/session routing is retained.
+- Staged and allowlisted the new character asset without changing profile, bot,
+  gateway, cron or Observatory-room ownership.
+
 ## v1.13.0 — 2026-09-13 (minor: roam a shared office and talk to the cast)
 
 - Replaced fixed character bays with one open office: seven 2D characters follow

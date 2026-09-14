@@ -15,3 +15,23 @@ Color palette: ivory, sage, navy and muted room-specific accent colors matching 
 Constraints: all characters are adults; balanced ensemble of three women, three men, and one androgynous lead; exactly seven people; hands and props clean and readable; production-ready clean cutout edges; actual transparent alpha background; no text, no labels, no border, no UI, no watermark, no logos
 Avoid: sexualized clothing, cleavage emphasis, school uniforms, childlike anatomy, photorealism, 3D render, pixel art, extra people, cropped feet, touching or overlapping characters
 ```
+
+## Ellie replacement asset — v1.14.0
+
+The built-in edit path preserved the character design but rendered its transparency
+checkerboard as RGB pixels, so the selected production result is a separate transparent
+cutout. The original sheet remains unchanged for the other six characters.
+
+```text
+Use case: stylized-concept
+Asset type: production transparent game character cutout for the Hermes agent-observatory website
+Primary request: create one friendly adult female English tutor named Ellie as a full-body super-deformed anime office agent
+Scene/backdrop: genuinely transparent background, no floor, no scenery, no checkerboard drawn into the image
+Subject: soft chestnut shoulder-length hair, warm hazel eyes, rose-beige cardigan over a cream office blouse, tailored brown trousers, brown loafers, holding an open dark-brown notebook and a red correction pen; poised, intelligent, approachable expression
+Style/medium: premium polished 2D anime game art, high-end cel shading, crisp silhouette, subtle texture, expressive friendly face, sophisticated modern office fashion, around 3 heads tall; visually consistent with a warm polished anime office ensemble
+Composition/framing: exactly one character, fully visible head to toe, centered, neutral three-quarter standing pose, generous transparent padding, vertical cutout
+Lighting/mood: soft warm studio light, capable, cozy and professional
+Color palette: rose beige, cream, warm brown and muted ivory
+Constraints: adult woman; clean readable hands and props; production-ready clean cutout edges; actual transparent alpha background; no text, labels, border, UI, watermark or logos
+Avoid: male character, extra people, checkerboard pattern, solid background, cropped feet, sexualized clothing, cleavage emphasis, school uniform, childlike anatomy, photorealism, 3D render, pixel art
+```

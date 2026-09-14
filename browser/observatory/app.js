@@ -71,7 +71,7 @@ const officeCast = {
   },
   english: {
     index: 5,
-    name: "Evan",
+    name: "Ellie",
     role: "English tutor",
     activities: [
       ["오늘의 표현을 정리하는 중", "read"],
@@ -507,6 +507,7 @@ $("detail").addEventListener("close", () => {
 function stopReplay() {
   if (state.replay) clearTimeout(state.replay.timer);
   state.replay = null;
+  window.sharedOffice?.visibility();
   document
     .querySelectorAll(".replaying")
     .forEach((e) => e.classList.remove("replaying"));
@@ -519,6 +520,7 @@ async function replay() {
   if (!date) return;
   const current = { items: [], index: 0, timer: null };
   state.replay = current;
+  window.sharedOffice?.visibility();
   $("replay-start").disabled = true;
   $("replay-stop").hidden = false;
   $("replay-label").textContent = "기록을 불러오는 중…";

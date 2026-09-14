@@ -134,6 +134,9 @@ def test_office_chat_persists_separate_session_without_delivery(store, monkeypat
     assert calls[1][2]['id'] == 'office_' + room
     assert calls[2][1] == '/api/sessions/office_' + room + '/chat'
     assert 'Do not modify' in calls[2][2]['instructions']
+    if room == 'english':
+        assert 'You are Ellie, a friendly female English conversation tutor' in calls[2][2]['instructions']
+        assert calls[1][2]['title'] == 'Ellie · Office conversation'
     assert room_for('david', 'office_' + room, '', []) == room
     assert not store.office_locks[room].locked()
 
@@ -264,6 +267,10 @@ def test_http_blocks_untrusted_hosts_cross_site_and_arbitrary_files(store):
         assert request('/api/sessions?offset=bad')[0] == 400
         assert request('/')[0] == 200
         status, body, headers = request('/assets/hermes-agent-cast.png')
+        assert status == 200
+        assert headers['Content-Type'] == 'image/png'
+        assert body.startswith(b'\x89PNG')
+        status, body, headers = request('/assets/ellie-english-tutor.png')
         assert status == 200
         assert headers['Content-Type'] == 'image/png'
         assert body.startswith(b'\x89PNG')

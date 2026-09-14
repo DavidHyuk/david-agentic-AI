@@ -13,18 +13,33 @@ window.sharedOffice = (() => {
     {point: [690, 400], label: "동료에게 인사하는 중", icon: "♡"},
     {point: [895, 360], label: "창가에서 생각하는 중", icon: "✦"},
   ];
+  // Scripted small talk is decorative, never a model call or a work-status report.
+  const ambientLines = {
+    hq: ["필요하면 언제든 불러주세요.", "오늘의 흐름을 같이 정리해볼까요?", "천천히, 하나씩 해도 괜찮아요."],
+    papers: ["흥미로운 논문을 같이 찾아볼까요?", "논문의 아이디어를 면접 답변으로 연결해봐요.", "초록부터 같이 읽어볼까요?"],
+    interview: ["답을 소리 내어 말해볼까요?", "좋아요. 근거를 한 단계 더 붙여보죠.", "트레이드오프도 함께 설명해보세요."],
+    coding: ["힌트 하나만 드릴까요?", "경계 조건부터 떠올려봐요.", "복잡도도 잊지 마세요!"],
+    design: ["실패 시나리오부터 살펴볼까요?", "병목은 어디에서 생길까요?", "요구사항을 먼저 정리해보죠."],
+    english: ["오늘 한 문장 말해볼까요?", "자연스럽게 다시 표현해봐요.", "틀려도 괜찮아요. 제가 도와드릴게요."],
+    podcast: ["이 표현, 귀에 익혀봐요!", "짧게 따라 말해볼까요?", "오늘은 어떤 이야기를 들어볼까요?"],
+  };
   const actors = new Map();
   const conversations = new Map();
   const reduced = matchMedia("(prefers-reduced-motion: reduce)");
   let selected = null, paused = localRead("office-paused", false);
   let previous = 0, frame = 0, roomData = [], historyRequest = 0;
+  let talkTimer = 0, speakingRoom = null;
   const conversation = (room) => {
     if (!conversations.has(room))
       conversations.set(room, {history: [], busy: false, available: false, loaded: false, error: ""});
     return conversations.get(room);
   };
-  const sprite = (room, className = "") =>
-    `<span class="cast-art ${className}" data-character="${room}" style="--cast-index:${officeCast[room].index}" aria-hidden="true"><img src="assets/hermes-agent-cast.png" alt="" /></span>`;
+  const sprite = (room, className = "") => {
+    const source = room === "english"
+      ? "assets/ellie-english-tutor.png"
+      : "assets/hermes-agent-cast.png";
+    return `<span class="cast-art ${className}" data-character="${room}" style="--cast-index:${officeCast[room].index}" aria-hidden="true"><img src="${source}" alt="" /></span>`;
+  };
 
   function build() {
     $("rooms").innerHTML = `<div class="office-viewport" tabindex="0" aria-label="큰 사무실. 작은 화면에서는 좌우로 스크롤할 수 있습니다.">
@@ -76,11 +91,12 @@ window.sharedOffice = (() => {
         const button = document.createElement("button");
         button.className = "walking-agent";
         button.dataset.room = room.id;
-        button.innerHTML = `<span class="walk-bubble" aria-hidden="true">…</span>${sprite(room.id)}<span class="walk-name">${officeCast[room.id].name} <i></i></span>`;
+        button.innerHTML = `<span class="walk-bubble" aria-hidden="true"></span>${sprite(room.id)}<span class="walk-name">${officeCast[room.id].name} <i></i></span>`;
         button.onclick = () => select(room.id);
         $("walking-floor").append(button);
         actor = {node: button, x: homes[room.id][0], y: homes[room.id][1], route: [],
-          wait: 0.8 + officeCast[room.id].index * 1.1, home: true, mode: "ambient"};
+          wait: 15 + officeCast[room.id].index * 17 + Math.random() * 8,
+          home: true, mode: "ambient"};
         actors.set(room.id, actor);
       }
       const mode = room.presence?.mode || "ambient";
@@ -130,9 +146,8 @@ window.sharedOffice = (() => {
           const index = officeCast[room].index;
           const destination = [spot.point[0] + (index - 3) * 9, spot.point[1] - (index % 3) * 8];
           route(actor, actor.home ? destination : homes[room]);
-          actor.node.querySelector(".walk-bubble").textContent = actor.home ? spot.icon : "…";
           actor.home = !actor.home;
-          actor.wait = 7 + Math.random() * 12;
+          actor.wait = 60 + Math.random() * 80;
         }
       }
       actor.node.classList.toggle("is-walking", !held && actor.route.length > 0);
@@ -151,6 +166,41 @@ window.sharedOffice = (() => {
     }
     previous = 0;
     if (!stop) frame = requestAnimationFrame(tick);
+    if (document.hidden || state.view !== "office" || state.replay) stopTalk();
+    else scheduleTalk();
+  }
+  function stopTalk() {
+    clearTimeout(talkTimer);
+    talkTimer = 0;
+    if (speakingRoom) actors.get(speakingRoom)?.node.classList.remove("is-speaking");
+    speakingRoom = null;
+  }
+  function speak(room, text, duration = 7200) {
+    if (speakingRoom) actors.get(speakingRoom)?.node.classList.remove("is-speaking");
+    const actor = actors.get(room);
+    if (!actor) return;
+    speakingRoom = room;
+    actor.node.querySelector(".walk-bubble").textContent = text;
+    actor.node.classList.add("is-speaking");
+    clearTimeout(talkTimer);
+    talkTimer = setTimeout(() => {
+      actor.node.classList.remove("is-speaking");
+      speakingRoom = null;
+      talkTimer = 0;
+      scheduleTalk();
+    }, duration);
+  }
+  function scheduleTalk() {
+    if (talkTimer || document.hidden || state.view !== "office" || state.replay || !actors.size) return;
+    talkTimer = setTimeout(() => {
+      talkTimer = 0;
+      if (document.hidden || state.view !== "office" || state.replay) return;
+      const rooms = [...actors.keys()].filter((room) => room !== selected);
+      if (!rooms.length) return;
+      const room = rooms[Math.floor(Math.random() * rooms.length)];
+      const lines = ambientLines[room];
+      speak(room, lines[Math.floor(Math.random() * lines.length)]);
+    }, 11000 + Math.random() * 15000);
   }
   function close() {
     const last = selected;
@@ -169,6 +219,7 @@ window.sharedOffice = (() => {
     (insideWorkbench ? $("bench-character") : $("rooms")).append($("office-conversation"));
     const cast = officeCast[room], actor = actors.get(room);
     actor?.node.classList.add("is-selected");
+    speak(room, "불러주셨나요?", 4200);
     if (!insideWorkbench) actor?.node.scrollIntoView({block: "nearest", inline: "center", behavior: "smooth"});
     $("conversation-portrait").innerHTML = sprite(room, "portrait-art");
     $("conversation-role").textContent = cast.role;

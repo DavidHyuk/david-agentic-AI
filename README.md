@@ -846,12 +846,18 @@ panel over the office. Use **작업실 열기** for their study workbench, where
 character remains present and **대화 이어가기** opens the conversation in place.
 **움직임 멈추기** pauses roaming; reduced-motion preferences also stop movement.
 
-The office uses one repository-owned transparent character sheet under
-`browser/observatory/assets/`. `bootstrap/install_observatory.sh` stages it with
+The office uses a repository-owned transparent character sheet plus Ellie's
+transparent English-tutor cutout under `browser/observatory/assets/`.
+`bootstrap/install_observatory.sh` stages them with
 the rest of the UI. The 2D cast moves over a room with shaded furniture. Mobile
 keeps this same room in a horizontally scrollable viewport, with named character
 shortcuts beneath it. Browser-only ambient routes run even when Hermes is idle;
-hidden tabs and other views suspend animation.
+hidden tabs and other views suspend animation. Roaming is intentionally sparse:
+each character normally remains at a location for 60–140 seconds before moving,
+with staggered initial departures. One cast member periodically speaks a short,
+role-specific ambient line; selecting a character produces an immediate greeting.
+These are scripted text bubbles, not voice playback or actual task reports, and
+do not invoke the model. Hidden views and historical replay suspend small talk.
 
 Office conversations use separate persisted `office_<room>` sessions on the
 existing HQ API, classified into their matching Observatory rooms. They are

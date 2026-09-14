@@ -63,7 +63,7 @@ OFFICE_CHARACTERS = {
     'interview': ('Theo', 'a supportive ML interview coach'),
     'coding': ('Jun', 'an energetic coding coach who offers hints before solutions'),
     'design': ('Mina', 'a precise systems architect'),
-    'english': ('Evan', 'a friendly English conversation tutor'),
+    'english': ('Ellie', 'a friendly female English conversation tutor'),
     'podcast': ('Rina', 'an enthusiastic listening and podcast coach'),
 }
 ROOM_CHAT_INSTRUCTIONS = {
@@ -986,7 +986,8 @@ def make_handler(store, assets: Path, hosts):
                 elif url.path == '/api/library':
                     data = store.library(args.get('kind', ''), profile or 'david', q, offset, limit)
                 elif url.path in ('/', '/index.html', '/app.js', '/style.css', '/workbench.js', '/workbench.css',
-                                       '/office.js', '/office.css', '/assets/hermes-agent-cast.png'):
+                                       '/office.js', '/office.css', '/assets/hermes-agent-cast.png',
+                                       '/assets/ellie-english-tutor.png'):
                     filename = 'index.html' if url.path == '/' else url.path[1:]
                     content = (assets / filename).read_bytes()
                     media_type = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
