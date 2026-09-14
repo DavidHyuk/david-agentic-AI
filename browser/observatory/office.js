@@ -4,8 +4,8 @@ window.sharedOffice = (() => {
   // Coordinates are feet positions on a 1000 x 620 floor. All routes pass
   // through the open aisle; furniture stays outside that aisle.
   const homes = {
-    papers: [145, 265], interview: [365, 265], coding: [625, 265],
-    design: [855, 265], english: [185, 490], hq: [495, 420], podcast: [680, 455],
+    papers: [145, 300], interview: [365, 300], coding: [625, 300],
+    design: [855, 300], english: [275, 490], hq: [495, 420], podcast: [815, 480],
   };
   // Each role follows a small, deterministic work routine instead of choosing
   // arbitrary floor coordinates. Points are feet positions on the shared floor.
@@ -32,7 +32,7 @@ window.sharedOffice = (() => {
     ],
     english: [
       {point: homes.english, label: "예문 정리"},
-      {point: [315, 440], label: "발음 연습"},
+      {point: [335, 440], label: "발음 연습"},
       {point: [625, 475], label: "표현 맞추기"},
     ],
     hq: [
@@ -43,8 +43,8 @@ window.sharedOffice = (() => {
     ],
     podcast: [
       {point: homes.podcast, label: "레슨 편집"},
-      {point: [745, 440], label: "셰도잉 점검"},
-      {point: [850, 410], label: "녹음 확인"},
+      {point: [770, 440], label: "셰도잉 점검"},
+      {point: [875, 455], label: "녹음 확인"},
     ],
   };
   // Hermes is the only ambient walker. His visits make leadership presence
@@ -54,8 +54,8 @@ window.sharedOffice = (() => {
     {room: "interview", point: [455, 345], label: "Theo와 잠깐 이야기"},
     {room: "coding", point: [555, 345], label: "Jun과 진행 확인"},
     {room: "design", point: [765, 345], label: "Mina와 설계 이야기"},
-    {room: "english", point: [285, 440], label: "Ellie와 잠깐 이야기"},
-    {room: "podcast", point: [675, 440], label: "Rina와 잠깐 이야기"},
+    {room: "english", point: [335, 440], label: "Ellie와 잠깐 이야기"},
+    {room: "podcast", point: [765, 440], label: "Rina와 잠깐 이야기"},
     {room: "hq", point: homes.hq, label: "전체 흐름 정리"},
   ];
   // Scripted small talk is decorative, never a model call or a work-status report.
@@ -119,15 +119,19 @@ window.sharedOffice = (() => {
         <div class="floor-sign">THE STUDIO <span>↙ LOUNGE · COFFEE ↗</span></div>
         <div class="wall-board research-board" aria-hidden="true"><b>RESEARCH PULSE</b><i></i><i></i><i></i></div>
         <div class="wall-board systems-board" aria-hidden="true"><b>SYSTEM MAP</b><i></i><i></i><i></i></div>
+        <div class="studio-plaque research-plaque"><small>IRIS · THEO</small><b>RESEARCH / INTERVIEW</b><span>PAPERS · ANSWERS · EVIDENCE</span></div>
+        <div class="studio-plaque engineering-plaque"><small>JUN · MINA</small><b>CODE / SYSTEM DESIGN</b><span>BUILD · REVIEW · ARCHITECTURE</span></div>
+        <div class="ceiling-light light-one" aria-hidden="true"></div><div class="ceiling-light light-two" aria-hidden="true"></div>
+        <div class="floor-runner" aria-hidden="true"><span>HERMES COMMONS</span></div>
         <div class="zone-rug collaboration-zone" aria-hidden="true"><span>COLLABORATION COMMONS</span></div>
-        <div class="furniture desk-island desk-one"><b>RESEARCH / INTERVIEW</b><i></i><i></i><em>FIELD NOTES · QUESTION LAB</em><div class="zone-actions" id="research-actions"></div></div>
-        <div class="furniture desk-island desk-two"><b>CODE / DESIGN</b><i></i><i></i><em>BUILD · REVIEW · SYSTEM MAP</em><div class="zone-actions" id="engineering-actions"></div></div>
+        <div class="furniture desk-island desk-one"><i></i><i></i><em>FIELD NOTES · QUESTION LAB</em><div class="desk-lamp lamp-left" aria-hidden="true"></div><div class="desk-lamp lamp-right" aria-hidden="true"></div><div class="zone-actions" id="research-actions"></div></div>
+        <div class="furniture desk-island desk-two"><i></i><i></i><em>BUILD · REVIEW · SYSTEM MAP</em><div class="desk-lamp lamp-left" aria-hidden="true"></div><div class="desk-lamp lamp-right" aria-hidden="true"></div><div class="zone-actions" id="engineering-actions"></div></div>
         <div class="furniture archive-shelf" aria-hidden="true"><b>FIELD NOTES</b><i></i><i></i><i></i><span>ARCHIVE</span></div>
         <div class="furniture review-board" aria-hidden="true"><b>REVIEW</b><i></i><i></i><span></span></div>
-        <div class="furniture coffee-bar"><b>☕</b><span>COFFEE CLUB</span><i></i><div class="zone-actions" id="english-actions"></div></div>
-        <div class="furniture sofa"><span>TAKE A BREATH · QUIET LOUNGE</span><i></i><i></i><i></i><b>✦</b></div>
+        <div class="furniture coffee-bar"><b>☕</b><span><strong>COFFEE CLUB</strong><small>ESPRESSO BAR</small></span><i></i><div class="zone-actions" id="english-actions"></div></div>
+        <div class="furniture sofa"><span><strong>ELLIE · ENGLISH LOUNGE</strong><small>TAKE A BREATH · SPEAK EASY</small></span><i></i><i></i><i></i><b>✦</b></div>
         <div class="furniture meeting-table"><i></i><span>✦</span><i></i><div class="zone-actions" id="hq-actions"></div></div>
-        <div class="furniture sound-desk"><span>ON AIR · LISTENING STUDIO</span><b>▥ ▥ ▥</b><i></i><div class="zone-actions" id="podcast-actions"></div></div>
+        <div class="furniture sound-desk"><span><strong>RINA · ON AIR</strong><small>LISTENING STUDIO</small></span><b>▥ ▥ ▥</b><i></i><div class="zone-actions" id="podcast-actions"></div></div>
         <div class="furniture green-plant plant-one">✺</div><div class="furniture green-plant plant-two">✺</div>
         <div class="walking-floor" id="walking-floor"></div>
         <div class="shared-floor-caption">일상 연출 <span>캐릭터를 클릭해 이야기해 보세요</span></div>

@@ -854,7 +854,11 @@ transparent English-tutor cutout under `browser/observatory/assets/`.
 `bootstrap/install_observatory.sh` stages them with
 the rest of the UI. The 2D cast moves through a zoned studio with paired desks,
 research and review boards, an archive shelf, collaboration commons, coaching
-lounge, coffee bar, and audio desk. Mobile
+lounge, coffee bar, and an enclosed acoustic audio booth. High-contrast wall
+plaques identify `IRIS · THEO / RESEARCH · INTERVIEW` and
+`JUN · MINA / CODE · SYSTEM DESIGN` above the character plane. Ellie has a
+separate labeled English Lounge beside Coffee Club, while Rina stands inside
+the `RINA · ON AIR` listening booth rather than alongside it. Mobile
 keeps this same room in a horizontally scrollable viewport, with named character
 shortcuts and visible next-action cards beneath it. Browser-only animation is
 intentionally sparse: idle specialists stay in their work areas, while Hermes
@@ -873,7 +877,8 @@ Hovering a character shows its most recent recorded work and David's next action
 for that room without interrupting an active team exchange.
 Character name/purpose cards use high-contrast type. The `−/＋` controls and a
 two-finger pinch scale the complete office, furniture and cast from 60–140% on mobile;
-the smaller mobile floor keeps a full-room overview readable on narrow screens.
+the mobile floor preserves workstation spacing so room names and character cards
+do not collapse into one another at the minimum zoom.
 
 Office conversations use separate persisted `office_<room>` sessions on the
 existing HQ API, classified into their matching Observatory rooms. They are

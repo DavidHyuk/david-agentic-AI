@@ -3,6 +3,20 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.15.4 — 2026-09-14 (patch: make every office zone unmistakable)
+
+- Replaced the easily obscured generic desk captions with high-contrast wall
+  plaques that name both owners and their Research/Interview or Code/System
+  Design studio. The plaques live outside the character layer and remain clear
+  at desktop and mobile zoom levels.
+- Moved Ellie fully out of Coffee Club and into a separately labeled English
+  Lounge. Rebuilt Rina's area as an enclosed acoustic ON AIR booth and placed
+  her inside its console footprint instead of beside it.
+- Added warmer workstation lighting, stronger furniture depth, a central floor
+  runner and clearer coffee/lounge/studio detailing. Preserved readable mobile
+  proportions and added narrow-screen offsets so characters and room labels do
+  not collide at the minimum 60% zoom.
+
 ## v1.15.3 — 2026-09-14 (patch: prioritize legibility and coherent conversation)
 
 - Separated floor furniture from actionable content so character art never hides
