@@ -14,6 +14,8 @@ semantic versioning (major.minor.patch).
   localhost-only headless Chromium and asks for the account login/password only
   through terminal prompts. CAPTCHA, MFA, OAuth, and unexpected login forms fail
   closed; a browser-cookie connection remains the secure fallback.
+- Refined headless-login errors so a rejected login ID/password is not
+  misreported as CAPTCHA or MFA; browser-verification messages remain explicit.
 - Added a no-delivery four-hour `leetcode-history-sync` job on the existing
   David profile and a pre-lesson refresh in the existing `coding-coach` job.
   The existing LeetCode Gym Telegram room, profile, bot, and gateway remain the

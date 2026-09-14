@@ -231,6 +231,23 @@ def _cookie_value(cookies: list[dict], name: str) -> str:
     return ''
 
 
+def login_failure_reason(page_text: str) -> str | None:
+    """Turn known public login-page messages into an actionable safe error."""
+    text = ' '.join((page_text or '').lower().split())
+    if any(phrase in text for phrase in (
+            'incorrect password', 'incorrect username', 'invalid password',
+            'invalid username', 'invalid credentials', 'wrong password',
+            'username or password is incorrect')):
+        return 'LeetCode rejected the login ID or password. Check both and try again.'
+    if any(phrase in text for phrase in (
+            'captcha', 'verify you are human', 'security check', 'verification challenge')):
+        return 'LeetCode requires CAPTCHA verification. Complete it in a normal browser, then use connect.'
+    if any(phrase in text for phrase in (
+            'two-factor', '2fa', 'verification code', 'one-time password')):
+        return 'LeetCode requires MFA verification. Complete it in a normal browser, then use connect.'
+    return None
+
+
 def login_with_browser(cdp_url: str, username: str, login: str, password: str) -> dict:
     """Use the existing local headless Chromium only to obtain a fresh session.
 
@@ -279,9 +296,12 @@ def login_with_browser(cdp_url: str, username: str, login: str, password: str) -
                             candidate = {'username': username, 'session': session, 'csrf_token': '', 'linked_at': ''}
                             verify_connection(candidate)
                             return {'session': session, 'csrf_token': _cookie_value(cookies, 'csrftoken')}
+                        reason = login_failure_reason(page.locator('body').inner_text(timeout=1_000))
+                        if reason:
+                            raise LeetCodeSyncError(reason)
                         page.wait_for_timeout(250)
                     raise LeetCodeSyncError(
-                        'LeetCode did not issue a session. CAPTCHA, MFA, or an invalid login may require the connect fallback.'
+                        'LeetCode did not issue a session. The login form may have changed or require browser verification; use connect.'
                     )
                 finally:
                     page.close()

@@ -97,6 +97,15 @@ def test_cookie_value_selects_only_the_requested_cookie():
     assert ls._cookie_value(cookies, 'missing') == ''
 
 
+@pytest.mark.parametrize(('page_text', 'expected'), [
+    ('Your username or password is incorrect.', 'rejected the login ID or password'),
+    ('Please complete the CAPTCHA to continue.', 'requires CAPTCHA verification'),
+    ('Enter your two-factor verification code.', 'requires MFA verification'),
+])
+def test_login_failure_reason_is_specific(page_text, expected):
+    assert expected in ls.login_failure_reason(page_text)
+
+
 def test_status_never_exposes_saved_session(tmp_path):
     session_path = tmp_path / 'session.json'
     snapshot_path = tmp_path / 'history.json'
