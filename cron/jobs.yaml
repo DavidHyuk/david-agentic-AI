@@ -12,6 +12,18 @@ defaults:
   deliver: telegram
 
 jobs:
+  - name: leetcode-history-sync
+    schedule: "15 */4 * * *"        # every four hours; no Telegram delivery
+    deliver: null
+    skills: [interview-prep]
+    prompt: >
+      Refresh the opt-in LeetCode history snapshot for the Coding Coach. Run
+      python3 ~/.hermes/scripts/leetcode_sync.py sync. If no valid session is
+      linked or LeetCode is temporarily unavailable, leave the prior snapshot
+      untouched and reply only [SILENT]. Never expose, request, or transmit a
+      session token. This is a read-only sync: do not submit code or edit the
+      LeetCode account. Reply only [SILENT] after a successful sync as well.
+
   - name: papers-digest
     schedule: "30 8 * * 2,5"         # 08:30 Tue/Fri, after the daily 08:00 ingestion timer
     skills: [papers-digest]
@@ -47,7 +59,10 @@ jobs:
     deliver_chat_id_env: LEETCODE_TELEGRAM_CHAT_ID
     prompt: >
       Deliver today's Coding Coach using the interview-prep skill's Coding Coach
-      procedure. Run python3 ~/.hermes/scripts/interview_progress.py plan coding
+      procedure. First run python3 ~/.hermes/scripts/leetcode_sync.py sync; if
+      it is unlinked or unavailable, keep the existing coach state and continue
+      without inventing account activity. Read the safe local history snapshot
+      when it exists, then run python3 ~/.hermes/scripts/interview_progress.py plan coding
       and send the actual study message it returns. Include the concrete problem,
       pattern, goal, 35-minute target, and visible clickable canonical NeetCode and
       LeetCode URLs. Due weak reviews take priority over new curriculum problems.

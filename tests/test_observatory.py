@@ -121,6 +121,23 @@ def test_overview_exposes_actual_cron_response_as_room_notice(store):
     assert coding['action']['title'] == '코딩 과제'
 
 
+def test_coding_workbench_exposes_only_safe_leetcode_snapshot(store):
+    path = store.home / 'data/interview/leetcode_history.json'
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps({
+        'version': 1, 'username': 'david_choi', 'synced_at': '2026-09-14T12:00:00+00:00',
+        'total_solved': 12, 'solved_by_difficulty': {'easy': 5, 'medium': 6, 'hard': 1},
+        'recent_accepted': [{'title': 'Two Sum', 'slug': 'two-sum'}],
+        'session': 'must-not-leak',
+    }))
+
+    history = store.workbench('coding')['leetcode_history']
+
+    assert history['username'] == 'david_choi'
+    assert history['recent_accepted'][0]['title'] == 'Two Sum'
+    assert 'session' not in history
+
+
 def test_missing_sources_are_empty_and_db_is_readonly(store):
     assert store.library('learning')['total'] == 0
     assert store.library('memory')['total'] == 0

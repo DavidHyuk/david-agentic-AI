@@ -3,6 +3,20 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.16.0 — 2026-09-14 (minor: connect the Coding Coach to LeetCode history)
+
+- Added the standalone `leetcode_sync.py` helper. It verifies an opt-in
+  `LEETCODE_SESSION` through a hidden prompt, keeps the credential in an
+  owner-only local file, and writes a separate read-only snapshot containing
+  solved totals, difficulty counts, and recent accepted submissions. It neither
+  stores passwords nor submits code or edits the LeetCode account.
+- Added a no-delivery four-hour `leetcode-history-sync` job on the existing
+  David profile and a pre-lesson refresh in the existing `coding-coach` job.
+  The existing LeetCode Gym Telegram room, profile, bot, and gateway remain the
+  routing boundary; no duplicate polling or delivery destination was added.
+- Registered the snapshot in the existing LeetCode Gym Observatory room. The
+  workbench returns and displays only safe history fields, never session data.
+
 ## v1.15.4 — 2026-09-14 (patch: make every office zone unmistakable)
 
 - Replaced the easily obscured generic desk captions with high-contrast wall

@@ -1,7 +1,7 @@
 ---
 name: interview-prep
 description: Drive David's Staff/Senior ML Engineer interview prep in Silicon Valley with company-aware planning, focused drills, NeetCode/LeetCode foundations, practical coding strategy, Hello Interview system design, and adaptive progress.
-version: 1.2.1
+version: 1.3.0
 metadata:
   hermes:
     category: career
@@ -108,8 +108,20 @@ David starts as a **coding-interview beginner**, even though his MLE target is
 Staff/Senior. Use NeetCode's pattern ordering as the backbone, with actual
 NeetCode/LeetCode exercises from `references/coach_catalog.json`. This curated
 catalog is version controlled and copied with this skill by `bootstrap/stage.py`.
-No scraping, login cookies, or network calls are needed to choose a lesson.
-Browser/web tools may validate or refresh source links; never invent URLs.
+The catalog remains the fallback when LeetCode is not linked. When
+`~/.hermes/data/interview/leetcode_history.json` exists, treat its read-only
+solved totals and recent accepted problems as supplementary evidence: avoid
+assigning a recently accepted catalog problem and surface an obvious pattern
+gap. Never infer a completion from the snapshot; the structured coach state
+remains the source of truth for curriculum completion and reviews.
+
+LeetCode linking is opt-in. Run `python3 ~/.hermes/scripts/leetcode_sync.py
+status` before claiming it is connected. A linked session is refreshed with
+`python3 ~/.hermes/scripts/leetcode_sync.py sync`; it uses an owner-only local
+session file and writes a separate owner-only history snapshot. Never request,
+print, transmit, or place `LEETCODE_SESSION` in a command line, Telegram message,
+memory, source file, or Observatory response. The helper is read-only: no code
+submission, profile edit, or account setting change is allowed.
 
 For company-specific preparation questions and the planned transition from
 LeetCode foundations to weekly 60-minute implementation exercises, read

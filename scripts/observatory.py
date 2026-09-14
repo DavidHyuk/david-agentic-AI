@@ -42,7 +42,7 @@ ROOMS = [
     ('hq', 'Hermes HQ', '대화 · 통합 리뷰', '✦', '#c4ccaa'),
 ]
 JOB_ROOMS = {'papers-digest': 'papers', 'interview-prep': 'interview',
-             'coding-coach': 'coding', 'system-design-coach': 'design',
+             'coding-coach': 'coding', 'leetcode-history-sync': 'coding', 'system-design-coach': 'design',
              'weekly-review': 'hq', 'english-intake': 'english',
              'english-drill': 'english', 'english-weekly-review': 'english',
              'english-podcast-daily': 'podcast'}
@@ -250,6 +250,12 @@ class Observatory:
                         completed=sorted(state[track], key=lambda a: a['date'], reverse=True),
                         today_assignment=today_assignments[-1] if today_assignments else None,
                         catalog_available=bool(items))
+            if room == 'coding':
+                snapshot = read_json(self.home / 'data/interview/leetcode_history.json', {}) or {}
+                data['leetcode_history'] = {
+                    key: snapshot.get(key) for key in (
+                        'username', 'synced_at', 'total_solved', 'solved_by_difficulty', 'recent_accepted')
+                } if isinstance(snapshot, dict) and snapshot.get('version') == 1 else None
         elif room == 'english':
             cards = list(read_json(self.home / 'data/english/srs_deck.json', {'cards': {}})['cards'].values())
             due = sorted([c for c in cards if c['due'] <= today], key=lambda c: (c['box'], c['due']))

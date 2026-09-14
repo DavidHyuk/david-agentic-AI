@@ -79,6 +79,7 @@ David-Agent/
 │   ├── papers_ingest.py       # arXiv/HF 메타데이터 수집·중복 병합·실행 이력
 │   ├── papers_digest.py       # 새 논문 카탈로그 읽기 전용 조회
 │   ├── interview_progress.py  # 학습 자료 렌더링·힌트·진도·적응형 복습·주간 통계
+│   ├── leetcode_sync.py       # owner-only 세션 연결 + 읽기 전용 풀이 이력 snapshot
 │   ├── interview_trends.py    # HN·GitHub·논문 실시간 인터뷰 트렌드 수집
 │   ├── kakao_webhook.py       # Kakao 채널 피드백 수신·발신자 allowlist·로컬 큐
 │   ├── english_intake.py      # 새 레슨 탐지 + 이번 주 세션 조회 + 처리 상태 관리
@@ -97,7 +98,7 @@ David-Agent/
 │   └── hooks.json             # `.codex/hooks/auto_git_commit.py` 위임
 │
 ├── cron/
-│   └── jobs.yaml              # 9개의 Telegram 알림 스케줄 정의 (English profile 4개 사용)
+│   └── jobs.yaml              # 9개 Telegram 알림 + LeetCode 무전송 동기화 스케줄
 │
 ├── bootstrap/                 # 설치 및 동기화 자동화
 │   ├── install.sh             # 원클릭 설치 (Hermes + 설정 + 모델)
@@ -138,7 +139,7 @@ David-Agent/
 │   ├── Qwen/                  # Qwen 계열 모델
 │   └── MiniMax/               # MiniMax-M2.7 모델
 │
-├── tests/                     # pytest 테스트 (273개)
+├── tests/                     # pytest 테스트 (282개)
 │   ├── conftest.py
 │   ├── test_papers_ingest.py
 │   ├── test_papers_digest.py
@@ -212,6 +213,7 @@ history/search·알림 제어의 이점이 있으면 같은 bot을 별도 Telegr
 | `papers_ingest.py` | arXiv 4개 카테고리 + HF Daily Papers 메타데이터 수집, source/run provenance 저장 |
 | `papers_digest.py` | SQLite 카탈로그 읽기 전용 조회 → 추천/최신/인기 digest |
 | `interview_progress.py` | curated catalog → 실제 학습 메시지, 힌트 단계, 결과 저장, 2/7/21일 복습, 주간 통계 |
+| `leetcode_sync.py` | 숨김 세션 입력·검증, owner-only 저장, LeetCode solved/최근 정답의 읽기 전용 snapshot 갱신 |
 | `interview_trends.py` | HN·GitHub·논문 DB에서 실시간 인터뷰 트렌드 수집·캐시 |
 | `english_intake.py` | 새 레슨 탐지, Telegram 파일 저장, 이번 주 세션 조회, 처리 상태 관리 |
 | `english_srs.py` | Leitner SRS 덱 (카드 추가/리뷰/통계/취약 카드 랭킹) |
@@ -221,14 +223,15 @@ history/search·알림 제어의 이점이 있으면 같은 bot을 별도 Telegr
 | `wait_for_vllm.py` | 지정한 served model이 `/v1/models`에 나타날 때까지 gateway 시작 대기 |
 
 ### 5. `cron/jobs.yaml` — 선언형 스케줄
-9개의 Telegram 알림 잡이 YAML로 선언되어 있습니다. Calendar 연동을
-재개할 때까지 `morning-brief`는 등록하지 않습니다.
+9개의 Telegram 알림 잡과 무전송 LeetCode 동기화 잡이 YAML로 선언되어 있습니다.
+Calendar 연동을 재개할 때까지 `morning-brief`는 등록하지 않습니다.
 
 | 잡 | 시간 | 내용 |
 |----|------|------|
 | `papers-digest` | 08:30 화/금 | 전용 Telegram 논문 그룹: 가장 핫한 LLM/LVM 논문 3편 |
 | `interview-prep` | 12:00 월/수/금 | 전용 Interview 그룹: 실시간 트렌드 기반 Staff 레벨 드릴 1개 |
 | `coding-coach` | 12:00 화/목/토 | 전용 LeetCode 그룹: 35분 문제·목표·canonical URL |
+| `leetcode-history-sync` | 매 4시간 15분 | 전송 없음: 연결된 LeetCode 세션의 읽기 전용 풀이 이력 snapshot 갱신 |
 | `system-design-coach` | 12:00 일요일 | 전용 System Design 그룹: Hello Interview 설계 과제 |
 | `english-podcast-daily` | 09:00 매일 | 기존 English bot의 `🎧 Morning Echo` 전용 그룹: 다운로드된 대본 기반 개인화 학습 1편 |
 | `english-intake` | 월–토 20:00 | English bot: 새 피드백 분석 또는 취약 패턴 코칭 |
@@ -497,6 +500,10 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
 - Python 표준 라이브러리만 사용하며 runtime scraping/cookies/network 의존성이 없습니다.
   파일 잠금 + atomic replace로 저장하고 동일 assignment 결과 재시도는 중복 기록하지
   않습니다. 기존 MLE `progress.md`와 트렌드 cache는 계속 유지합니다.
+- 선택적으로 `leetcode_sync.py`가 `LEETCODE_SESSION`을 숨김 프롬프트/표준입력에서만
+  받고 `0600` 세션 파일과 별도 `0600` 풀이 snapshot을 만듭니다. 비밀번호 저장·코드
+  제출·계정 변경은 없으며, 4시간 cron과 Coding Coach 직전 동기화가 최근 정답/난이도별
+  해결 수를 갱신합니다. LeetCode Gym Observatory는 snapshot의 안전한 필드만 읽습니다.
 - 일요일 18시 보고서는 월요일부터의 완료 세션, 신규/복습, 평균 시간, 힌트/해설 사용,
   최신 취약 패턴, 설계 주제, 최저 설계 차원과 다음 주 집중 영역을 논문 리뷰에 합칩니다.
   CLI 배포/기록 예시는 README의 Interview study coach 절을 참조합니다.

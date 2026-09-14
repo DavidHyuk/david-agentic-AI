@@ -73,6 +73,7 @@ Local DGX Spark (vLLM @ :8003, Qwen3.6 FP8, 128K ctx)
 | `scripts/papers_ingest.py` | Fetch and merge arXiv/Hugging Face paper metadata |
 | `scripts/papers_digest.py` | Read-only recommended/recent/trending paper digest |
 | `scripts/interview_progress.py` | Concrete study messages, feedback, hints, adaptive reviews, weekly metrics |
+| `scripts/leetcode_sync.py` | Owner-only LeetCode session link and read-only solved-history snapshot |
 | `skills/career/interview-prep/references/coach_catalog.json` | Curated NeetCode/LeetCode problems and Hello Interview lessons |
 | `skills/career/interview-prep/references/company-coding-strategy.md` | Company-aware LeetCode/practical-coding preparation strategy |
 | `browser/setup_browser.sh` | Pin agent-browser + install the local Chromium CDP service |
@@ -655,6 +656,37 @@ updates, and corrupt state is retained for recovery instead of silently reset.
 full walkthrough is Premium. Its public problem prompt plus the coach's timed
 exercise and free delivery-framework/key-technologies links support practice
 without a subscription. The coach does not claim access to gated content.
+
+### LeetCode account history (optional, read-only)
+
+The Coding Coach can use your solved totals and recent accepted submissions as
+supplementary context. It never treats that history as a completed coach
+assignment, submits code, edits your LeetCode profile, or stores a password.
+The token is entered through a hidden prompt and is stored only at
+`~/.hermes/data/interview/leetcode_session.json` with `0600` permissions; the
+separate, safe-to-read snapshot is
+`~/.hermes/data/interview/leetcode_history.json`.
+
+After logging into LeetCode in your own browser, copy the `LEETCODE_SESSION`
+cookie value and run the following on the Hermes host. Do not put the value on a
+command line, in a shell history, or in a `.env` file.
+
+```bash
+python3 ~/.hermes/scripts/leetcode_sync.py connect --username <your-leetcode-handle>
+python3 ~/.hermes/scripts/leetcode_sync.py sync
+python3 ~/.hermes/scripts/leetcode_sync.py status
+```
+
+The first command verifies that the session belongs to the supplied handle. A
+read-only `leetcode-history-sync` cron then refreshes the snapshot every four
+hours, and `coding-coach` refreshes it again before each scheduled coding
+lesson. The LeetCode Gym Observatory room shows only the safe snapshot; it never
+returns the session cookie. To stop future account access while retaining the
+already saved progress snapshot, run:
+
+```bash
+python3 ~/.hermes/scripts/leetcode_sync.py disconnect
+```
 
 ### Dedicated English Telegram bot
 

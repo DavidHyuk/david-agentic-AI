@@ -11,6 +11,7 @@ JOBS = REPO / "cron" / "jobs.yaml"
 EXPECTED_JOBS = {
     "papers-digest", "interview-prep", "english-intake", "english-drill",
     "english-weekly-review", "english-podcast-daily", "weekly-review",
+    "leetcode-history-sync",
 }
 
 
@@ -22,7 +23,17 @@ def test_jobs_yaml_loads_and_validates():
 
 def test_defaults_applied_deliver_telegram():
     jobs = rc.load_jobs(JOBS)
-    assert all(j["deliver"] == "telegram" for j in jobs)
+    assert all(j["deliver"] == "telegram" for j in jobs if j["name"] != "leetcode-history-sync")
+    assert next(j for j in jobs if j["name"] == "leetcode-history-sync")["deliver"] is None
+
+
+def test_leetcode_history_sync_is_read_only_and_has_no_delivery():
+    jobs = {job["name"]: job for job in rc.load_jobs(JOBS)}
+    sync = jobs["leetcode-history-sync"]
+    assert sync["schedule"] == "15 */4 * * *"
+    assert "leetcode_sync.py sync" in sync["prompt"]
+    assert "read-only" in sync["prompt"]
+    assert "--deliver" not in rc.build_create_command(sync, environment={})
 
 
 def test_papers_digest_uses_dedicated_telegram_chat_from_environment():
@@ -313,6 +324,8 @@ def test_interview_coaches_fill_noon_without_replacing_mle_drills():
 def test_coach_cron_requires_material_canonical_links_and_real_feedback():
     jobs = {j['name']: j for j in rc.load_jobs(JOBS)}
     coding = jobs['coding-coach']['prompt']
+    assert 'leetcode_sync.py sync' in coding
+    assert 'history snapshot' in coding
     assert 'python3 ~/.hermes/scripts/interview_progress.py plan coding' in coding
     assert 'canonical NeetCode and LeetCode URLs' in coding
     assert '35-minute' in coding and '20 minutes without AI' in coding
