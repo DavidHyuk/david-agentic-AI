@@ -546,7 +546,11 @@ class Observatory:
             args = ['--state', str(self.home / 'data/interview/coach_state.json'),
                     '--catalog', str(self.catalog_path()), '--date', today]
             if action == 'plan':
-                args += ['plan', track, '--next', '--format', 'json']
+                mode = body.get('mode', 'next')
+                if mode not in ('next', 'review'):
+                    raise ValueError('새 문제 또는 복습 중 하나를 선택하세요.')
+                args += ['plan', track, '--review' if mode == 'review' else '--next',
+                         '--format', 'json']
             else:
                 assignment = body.get('assignment')
                 row = self.coach_state()['assignments'].get(assignment)

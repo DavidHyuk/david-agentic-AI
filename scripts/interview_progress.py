@@ -147,21 +147,37 @@ def select_item(state: dict, catalog: dict, track: str, today: str,
             'session_type': 'review' if item_id in latest else 'new'}
 
 
+def select_review_item(state: dict, catalog: dict, track: str, today: str) -> dict:
+    """Return the highest-value prior exercise for an explicit review request."""
+    latest = latest_sessions(state, track, today)
+    if not latest:
+        raise ValueError('Complete one problem before requesting a review.')
+    items = catalog['problems' if track == 'coding' else 'system_design']
+    by_id = {item['id']: item for item in items}
+    ranked = sorted(latest.values(), key=lambda session: (
+        session['next_review_date'] > today, weakness(session, track),
+        session['next_review_date'], by_id[session['item_id']].get('recommended_order', 0)))
+    return {'item_id': ranked[0]['item_id'], 'reason': 'requested review',
+            'curriculum_slot': None, 'session_type': 'review'}
+
+
 def plan(state: dict, catalog: dict, track: str, today: str,
-         next_assignment: bool = False) -> dict:
-    """Return the daily assignment or open one more after today's completion.
+         next_assignment: bool = False, review_assignment: bool = False) -> dict:
+    """Return the daily assignment or an explicit new/review follow-up.
 
     Normal scheduled planning stays idempotent for the whole day.  An explicit
-    next-assignment request reuses any unfinished assignment from today and only
-    advances after every assignment for the track and date is complete.
+    new-problem request never replaces itself with an old review; an explicit
+    review request is the only follow-up path that selects a completed problem.
     """
+    if next_assignment and review_assignment:
+        raise ValueError('Choose either a new problem or a review, not both.')
     date.fromisoformat(today)
     daily_id = f'{track}:{today}'
-    if not next_assignment and daily_id in state['assignments']:
+    if not next_assignment and not review_assignment and daily_id in state['assignments']:
         return state['assignments'][daily_id]
     today_assignments = [assignment for assignment in state['assignments'].values()
                          if assignment['track'] == track and assignment['date'] == today]
-    if next_assignment:
+    if next_assignment or review_assignment:
         unfinished = [assignment for assignment in today_assignments
                       if not assignment['completed']]
         if unfinished:
@@ -171,7 +187,8 @@ def plan(state: dict, catalog: dict, track: str, today: str,
     while assignment_id in state['assignments']:
         assignment_id = f'{daily_id}:{sequence}'
         sequence += 1
-    selection = select_item(state, catalog, track, today, prefer_new=next_assignment)
+    selection = (select_review_item(state, catalog, track, today) if review_assignment
+                 else select_item(state, catalog, track, today, prefer_new=next_assignment))
     # Preserve hint/solution exposure if an unfinished exercise is pushed again.
     previous = [a for a in state['assignments'].values()
                 if a['track'] == track and a['item_id'] == selection['item_id']
@@ -332,8 +349,11 @@ def parse_args(argv=None) -> argparse.Namespace:
     sub = parser.add_subparsers(dest='command', required=True)
     select = sub.add_parser('plan')
     select.add_argument('track', choices=TRACKS)
-    select.add_argument('--next', action='store_true', dest='next_assignment',
-                        help="open another assignment after today's completed work")
+    follow_up = select.add_mutually_exclusive_group()
+    follow_up.add_argument('--next', action='store_true', dest='next_assignment',
+                           help='open the next uncompleted curriculum problem')
+    follow_up.add_argument('--review', action='store_true', dest='review_assignment',
+                           help='open the highest-value completed problem for review')
     select.add_argument('--format', choices=('text', 'json'), default='text')
     for command in ('hint', 'solution'):
         assistance = sub.add_parser(command)
@@ -370,7 +390,8 @@ def main(argv=None) -> int:
             state = load_state(path)
             before = deepcopy(state)
             if args.command == 'plan':
-                result = plan(state, catalog, args.track, args.date, args.next_assignment)
+                result = plan(state, catalog, args.track, args.date, args.next_assignment,
+                              args.review_assignment)
                 output = render_message(result, catalog) if args.format == 'text' else json.dumps(result, indent=2)
             elif args.command in ('hint', 'solution'):
                 result = record_hint(state, args.assignment, args.command == 'solution')

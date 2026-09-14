@@ -125,7 +125,7 @@ function coachDesk(d) {
     ? `<article class="desk-card"><span class="tag">LEETCODE · READ ONLY</span><h2>${esc(lc.username)} 풀이 기록</h2><p class="muted">${esc(lc.synced_at || "동기화 시각 미확인")} · 제출이나 계정 변경 없이 동기화됩니다.</p><div class="desk-metrics"><div><b>${Number(lc.total_solved || 0)}</b><span>해결한 문제</span></div><div><b>${Number(lc.solved_by_difficulty?.easy || 0)} / ${Number(lc.solved_by_difficulty?.medium || 0)} / ${Number(lc.solved_by_difficulty?.hard || 0)}</b><span>Easy / Medium / Hard</span></div></div>${lc.recent_accepted?.length ? `<p class="muted">최근 정답: ${esc(lc.recent_accepted.slice(0, 3).map((item) => item.title).join(", "))}</p>` : ""}</article>`
     : `<article class="desk-card"><span class="tag">LEETCODE · OPTIONAL</span><h2>LeetCode 기록 미연동</h2><p class="muted">터미널에서 세션을 연결하면 이곳에 읽기 전용 풀이 기록이 나타납니다.</p></article>`;
   if (!a)
-    return lcSummary + `<article class="desk-card"><span class="tag">TODAY</span><h2>${d.today_assignment?.completed ? "오늘 과제를 완료했습니다" : "이어갈 미완료 과제가 없습니다"}</h2><p>${d.today_assignment?.completed ? "한 문제 더 풀고 싶다면 이전 복습이 아니라 다음 미해결 커리큘럼 문제를 배정합니다." : "학습 기록에 맞춰 오늘의 과제를 배정합니다."} 과제 배정은 학습 완료로 기록되지 않습니다.</p><button id="desk-plan" class="primary" ${!d.catalog_available ? "disabled" : ""}>${d.today_assignment?.completed ? "새 문제 준비하기" : "오늘 과제 준비하기"}</button>${!d.catalog_available ? "<p>커리큘럼 카탈로그가 아직 설치되지 않았습니다.</p>" : ""}</article>`;
+    return lcSummary + `<article class="desk-card"><span class="tag">TODAY</span><h2>${d.today_assignment?.completed ? "오늘 과제를 완료했습니다" : "이어갈 미완료 과제가 없습니다"}</h2><p><b>작업 이어가기</b>는 항상 다음 미해결 커리큘럼의 새 문제를 배정합니다. 이전 문제는 <b>복습하기</b>로만 다시 배정합니다. 과제 배정은 학습 완료로 기록되지 않습니다.</p><div class="desk-actions"><button id="desk-plan" class="primary" ${!d.catalog_available ? "disabled" : ""}>작업 이어가기 · 새 문제</button>${d.completed?.length ? `<button id="desk-review" class="outline" ${!d.catalog_available ? "disabled" : ""}>복습하기</button>` : ""}</div>${!d.catalog_available ? "<p>커리큘럼 카탈로그가 아직 설치되지 않았습니다.</p>" : ""}</article>`;
   const item = a.item,
     coding = d.track === "coding";
   return lcSummary + `<article class="desk-card mission"><span class="tag">이어하기 · ${esc(a.date)} 배정 · ${a.session_type === "review" ? "복습" : "새 과제"}</span><h2>${esc(item.name || a.item_id)}</h2><p>${esc(coding ? item.goal : item.exercise)}</p><div class="desk-tags"><span>${esc(item.pattern || "System design")}</span><span>목표 ${coding ? 35 : item.target_minutes}분</span><span>결과 미입력</span>${coding ? `<span>기록된 힌트 ${a.hint_level} / 3</span>` : ""}</div>
@@ -331,8 +331,14 @@ function renderWorkbench(d) {
   if ($("desk-plan"))
     $("desk-plan").onclick = () =>
       deskAction(
-        { action: "plan", track: d.track },
-        "오늘의 과제를 확인했습니다.",
+        { action: "plan", track: d.track, mode: "next" },
+        "다음 새 문제를 배정했습니다.",
+      );
+  if ($("desk-review"))
+    $("desk-review").onclick = () =>
+      deskAction(
+        { action: "plan", track: d.track, mode: "review" },
+        "복습 문제를 배정했습니다.",
       );
   if ($("coach-feedback")) wireCoach(d);
   if ($("telegram-chat-form")) wireTelegramChat(d);

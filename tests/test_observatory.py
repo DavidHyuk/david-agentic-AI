@@ -480,6 +480,17 @@ def test_feedback_rejects_bad_track_values_and_changed_retries(study_store):
     assert study_store.coach_state()['system_design'][0]['duration'] == 45
 
 
+def test_review_action_is_explicit_and_new_problem_action_stays_new(study_store):
+    assignment = study_store.study_action({'action': 'plan', 'track': 'coding'})['result']
+    study_store.study_action({'action': 'feedback', 'track': 'coding', 'assignment': assignment['id'],
+                              'feedback': {'duration': 25, 'confidence': 2, 'independent': False,
+                                           'hint_level': 2, 'solution_viewed': False,
+                                           'lesson': 'Need more HashMap practice.'}})
+    review = study_store.study_action({'action': 'plan', 'track': 'coding', 'mode': 'review'})['result']
+    assert review['item_id'] == 'contains-duplicate'
+    assert review['reason'] == 'requested review'
+
+
 def test_srs_review_stale_click_does_not_promote_twice(study_store):
     request = {'action': 'srs_review', 'card': 'one', 'result': 'correct', 'expected_reviews': 0}
     study_store.study_action(request)

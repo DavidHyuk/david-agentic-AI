@@ -51,7 +51,8 @@ def test_review_intervals(independent, hint, confidence, solution, days):
 
 def test_catalog_is_ordered_and_links_are_problem_specific(catalog):
     seen = set()
-    for order, problem in enumerate(catalog['problems'], 1):
+    ordered_problems = sorted(catalog['problems'], key=lambda item: item['recommended_order'])
+    for order, problem in enumerate(ordered_problems, 1):
         assert problem['id'] not in seen
         assert set(problem['prerequisites']) <= seen
         seen.add(problem['id'])
@@ -63,12 +64,14 @@ def test_catalog_is_ordered_and_links_are_problem_specific(catalog):
             parsed = urlparse(problem[key])
             assert parsed.scheme == 'https' and parsed.netloc == domain
             assert parsed.path.startswith('/problems/') and not parsed.query
-    assert len(catalog['coding_curriculum']) == 12
+    assert len(catalog['coding_curriculum']) == 15
     assert [s.get('problem') for s in catalog['coding_curriculum']] == [
-        'contains-duplicate', 'valid-anagram', 'two-sum', 'valid-palindrome',
-        'two-sum-ii-input-array-is-sorted', None, 'valid-parentheses', 'binary-search',
-        'min-stack', 'best-time-to-buy-and-sell-stock',
-        'longest-substring-without-repeating-characters', None]
+        'contains-duplicate', 'valid-anagram', 'two-sum', 'group-anagrams',
+        'valid-palindrome', 'two-sum-ii-input-array-is-sorted', 'best-time-to-buy-and-sell-stock',
+        'longest-substring-without-repeating-characters', 'valid-parentheses',
+        'min-stack', 'binary-search', 'invert-binary-tree',
+        'maximum-depth-of-binary-tree', 'kth-largest-element-in-a-stream',
+        'number-of-islands']
     for item in catalog['system_design']:
         assert urlparse(item['url']).netloc == 'www.hellointerview.com'
         assert 45 <= item['target_minutes'] <= 60
@@ -110,9 +113,23 @@ def test_explicit_next_plan_skips_due_review_for_next_unseen_problem(catalog):
 
     next_assignment = ip.plan(state, catalog, 'coding', '2026-09-10', next_assignment=True)
 
-    assert next_assignment['item_id'] == 'valid-palindrome'
+    assert next_assignment['item_id'] == 'group-anagrams'
     assert next_assignment['reason'] == 'next new curriculum item'
     assert next_assignment['session_type'] == 'new'
+
+
+def test_explicit_review_plan_returns_prior_problem_only_on_review_request(catalog):
+    state = ip.empty_state()
+    complete(state, catalog, '2026-09-08', confidence=2)
+
+    review = ip.plan(state, catalog, 'coding', '2026-09-10', review_assignment=True)
+
+    assert review['item_id'] == 'contains-duplicate'
+    assert review['reason'] == 'requested review'
+    assert review['session_type'] == 'review'
+    with pytest.raises(ValueError, match='either a new problem or a review'):
+        ip.plan(state, catalog, 'coding', '2026-09-10', next_assignment=True,
+                review_assignment=True)
 
 
 def test_due_review_displaces_then_resumes_new_slot(catalog):
@@ -154,7 +171,7 @@ def test_seed_sequence_and_reserved_reviews(catalog):
             assert row['session_type'] == 'review'
         else:
             assert row['item_id'] == slot['problem']
-    assert ip.select_item(state, catalog, 'coding', '2026-09-13')['reason'] == 'consolidation review'
+    assert ip.select_item(state, catalog, 'coding', '2026-09-20')['reason'] == 'consolidation review'
 
 
 def test_scheduled_first_four_weeks_keep_sliding_window_reachable(catalog):
@@ -166,7 +183,7 @@ def test_scheduled_first_four_weeks_keep_sliding_window_reachable(catalog):
         if day.weekday() in (1, 3, 5):
             items.append(complete(state, catalog, day.isoformat())['item_id'])
     assert 'longest-substring-without-repeating-characters' in items
-    assert ip.curriculum_cursor(state, 'coding', '2026-10-20') == 12
+    assert ip.curriculum_cursor(state, 'coding', '2026-10-20') == 15
 
 
 def test_week_three_min_stack_can_be_replaced_by_due_weak_review(catalog):
@@ -175,7 +192,8 @@ def test_week_three_min_stack_can_be_replaced_by_due_weak_review(catalog):
         complete(state, catalog, f'2026-09-{i+1:02}')
     state['coding'][-1].update(confidence=2, next_review_date='2026-09-09')
     chosen = ip.select_item(state, catalog, 'coding', '2026-09-09')
-    assert chosen['item_id'] == 'binary-search' and chosen['curriculum_slot'] == 8
+    assert chosen['item_id'] == 'longest-substring-without-repeating-characters'
+    assert chosen['curriculum_slot'] is None
 
 
 def test_prerequisite_recovery(catalog):

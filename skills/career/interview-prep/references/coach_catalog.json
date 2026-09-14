@@ -55,9 +55,9 @@
       "neetcode_url": "https://neetcode.io/problems/is-palindrome/question",
       "leetcode_url": "https://leetcode.com/problems/valid-palindrome/",
       "prerequisites": [
-        "two-sum"
+        "group-anagrams"
       ],
-      "recommended_order": 4,
+      "recommended_order": 5,
       "goal": "Check a phrase for palindrome symmetry while ignoring punctuation and letter case."
     },
     {
@@ -71,7 +71,7 @@
       "prerequisites": [
         "valid-palindrome"
       ],
-      "recommended_order": 5,
+      "recommended_order": 6,
       "goal": "Use sorted input to find a target pair and justify why each move can discard candidates."
     },
     {
@@ -85,7 +85,7 @@
       "prerequisites": [
         "contains-duplicate"
       ],
-      "recommended_order": 6,
+      "recommended_order": 9,
       "goal": "Check whether mixed bracket types close in the correct order; test empty and incomplete input."
     },
     {
@@ -99,7 +99,7 @@
       "prerequisites": [
         "two-sum-ii-input-array-is-sorted"
       ],
-      "recommended_order": 7,
+      "recommended_order": 11,
       "goal": "Locate a target in a sorted array; state an invariant and test absent targets and boundary indices."
     },
     {
@@ -113,7 +113,7 @@
       "prerequisites": [
         "valid-parentheses"
       ],
-      "recommended_order": 8,
+      "recommended_order": 10,
       "goal": "Design push, pop, top, and minimum queries with constant time per operation, including duplicate minima."
     },
     {
@@ -127,7 +127,7 @@
       "prerequisites": [
         "two-sum-ii-input-array-is-sorted"
       ],
-      "recommended_order": 9,
+      "recommended_order": 7,
       "goal": "Choose a buy day before a sell day to maximize one trade; explain the result for falling prices."
     },
     {
@@ -142,8 +142,78 @@
         "best-time-to-buy-and-sell-stock",
         "valid-anagram"
       ],
-      "recommended_order": 10,
+      "recommended_order": 8,
       "goal": "Find the longest contiguous substring with unique characters; explain how to handle a repeated character."
+    },
+    {
+      "id": "group-anagrams",
+      "leetcode_id": 49,
+      "name": "Group Anagrams",
+      "pattern": "HashMap",
+      "difficulty": "Medium",
+      "neetcode_url": "https://neetcode.io/problems/anagram-groups/question",
+      "leetcode_url": "https://leetcode.com/problems/group-anagrams/",
+      "prerequisites": [
+        "two-sum"
+      ],
+      "recommended_order": 4,
+      "goal": "Group words by a canonical character-count signature and explain why equivalent words share one key."
+    },
+    {
+      "id": "invert-binary-tree",
+      "leetcode_id": 226,
+      "name": "Invert Binary Tree",
+      "pattern": "Tree / DFS",
+      "difficulty": "Easy",
+      "neetcode_url": "https://neetcode.io/problems/invert-a-binary-tree/question",
+      "leetcode_url": "https://leetcode.com/problems/invert-binary-tree/",
+      "prerequisites": [
+        "binary-search"
+      ],
+      "recommended_order": 12,
+      "goal": "Traverse every node exactly once and explain the recursive base case before swapping child pointers."
+    },
+    {
+      "id": "maximum-depth-of-binary-tree",
+      "leetcode_id": 104,
+      "name": "Maximum Depth of Binary Tree",
+      "pattern": "Tree / BFS / DFS",
+      "difficulty": "Easy",
+      "neetcode_url": "https://neetcode.io/problems/depth-of-binary-tree/question",
+      "leetcode_url": "https://leetcode.com/problems/maximum-depth-of-binary-tree/",
+      "prerequisites": [
+        "invert-binary-tree"
+      ],
+      "recommended_order": 13,
+      "goal": "Compare recursive DFS with level-order BFS and state what each approach stores in memory."
+    },
+    {
+      "id": "kth-largest-element-in-a-stream",
+      "leetcode_id": 703,
+      "name": "Kth Largest Element in a Stream",
+      "pattern": "Heap",
+      "difficulty": "Easy",
+      "neetcode_url": "https://neetcode.io/problems/kth-largest-element-in-a-stream/question",
+      "leetcode_url": "https://leetcode.com/problems/kth-largest-element-in-a-stream/",
+      "prerequisites": [
+        "maximum-depth-of-binary-tree"
+      ],
+      "recommended_order": 14,
+      "goal": "Maintain only the k best candidates with a min-heap and justify the update cost for each stream value."
+    },
+    {
+      "id": "number-of-islands",
+      "leetcode_id": 200,
+      "name": "Number of Islands",
+      "pattern": "Graph / BFS / DFS",
+      "difficulty": "Medium",
+      "neetcode_url": "https://neetcode.io/problems/count-number-of-islands/question",
+      "leetcode_url": "https://leetcode.com/problems/number-of-islands/",
+      "prerequisites": [
+        "kth-largest-element-in-a-stream"
+      ],
+      "recommended_order": 15,
+      "goal": "Model a grid as a graph, mark a component once, and compare iterative BFS with recursive DFS for large inputs."
     }
   ],
   "coding_curriculum": [
@@ -157,22 +227,13 @@
       "problem": "two-sum"
     },
     {
+      "problem": "group-anagrams"
+    },
+    {
       "problem": "valid-palindrome"
     },
     {
       "problem": "two-sum-ii-input-array-is-sorted"
-    },
-    {
-      "review": true
-    },
-    {
-      "problem": "valid-parentheses"
-    },
-    {
-      "problem": "binary-search"
-    },
-    {
-      "problem": "min-stack"
     },
     {
       "problem": "best-time-to-buy-and-sell-stock"
@@ -181,7 +242,25 @@
       "problem": "longest-substring-without-repeating-characters"
     },
     {
-      "review": true
+      "problem": "valid-parentheses"
+    },
+    {
+      "problem": "min-stack"
+    },
+    {
+      "problem": "binary-search"
+    },
+    {
+      "problem": "invert-binary-tree"
+    },
+    {
+      "problem": "maximum-depth-of-binary-tree"
+    },
+    {
+      "problem": "kth-largest-element-in-a-stream"
+    },
+    {
+      "problem": "number-of-islands"
     }
   ],
   "system_design": [
