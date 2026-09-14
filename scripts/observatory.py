@@ -109,6 +109,21 @@ def task_prompt(prompt):
     return prompt.rsplit('\n\n', 1)[-1].strip()
 
 
+def notification_excerpt(content, limit=96):
+    """Turn a delivered assistant message into one safe, readable bubble line."""
+    text = redact(str(content or ''))
+    if text.strip() == '[SILENT]':
+        return ''
+    text = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', text)
+    for raw in text.splitlines():
+        line = re.sub(r'^[\s#>*_`~-]+', '', raw).strip()
+        line = re.sub(r'[*_`]+', '', line).strip()
+        if not line or re.fullmatch(r'[-—–\s]+', line):
+            continue
+        return line if len(line) <= limit else line[:limit - 1].rstrip() + '…'
+    return ''
+
+
 def room_for(profile, session_id, prompt, jobs):
     office = re.fullmatch(r'office_(hq|papers|interview|coding|design|english|podcast)', session_id)
     if profile == 'david' and office:
@@ -776,6 +791,28 @@ class Observatory:
         finally:
             conn.close()
 
+    def recent_notification(self, history):
+        """Read the newest actual cron response for an Observatory room."""
+        for session in history:
+            if session.get('source') != 'cron':
+                continue
+            try:
+                conn = self.connect(session['profile'])
+                try:
+                    found = conn.execute("""SELECT content,timestamp FROM messages
+                        WHERE session_id=? AND role='assistant' AND content IS NOT NULL
+                        AND trim(content) NOT IN ('','[SILENT]')
+                        ORDER BY id DESC LIMIT 1""", (session['id'],)).fetchone()
+                finally:
+                    conn.close()
+            except (sqlite3.Error, OSError, ValueError):
+                continue
+            text = notification_excerpt(found['content']) if found else ''
+            if text:
+                return {'text': text, 'timestamp': found['timestamp'],
+                        'session': session['id']}
+        return None
+
     def gateway(self, profile):
         state = read_json(self.profile_home(profile) / 'gateway_state.json', {})
         alive = False
@@ -861,7 +898,7 @@ class Observatory:
             latest = history[0] if history else None
             rooms.append({'id': key, 'title': title, 'subtitle': subtitle, 'icon': icon,
                           'color': color, 'sessions': len(history), 'latest': latest,
-                          'jobs': room_jobs,
+                          'jobs': room_jobs, 'notice': self.recent_notification(history),
                           'profile': ROOM_PROFILES.get(key, key),
                           'presence': presence.get(key, {
                               'mode': 'ambient', 'label': '일상 활동',

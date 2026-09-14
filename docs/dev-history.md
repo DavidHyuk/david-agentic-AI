@@ -3,6 +3,22 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.15.0 — 2026-09-13 (minor: add team exchanges and notification bubbles)
+
+- Added paired, visibly labeled `TEAM CHAT` exchanges between complementary
+  office characters when physically near each other, without invoking a model
+  or representing fictional work. Passive bubbles now wait 24–42 seconds.
+- Added rotating `RECENT NOTICE` bubbles for every character. They use a compact
+  excerpt of the room's newest stored cron response and fall back to the room's
+  next scheduled notification when no response exists.
+- Increased Ellie's shared-office, portrait and workbench rendering size while
+  preserving the existing generated asset and mobile layout.
+- Replaced arbitrary roaming targets with deterministic role-specific circuits,
+  visible purpose labels and a more detailed zoned studio containing research,
+  review, archive, collaboration, coaching and audio areas.
+- Added regression coverage for safe notification excerpts and their read-only
+  Observatory room exposure. No profile, bot, cron or routing changes were made.
+
 ## v1.14.0 — 2026-09-13 (minor: calm the office and rebalance the cast)
 
 - Reduced ambient roaming to staggered departures followed by 60–140 second

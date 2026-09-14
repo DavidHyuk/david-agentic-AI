@@ -7,12 +7,46 @@ window.sharedOffice = (() => {
     papers: [145, 265], interview: [365, 265], coding: [625, 265],
     design: [855, 265], english: [185, 490], hq: [495, 420], podcast: [735, 455],
   };
-  const spots = [
-    {point: [185, 430], label: "커피 한 잔의 여유", icon: "☕"},
-    {point: [320, 455], label: "라운지에서 쉬는 중", icon: "…"},
-    {point: [690, 400], label: "동료에게 인사하는 중", icon: "♡"},
-    {point: [895, 360], label: "창가에서 생각하는 중", icon: "✦"},
-  ];
+  // Each role follows a small, deterministic work routine instead of choosing
+  // arbitrary floor coordinates. Points are feet positions on the shared floor.
+  const routines = {
+    papers: [
+      {point: homes.papers, label: "논문 정리"},
+      {point: [145, 350], label: "자료 근거 확인"},
+      {point: [430, 400], label: "연구 메모 공유"},
+    ],
+    interview: [
+      {point: homes.interview, label: "면접 질문 정리"},
+      {point: [410, 350], label: "답변 구조화"},
+      {point: [570, 400], label: "모의 답변 검토"},
+    ],
+    coding: [
+      {point: homes.coding, label: "문제 분석"},
+      {point: [690, 350], label: "코드 리뷰"},
+      {point: [520, 400], label: "풀이 검토"},
+    ],
+    design: [
+      {point: homes.design, label: "다이어그램 작성"},
+      {point: [850, 350], label: "병목 점검"},
+      {point: [680, 400], label: "설계 리뷰"},
+    ],
+    english: [
+      {point: homes.english, label: "예문 정리"},
+      {point: [315, 440], label: "발음 연습"},
+      {point: [625, 475], label: "표현 맞추기"},
+    ],
+    hq: [
+      {point: homes.hq, label: "전체 흐름 정리"},
+      {point: [260, 350], label: "연구 팀 확인"},
+      {point: [745, 350], label: "엔지니어링 팀 확인"},
+      {point: [180, 410], label: "잠깐 재정비"},
+    ],
+    podcast: [
+      {point: homes.podcast, label: "레슨 편집"},
+      {point: [745, 440], label: "셰도잉 점검"},
+      {point: [850, 410], label: "녹음 확인"},
+    ],
+  };
   // Scripted small talk is decorative, never a model call or a work-status report.
   const ambientLines = {
     hq: ["필요하면 언제든 불러주세요.", "오늘의 흐름을 같이 정리해볼까요?", "천천히, 하나씩 해도 괜찮아요."],
@@ -23,12 +57,28 @@ window.sharedOffice = (() => {
     english: ["오늘 한 문장 말해볼까요?", "자연스럽게 다시 표현해봐요.", "틀려도 괜찮아요. 제가 도와드릴게요."],
     podcast: ["이 표현, 귀에 익혀봐요!", "짧게 따라 말해볼까요?", "오늘은 어떤 이야기를 들어볼까요?"],
   };
+  const dialogueScenes = [
+    ["papers", "interview", "Theo, 논문 근거를 답변에 넣어볼까요?", "좋아요, 사례까지 이어서 말해볼게요."],
+    ["coding", "design", "Mina, 이 구조의 병목은 어디일까요?", "트래픽부터 같이 계산해보죠."],
+    ["english", "podcast", "Rina, 오늘 표현 하나 골라줄래요?", "Ellie, 셰도잉하기 좋은 걸로 찾아볼게요!"],
+    ["hq", "papers", "Iris, 요즘 어떤 주제가 눈에 띄나요?", "추론과 에이전트 흐름을 보고 있어요."],
+    ["interview", "design", "Mina, 이 답변의 약점도 봐줄래요?", "실패 시나리오를 하나 더 붙여봐요."],
+  ];
+  const jobLabels = {
+    "papers-digest": "연구 다이제스트", "interview-prep": "MLE 면접 드릴",
+    "coding-coach": "코딩 훈련", "system-design-coach": "시스템 디자인 훈련",
+    "weekly-review": "주간 리뷰", "english-intake": "영어 피드백",
+    "english-drill": "영어 복습", "english-weekly-review": "영어 주간 리뷰",
+    "english-podcast-daily": "팟캐스트 영어",
+  };
   const actors = new Map();
   const conversations = new Map();
   const reduced = matchMedia("(prefers-reduced-motion: reduce)");
   let selected = null, paused = localRead("office-paused", false);
   let previous = 0, frame = 0, roomData = [], historyRequest = 0;
-  let talkTimer = 0, speakingRoom = null;
+  let talkTimer = 0, replyTimer = 0, talkTurn = 0, noticeTurn = 0;
+  let dialogueTurn = 0, ambientTurn = 0;
+  const speakingRooms = new Set();
   const conversation = (room) => {
     if (!conversations.has(room))
       conversations.set(room, {history: [], busy: false, available: false, loaded: false, error: ""});
@@ -46,8 +96,13 @@ window.sharedOffice = (() => {
       <div class="shared-floor">
         <div class="back-wall" aria-hidden="true"><div class="wide-window"></div><span>HERMES<br><small>IDEAS LIVE HERE</small></span><div class="wide-window"></div></div>
         <div class="floor-sign">THE STUDIO <span>↙ LOUNGE · COFFEE ↗</span></div>
+        <div class="wall-board research-board" aria-hidden="true"><b>RESEARCH PULSE</b><i></i><i></i><i></i></div>
+        <div class="wall-board systems-board" aria-hidden="true"><b>SYSTEM MAP</b><i></i><i></i><i></i></div>
+        <div class="zone-rug collaboration-zone" aria-hidden="true"><span>COLLABORATION COMMONS</span></div>
         <div class="furniture desk-island desk-one"><i></i><i></i><span>RESEARCH / INTERVIEW</span></div>
         <div class="furniture desk-island desk-two"><i></i><i></i><span>CODE / DESIGN</span></div>
+        <div class="furniture archive-shelf" aria-hidden="true"><b>FIELD NOTES</b><i></i><i></i><i></i><span>ARCHIVE</span></div>
+        <div class="furniture review-board" aria-hidden="true"><b>REVIEW</b><i></i><i></i><span></span></div>
         <div class="furniture coffee-bar"><b>☕</b><span>COFFEE CLUB</span><i></i></div>
         <div class="furniture sofa"><span>TAKE A BREATH</span><i></i><i></i><i></i></div>
         <div class="furniture meeting-table"><i></i><span>✦</span><i></i></div>
@@ -91,22 +146,27 @@ window.sharedOffice = (() => {
         const button = document.createElement("button");
         button.className = "walking-agent";
         button.dataset.room = room.id;
-        button.innerHTML = `<span class="walk-bubble" aria-hidden="true"></span>${sprite(room.id)}<span class="walk-name">${officeCast[room.id].name} <i></i></span>`;
+        button.innerHTML = `<span class="walk-bubble" aria-hidden="true"></span>${sprite(room.id)}<span class="walk-name"><b>${officeCast[room.id].name}</b><small class="walk-purpose"></small><i></i></span>`;
         button.onclick = () => select(room.id);
         $("walking-floor").append(button);
         actor = {node: button, x: homes[room.id][0], y: homes[room.id][1], route: [],
-          wait: 15 + officeCast[room.id].index * 17 + Math.random() * 8,
-          home: true, mode: "ambient"};
+          wait: 18 + officeCast[room.id].index * 18, routineIndex: 1,
+          pendingPurpose: "", purpose: routines[room.id][0].label, mode: "ambient"};
         actors.set(room.id, actor);
+        setPurpose(actor, actor.purpose);
       }
       const mode = room.presence?.mode || "ambient";
       if (actor.mode !== mode) {
         actor.route = [];
-        if (mode !== "ambient") route(actor, homes[room.id]);
+        if (mode !== "ambient") route(actor, homes[room.id], room.presence?.label || "실제 작업 확인");
+        else {
+          actor.routineIndex = 1;
+          route(actor, homes[room.id], routines[room.id][0].label);
+        }
       }
       actor.mode = mode;
       actor.node.dataset.presence = mode;
-      actor.node.title = `${room.title} · ${room.presence?.label || "일상 연출"}`;
+      actor.node.title = `${room.title} · ${room.presence?.label || "일상 연출"} · ${actor.purpose}`;
       actor.node.setAttribute("aria-label", `${officeCast[room.id].name}와 대화하기 · ${room.title}`);
       paint(actor);
     }
@@ -120,8 +180,14 @@ window.sharedOffice = (() => {
     }
     visibility();
   }
-  function route(actor, target) {
+  function setPurpose(actor, purpose) {
+    actor.purpose = purpose;
+    actor.node.querySelector(".walk-purpose").textContent = purpose;
+  }
+  function route(actor, target, purpose) {
     actor.route = [[actor.x, 345], [target[0], 345], target];
+    actor.pendingPurpose = purpose;
+    setPurpose(actor, purpose + " · 이동 중");
   }
   function paint(actor) {
     actor.node.style.left = actor.x / 10 + "%";
@@ -138,16 +204,17 @@ window.sharedOffice = (() => {
         const distance = Math.hypot(dx, dy), step = delta * 45;
         if (distance <= step) {
           actor.x = x; actor.y = y; actor.route.shift();
+          if (!actor.route.length && actor.pendingPurpose) {
+            setPurpose(actor, actor.pendingPurpose);
+            actor.pendingPurpose = "";
+          }
         } else { actor.x += dx / distance * step; actor.y += dy / distance * step; }
       } else if (!held && actor.mode === "ambient") {
         actor.wait -= delta;
         if (actor.wait <= 0) {
-          const spot = spots[(officeCast[room].index + Math.floor(Math.random() * spots.length)) % spots.length];
-          const index = officeCast[room].index;
-          const destination = [spot.point[0] + (index - 3) * 9, spot.point[1] - (index % 3) * 8];
-          route(actor, actor.home ? destination : homes[room]);
-          actor.home = !actor.home;
-          actor.wait = 60 + Math.random() * 80;
+          const routine = routines[room][actor.routineIndex++ % routines[room].length];
+          route(actor, routine.point, routine.label);
+          actor.wait = 75 + officeCast[room].index * 7 + (actor.routineIndex % 3) * 12;
         }
       }
       actor.node.classList.toggle("is-walking", !held && actor.route.length > 0);
@@ -171,36 +238,80 @@ window.sharedOffice = (() => {
   }
   function stopTalk() {
     clearTimeout(talkTimer);
+    clearTimeout(replyTimer);
     talkTimer = 0;
-    if (speakingRoom) actors.get(speakingRoom)?.node.classList.remove("is-speaking");
-    speakingRoom = null;
+    replyTimer = 0;
+    for (const room of speakingRooms) actors.get(room)?.node.classList.remove("is-speaking");
+    speakingRooms.clear();
   }
-  function speak(room, text, duration = 7200) {
-    if (speakingRoom) actors.get(speakingRoom)?.node.classList.remove("is-speaking");
+  function showBubble(room, text, kind) {
     const actor = actors.get(room);
-    if (!actor) return;
-    speakingRoom = room;
-    actor.node.querySelector(".walk-bubble").textContent = text;
+    if (!actor) return false;
+    const bubble = actor.node.querySelector(".walk-bubble");
+    bubble.textContent = text;
+    bubble.dataset.kind = kind;
     actor.node.classList.add("is-speaking");
-    clearTimeout(talkTimer);
+    speakingRooms.add(room);
+    return true;
+  }
+  function finishTalk(duration) {
     talkTimer = setTimeout(() => {
-      actor.node.classList.remove("is-speaking");
-      speakingRoom = null;
-      talkTimer = 0;
+      stopTalk();
       scheduleTalk();
     }, duration);
+  }
+  function speak(room, text, duration = 7200, kind = "ambient") {
+    stopTalk();
+    if (showBubble(room, text, kind)) finishTalk(duration);
+  }
+  function notificationLine(room) {
+    const data = roomData.find((item) => item.id === room);
+    if (data?.notice?.text) return `최근 알림 · ${data.notice.text}`;
+    const job = data && nextRoomJob(data);
+    if (job) return `다음 알림 · ${jobLabels[job.name] || job.name} ${when(job.next_run_at)}`;
+    return "최근 알림 · 아직 새 소식은 없어요.";
+  }
+  function speakNotification() {
+    const rooms = [...actors.keys()];
+    for (let i = 0; i < rooms.length; i++) {
+      const room = rooms[noticeTurn++ % rooms.length];
+      if (room !== selected) {
+        speak(room, notificationLine(room), 7800, "notice");
+        return;
+      }
+    }
+  }
+  function speakDialogue() {
+    for (let i = 0; i < dialogueScenes.length; i++) {
+      const scene = dialogueScenes[dialogueTurn++ % dialogueScenes.length];
+      if (scene[0] === selected || scene[1] === selected) continue;
+      const first = actors.get(scene[0]), second = actors.get(scene[1]);
+      if (!first || !second || Math.hypot(first.x - second.x, first.y - second.y) > 270) continue;
+      stopTalk();
+      showBubble(scene[0], scene[2], "dialogue");
+      replyTimer = setTimeout(() => showBubble(scene[1], scene[3], "dialogue"), 1700);
+      finishTalk(8600);
+      return;
+    }
+    speakNotification();
+  }
+  function speakAmbient() {
+    const rooms = [...actors.keys()].filter((room) => room !== selected);
+    if (!rooms.length) return;
+    const room = rooms[ambientTurn++ % rooms.length];
+    const lines = ambientLines[room];
+    speak(room, lines[ambientTurn % lines.length]);
   }
   function scheduleTalk() {
     if (talkTimer || document.hidden || state.view !== "office" || state.replay || !actors.size) return;
     talkTimer = setTimeout(() => {
       talkTimer = 0;
       if (document.hidden || state.view !== "office" || state.replay) return;
-      const rooms = [...actors.keys()].filter((room) => room !== selected);
-      if (!rooms.length) return;
-      const room = rooms[Math.floor(Math.random() * rooms.length)];
-      const lines = ambientLines[room];
-      speak(room, lines[Math.floor(Math.random() * lines.length)]);
-    }, 11000 + Math.random() * 15000);
+      const event = ["notice", "dialogue", "notice", "ambient"][talkTurn++ % 4];
+      if (event === "notice") speakNotification();
+      else if (event === "dialogue") speakDialogue();
+      else speakAmbient();
+    }, 24000 + Math.random() * 18000);
   }
   function close() {
     const last = selected;
@@ -219,7 +330,7 @@ window.sharedOffice = (() => {
     (insideWorkbench ? $("bench-character") : $("rooms")).append($("office-conversation"));
     const cast = officeCast[room], actor = actors.get(room);
     actor?.node.classList.add("is-selected");
-    speak(room, "불러주셨나요?", 4200);
+    speak(room, "불러주셨나요?", 4200, "greeting");
     if (!insideWorkbench) actor?.node.scrollIntoView({block: "nearest", inline: "center", behavior: "smooth"});
     $("conversation-portrait").innerHTML = sprite(room, "portrait-art");
     $("conversation-role").textContent = cast.role;

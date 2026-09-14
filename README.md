@@ -849,15 +849,21 @@ character remains present and **대화 이어가기** opens the conversation in 
 The office uses a repository-owned transparent character sheet plus Ellie's
 transparent English-tutor cutout under `browser/observatory/assets/`.
 `bootstrap/install_observatory.sh` stages them with
-the rest of the UI. The 2D cast moves over a room with shaded furniture. Mobile
+the rest of the UI. The 2D cast moves through a zoned studio with paired desks,
+research and review boards, an archive shelf, collaboration commons, coaching
+lounge, coffee bar, and audio desk. Mobile
 keeps this same room in a horizontally scrollable viewport, with named character
 shortcuts beneath it. Browser-only ambient routes run even when Hermes is idle;
 hidden tabs and other views suspend animation. Roaming is intentionally sparse:
-each character normally remains at a location for 60–140 seconds before moving,
-with staggered initial departures. One cast member periodically speaks a short,
-role-specific ambient line; selecting a character produces an immediate greeting.
-These are scripted text bubbles, not voice playback or actual task reports, and
-do not invoke the model. Hidden views and historical replay suspend small talk.
+each character follows a deterministic role-specific circuit and displays its
+current purpose below its name. Characters normally remain at each location for
+roughly 75–140 seconds, with staggered initial departures. Speech cycles among real recent cron-notification
+excerpts, next-schedule fallbacks, short role-specific lines, and paired agent-to-agent
+exchanges only when the pair is physically near each other. Bubbles appear at a
+restrained 24–42 second interval. Recent-notification bubbles come from stored assistant output and are
+visually labeled; ambient team exchanges are scripted and never presented as actual
+work. Selecting a character produces an immediate greeting. Passive bubbles do not
+invoke the model or play audio. Hidden views and historical replay suspend small talk.
 
 Office conversations use separate persisted `office_<room>` sessions on the
 existing HQ API, classified into their matching Observatory rooms. They are

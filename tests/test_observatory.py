@@ -12,7 +12,8 @@ from http.server import ThreadingHTTPServer
 
 import pytest
 
-from observatory import Observatory, date_range, make_handler, redact, room_for
+from observatory import (Observatory, date_range, make_handler,
+                         notification_excerpt, redact, room_for)
 
 
 @pytest.fixture
@@ -99,6 +100,22 @@ def test_redaction_preserves_metrics_but_masks_credentials():
     assert 'PASSWORD=abc' not in output['body']
     assert 'Bearer abcdef' not in output['body']
     assert 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' not in output['body']
+
+
+def test_notification_excerpt_uses_first_meaningful_line_and_stays_compact():
+    content = '\n---\n## **Today:** [Production RAG](https://example.com) ' + 'x' * 120
+    excerpt = notification_excerpt(content, limit=50)
+    assert excerpt.startswith('Today: Production RAG')
+    assert len(excerpt) == 50
+    assert excerpt.endswith('…')
+    assert notification_excerpt('[SILENT]') == ''
+
+
+def test_overview_exposes_actual_cron_response_as_room_notice(store):
+    hq = next(room for room in store.overview()['rooms'] if room['id'] == 'hq')
+    assert hq['notice']['text'] == 'Hello English'
+    coding = next(room for room in store.overview()['rooms'] if room['id'] == 'coding')
+    assert coding['notice'] is None
 
 
 def test_missing_sources_are_empty_and_db_is_readonly(store):
