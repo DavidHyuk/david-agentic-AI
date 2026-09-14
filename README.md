@@ -808,9 +808,12 @@ continuing study tasks from room workbenches.
 The campus has separate paper, MLE, coding, system-design, English, Morning Echo,
 and HQ rooms; other installed Hermes profiles also appear as independent rooms.
 Morning Echo is a separate podcast workspace owned by the existing English
-profile, not a separate bot or gateway. Room animation
-is decorative; the explicitly labeled daily replay follows real session start
-times. Gateway process availability is checked separately from session history.
+profile, not a separate bot or gateway. The main campus is a living anime office
+with a balanced seven-character ensemble: ambient reading, walking, listening,
+and break animations keep the room alive between sparse cron runs. `AMBIENT` is
+explicitly decorative; `LIVE` and `BLOCKED` are derived from gateway activity and
+read-only Kanban state. The daily replay still follows real session start times,
+and gateway process availability is checked separately from session history.
 
 Install or update while Tailscale is connected:
 
@@ -838,6 +841,13 @@ sudo tailscale serve --bg --https=8443 http://127.0.0.1:8788
 
 The first screen refreshes every ten seconds. Click a campus room to open its
 workbench; its history button opens the room's saved conversations.
+
+The office uses one repository-owned transparent character sheet under
+`browser/observatory/assets/`. `bootstrap/install_observatory.sh` stages it with
+the rest of the UI. On desktop the cast occupies a shared office floor; on small
+screens it becomes a two-column character roster. Browser-only ambient routines
+change at staggered intervals even when Hermes is idle, while state badges retain
+the source-of-truth distinction above.
 
 - **LeetCode / System Design**: resume unfinished assignments, prepare today's
   assignment, or open another same-day assignment after completing one; use a

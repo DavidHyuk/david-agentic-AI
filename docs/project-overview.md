@@ -123,8 +123,8 @@ David-Agent/
 │   ├── hermes-gateway-vllm.conf # gateway → vLLM 의존성/readiness drop-in
 │   ├── restart_service.sh     # vLLM 서비스 재시작 및 API 준비 대기
 │
-├── browser/                   # Built-in Browser 런타임 + 관제실 정적 UI
-│   ├── observatory/          # 픽셀 캠퍼스·검색·기록·리플레이·workbench.js/css
+├── browser/                   # Built-in Browser 런타임 + living-office 관제실 UI
+│   ├── observatory/          # anime living office·검색·기록·리플레이·workbench
 │   ├── setup_browser.sh       # agent-browser 고정 설치 + user service 설치
 │   ├── hermes-browser.service # localhost-only Chromium CDP
 │   └── browser_smoke.py       # 탐색·클릭·DOM·snapshot E2E 검사
@@ -138,7 +138,7 @@ David-Agent/
 │   ├── Qwen/                  # Qwen 계열 모델
 │   └── MiniMax/               # MiniMax-M2.7 모델
 │
-├── tests/                     # pytest 테스트 (259개)
+├── tests/                     # pytest 테스트 (260개)
 │   ├── conftest.py
 │   ├── test_papers_ingest.py
 │   ├── test_papers_digest.py
@@ -350,7 +350,16 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
 - `scripts/observatory.py` + `browser/observatory/`의 HTML/CSS/JavaScript
   (`app.js`, `workbench.js`, `style.css`, `workbench.css`):
   Python 표준 라이브러리 HTTP 서버와 로컬 HTML/CSS/JavaScript. CDN 없이
-  픽셀 작업실, 세션 날짜별 리플레이, 검색·페이지네이션 제공.
+  애니메이션 에이전트 오피스, 세션 날짜별 리플레이, 검색·페이지네이션 제공.
+- 메인 오피스는 여성 3명, 남성 3명, 중성적인 Hermes 1명의 통일된 SD
+  애니메이션 캐스트를 사용합니다. 투명 캐릭터 시트는
+  `browser/observatory/assets/hermes-agent-cast.png`에 보관하고 installer가
+  정적 UI와 함께 staging합니다. 데스크톱은 공용 오피스, 모바일은 2열
+  캐릭터 roster로 반응형 전환합니다.
+- cron 사이에도 읽기, 산책, 듣기, 대화 같은 브라우저 전용 일상 동작을
+  엇갈린 주기로 실행합니다. 이 동작은 `AMBIENT`로 명시하며 gateway 또는
+  read-only Kanban DB에서 확인된 작업만 `LIVE`, 막힌 Kanban 임무만
+  `BLOCKED`로 표시하여 장식과 운영 상태를 혼동하지 않습니다.
 - 캠퍼스 방 클릭으로 학습 작업실을 엽니다. 코딩·시스템 디자인은 미완료
   과제 재개, 타이머, 실제 연습 결과 제출을 제공하고, English는 정답 확인과
   SRS 채점, Morning Echo는 일일 podcast 배정·대본 준비·전달 상태,

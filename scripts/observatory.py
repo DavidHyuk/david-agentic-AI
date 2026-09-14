@@ -721,6 +721,53 @@ class Observatory:
                 'updated_at': state.get('updated_at'),
                 'platforms': state.get('platforms', {})}
 
+    def room_presence(self, profiles):
+        """Separate decorative office life from evidence-backed agent activity."""
+        presence = {key: {'mode': 'ambient', 'label': '일상 활동', 'source': 'ambient'}
+                    for key, *_ in ROOMS}
+        database = self.home / 'kanban/boards' / self.board / 'kanban.db'
+        if database.is_file():
+            try:
+                connection = sqlite3.connect(database.as_uri() + '?mode=ro', uri=True, timeout=2)
+                connection.row_factory = sqlite3.Row
+                try:
+                    rows = connection.execute('''
+                        SELECT id,title,status,assignee,created_at
+                        FROM tasks
+                        WHERE status IN ('claimed','running','review','blocked')
+                        ORDER BY CASE status
+                          WHEN 'running' THEN 0 WHEN 'claimed' THEN 1
+                          WHEN 'review' THEN 2 ELSE 3 END, created_at DESC
+                    ''').fetchall()
+                finally:
+                    connection.close()
+                for row in rows:
+                    room = SPECIALIST_ROOMS.get(row['assignee'], 'hq')
+                    if room not in presence or presence[room]['mode'] != 'ambient':
+                        continue
+                    blocked = row['status'] == 'blocked'
+                    presence[room] = {
+                        'mode': 'blocked' if blocked else 'working',
+                        'label': '확인 필요' if blocked else '실제 작업 중',
+                        'source': 'kanban',
+                        'task': row['title'],
+                        'task_id': row['id'],
+                    }
+            except sqlite3.Error:
+                # The office remains usable while an absent or changing Kanban
+                # schema is handled by the dedicated HQ workbench.
+                pass
+        for profile in profiles:
+            if not profile['alive'] or not profile['active_agents']:
+                continue
+            room = 'hq' if profile['profile'] == 'david' else profile['profile']
+            if room in presence and presence[room]['mode'] == 'ambient':
+                presence[room] = {
+                    'mode': 'working', 'label': '프로필 작업 중',
+                    'source': 'gateway',
+                }
+        return presence
+
     def overview(self):
         profiles, jobs, errors = [], [], []
         for name in self.profiles():
@@ -734,6 +781,7 @@ class Observatory:
             except (OSError, ValueError) as exc:
                 errors.append({'profile': name, 'error': type(exc).__name__})
         sessions = self.sessions(limit=1000000)
+        presence = self.room_presence(profiles)
         rooms = []
         room_ids = {room[0] for room in ROOMS}
         definitions = ROOMS + [(n, n.title(), '독립 프로필', '📷', '#d2c3af')
@@ -745,7 +793,11 @@ class Observatory:
             rooms.append({'id': key, 'title': title, 'subtitle': subtitle, 'icon': icon,
                           'color': color, 'sessions': len(history), 'latest': latest,
                           'jobs': room_jobs,
-                          'profile': ROOM_PROFILES.get(key, key)})
+                          'profile': ROOM_PROFILES.get(key, key),
+                          'presence': presence.get(key, {
+                              'mode': 'ambient', 'label': '일상 활동',
+                              'source': 'ambient',
+                          })})
         today = datetime.now(TZ).strftime('%Y-%m-%d')
         today_start, _ = date_range(today)
         return {'now': time.time(), 'timezone': str(TZ), 'profiles': profiles, 'jobs': jobs,
@@ -862,10 +914,14 @@ def make_handler(store, assets: Path, hosts):
                     data = store.messages(profile or 'david', args.get('session', ''), offset, limit, q)
                 elif url.path == '/api/library':
                     data = store.library(args.get('kind', ''), profile or 'david', q, offset, limit)
-                elif url.path in ('/', '/index.html', '/app.js', '/style.css', '/workbench.js', '/workbench.css'):
+                elif url.path in ('/', '/index.html', '/app.js', '/style.css', '/workbench.js', '/workbench.css',
+                                       '/assets/hermes-agent-cast.png'):
                     filename = 'index.html' if url.path == '/' else url.path[1:]
                     content = (assets / filename).read_bytes()
-                    self.respond(200, content, mimetypes.guess_type(filename)[0] + '; charset=utf-8')
+                    media_type = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
+                    if media_type.startswith('text/') or media_type == 'application/javascript':
+                        media_type += '; charset=utf-8'
+                    self.respond(200, content, media_type)
                     return
                 else:
                     self.respond(404, {'error': '찾을 수 없습니다.'})

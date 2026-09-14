@@ -119,6 +119,29 @@ def test_gateway_pid_absent_is_not_live(store):
     assert store.gateway('david')['active_agents'] == 0
 
 
+def test_room_presence_distinguishes_ambient_live_and_blocked(store):
+    board = store.home / 'kanban/boards/hermes-hq'
+    board.mkdir(parents=True)
+    conn = sqlite3.connect(board / 'kanban.db')
+    conn.execute('''CREATE TABLE tasks(
+        id TEXT, title TEXT, status TEXT, assignee TEXT, created_at INTEGER)''')
+    conn.executemany('INSERT INTO tasks VALUES(?,?,?,?,?)', [
+        ('t_11111111', 'Run coding mission', 'running', 'coding', 2),
+        ('t_22222222', 'Review a design issue', 'blocked', 'design', 1),
+    ])
+    conn.commit()
+    conn.close()
+
+    presence = store.room_presence([{
+        'profile': 'david', 'alive': True, 'active_agents': 1,
+    }])
+    assert presence['coding']['mode'] == 'working'
+    assert presence['coding']['task'] == 'Run coding mission'
+    assert presence['design']['mode'] == 'blocked'
+    assert presence['hq']['source'] == 'gateway'
+    assert presence['papers']['mode'] == 'ambient'
+
+
 def test_date_range_uses_local_day_with_dst():
     start, end = date_range('2026-03-08', '2026-03-08')
     assert end - start == 23 * 3600
@@ -186,6 +209,10 @@ def test_http_blocks_untrusted_hosts_cross_site_and_arbitrary_files(store):
         assert 'frame-ancestors' in headers['Content-Security-Policy']
         assert request('/api/sessions?offset=bad')[0] == 400
         assert request('/')[0] == 200
+        status, body, headers = request('/assets/hermes-agent-cast.png')
+        assert status == 200
+        assert headers['Content-Type'] == 'image/png'
+        assert body.startswith(b'\x89PNG')
     finally:
         server.shutdown()
         server.server_close()

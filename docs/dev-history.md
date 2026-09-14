@@ -3,6 +3,21 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.12.0 — 2026-09-13 (minor: add the living anime agent office)
+
+- Replaced the Observatory's static pixel-room cards with a shared animated
+  office and a polished seven-character anime ensemble: three women, three men,
+  and an androgynous Hermes lead.
+- Added staggered ambient routines for reading, walking, listening, planning,
+  and taking breaks so the office remains alive between sparse cron executions.
+- Kept operational truth explicit: `AMBIENT` is decorative, `LIVE` is backed by
+  gateway or read-only Kanban activity, and `BLOCKED` reflects a blocked mission.
+- Preserved room workbench navigation, historical daily replay, dynamic profile
+  annex rooms, reduced-motion accessibility, and a two-column mobile layout.
+- Added secure static serving and installer staging for the repository-owned
+  transparent character sheet, plus regression coverage for character delivery
+  and room-presence classification.
+
 ## v1.11.0 — 2026-09-13 (minor: make cron delivery recovery stateful)
 
 - Changed cron registration from delete-and-recreate to compare-and-preserve:
