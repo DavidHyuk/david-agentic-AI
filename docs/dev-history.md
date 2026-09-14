@@ -3,6 +3,19 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.16.2 — 2026-09-14 (minor: separate new Coding work from reviews)
+
+- Made LeetCode Gym's **작업 이어가기 · 새 문제** an unconditional new-problem
+  path. It selects the next uncompleted curriculum problem and never turns into
+  an old review; added a distinct **복습하기** action that selects the most
+  valuable completed problem, preferring a weak due one.
+- Extended the beginner, Staff/Senior-MLE preparation path to 15 explicitly
+  staged 35-minute problems over five Tue/Thu/Sat weeks: Two Sum/HashMap,
+  Two Pointers, Sliding Window, Stack, Binary Search, Tree/BFS/DFS, Heap, and
+  Graph. Prerequisites and reported hint/confidence evidence still gate pacing.
+- Added CLI, Observatory action, and selection regression coverage for the
+  separated new-problem and review paths.
+
 ## v1.16.1 — 2026-09-14 (patch: make Coding follow-up assignments new)
 
 - Fixed the LeetCode Gym's post-completion follow-up path: it now selects the

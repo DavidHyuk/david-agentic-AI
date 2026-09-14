@@ -569,9 +569,10 @@ not active until its catalog, progress tracking, and cron job are implemented.
 | Nominal week | Coding: Tue / Thu / Sat | System design: Sunday |
 |---|---|---|
 | 1 | Contains Duplicate / Valid Anagram / Two Sum | Delivery framework, requirements, relevant estimation |
-| 2 | Valid Palindrome / Two Sum II / weak review | API design and data modeling through URL Shortener |
-| 3 | Valid Parentheses / Binary Search / Min Stack or weak review | Cache, queue, load balancer, DB replication |
-| 4 | Best Time to Buy and Sell Stock / Longest Substring Without Repeating Characters / weak review | 45-minute Design a Notification System mock + 5-minute self-review |
+| 2 | Group Anagrams / Valid Palindrome / Two Sum II | API design and data modeling through URL Shortener |
+| 3 | Best Time to Buy and Sell Stock / Longest Substring Without Repeating Characters / Valid Parentheses | Cache, queue, load balancer, DB replication |
+| 4 | Min Stack / Binary Search / Invert Binary Tree | 45-minute Design a Notification System mock + 5-minute self-review |
+| 5 | Maximum Depth of Binary Tree / Kth Largest Element in a Stream / Number of Islands | Evidence-backed consolidation from the completed design topics |
 
 Start as a coding beginner. Each coding push includes a goal, both problem links,
 a 35-minute budget, and “try 20 minutes without AI first.” Ask for a hint when
@@ -587,9 +588,10 @@ completing it. Missing feedback keeps the current curriculum slot pending.
 
 Solution viewed or confidence ≤2 schedules a review in 2 days; hint 2/3 or
 confidence 3 in 7 days; independent work with confidence ≥4 in 21 days. Other
-assisted attempts use 7 days. Due weak reviews interrupt new material and may
-extend the nominal four weeks. Strong reviews use reserved/consolidation slots;
-a review due date means eligibility at the next applicable coach slot. Design
+assisted attempts use 7 days. Due weak reviews interrupt scheduled material and
+may extend the nominal five weeks. In the workbench, **작업 이어가기 · 새 문제**
+always remains a new curriculum problem; use **복습하기** to request a prior
+problem. A review due date means eligibility at the next applicable coach slot. Design
 uses its lowest dimension/confidence score with the same 2/7/21-day intervals.
 After the seed curriculum, concrete consolidation reviews continue.
 
@@ -931,10 +933,13 @@ Session setup fails with a visible gateway error after 15 seconds instead of
 hanging indefinitely; an active local-model turn may run for up to ten minutes.
 
 - **LeetCode / System Design**: resume unfinished assignments, prepare today's
-  assignment, or open another same-day assignment after completing one. The
-  follow-up Coding action selects the next uncompleted curriculum problem rather
-  than resurfacing a due review; scheduled sessions still prioritize weak due
-  reviews. Use a
+  assignment, or open another same-day assignment after completing one. In the
+  LeetCode room, **작업 이어가기 · 새 문제** always selects the next uncompleted
+  curriculum problem; **복습하기** is the separate action that selects a prior
+  weak or due problem. Scheduled sessions still prioritize weak due reviews.
+  The new-problem path follows the 35-minute Tue/Thu/Sat progression from Two
+  Sum/HashMap through Two Pointers, Sliding Window, Stack, Binary Search,
+  Tree/BFS/DFS, Heap, and Graph. Use a
   timer and submit actual practice results. Coding feedback
   records duration, confidence, hints and solution use; design feedback records
   your self-assessment and improvement notes. These update the existing coach

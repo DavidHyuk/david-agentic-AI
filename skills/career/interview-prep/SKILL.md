@@ -1,7 +1,7 @@
 ---
 name: interview-prep
 description: Drive David's Staff/Senior ML Engineer interview prep in Silicon Valley with company-aware planning, focused drills, NeetCode/LeetCode foundations, practical coding strategy, Hello Interview system design, and adaptive progress.
-version: 1.3.0
+version: 1.4.0
 metadata:
   hermes:
     category: career
@@ -133,13 +133,17 @@ from candidate anecdotes. The automated coach currently implements the LeetCode
 foundation phase; do not imply that a scheduled Practical Coding track is active
 until its catalog, progress tracking, and job have actually been added.
 
-1. Run `python3 ~/.hermes/scripts/interview_progress.py plan coding`.
-   If David explicitly asks for another/new problem after completing today's
-   assignment, run
+1. Scheduled Coding Coach runs use `python3 ~/.hermes/scripts/interview_progress.py
+   plan coding`, which may select a due weak review. The workbench's **작업
+   이어가기** action and any explicit request for a new problem use
    `python3 ~/.hermes/scripts/interview_progress.py plan coding --next` instead.
-   This creates a numbered same-day assignment or returns the already-open next
-   assignment on retry. Never propose an untracked replacement problem from
-   memory or the catalog alone.
+   It always selects the next uncompleted curriculum problem; never substitute
+   an already attempted review. **복습하기** is the separate explicit path:
+   `python3 ~/.hermes/scripts/interview_progress.py plan coding --review`.
+   It selects the highest-value completed problem, preferring a due weak one.
+   Each path is retry-safe and returns an already-open same-day assignment on
+   retry. Never propose an untracked replacement problem from memory or the
+   catalog alone.
 2. Send the returned study message as the scheduled Telegram response, preserving
    the concrete problem, pattern, goal, 35-minute target, **both canonical URLs**,
    20-minute no-AI rule, and invitation to ask for a hint. It is actual study
@@ -151,21 +155,30 @@ until its catalog, progress tracking, and job have actually been added.
    David provides results, including unsuccessful attempts. Ask for missing
    fields rather than guessing completion, duration, confidence, or mistakes.
 
-Nominal first four weeks (three completed study slots per week):
+The preparation pace is three completed 35-minute problems per week (Tue/Thu/Sat).
+It keeps David at beginner implementation depth while building toward Staff/Senior
+MLE interviews: require the prerequisite pattern before changing families, use
+feedback to make weak work prominent in **복습하기**, and do not jump to trees,
+heaps, or graphs early merely to increase difficulty.
+
+Nominal first five weeks (three completed study slots per week):
 
 | Week | Pattern | Tue / Thu / Sat |
 |---|---|---|
-| 1 | Arrays & Hashing | Contains Duplicate / Valid Anagram / Two Sum |
-| 2 | Two Pointers | Valid Palindrome / Two Sum II / weak-problem review |
-| 3 | Stack / Binary Search | Valid Parentheses / Binary Search / Min Stack or due weak review |
-| 4 | Sliding Window | Best Time to Buy and Sell Stock / Longest Substring Without Repeating Characters / weak review |
+| 1 | Two Sum → HashMap foundations | Contains Duplicate / Valid Anagram / Two Sum |
+| 2 | HashMap extension → Two Pointers | Group Anagrams / Valid Palindrome / Two Sum II |
+| 3 | Sliding Window → Stack | Best Time to Buy and Sell Stock / Longest Substring Without Repeating Characters / Valid Parentheses |
+| 4 | Stack → Binary Search → Trees | Min Stack / Binary Search / Invert Binary Tree |
+| 5 | Tree BFS/DFS → Heap → Graph | Maximum Depth of Binary Tree / Kth Largest Element in a Stream / Number of Islands |
 
-The helper chooses due weak reviews before new problems, resumes interrupted slots,
-and enforces attempted prerequisites. Missed sessions do not advance slots;
-reviews can extend the nominal four weeks. Review slots choose the weakest
-previously attempted problem even if no review is due. After the seed curriculum,
-continue concrete consolidation reviews; extend the curated catalog in source
-before introducing a new curriculum. Do not silently jump to advanced problems.
+The scheduled helper chooses due weak reviews before new problems, resumes
+interrupted slots, and enforces attempted prerequisites. **작업 이어가기** is
+deliberately different: it advances only to a new, uncompleted curriculum
+problem. Missed sessions do not advance slots; reviews can extend the nominal
+five weeks. **복습하기** chooses the weakest/due previously attempted problem.
+After the seed curriculum, continue concrete consolidation reviews; extend the
+curated catalog in source before introducing a new curriculum. Do not silently
+jump to advanced problems.
 
 ## Hint ladder and feedback
 

@@ -404,7 +404,8 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   드릴과 답안 노트, HQ는 미완료 과제·복습 카드·읽을 논문을 모아 보여줍니다.
   오늘 과제를 완료한 뒤 한 문제를 더 요청하면 번호가 붙은 당일 과제로
   저장되어 Telegram과 작업실이 같은 미완료 상태를 봅니다. Coding 작업실의
-  추가 과제 요청은 이전 due 복습 대신 다음 미해결 커리큘럼 문제를 고릅니다.
+  **작업 이어가기 · 새 문제**는 언제나 다음 미해결 커리큘럼 문제를 고르고,
+  별도 **복습하기**가 이전 due/약점 문제를 고릅니다.
 - Papers, MLE Interview, LeetCode, System Design 작업실에는 방별 영속 세션을
   사용하는 직접 대화 입력창이 있습니다. 로컬 Hermes API로 답을 만든 뒤
   질문과 답을 해당 Telegram 그룹에도 기록합니다. 브라우저에는 API key,
@@ -481,23 +482,24 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
 - 기존 `interview-prep` 스킬 안에서 동작하며, `stage.py`가 standalone helper와
   `references/coach_catalog.json`을 그대로 배포합니다. 모델/엔진 구성은 기존
   Qwen3.6 FP8 vLLM 128K 설정과 지원 대안을 사용합니다.
-- NeetCode roadmap/150의 패턴 순서: Arrays & Hashing → Two Pointers →
-  Stack / Binary Search → Sliding Window. 10개 문제 + 2개 복습 슬롯이며,
-  각 문제에 ID·이름·난도·선행 문제·권장 순서·NeetCode/LeetCode URL을 저장합니다.
+- NeetCode roadmap/150의 15문제 경로는 Two Sum/HashMap → Two Pointers →
+  Sliding Window → Stack → Binary Search → Tree/BFS/DFS → Heap → Graph 순서입니다.
+  주 3회 35분 페이스에서 현재 완료·힌트·자신감·선행 패턴을 반영해 다음 단계를
+  고르며, 각 문제에 ID·이름·난도·선행 문제·권장 순서·NeetCode/LeetCode URL을 저장합니다.
 - Hello Interview: framework/요구사항/추정 → URL Shortener의 API/데이터 모델 →
   cache/queue/load balancer/DB replication → 45분 Notification System mock.
   마지막 문서의 Premium 제한을 표시하고 무료 보조 링크와 자체 과제를 제공합니다.
 - 새 cron push는 날짜별 assignment일 뿐 완료가 아닙니다. 실제 결과를 받은 후에만
   `~/.hermes/data/interview/coach_state.json`에 기록하고 커리큘럼을 진행합니다.
-  놓친 세션과 취약 복습 때문에 기본 4주 일정이 늘어날 수 있습니다.
+  놓친 세션과 취약 복습 때문에 기본 5주 일정이 늘어날 수 있습니다.
 - 코딩은 날짜·문제·패턴·시간·독립 해결 여부·최고 힌트·해설 열람·자신감·교훈·복습일을
   기록합니다. 설계는 주제·시간·요구사항/구조/trade-off/failure-mode 점수·자신감·다음
   개선점을 기록하며 점수는 1–5입니다.
 - 해설 열람/자신감 ≤2 → 2일, 힌트 2/3 또는 자신감 3 → 7일, 독립 해결/자신감 ≥4 →
-  21일. 취약 due 복습을 새 문제보다 우선하며 강한 문제는 지정 복습/통합 슬롯에서
-  다룹니다. 단, Coding 작업실에서 완료 후 명시적으로 새 과제를 요청하면 다음
-  미해결 커리큘럼 문제를 먼저 배정합니다. 설계는 최저 차원 점수/자신감으로 같은
-  간격을 적용하고 일요일에 전달합니다.
+  21일. 정기 코칭은 취약 due 복습을 새 문제보다 우선합니다. 단, Coding 작업실의
+  **작업 이어가기 · 새 문제**는 이전 문제를 절대 재배정하지 않으며, 이전 문제는
+  별도 **복습하기**에서만 고릅니다. 설계는 최저 차원 점수/자신감으로 같은 간격을
+  적용하고 일요일에 전달합니다.
 - 힌트는 관찰 → 알고리즘/자료구조 → 의사코드 순서로 요청당 하나씩 제공합니다.
   전체 해설은 3단계 이후 다시 명시적으로 요청해야 합니다.
 - Python 표준 라이브러리만 사용하며 runtime scraping/cookies/network 의존성이 없습니다.
