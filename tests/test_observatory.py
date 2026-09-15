@@ -181,6 +181,18 @@ def test_office_visually_celebrates_verified_rewards():
     assert 'CAREER CASH · GAME REWARD' in workbench
 
 
+def test_office_randomizes_short_next_action_conversations():
+    office = (Path(__file__).resolve().parents[1] /
+              'browser/observatory/office.js').read_text()
+
+    assert 'lastVisitRoom' in office
+    assert 'lastNoticeRoom' in office
+    assert 'randomItem(choices.length ? choices : leaderVisits)' in office
+    assert 'return `${action.title} · ${action.detail}`' in office
+    assert '3200 + Math.random() * 2800' in office
+    assert 'routineIndex++ % leaderVisits.length' not in office
+
+
 def test_missing_sources_are_empty_and_db_is_readonly(store):
     assert store.library('learning')['total'] == 0
     assert store.library('memory')['total'] == 0

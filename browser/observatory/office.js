@@ -47,8 +47,8 @@ window.sharedOffice = (() => {
       {point: [875, 455], label: "녹음 확인"},
     ],
   };
-  // Hermes is the only ambient walker. His visits make leadership presence
-  // legible without turning every idle specialist into background motion.
+  // Hermes is the only ambient walker. Visits are randomized so a short glance
+  // at the office does not replay the same fixed team route.
   const leaderVisits = [
     {room: "papers", point: [245, 345], label: "Iris와 연구 이야기"},
     {room: "interview", point: [455, 345], label: "Theo와 잠깐 이야기"},
@@ -98,8 +98,8 @@ window.sharedOffice = (() => {
   let officeZoom = Math.min(1.4, Math.max(0.6, Number(localRead("office-zoom", 1)) || 1));
   let previous = 0, frame = 0, roomData = [], historyRequest = 0;
   let talkTimer = 0, replyTimer = 0, followupTimer = 0, closingTimer = 0;
-  let talkTurn = 0, noticeTurn = 0;
-  let dialogueTurn = 0, ambientTurn = 0;
+  let lastVisitRoom = null, lastNoticeRoom = null;
+  let lastDialogue = null, lastAmbientRoom = null;
   const speakingRooms = new Set();
   const conversation = (room) => {
     if (!conversations.has(room))
@@ -226,7 +226,7 @@ window.sharedOffice = (() => {
         button.addEventListener("pointerleave", () => button.classList.remove("is-hovering"));
         $("walking-floor").append(button);
         actor = {node: button, x: homes[room.id][0], y: homes[room.id][1], route: [],
-          wait: room.id === "hq" ? 55 : Infinity, routineIndex: 0, visitRoom: null,
+          wait: room.id === "hq" ? 4 + Math.random() * 4 : Infinity, visitRoom: null,
           pendingPurpose: "", purpose: routines[room.id][0].label, mode: "ambient"};
         actors.set(room.id, actor);
         setPurpose(actor, actor.purpose);
@@ -351,9 +351,11 @@ window.sharedOffice = (() => {
       } else if (!held && room === "hq" && actor.mode === "ambient") {
         actor.wait -= delta;
         if (actor.wait <= 0) {
-          const visit = leaderVisits[actor.routineIndex++ % leaderVisits.length];
+          const choices = leaderVisits.filter(visit => visit.room !== lastVisitRoom && visit.room !== selected);
+          const visit = randomItem(choices.length ? choices : leaderVisits);
+          lastVisitRoom = visit.room;
           route(actor, visit.point, visit.label, visit.room === "hq" ? null : visit.room);
-          actor.wait = 115 + (actor.routineIndex % 3) * 18;
+          actor.wait = 12 + Math.random() * 12;
         }
       }
       actor.node.classList.toggle("is-walking", !held && actor.route.length > 0);
@@ -409,10 +411,11 @@ window.sharedOffice = (() => {
   }
   function notificationLine(room) {
     const data = roomData.find((item) => item.id === room);
-    if (data?.notice?.text) return `최근 알림 · ${data.notice.text}`;
+    const action = data?.action;
+    if (action) return `${action.title} · ${action.detail}`;
     const job = data && nextRoomJob(data);
-    if (job) return `다음 알림 · ${jobLabels[job.name] || job.name} ${when(job.next_run_at)}`;
-    return "최근 알림 · 아직 새 소식은 없어요.";
+    if (job) return `${jobLabels[job.name] || job.name} · ${when(job.next_run_at)}`;
+    return "다음 할 일을 같이 골라볼까요?";
   }
   function hoverNoticeLine(room) {
     const data = roomData.find((item) => item.id === room);
@@ -430,58 +433,56 @@ window.sharedOffice = (() => {
     actor.node.classList.add("is-hovering");
   }
   function speakNotification() {
-    const rooms = [...actors.keys()];
-    for (let i = 0; i < rooms.length; i++) {
-      const room = rooms[noticeTurn++ % rooms.length];
-      if (room !== selected) {
-        speak(room, notificationLine(room), 7800, "notice");
-        return;
-      }
-    }
+    const rooms = [...actors.keys()].filter(room => room !== selected && room !== lastNoticeRoom);
+    const room = randomItem(rooms.length ? rooms : [...actors.keys()].filter(item => item !== selected));
+    if (!room) return;
+    lastNoticeRoom = room;
+    speak(room, notificationLine(room), 4300, "notice");
   }
   function speakDialogue() {
-    for (let i = 0; i < dialogueScenes.length; i++) {
-      const scene = dialogueScenes[dialogueTurn++ % dialogueScenes.length];
-      if (scene[0] === selected || scene[1] === selected) continue;
-      const first = actors.get(scene[0]), second = actors.get(scene[1]);
-      if (!first || !second || Math.hypot(first.x - second.x, first.y - second.y) > 270) continue;
-      stopTalk();
-      showBubble(scene[0], scene[2], "dialogue");
-      replyTimer = setTimeout(() => showBubble(scene[1], scene[3], "dialogue"), 1700);
-      followupTimer = setTimeout(() => showBubble(scene[0], "좋아요, 핵심만 하나 더 맞춰볼까요?", "dialogue"), 3400);
-      closingTimer = setTimeout(() => showBubble(scene[1], "네, 그 정도면 다음에 이어가기 좋겠어요.", "dialogue"), 5100);
-      finishTalk(9000);
-      return;
-    }
-    speakNotification();
+    const scenes = dialogueScenes.filter(scene => scene !== lastDialogue
+      && scene[0] !== selected && scene[1] !== selected
+      && actors.has(scene[0]) && actors.has(scene[1]));
+    const scene = randomItem(scenes);
+    if (!scene) return speakNotification();
+    lastDialogue = scene;
+    stopTalk();
+    showBubble(scene[0], scene[2], "dialogue");
+    replyTimer = setTimeout(() => showBubble(scene[1], scene[3], "dialogue"), 1200);
+    followupTimer = setTimeout(() => showBubble(scene[0], notificationLine(scene[0]), "notice"), 2600);
+    closingTimer = setTimeout(() => showBubble(scene[1], notificationLine(scene[1]), "notice"), 4000);
+    finishTalk(6500);
   }
   function startLeaderSmallTalk(partner) {
     const lines = leaderSmallTalk[partner];
     if (!lines || selected || state.replay || document.hidden || state.view !== "office") return;
     stopTalk();
     showBubble("hq", lines[0], "dialogue");
-    replyTimer = setTimeout(() => showBubble(partner, lines[1], "dialogue"), 1600);
-    followupTimer = setTimeout(() => showBubble("hq", "좋아요. 너무 급하게 하진 말아요.", "dialogue"), 3200);
-    closingTimer = setTimeout(() => showBubble(partner, "네, 다음에 진행도 같이 알려드릴게요.", "dialogue"), 4800);
-    finishTalk(8800);
+    replyTimer = setTimeout(() => showBubble(partner, lines[1], "dialogue"), 1100);
+    followupTimer = setTimeout(() => showBubble(partner, notificationLine(partner), "notice"), 2400);
+    finishTalk(5200);
   }
   function speakAmbient() {
-    const rooms = [...actors.keys()].filter((room) => room !== selected);
+    const rooms = [...actors.keys()].filter((room) => room !== selected && room !== lastAmbientRoom);
     if (!rooms.length) return;
-    const room = rooms[ambientTurn++ % rooms.length];
+    const room = randomItem(rooms);
+    lastAmbientRoom = room;
     const lines = ambientLines[room];
-    speak(room, lines[ambientTurn % lines.length]);
+    speak(room, randomItem(lines), 4000);
+  }
+  function randomItem(items) {
+    return items?.length ? items[Math.floor(Math.random() * items.length)] : null;
   }
   function scheduleTalk() {
     if (talkTimer || document.hidden || state.view !== "office" || state.replay || !actors.size) return;
     talkTimer = setTimeout(() => {
       talkTimer = 0;
       if (document.hidden || state.view !== "office" || state.replay) return;
-      const event = ["dialogue", "notice", "dialogue", "ambient"][talkTurn++ % 4];
-      if (event === "notice") speakNotification();
-      else if (event === "dialogue") speakDialogue();
+      const roll = Math.random();
+      if (roll < 0.58) speakNotification();
+      else if (roll < 0.85) speakDialogue();
       else speakAmbient();
-    }, 7000 + Math.random() * 7000);
+    }, 3200 + Math.random() * 2800);
   }
   function close() {
     const last = selected;

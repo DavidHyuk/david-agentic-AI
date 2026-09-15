@@ -3,6 +3,14 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.17.1 — 2026-09-15 (patch: randomize short office interactions)
+
+- Replaced Hermes' fixed specialist visit loop with randomized visits that avoid
+  immediately repeating the previous room and begin within seconds of opening.
+- Randomized character conversations and ambient lines without immediate repeats.
+  Automatic bubbles now prioritize each room's evidence-backed next action and
+  cycle every 3.2–6 seconds so short Observatory visits show useful variation.
+
 ## v1.17.0 — 2026-09-15 (minor: add visual Career Cash rewards)
 
 - Added an evidence-backed, idempotent Career Cash ledger for completed coding,

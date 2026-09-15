@@ -936,16 +936,16 @@ separate labeled English Lounge beside Coffee Club, while Rina stands inside
 the `RINA · ON AIR` listening booth rather than alongside it. Mobile
 keeps this same room in a horizontally scrollable viewport, with named character
 shortcuts and visible next-action cards beneath it. Browser-only animation is
-intentionally sparse: idle specialists stay in their work areas, while Hermes
-makes periodic leadership rounds. Every room displays an evidence-backed next
+intentionally calm: idle specialists stay in their work areas, while Hermes
+makes randomized leadership visits that avoid immediately repeating a teammate
+and begin within seconds. Every room displays an evidence-backed next
 action such as due English reviews, unread papers, or an unfinished assignment;
 clicking it opens the matching workbench. Hidden tabs and other views suspend animation.
-Speech cycles among real recent cron-notification
-excerpts, next-schedule fallbacks, short role-specific lines, and paired agent-to-agent
-exchanges only when the pair is physically near each other. A nearby pair speaks
-first; each scene continues for four short turns, and later bubbles wait 7–14
-seconds after the previous exchange. Recent-notification bubbles come from stored assistant output and are
-visually labeled; ambient team exchanges are scripted and never presented as actual
+Automatic speech now prioritizes each character's evidence-backed next action,
+with randomized role lines and paired agent exchanges as supporting variety.
+Rooms and dialogue scenes avoid immediate repeats, and a new bubble begins about
+3.2–6 seconds after the previous exchange so a short office visit still shows
+useful activity. Ambient team exchanges are scripted and never presented as actual
 work. Selecting a character produces an immediate greeting. Passive bubbles do not
 invoke the model or play audio. Hidden views and historical replay suspend small talk.
 Hovering a character shows its most recent recorded work and David's next action
