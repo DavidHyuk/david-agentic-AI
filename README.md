@@ -959,8 +959,9 @@ MacBook view shows the same complete office; horizontal scrolling appears only
 after deliberate magnification. The mobile floor preserves workstation spacing so
 room names and character cards do not collapse into one another. On narrow containers,
 including Galaxy Fold landscape with the navigation sidebar open, compact mode
-replaces the large character cards with name pills, moves speech into one caption
-rail below the office, and renders next-action cards in two readable columns.
+replaces the large character cards with name pills, keeps smaller live speech
+bubbles attached directly above each speaking character, and renders next-action
+cards in two readable columns.
 On laptop and desktop, use the `‹` control on the sidebar edge to slide navigation
 away and let the office fill the window; `›` restores it. The preference persists
 in that browser, while the compact mobile navigation always remains available.

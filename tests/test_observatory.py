@@ -196,17 +196,18 @@ def test_office_randomizes_short_next_action_conversations():
     assert 'routineIndex++ % leaderVisits.length' not in office
 
 
-def test_fold_layout_uses_container_width_and_single_readable_caption():
+def test_fold_layout_keeps_small_bubbles_attached_to_characters():
     root = Path(__file__).resolve().parents[1] / 'browser/observatory'
     office = (root / 'office.js').read_text()
     css = (root / 'office.css').read_text()
 
-    assert 'office-compact-caption' in office
-    assert 'document.querySelector(".office-floor")?.clientWidth' in office
-    assert 'matchMedia("(max-width: 1100px)")' in office
+    assert 'class="walk-bubble" role="status" aria-live="polite"' in office
+    assert 'office-compact-caption' not in office
     assert 'container: office / inline-size' in css
     assert '@container office (max-width: 900px)' in css
     assert '.walk-name small, .walk-name i { display: none; }' in css
+    assert '.walk-bubble { max-width: 165px; padding: 6px 8px' in css
+    assert '.walk-bubble { display: none' not in css
     assert '#office-roster { grid-template-columns: repeat(2' in css
 
 

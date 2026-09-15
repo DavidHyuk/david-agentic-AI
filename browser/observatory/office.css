@@ -230,12 +230,6 @@
 .roster-action strong, .roster-action em { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .roster-action strong { color: #536e51; font-size: 10px; }
 .roster-action em { margin-top: 2px; color: #87917c; font-size: 8px; font-style: normal; }
-.office-compact-caption { display: none; margin-top: 9px; padding: 10px 13px; border: 1px solid #aab99d;
-  border-radius: 10px; background: #fffdf4; color: #354b3d; box-shadow: 0 3px 10px #33472e1c; }
-.office-compact-caption b { flex: 0 0 auto; color: #315743; font-size: 13px; }
-.office-compact-caption span { min-width: 0; font-size: 12px; line-height: 1.45; overflow-wrap: anywhere; }
-.office-compact-caption[data-kind="reward"] { border-color: #d9b84f; background: #fff6c7; }
-.office-compact-caption[hidden] { display: none !important; }
 .office-zoom-controls { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; }
 .office-zoom-controls button { min-width: 30px; padding: 6px 8px; font-size: 14px; line-height: 1; }
 .office-zoom-controls output { min-width: 42px; color: #65745f; font-size: 9px; text-align: center; }
@@ -291,8 +285,9 @@
     border-radius: 999px; text-align: center; box-shadow: 0 2px 5px #35412f25; }
   .walk-name b { font-size: 11px; line-height: 1; }
   .walk-name small, .walk-name i { display: none; }
-  .walk-bubble { display: none !important; }
-  .office-compact-caption:not([hidden]) { display: flex; align-items: center; gap: 10px; }
+  .walk-bubble { max-width: 165px; padding: 6px 8px; border-radius: 8px 8px 8px 2px;
+    font-size: 10px; line-height: 1.3; }
+  .walk-bubble:before { margin-bottom: 2px; font-size: 6px; letter-spacing: .7px; }
   #office-roster { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   #office-roster button { min-height: 88px; padding: 11px 12px; }
   #office-roster > button > b { font-size: 14px; }
@@ -335,8 +330,9 @@
 @media (max-width: 1100px) {
   .walk-name { bottom: 2px; width: auto; min-width: 54px; display: block; padding: 4px 7px; border-radius: 999px; text-align: center; }
   .walk-name b { font-size: 11px; line-height: 1; }
-  .walk-name small, .walk-name i, .walk-bubble { display: none !important; }
-  .office-compact-caption:not([hidden]) { display: flex; align-items: center; gap: 10px; }
+  .walk-name small, .walk-name i { display: none !important; }
+  .walk-bubble { max-width: 165px; padding: 6px 8px; border-radius: 8px 8px 8px 2px; font-size: 10px; line-height: 1.3; }
+  .walk-bubble:before { margin-bottom: 2px; font-size: 6px; letter-spacing: .7px; }
   #office-roster { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   #office-roster button { min-height: 88px; padding: 11px 12px; }
   .roster-action em { font-size: 10px; white-space: normal; line-height: 1.35; }

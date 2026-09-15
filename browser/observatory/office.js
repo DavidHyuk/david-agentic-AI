@@ -166,7 +166,6 @@ window.sharedOffice = (() => {
         <div class="walking-floor" id="walking-floor"></div>
         <div class="shared-floor-caption">일상 연출 <span>캐릭터를 클릭해 이야기해 보세요</span></div>
       </div></div>
-      <div class="office-compact-caption" id="office-compact-caption" role="status" aria-live="polite" hidden><b></b><span></span></div>
       <section id="office-conversation" class="office-conversation" aria-label="캐릭터 대화" hidden>
         <div class="conversation-portrait" id="conversation-portrait"></div>
         <div class="conversation-main">
@@ -256,7 +255,7 @@ window.sharedOffice = (() => {
         const button = document.createElement("button");
         button.className = "walking-agent";
         button.dataset.room = room.id;
-        button.innerHTML = `<span class="walk-bubble" aria-hidden="true"></span>${sprite(room.id)}<span class="walk-name"><b>${officeCast[room.id].name}</b><small class="walk-purpose"></small><i></i></span>`;
+        button.innerHTML = `<span class="walk-bubble" role="status" aria-live="polite"></span>${sprite(room.id)}<span class="walk-name"><b>${officeCast[room.id].name}</b><small class="walk-purpose"></small><i></i></span>`;
         button.onclick = () => select(room.id);
         button.addEventListener("pointerenter", () => showHoverNotice(room.id));
         button.addEventListener("pointerleave", () => button.classList.remove("is-hovering"));
@@ -424,11 +423,6 @@ window.sharedOffice = (() => {
     closingTimer = 0;
     for (const room of speakingRooms) actors.get(room)?.node.classList.remove("is-speaking");
     speakingRooms.clear();
-    if ($("office-compact-caption")) $("office-compact-caption").hidden = true;
-  }
-  function compactOffice() {
-    const floorWidth = document.querySelector(".office-floor")?.clientWidth || innerWidth;
-    return floorWidth <= 900 || matchMedia("(max-width: 1100px)").matches;
   }
   function showBubble(room, text, kind) {
     const actor = actors.get(room);
@@ -438,17 +432,6 @@ window.sharedOffice = (() => {
     bubble.dataset.kind = kind;
     actor.node.classList.add("is-speaking");
     speakingRooms.add(room);
-    const caption = $("office-compact-caption");
-    if (caption && compactOffice()) {
-      for (const other of speakingRooms)
-        if (other !== room) actors.get(other)?.node.classList.remove("is-speaking");
-      speakingRooms.clear();
-      speakingRooms.add(room);
-      caption.querySelector("b").textContent = officeCast[room]?.name || room;
-      caption.querySelector("span").textContent = text;
-      caption.dataset.kind = kind;
-      caption.hidden = false;
-    }
     return true;
   }
   function finishTalk(duration) {

@@ -3,6 +3,13 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.18.1 — 2026-09-15 (patch: restore in-scene bubbles on small screens)
+
+- Restored speech bubbles directly above their speaking characters in compact
+  laptop and Galaxy Fold layouts instead of redirecting dialogue to a caption rail.
+- Reduced compact bubble width, padding, labels, and type while retaining live
+  status semantics, keeping dialogue visually attributable without large overlays.
+
 ## v1.18.0 — 2026-09-15 (minor: add collapsible responsive sidebar)
 
 - Added an accessible `‹`/`›` control that slides the desktop or laptop sidebar
