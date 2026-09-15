@@ -88,8 +88,9 @@ window.sharedOffice = (() => {
     "coding-coach": "코딩 훈련", "system-design-coach": "시스템 디자인 훈련",
     "weekly-review": "주간 리뷰", "english-intake": "영어 피드백",
     "english-drill": "영어 복습", "english-weekly-review": "영어 주간 리뷰",
-    "english-podcast-daily": "팟캐스트 영어",
+    "english-podcast-daily": "팟캐스트 영어", "career-rewards-daily": "오늘의 보상",
   };
+  const rewardRooms = {coding: "coding", design: "design", english: "english", paper: "papers", weekly: "hq", combo: "hq"};
   const actors = new Map();
   const conversations = new Map();
   const reduced = matchMedia("(prefers-reduced-motion: reduce)");
@@ -116,6 +117,8 @@ window.sharedOffice = (() => {
     $("rooms").innerHTML = `<div class="office-viewport" tabindex="0" aria-label="큰 사무실. 작은 화면에서는 좌우로 스크롤할 수 있습니다.">
       <div class="shared-floor">
         <div class="back-wall" aria-hidden="true"><div class="wide-window"></div><span>HERMES<br><small>IDEAS LIVE HERE</small></span><div class="wide-window"></div></div>
+        <div class="reward-hud" id="reward-hud" hidden><span class="reward-wallet">$<b id="reward-balance">0</b></span><div><small id="reward-streak">TODAY'S MISSION</small><strong id="reward-offer">첫 보상을 준비 중</strong><i><em id="reward-progress"></em></i></div></div>
+        <div class="reward-shower" id="reward-shower" aria-hidden="true"></div>
         <div class="floor-sign">THE STUDIO <span>↙ LOUNGE · COFFEE ↗</span></div>
         <div class="wall-board research-board" aria-hidden="true"><b>RESEARCH PULSE</b><i></i><i></i><i></i></div>
         <div class="wall-board systems-board" aria-hidden="true"><b>SYSTEM MAP</b><i></i><i></i><i></i></div>
@@ -207,7 +210,7 @@ window.sharedOffice = (() => {
     if (persist) localWrite("office-zoom", officeZoom);
   }
 
-  function render(rooms) {
+  function render(rooms, rewards = null) {
     roomData = rooms;
     if (!$("walking-floor")) build();
     for (const room of rooms) {
@@ -244,6 +247,7 @@ window.sharedOffice = (() => {
     }
     // Stable actor nodes retain positions, keyboard focus and animation on polling.
     renderUserActions(rooms);
+    renderRewards(rewards);
     $("office-roster").innerHTML = rooms.map(room => {
       const action = room.action || {title: "다음 행동", detail: "작업실 열기"};
       return `<button class="outline" data-cast="${esc(room.id)}"><b>${esc(officeCast[room.id]?.name || room.title)}</b><small>${esc(room.subtitle)}</small><span class="roster-action"><strong>${esc(action.title)}</strong><em>${esc(action.detail)}</em></span></button>`;
@@ -252,6 +256,43 @@ window.sharedOffice = (() => {
       button.onclick = () => officeCast[button.dataset.cast] ? select(button.dataset.cast) : openWorkbench(button.dataset.cast);
     });
     visibility();
+  }
+  function renderRewards(rewards) {
+    const hud = $("reward-hud");
+    if (!hud || !rewards || rewards.available === false) {
+      if (hud) hud.hidden = true;
+      return;
+    }
+    hud.hidden = false;
+    const balance = Number(rewards.balance || 0);
+    $("reward-balance").textContent = balance.toLocaleString();
+    $("reward-streak").textContent = `CAREER CASH · 🔥 ${Number(rewards.streak || 0)} DAY`;
+    $("reward-offer").textContent = rewards.next_offer
+      ? `${rewards.next_offer.label} · $${rewards.next_offer.remaining} 남음`
+      : "ALL VIRTUAL OFFERS UNLOCKED";
+    const threshold = Number(rewards.next_offer?.threshold || balance || 1);
+    $("reward-progress").style.width = `${Math.min(100, balance / threshold * 100)}%`;
+    const previousBalance = Number(localRead("career-cash-seen", 0) || 0);
+    if (balance > previousBalance) celebrateReward(rewards, balance - previousBalance);
+    localWrite("career-cash-seen", balance);
+  }
+  function celebrateReward(rewards, earned) {
+    const latest = (rewards.recent || []).find(item => item.kind === "activity") || rewards.recent?.[0];
+    const room = rewardRooms[latest?.category] || "hq";
+    const actor = actors.get(room), leader = actors.get("hq");
+    const shower = $("reward-shower"), floor = document.querySelector(".shared-floor");
+    if (shower) shower.innerHTML = Array.from({length: 14}, (_, index) => `<i style="--coin:${index}">$</i>`).join("");
+    floor?.classList.add("reward-party");
+    actor?.node.classList.add("rewarding");
+    stopTalk();
+    showBubble(room, `미션 완료! Career Cash +$${earned} 🎉`, "reward");
+    if (room !== "hq") replyTimer = setTimeout(() => showBubble("hq", `잘했어요 David! 잔액 $${Number(rewards.balance).toLocaleString()} · 다음 오퍼를 향해 가죠.`, "reward"), 1800);
+    finishTalk(8500);
+    setTimeout(() => {
+      floor?.classList.remove("reward-party");
+      actor?.node.classList.remove("rewarding");
+      if (shower) shower.replaceChildren();
+    }, 8200);
   }
   function renderUserActions(rooms) {
     const byId = new Map(rooms.map(room => [room.id, room]));

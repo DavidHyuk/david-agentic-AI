@@ -145,6 +145,15 @@ jobs:
       question, and one measurable focus for next week. Do not invent teacher
       corrections. This is a standalone weekly review, not a daily intake message.
 
+  - name: career-rewards-daily
+    schedule: "25 21 * * *"         # 21:25 daily, after all study notifications
+    prompt: >
+      Run python3 ~/.hermes/scripts/reward_system.py notify and return its output
+      exactly as the final response. Do not invent completions, money, job offers,
+      or extra praise. Career Cash and recruiter offer cards are explicitly
+      motivational game rewards with no monetary value and are never real hiring
+      contact. If the helper returns [SILENT], reply only [SILENT].
+
   - name: weekly-review
     schedule: "5 18 * * 0"          # 18:05 Sunday
     skills: [papers-digest, interview-prep]

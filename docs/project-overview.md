@@ -87,6 +87,7 @@ David-Agent/
 │   ├── english_podcast.py     # 일일 영상 선택 + YouTube 자막/대본 저장
 │   ├── agenda.py              # 캘린더 이벤트 포맷팅 + 충돌 감지
 │   ├── cron_health.py         # cron tick lock / jobs.json 건강 검사 (+ 선택적 gateway restart)
+│   ├── reward_system.py       # 실제 완료 증거 → Career Cash·연속 달성·가상 오퍼
 │   ├── observatory.py         # 기록·학습·Kanban orchestration API + 관제실
 │   └── wait_for_vllm.py       # gateway 시작 전 /v1/models readiness gate
 │
@@ -139,7 +140,7 @@ David-Agent/
 │   ├── Qwen/                  # Qwen 계열 모델
 │   └── MiniMax/               # MiniMax-M2.7 모델
 │
-├── tests/                     # pytest 테스트 (304개)
+├── tests/                     # pytest 테스트 (312개)
 │   ├── conftest.py
 │   ├── test_papers_ingest.py
 │   ├── test_papers_digest.py
@@ -220,10 +221,11 @@ history/search·알림 제어의 이점이 있으면 같은 bot을 별도 Telegr
 | `english_podcast.py` | 최신 미학습 영상 일일 배정, 영문 JSON3 자막 및 타임스탬프 대본 저장, 전달 상태 관리 |
 | `agenda.py` | 캘린더 이벤트 포맷팅 + 충돌·여유 슬롯 감지 |
 | `cron_health.py` | cron tick lock·stale·마지막 실행 실패와 David Observatory API 응답 정지 감지, profile별 단발 재시도와 gateway 복구 |
+| `reward_system.py` | 코딩·설계·영어 SRS·논문 완료 증거를 멱등 Career Cash ledger와 일일/주간 미션으로 변환 |
 | `wait_for_vllm.py` | 지정한 served model이 `/v1/models`에 나타날 때까지 gateway 시작 대기 |
 
 ### 5. `cron/jobs.yaml` — 선언형 스케줄
-9개의 Telegram 알림 잡과 무전송 LeetCode 동기화 잡이 YAML로 선언되어 있습니다.
+10개의 Telegram 알림 잡과 무전송 LeetCode 동기화 잡이 YAML로 선언되어 있습니다.
 Calendar 연동을 재개할 때까지 `morning-brief`는 등록하지 않습니다.
 
 | 잡 | 시간 | 내용 |
@@ -237,6 +239,7 @@ Calendar 연동을 재개할 때까지 `morning-brief`는 등록하지 않습니
 | `english-intake` | 월–토 20:05 | English bot: 새 피드백 분석 또는 취약 패턴 코칭 |
 | `english-drill` | 21:10 매일 | English bot: SRS 드릴 전달 |
 | `english-weekly-review` | 일요일 20:15 | English bot: tutor feedback + 취약 SRS 누적 복습 |
+| `career-rewards-daily` | 매일 21:25 | David bot: 새 Career Cash가 있을 때만 잔액·연속 달성·주간 진척 요약 |
 | `weekly-review` | 18:05 일요일 | David bot: 논문 + MLE coverage + 코딩/설계 실측 진도·다음 주 집중 영역 |
 
 Podcast 알림은 daily content feed이므로 기존 English bot을 유지하면서 Podcast
@@ -519,6 +522,22 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
 - 일요일 18시 보고서는 월요일부터의 완료 세션, 신규/복습, 평균 시간, 힌트/해설 사용,
   최신 취약 패턴, 설계 주제, 최저 설계 차원과 다음 주 집중 영역을 논문 리뷰에 합칩니다.
   CLI 배포/기록 예시는 README의 Interview study coach 절을 참조합니다.
+
+### Career Cash 보상 UX
+
+- 코딩 `$30`, 시스템 설계 `$45`, 영어 SRS 수행일 `$10`, 논문 완독 `$20`을
+  기존 완료 데이터에서만 지급합니다. 하루 한 영역이면 일일 미션 완료, 서로
+  다른 두 영역이면 `$15` 콤보입니다.
+- 주간 미션은 코딩 3회·설계 1회·영어 3일·논문 1편이며 모두 충족하면 `$150`을
+  지급합니다. ledger ID와 파일 잠금/atomic replace로 중복 지급하지 않습니다.
+- 오피스 중앙 HUD에는 잔액·연속 달성·다음 가상 오퍼 진행률이 표시됩니다.
+  새 보상은 담당 캐릭터의 점프와 코인 샤워, 담당 캐릭터→Hermes 축하 말풍선으로
+  시각화되며 모션 감소 설정에서는 장식 애니메이션을 멈춥니다.
+- `$250/$500/$1000/$2000`에 recruiter/onsite/offer 테마의 게임 카드가 열리지만
+  실제 현금이나 채용 연락이 아님을 UI와 Telegram에 항상 표시합니다.
+- 여러 학습 room의 완료를 합치는 낮은 빈도의 HQ 요약이므로 기존 David profile,
+  private Telegram, Hermes HQ room을 재사용합니다. 새 profile·gateway·bot·빈 room은
+  만들지 않았고 21:25에 새 보상이 있을 때만 한 번 알립니다.
 
 ### 실시간 트렌드 수집 (interview_trends.py)
 - **HN Algolia API**: 포인트 임계값 + 최신 윈도우로 고품질 ML 인터뷰 담론 수집

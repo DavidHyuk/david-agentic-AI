@@ -12,6 +12,7 @@ EXPECTED_JOBS = {
     "papers-digest", "interview-prep", "english-intake", "english-drill",
     "english-weekly-review", "english-podcast-daily", "weekly-review",
     "leetcode-history-sync",
+    "career-rewards-daily",
 }
 
 
@@ -112,6 +113,16 @@ def test_scheduled_coding_assigns_new_work_and_only_suggests_review():
     assert "plan coding --next" in prompt
     assert "never create a review assignment" in prompt
     assert "suggest the separate workbench Review button" in prompt
+
+
+def test_reward_digest_is_staggered_and_never_claims_real_money_or_offers():
+    jobs = {job["name"]: job for job in rc.load_jobs(JOBS)}
+    reward = jobs["career-rewards-daily"]
+
+    assert reward["schedule"] == "25 21 * * *"
+    assert reward["deliver"] == "telegram"
+    assert "reward_system.py notify" in reward["prompt"]
+    assert "no monetary value" in reward["prompt"]
 
 
 def test_env_file_loader_supports_export_and_quotes(tmp_path):

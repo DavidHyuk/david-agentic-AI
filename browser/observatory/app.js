@@ -234,7 +234,7 @@ function drawOverview() {
         `<div class="team-item" title="${esc(`gateway 보고 시각: ${when(p.updated_at)}`)}"><span class="dot ${p.alive ? "on" : ""}"></span>${esc(p.profile === "david" ? "David / Hermes" : p.profile)}<small>${p.alive ? (p.active_agents ? `작업 ${p.active_agents}개` : "대기") : "확인 필요"}</small></div>`,
     )
     .join("");
-  window.sharedOffice.render(d.rooms);
+  window.sharedOffice.render(d.rooms, d.rewards);
   $("recent").innerHTML =
     d.recent
       .slice(0, 7)

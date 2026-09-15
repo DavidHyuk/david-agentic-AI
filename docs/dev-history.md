@@ -3,6 +3,21 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.17.0 — 2026-09-15 (minor: add visual Career Cash rewards)
+
+- Added an evidence-backed, idempotent Career Cash ledger for completed coding,
+  system-design, English SRS, and paper-reading activity. Daily activity, cross-area
+  combos, streaks, and a four-part weekly mission produce deterministic rewards.
+- Added clearly fictional Big Tech recruiter/offer unlock cards at cumulative
+  milestones. Web and Telegram state that these are game rewards, never money or
+  real hiring contact.
+- Added an HQ reward dashboard and an office HUD with balance, streak, weekly
+  progress, next-offer progress, coin shower, character jump, and coach-to-Hermes
+  celebration bubbles. Reduced-motion preferences still disable decoration.
+- Added a staggered 21:25 daily reward digest through the existing David bot. It
+  stays silent without new earnings and reuses Hermes HQ rather than adding a new
+  profile, gateway, bot, chat, or empty Observatory room.
+
 ## v1.16.9 — 2026-09-15 (patch: isolate new work from reviews and stagger jobs)
 
 - Fixed the Coding workbench to keep its default surface on the latest unfinished

@@ -121,6 +121,13 @@ def test_overview_exposes_actual_cron_response_as_room_notice(store):
     assert coding['action']['title'] == '코딩 과제'
 
 
+def test_reward_digest_routes_to_existing_hq_room():
+    jobs = [{"id": "reward", "name": "career-rewards-daily"}]
+    prompt = "Run reward_system.py notify for Career Cash."
+
+    assert room_for("david", "cron_reward_20260915", prompt, jobs) == "hq"
+
+
 def test_coding_workbench_exposes_only_safe_leetcode_snapshot(store):
     path = store.home / 'data/interview/leetcode_history.json'
     path.parent.mkdir(parents=True)
@@ -159,6 +166,19 @@ def test_completion_lesson_display_preserves_saved_line_breaks():
     css = (root / 'workbench.css').read_text()
     assert '.completion-lesson' in css
     assert 'white-space: pre-wrap' in css
+
+
+def test_office_visually_celebrates_verified_rewards():
+    root = Path(__file__).resolve().parents[1] / 'browser/observatory'
+    office = (root / 'office.js').read_text()
+    office_css = (root / 'office.css').read_text()
+    workbench = (root / 'workbench.js').read_text()
+
+    assert 'reward-hud' in office
+    assert 'celebrateReward' in office
+    assert 'REWARD UNLOCKED' in office_css
+    assert '@keyframes reward-coin' in office_css
+    assert 'CAREER CASH · GAME REWARD' in workbench
 
 
 def test_missing_sources_are_empty_and_db_is_readonly(store):
@@ -499,7 +519,10 @@ def test_plan_feedback_and_retries_use_shared_coach_rules(study_store):
                             'lesson': 'Used a set, checked empty input.'}}
     response = study_store.study_action(request)
     assert response['result']['hint_level'] == 2
-    assert study_store.study_action(request) == response
+    assert response['reward']['earned'] == 30
+    repeated = study_store.study_action(request)
+    assert repeated['result'] == response['result']
+    assert repeated['reward']['earned'] == 0
     state = study_store.coach_state()
     assert len(state['coding']) == 1
     assert not study_store.workbench('coding')['pending']

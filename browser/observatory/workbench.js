@@ -92,6 +92,8 @@ async function deskAction(body, success = "저장했습니다.") {
     if (body.action === "plan")
       bench.focusAssignment = body.mode === "review" ? result.result?.id : null;
     if (body.action === "feedback") bench.focusAssignment = null;
+    if (result.reward?.earned)
+      success = `Career Cash +$${result.reward.earned} · 잔액 $${result.reward.balance}`;
     if (room === bench.room) {
       await loadWorkbench();
       $("bench-status").textContent = success;
@@ -223,8 +225,13 @@ function missionCard(task) {
 }
 function hqDesk(d) {
   const o = d.orchestration;
+  const rewards = d.rewards || {};
+  const weekly = rewards.weekly || { counts: {}, goals: {} };
+  const rewardCard = rewards.available === false
+    ? '<article class="desk-card reward-card"><span class="tag">CAREER CASH</span><h2>보상 기록을 준비하지 못했습니다</h2></article>'
+    : `<article class="desk-card reward-card"><div><span class="tag">CAREER CASH · GAME REWARD</span><h2>$${Number(rewards.balance || 0).toLocaleString()}</h2><p>🔥 연속 ${Number(rewards.streak || 0)}일 · ${rewards.today?.cleared ? "오늘 미션 완료" : "오늘 첫 미션 대기"}</p></div><div class="reward-week"><b>이번 주 미션</b>${Object.entries(weekly.goals).map(([key, goal]) => `<span>${esc({coding:"코딩",design:"설계",english:"영어",paper:"논문"}[key] || key)} <strong>${Math.min(Number(weekly.counts[key] || 0), goal)}/${goal}</strong></span>`).join("")}</div><div class="reward-next">${rewards.unlocks?.length ? `<small>최근 해금한 가상 오퍼</small><b>🏆 ${esc(rewards.unlocks.at(-1).label)}</b>` : rewards.next_offer ? `<small>다음 가상 오퍼</small><b>🔒 ${esc(rewards.next_offer.label)}</b>` : ""}${rewards.next_offer ? `<span>$${Number(rewards.next_offer.remaining)} 남음</span>` : ""}</div><small class="reward-disclaimer">실제 현금이나 채용 제안이 아닌 동기부여용 게임 보상입니다.</small></article>`;
   if (!o.available)
-    return `<article class="desk-card mission-command"><span class="tag">COMMAND CENTER</span><h2>오케스트레이션을 준비할 수 없습니다</h2><p>${esc(o.error)}</p></article>`;
+    return rewardCard + `<article class="desk-card mission-command"><span class="tag">COMMAND CENTER</span><h2>오케스트레이션을 준비할 수 없습니다</h2><p>${esc(o.error)}</p></article>`;
   const columns = [
     ["triage", "접수"],
     ["todo,ready,scheduled", "계획 · 대기"],
@@ -233,7 +240,7 @@ function hqDesk(d) {
     ["done", "완료"],
   ];
   const draft = localRead("hermes-mission-draft", {});
-  return `<article class="desk-card mission-command"><span class="tag">COMMAND CENTER · ${esc(o.board)}</span><h2>HQ에 목표 맡기기</h2><p>목표를 접수하면 HQ가 전문 에이전트별 작업과 의존관계로 나누고 결과를 다시 종합합니다. 제출 즉시 실제 에이전트 실행 대기열에 들어갑니다.</p><form id="mission-form"><label class="desk-field">달성할 목표<input name="goal" maxlength="200" required placeholder="예: 이번 주 Anthropic MLE 면접 준비 계획과 연습 자료를 만들어줘" value="${esc(draft.goal || "")}"></label><label class="desk-field">배경·제약·원하는 결과<textarea name="context" maxlength="4000" rows="5" placeholder="마감, 지원 회사, 산출물 형태, 이미 시도한 내용 등을 적어주세요.">${esc(draft.context || "")}</textarea></label><label class="desk-field compact-field">우선순위<select name="priority"><option value="80" ${draft.priority === "80" ? "selected" : ""}>높음</option><option value="50" ${!draft.priority || draft.priority === "50" ? "selected" : ""}>보통</option><option value="20" ${draft.priority === "20" ? "selected" : ""}>낮음</option></select></label><button class="primary">계획 · 실행 시작</button></form></article>
+  return rewardCard + `<article class="desk-card mission-command"><span class="tag">COMMAND CENTER · ${esc(o.board)}</span><h2>HQ에 목표 맡기기</h2><p>목표를 접수하면 HQ가 전문 에이전트별 작업과 의존관계로 나누고 결과를 다시 종합합니다. 제출 즉시 실제 에이전트 실행 대기열에 들어갑니다.</p><form id="mission-form"><label class="desk-field">달성할 목표<input name="goal" maxlength="200" required placeholder="예: 이번 주 Anthropic MLE 면접 준비 계획과 연습 자료를 만들어줘" value="${esc(draft.goal || "")}"></label><label class="desk-field">배경·제약·원하는 결과<textarea name="context" maxlength="4000" rows="5" placeholder="마감, 지원 회사, 산출물 형태, 이미 시도한 내용 등을 적어주세요.">${esc(draft.context || "")}</textarea></label><label class="desk-field compact-field">우선순위<select name="priority"><option value="80" ${draft.priority === "80" ? "selected" : ""}>높음</option><option value="50" ${!draft.priority || draft.priority === "50" ? "selected" : ""}>보통</option><option value="20" ${draft.priority === "20" ? "selected" : ""}>낮음</option></select></label><button class="primary">계획 · 실행 시작</button></form></article>
     <article class="desk-card"><div class="mission-heading"><div><span class="tag">LIVE MISSION BOARD</span><h2>에이전트 작업 흐름</h2></div><span class="dispatcher ${o.dispatcher_alive ? "on" : ""}">● ${o.dispatcher_alive ? "Dispatcher online" : "Dispatcher offline"}</span></div><div class="agent-roster">${o.assignees.map((a) => `<span>${esc(roomIcon(a.room))} ${esc(a.name)} <small>${Object.values(a.counts || {}).reduce((sum, n) => sum + n, 0)}</small></span>`).join("")}</div><div class="mission-board">${columns
       .map(([keys, title]) => {
         const statuses = keys.split(","),

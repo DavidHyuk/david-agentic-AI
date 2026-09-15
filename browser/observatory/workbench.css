@@ -49,6 +49,23 @@
 .mission {
   border-top: 4px solid #b5c99a;
 }
+.reward-card {
+  position: relative; display: grid; grid-template-columns: 1.1fr 1.4fr 1fr;
+  gap: 18px; overflow: hidden; color: #173f32;
+  background: linear-gradient(125deg, #fff9d8, #e5f3cf 55%, #d7ece8);
+  border-color: #d5b95f; box-shadow: inset 0 0 0 2px #fff9cf, 0 8px 22px #85702c1f;
+}
+.reward-card:after { content: "$"; position: absolute; right: 2%; bottom: -35px; color: #e0c46138; font: 130px Georgia, serif; }
+.reward-card h2 { margin: 8px 0 4px; color: #866816; font-size: 42px; }
+.reward-week { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; align-content: center; }
+.reward-week > b { grid-column: 1 / -1; }
+.reward-week span { padding: 7px 9px; border-radius: 8px; background: #fffdf0b5; font-size: 11px; }
+.reward-week strong { float: right; color: #4d7455; }
+.reward-next { align-self: center; position: relative; z-index: 1; }
+.reward-next small, .reward-next b, .reward-next span { display: block; }
+.reward-next b { margin: 5px 0; font: 18px Georgia, serif; }
+.reward-disclaimer { grid-column: 1 / -1; color: #7c806d; }
+@media (max-width: 700px) { .reward-card { grid-template-columns: 1fr; } .reward-disclaimer { grid-column: auto; } }
 .desk-tags,
 .desk-actions {
   display: flex;

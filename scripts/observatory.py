@@ -45,7 +45,7 @@ JOB_ROOMS = {'papers-digest': 'papers', 'interview-prep': 'interview',
              'coding-coach': 'coding', 'leetcode-history-sync': 'coding', 'system-design-coach': 'design',
              'weekly-review': 'hq', 'english-intake': 'english',
              'english-drill': 'english', 'english-weekly-review': 'english',
-             'english-podcast-daily': 'podcast'}
+             'english-podcast-daily': 'podcast', 'career-rewards-daily': 'hq'}
 ROOM_PROFILES = {'hq': 'david', 'podcast': 'english'}
 SECRET_KEY = re.compile(r'(token|secret|password|api[_-]?key|authorization|cookie|credential)', re.I)
 TASK_ID = re.compile(r't_[0-9a-f]{8}')
@@ -217,6 +217,17 @@ class Observatory:
         return read_json(self.home / 'data/observatory/workspace.json',
                          {'revision': 0, 'notes': {}, 'papers': {}, 'events': []})
 
+    def reward_status(self):
+        """Return Career Cash derived only from verified local progress."""
+        try:
+            return self.helper('reward_system.py', [
+                '--home', str(self.home), '--date', datetime.now(TZ).date().isoformat(),
+                'status',
+            ])
+        except (OSError, ValueError, subprocess.SubprocessError) as exc:
+            return {'available': False, 'error': type(exc).__name__, 'balance': 0,
+                    'streak': 0, 'recent': [], 'unlocks': [], 'next_offer': None}
+
     def pending_assignments(self):
         state = self.coach_state()
         latest = {}
@@ -303,6 +314,7 @@ class Observatory:
             data['reading_count'] = sum(not p.get('read') for p in notebook['papers'].values())
             data['events'] = list(reversed(notebook['events']))[:20]
             data['orchestration'] = self.orchestration()
+            data['rewards'] = self.reward_status()
         elif room == 'interview':
             data['drill'] = ''
             for session in history['items']:
@@ -630,7 +642,9 @@ class Observatory:
                     for key in ('requirements', 'architecture', 'trade_off', 'failure_mode'):
                         args += ['--' + key.replace('_', '-') + '-score', integer(key + '_score', 5)]
                     args += ['--next-improvement', self.text_field(feedback, 'next_improvement')]
-            return {'saved': True, 'result': self.helper('interview_progress.py', args)}
+            result = self.helper('interview_progress.py', args)
+            return {'saved': True, 'result': result,
+                    'reward': self.reward_status() if action == 'feedback' else None}
         if action == 'srs_review':
             if body.get('result') not in ('correct', 'wrong') or type(body.get('expected_reviews')) is not int:
                 raise ValueError('카드 결과와 현재 복습 횟수가 필요합니다.')
@@ -638,12 +652,16 @@ class Observatory:
             deck = read_json(self.home / 'data/english/srs_deck.json', {'cards': {}})
             if not isinstance(card, str) or card not in deck['cards']:
                 raise ValueError('카드를 찾을 수 없습니다.')
-            return {'saved': True, 'result': self.helper('english_srs.py', [
+            result = self.helper('english_srs.py', [
                 '--deck', str(self.home / 'data/english/srs_deck.json'), '--date', today,
                 'review', '--id', card, '--result', body['result'],
-                '--expected-reviews', str(body['expected_reviews'])])}
+                '--expected-reviews', str(body['expected_reviews'])])
+            return {'saved': True, 'result': result, 'reward': self.reward_status()}
         if action in ('note', 'bookmark', 'paper_read'):
-            return self.save_notebook(body)
+            result = self.save_notebook(body)
+            if action == 'paper_read' and body.get('read') is True:
+                result['reward'] = self.reward_status()
+            return result
         if action == 'room_chat':
             return self.room_chat(body)
         if action == 'office_chat':
@@ -1010,6 +1028,7 @@ class Observatory:
         today = datetime.now(TZ).strftime('%Y-%m-%d')
         today_start, _ = date_range(today)
         return {'now': time.time(), 'timezone': str(TZ), 'profiles': profiles, 'jobs': jobs,
+                'rewards': self.reward_status(),
                 'rooms': rooms, 'total_sessions': sessions['total'],
                 'today_sessions': sum(s['started_at'] >= today_start for s in sessions['items']),
                 'total_messages': sum(s['message_count'] or 0 for s in sessions['items']),

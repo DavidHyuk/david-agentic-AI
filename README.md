@@ -73,6 +73,7 @@ Local DGX Spark (vLLM @ :8003, Qwen3.6 FP8, 128K ctx)
 | `scripts/papers_ingest.py` | Fetch and merge arXiv/Hugging Face paper metadata |
 | `scripts/papers_digest.py` | Read-only recommended/recent/trending paper digest |
 | `scripts/interview_progress.py` | Concrete study messages, feedback, hints, adaptive reviews, weekly metrics |
+| `scripts/reward_system.py` | Evidence-backed Career Cash, streaks, weekly missions, and virtual offer unlocks |
 | `scripts/leetcode_sync.py` | Owner-only LeetCode session link and read-only solved-history snapshot |
 | `skills/career/interview-prep/references/coach_catalog.json` | Curated NeetCode/LeetCode problems and Hello Interview lessons |
 | `skills/career/interview-prep/references/company-coding-strategy.md` | Company-aware LeetCode/practical-coding preparation strategy |
@@ -542,6 +543,7 @@ coding, and system-design progress.
 | `english-intake` | 20:05 Mon–Sat | Dedicated English bot: feedback analysis or weakness coaching |
 | `english-drill` | 21:10 daily | Dedicated English bot: tonight's spaced-repetition drill |
 | `english-weekly-review` | 20:15 Sunday | Dedicated English bot: tutor feedback + weak SRS cumulative review |
+| `career-rewards-daily` | 21:25 daily | Main David bot: newly earned Career Cash and weekly progress |
 | `weekly-review` | 18:05 Sunday | Main David bot: papers + MLE coverage + coding/design progress and next focus |
 
 ### Interview study coach
@@ -600,6 +602,27 @@ counts, weak patterns, average session minutes (including unsuccessful attempts)
 hint usage, solutions viewed, design topics and weakest dimension, and next
 week's focus, alongside papers and MLE coverage. Reports cover local Monday
 through the requested date; unknown scores remain unknown.
+
+### Career Cash rewards
+
+Verified study activity earns motivational **Career Cash**: coding `$30`, system
+design `$45`, an English SRS day `$10`, and a completed paper `$20`. Completing
+any one is the daily mission; completing two different categories on the same day
+adds a `$15` combo. The weekly mission is 3 coding sessions, 1 design session,
+3 English practice days, and 1 read paper, with a `$150` clear bonus. Assignments,
+agent messages, and reminders do not count until David records the actual result.
+
+The office shows the wallet, streak, weekly checklist, next unlock progress, coin
+animation, and a celebration from the relevant character followed by Hermes.
+At cumulative `$250/$500/$1000/$2000`, fictional recruiter/offer cards unlock.
+They are game achievements—not cash, hiring contact, or real offers. HQ owns this
+cross-room workflow, so the existing David profile, private Telegram chat, and
+Hermes HQ room are reused. The 21:25 digest stays silent without new rewards.
+
+```bash
+python3 ~/.hermes/scripts/reward_system.py status
+python3 ~/.hermes/scripts/reward_system.py notify
+```
 
 Stage and register using the existing bootstrap:
 
