@@ -125,6 +125,7 @@ window.sharedOffice = (() => {
   let lastVisitRoom = null, lastNoticeRoom = null;
   let lastDialogue = null, lastAmbientRoom = null;
   let visitDeck = [];
+  let officeResizeObserver = null;
   const lastLeaderTalk = new Map();
   const speakingRooms = new Set();
   const conversation = (room) => {
@@ -140,7 +141,7 @@ window.sharedOffice = (() => {
   };
 
   function build() {
-    $("rooms").innerHTML = `<div class="office-viewport" tabindex="0" aria-label="큰 사무실. 작은 화면에서는 좌우로 스크롤할 수 있습니다.">
+    $("rooms").innerHTML = `<div class="office-viewport" tabindex="0" aria-label="창 너비에 맞춘 사무실. 직접 확대하면 좌우로 스크롤할 수 있습니다.">
       <div class="shared-floor">
         <div class="back-wall" aria-hidden="true"><div class="wide-window"></div><span>HERMES<br><small>IDEAS LIVE HERE</small></span><div class="wide-window"></div></div>
         <div class="reward-hud" id="reward-hud" hidden><span class="reward-wallet">$<b id="reward-balance">0</b></span><div><small id="reward-streak">TODAY'S MISSION</small><strong id="reward-offer">첫 보상을 준비 중</strong><i><em id="reward-progress"></em></i></div></div>
@@ -220,17 +221,25 @@ window.sharedOffice = (() => {
     viewport.addEventListener("touchend", finishPinch, {passive: true});
     viewport.addEventListener("touchcancel", finishPinch, {passive: true});
     setOfficeZoom(officeZoom, null, false);
+    officeResizeObserver?.disconnect();
+    officeResizeObserver = new ResizeObserver(() => setOfficeZoom(officeZoom, null, false));
+    officeResizeObserver.observe(viewport);
   }
 
   function setOfficeZoom(value, focusX = null, persist = true) {
     const viewport = document.querySelector(".office-viewport"), floor = document.querySelector(".shared-floor");
     if (!viewport || !floor) return;
-    const previousZoom = officeZoom;
+    const previousScale = Number(floor.dataset.scale) || 1;
     officeZoom = Math.round(Math.min(1.4, Math.max(0.6, value)) * 20) / 20;
     const center = focusX ?? viewport.clientWidth / 2;
-    const contentPoint = (viewport.scrollLeft + center) / previousZoom;
-    floor.style.zoom = String(officeZoom);
-    viewport.scrollLeft = Math.max(0, contentPoint * officeZoom - center);
+    const contentPoint = (viewport.scrollLeft + center) / previousScale;
+    const floorWidth = Math.max(780, viewport.clientWidth);
+    const fitScale = Math.min(1, viewport.clientWidth / floorWidth);
+    const scale = Math.round(fitScale * officeZoom * 1000) / 1000;
+    floor.style.width = floorWidth + "px";
+    floor.style.zoom = String(scale);
+    floor.dataset.scale = String(scale);
+    viewport.scrollLeft = Math.max(0, contentPoint * scale - center);
     $("office-zoom-label").textContent = Math.round(officeZoom * 100) + "%";
     $("office-zoom-out").disabled = officeZoom <= 0.6;
     $("office-zoom-in").disabled = officeZoom >= 1.4;

@@ -3,6 +3,14 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.17.4 — 2026-09-15 (patch: auto-fit office in split windows)
+
+- Added container resize observation and a separate automatic fit scale for the
+  complete office stage. MacBook split-window and other narrow layouts now show
+  the whole 780px reference scene instead of clipping its right side.
+- Kept the 60–140% user zoom relative to the fitted scene, introducing horizontal
+  scrolling only when the user deliberately magnifies beyond the available width.
+
 ## v1.17.3 — 2026-09-15 (patch: prevent repetitive office visits)
 
 - Replaced independent random Hermes destinations with a shuffled visit deck, so

@@ -210,6 +210,19 @@ def test_fold_layout_uses_container_width_and_single_readable_caption():
     assert '#office-roster { grid-template-columns: repeat(2' in css
 
 
+def test_office_auto_fits_partial_laptop_windows_before_manual_zoom():
+    root = Path(__file__).resolve().parents[1] / 'browser/observatory'
+    office = (root / 'office.js').read_text()
+    css = (root / 'office.css').read_text()
+
+    assert 'new ResizeObserver(() => setOfficeZoom(officeZoom, null, false))' in office
+    assert 'const floorWidth = Math.max(780, viewport.clientWidth)' in office
+    assert 'const fitScale = Math.min(1, viewport.clientWidth / floorWidth)' in office
+    assert 'const scale = Math.round(fitScale * officeZoom * 1000) / 1000' in office
+    assert 'floor.dataset.scale = String(scale)' in office
+    assert 'min-width: 0; aspect-ratio: 1000 / 560' in css
+
+
 def test_missing_sources_are_empty_and_db_is_readonly(store):
     assert store.library('learning')['total'] == 0
     assert store.library('memory')['total'] == 0

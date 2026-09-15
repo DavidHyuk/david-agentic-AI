@@ -8,7 +8,7 @@
 #rooms { display: block; position: relative; }
 .office-viewport { overflow: auto; border-radius: 12px; border: 1px solid #a7b3a1; }
 .shared-floor {
-  position: relative; width: 100%; min-width: 780px; aspect-ratio: 1000 / 560;
+  position: relative; width: 100%; min-width: 0; aspect-ratio: 1000 / 560;
   overflow: hidden; isolation: isolate; background-color: #eee4d1;
   background-image: linear-gradient(115deg, #fff9e92b, transparent 38%),
     repeating-linear-gradient(0deg, transparent 0 46px, #ac997843 47px 48px),
