@@ -3,6 +3,23 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.16.9 — 2026-09-15 (patch: isolate new work from reviews and stagger jobs)
+
+- Fixed the Coding workbench to keep its default surface on the latest unfinished
+  new curriculum problem even when a newer scheduled review assignment exists.
+  Review assignments now appear only after the explicit **복습하기** action, with
+  a direct return to the current new problem.
+- Made same-day new and review requests resume only assignments of their own type,
+  preventing an unfinished review from being returned by **작업 이어가기**.
+- Changed scheduled Coding Coach delivery to assign new curriculum work as well;
+  Jun may suggest a due weak review, but only the explicit review button creates it.
+- Staggered all visible cron start minutes, moved podcast prefetch to 08:25 and
+  delivery to 09:15, and moved the paper digest away from prefetch to 08:50.
+- Reduced the watchdog from every minute to a separate five-minute offset and
+  added a 15-minute next-run startup grace. This prevents a job that has only just
+  become due from being mistaken for a stalled scheduler and restarting an active
+  Hermes or English chat.
+
 ## v1.16.8 — 2026-09-14 (patch: inject matched source into Coding chat)
 
 - Fixed the missing final connection between the synced Accepted-source snapshot

@@ -10,7 +10,7 @@ bot, plus English feedback delivered to a dedicated English **Telegram** bot:
 2. **Staff/Senior MLE interview prep** — MLE drills plus beginner coding and system-design study delivered daily at noon.
 3. **English practice** — turns tutor recordings + corrections into spaced-repetition drills.
 4. **Daily podcast English** — pre-downloads one English Goal Podcast transcript
-   and turns it into a personalized 09:00 listening/expression lesson in the
+   and turns it into a personalized 09:15 listening/expression lesson in the
    existing English Telegram bot.
 
 Google Calendar support is retained for a later phase, but its skill, MCP
@@ -43,7 +43,7 @@ Local DGX Spark (vLLM @ :8003, Qwen3.6 FP8, 128K ctx)
    English Hermes profile ─────────────────────────────────────► English Telegram bot
         │ isolated SOUL / memory / sessions / Telegram token
         ├─ english-practice ─ Kakao webhook → intake + SRS review/drill
-        └─ english-podcast-coach ─ 08:30 transcript → 09:00 personalized lesson
+        └─ english-podcast-coach ─ 08:25 transcript → 09:15 personalized lesson
 
  arXiv + Hugging Face ── papers_ingest.py ── SQLite paper catalog
                               ▲
@@ -131,7 +131,7 @@ Then complete the **interactive, one-time** steps `install.sh` prints:
   ```
 
   The English token is stored only in `~/.hermes/profiles/english/.env`. The same
-  installer enables the 08:30 podcast transcript timer and registers the 09:00
+  installer enables the 08:25 podcast transcript timer and registers the 09:15
   lesson in this existing bot; no second token is needed.
 - `bash bootstrap/install_cron_watchdog.sh` → recover automatically from a
   permanently stuck cron worker.
@@ -451,10 +451,10 @@ Open Builder에서 다음 순서로 설정합니다.
 다시 보내야 합니다.
 
 수집된 원문은 `~/english-lessons/YYYY-MM-DD/` 아래에 저장됩니다. 월–토
-20:00 `english-intake`가 새 피드백을 분석합니다. 새 피드백이 없는 날에는
-누적 SRS 카드에서 취약 패턴을 골라 짧은 코칭을 보냅니다. 일요일 20:00
+20:05 `english-intake`가 새 피드백을 분석합니다. 새 피드백이 없는 날에는
+누적 SRS 카드에서 취약 패턴을 골라 짧은 코칭을 보냅니다. 일요일 20:15
 `english-weekly-review`는 그 주의 전체 피드백과 누적 취약 카드를 전용
-English bot으로 복습합니다. 21:00 `english-drill`은
+English bot으로 복습합니다. 21:10 `english-drill`은
 당일 복습 문제를 전송합니다.
 
 개인화 코칭과 주간 복습에 사용되는 근거를 직접 확인할 수 있습니다.
@@ -534,15 +534,15 @@ coding, and system-design progress.
 
 | Job | When (local) | What |
 |---|---|---|
-| `papers-digest` | 08:30 Tue/Fri | Dedicated paper group: three hottest LLM/LVM papers after 08:00 ingestion |
-| `interview-prep` | 12:00 Mon/Wed/Fri | Interview group: one focused Staff/Senior MLE drill |
-| `coding-coach` | 12:00 Tue/Thu/Sat | LeetCode group: 35-minute beginner problem with canonical links |
-| `system-design-coach` | 12:00 Sunday | System-design group: Hello Interview exercise |
-| `english-podcast-daily` | 09:00 daily | `🎧 Morning Echo` group on the existing English bot: one downloaded transcript + personalized three-point lesson |
-| `english-intake` | 20:00 Mon–Sat | Dedicated English bot: feedback analysis or weakness coaching |
-| `english-drill` | 21:00 daily | Dedicated English bot: tonight's spaced-repetition drill |
-| `english-weekly-review` | 20:00 Sunday | Dedicated English bot: tutor feedback + weak SRS cumulative review |
-| `weekly-review` | 18:00 Sunday | Main David bot: papers + MLE coverage + coding/design progress and next focus |
+| `papers-digest` | 08:50 Tue/Fri | Dedicated paper group: three hottest LLM/LVM papers after 08:00 ingestion |
+| `interview-prep` | 12:05 Mon/Wed/Fri | Interview group: one focused Staff/Senior MLE drill |
+| `coding-coach` | 12:10 Tue/Thu/Sat | LeetCode group: 35-minute beginner problem with canonical links |
+| `system-design-coach` | 12:15 Sunday | System-design group: Hello Interview exercise |
+| `english-podcast-daily` | 09:15 daily | `🎧 Morning Echo` group on the existing English bot: one downloaded transcript + personalized three-point lesson |
+| `english-intake` | 20:05 Mon–Sat | Dedicated English bot: feedback analysis or weakness coaching |
+| `english-drill` | 21:10 daily | Dedicated English bot: tonight's spaced-repetition drill |
+| `english-weekly-review` | 20:15 Sunday | Dedicated English bot: tutor feedback + weak SRS cumulative review |
+| `weekly-review` | 18:05 Sunday | Main David bot: papers + MLE coverage + coding/design progress and next focus |
 
 ### Interview study coach
 
@@ -588,14 +588,14 @@ completing it. Missing feedback keeps the current curriculum slot pending.
 
 Solution viewed or confidence ≤2 schedules a review in 2 days; hint 2/3 or
 confidence 3 in 7 days; independent work with confidence ≥4 in 21 days. Other
-assisted attempts use 7 days. Due weak reviews interrupt scheduled material and
-may extend the nominal five weeks. In the workbench, **작업 이어가기 · 새 문제**
-always remains a new curriculum problem; use **복습하기** to request a prior
-problem. A review due date means eligibility at the next applicable coach slot. Design
+assisted attempts use 7 days. Scheduled Jun and **작업 이어가기 · 새 문제** always
+keep the latest uncompleted new curriculum problem. Jun may suggest a due weak
+review without assigning it; use **복습하기** to request a prior problem. A review
+due date means eligibility when that explicit review path is used. Design
 uses its lowest dimension/confidence score with the same 2/7/21-day intervals.
 After the seed curriculum, concrete consolidation reviews continue.
 
-Sunday's existing 18:00 review includes completed coding sessions, new/review
+Sunday's existing 18:05 review includes completed coding sessions, new/review
 counts, weak patterns, average session minutes (including unsuccessful attempts),
 hint usage, solutions viewed, design topics and weakest dimension, and next
 week's focus, alongside papers and MLE coverage. Reports cover local Monday
@@ -736,10 +736,10 @@ daily feed is delivered to a dedicated `🎧 Morning Echo` Telegram group throug
 ID rather than sending it to the tutor/SRS chat. The Observatory room is also
 separate regardless of Telegram routing. `bootstrap/install_english_bot.sh` installs
 `yt-dlp` and enables
-`hermes-english-podcast-sync.timer`. At 08:30 local time the timer selects the
+`hermes-english-podcast-sync.timer`. At 08:25 local time the timer selects the
 newest channel video not previously assigned, preserves its English caption
 JSON3, and writes a timestamped text transcript under
-`~/.hermes/data/english-podcast/`. The 09:00 cron verifies that local transcript,
+`~/.hermes/data/english-podcast/`. The 09:15 cron verifies that local transcript,
 reads weakness cards from `~/.hermes/data/english/srs_deck.json` plus the same
 English profile memory, and sends exactly one episode with three short learning
 moments to the existing English chat. It never edits the tutor deck and does not
@@ -763,10 +763,12 @@ bash bootstrap/install_cron_watchdog.sh
 ```
 
 `hermes-cron-watchdog.timer` checks the David and installed English profile
-schedulers every minute. The David watchdog also makes a credential-free
+schedulers every five minutes on a minute offset separate from scheduled study
+jobs. The David watchdog also makes a credential-free
 loopback probe of the Observatory chat API; a TCP listener that has stopped
-serving HTTP requests is restarted as well. A stale next-run timestamp or cron
-tick lock held longer than 20 minutes triggers a restart of the matching gateway. The installed
+serving HTTP requests is restarted as well. A due job gets 15 minutes to start;
+only a next-run timestamp beyond that grace or a cron tick lock held longer than
+20 minutes triggers a restart of the matching gateway. The installed
 gateway drop-ins cap shutdown at 45 seconds, so a permanently blocked worker
 cannot prevent recovery indefinitely. A job whose latest run is marked failed is
 also restarted and queued once again; the retry state is stored per profile, so a
@@ -801,7 +803,7 @@ hermes -p english cron run <ENGLISH_JOB_ID_FROM_LIST>
 ```
 
 `hermes cron list` shows the David bot jobs; `hermes -p english cron list` shows
-the isolated tutor-English jobs plus the 09:00 transcript-backed lesson. Run each
+the isolated tutor-English jobs plus the 09:15 transcript-backed lesson. Run each
 profile's E2E message only after its Telegram bot has completed pairing.
 
 The gateway only starts after `/v1/models` contains

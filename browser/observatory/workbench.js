@@ -1,6 +1,12 @@
 // Author: David Choi. Purpose: resumable study desks and explicit progress actions.
 "use strict";
-let bench = { room: "hq", data: null, request: 0, busy: false };
+let bench = {
+  room: "hq",
+  data: null,
+  request: 0,
+  busy: false,
+  focusAssignment: null,
+};
 const deskTitles = {
   papers: "Frontier Radar",
   interview: "Interview Lab",
@@ -41,6 +47,7 @@ async function openWorkbench(room, historyMode = "push") {
   localWrite("hermes-last-room", room);
   bench.room = room;
   bench.data = null;
+  bench.focusAssignment = null;
   view("workbench", historyMode, { room });
   $("bench-title").textContent = deskTitles[room] || roomName(room);
   $("bench-subtitle").textContent =
@@ -82,6 +89,9 @@ async function deskAction(body, success = "저장했습니다.") {
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || "저장하지 못했습니다.");
     if (body.action === "note") localWrite(draftKey(room), null);
+    if (body.action === "plan")
+      bench.focusAssignment = body.mode === "review" ? result.result?.id : null;
+    if (body.action === "feedback") bench.focusAssignment = null;
     if (room === bench.room) {
       await loadWorkbench();
       $("bench-status").textContent = success;
@@ -118,8 +128,15 @@ function telegramComposer(d, suggested = "") {
     .join("");
   return `<article class="desk-card telegram-chat"><span class="tag">DASHBOARD ↔ TELEGRAM</span><h2>Hermes에게 바로 질문하기</h2><p class="muted">여기서 질문하면 Hermes가 이 작업실 기록을 이어서 답하고, 질문과 답변이 해당 Telegram 그룹에도 표시됩니다.</p><div class="chat-history">${history || '<p class="muted">대시보드에서 시작한 대화가 아직 없습니다.</p>'}</div><form id="telegram-chat-form"><label class="desk-field">질문<textarea id="telegram-chat-message" rows="5" maxlength="4000" required placeholder="Hermes에게 물어볼 내용을 입력하세요.">${esc(draft || "")}</textarea></label><button class="primary">Hermes에게 보내기</button></form></article>`;
 }
+function activeCoachAssignment(d) {
+  const assignments = [...(d.pending || []), ...(d.pending_reviews || [])];
+  return (
+    assignments.find((assignment) => assignment.id === bench.focusAssignment) ||
+    d.pending?.[0]
+  );
+}
 function coachDesk(d) {
-  const a = d.pending[0];
+  const a = activeCoachAssignment(d);
   const lc = d.room === "coding" ? d.leetcode_history : null;
   const lcSummary = lc
     ? `<article class="desk-card"><span class="tag">LEETCODE · READ ONLY</span><h2>${esc(lc.username)} 풀이 기록</h2><p class="muted">${esc(lc.synced_at || "동기화 시각 미확인")} · 제출이나 계정 변경 없이 동기화됩니다.</p><div class="desk-metrics"><div><b>${Number(lc.total_solved || 0)}</b><span>해결한 문제</span></div><div><b>${Number(lc.solved_by_difficulty?.easy || 0)} / ${Number(lc.solved_by_difficulty?.medium || 0)} / ${Number(lc.solved_by_difficulty?.hard || 0)}</b><span>Easy / Medium / Hard</span></div></div>${lc.recent_accepted?.length ? `<p class="muted">최근 정답: ${esc(lc.recent_accepted.slice(0, 3).map((item) => item.title).join(", "))}</p>` : ""}</article>`
@@ -129,7 +146,7 @@ function coachDesk(d) {
   const item = a.item,
     coding = d.track === "coding";
   return lcSummary + `<article class="desk-card mission"><span class="tag">이어하기 · ${esc(a.date)} 배정 · ${a.session_type === "review" ? "복습" : "새 과제"}</span><h2>${esc(item.name || a.item_id)}</h2><p>${esc(coding ? item.goal : item.exercise)}</p><div class="desk-tags"><span>${esc(item.pattern || "System design")}</span><span>목표 ${coding ? 35 : item.target_minutes}분</span><span>결과 미입력</span>${coding ? `<span>기록된 힌트 ${a.hint_level} / 3</span>` : ""}</div>
-    <div class="desk-actions">${coding ? safeLink(item.leetcode_url, "LeetCode 문제") + safeLink(item.neetcode_url, "NeetCode 문제") : safeLink(item.url, "Hello Interview")}</div>
+    <div class="desk-actions">${coding ? safeLink(item.leetcode_url, "LeetCode 문제") + safeLink(item.neetcode_url, "NeetCode 문제") : safeLink(item.url, "Hello Interview")}${a.session_type === "review" ? '<button id="desk-current" class="primary">최신 문제로 돌아가기</button>' : d.completed?.length ? '<button id="desk-review" class="outline">복습하기</button>' : ""}</div>
     ${coding ? '<p class="muted">먼저 20분 동안 스스로 시도하고, 경계 조건과 시간·공간 복잡도를 설명해 보세요.</p>' : `<ul class="desk-focus">${(item.focus || []).map((f) => `<li>${esc(f)}</li>`).join("")}</ul><p>${esc(item.hermes_connection || "")}</p>${item.access_note ? `<p class="muted">${esc(item.access_note)}</p>` : ""}`}
     <div class="study-timer"><span id="study-time">00:00</span><div><button class="outline" id="timer-toggle">타이머 시작</button><button class="text-button" id="timer-reset">초기화</button></div><small>이 브라우저에서 이어집니다 · 타이머 종료는 완료 처리되지 않습니다</small></div>
   </article>${telegramComposer(d, `현재 ${item.name || a.item_id} 과제를 공부 중이야. 과제 ID는 ${a.id}야. ${coding ? "내 접근 방법을 먼저 물어보고, 요청하면 현재 힌트 단계 다음의 힌트 하나만 줘. 정답부터 보여주지 마." : "내 설계의 요구사항을 먼저 물어보고, 답변을 바탕으로 트레이드오프와 실패 시나리오를 질문해줘."}`)}
@@ -340,6 +357,12 @@ function renderWorkbench(d) {
         { action: "plan", track: d.track, mode: "review" },
         "복습 문제를 배정했습니다.",
       );
+  if ($("desk-current"))
+    $("desk-current").onclick = () => {
+      bench.focusAssignment = null;
+      renderWorkbench(bench.data);
+      $("bench-status").textContent = "최신 미완료 문제로 돌아왔습니다.";
+    };
   if ($("coach-feedback")) wireCoach(d);
   if ($("telegram-chat-form")) wireTelegramChat(d);
 }
@@ -445,7 +468,7 @@ async function showMission(taskId) {
   }
 }
 function wireCoach(d) {
-  const assignment = d.pending[0],
+  const assignment = activeCoachAssignment(d),
     form = $("coach-feedback");
   const key = "hermes-feedback:" + assignment.id;
   const draft = localRead(key, {});

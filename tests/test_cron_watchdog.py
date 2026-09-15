@@ -10,7 +10,7 @@ DROPIN = REPO / "bootstrap" / "hermes-gateway-cron-recovery.conf"
 INSTALLER = REPO / "bootstrap" / "install_cron_watchdog.sh"
 
 
-def test_watchdog_checks_frequently_and_recovers_stale_locks():
+def test_watchdog_checks_on_staggered_cadence_and_recovers_stale_locks():
     service = SERVICE.read_text()
     timer = TIMER.read_text()
 
@@ -22,7 +22,8 @@ def test_watchdog_checks_frequently_and_recovers_stale_locks():
     assert "--skip-missing-home" in service
     assert "TimeoutStartSec=180" in service
     assert "OnBootSec=1min" in timer
-    assert "OnUnitActiveSec=1min" in timer
+    assert "OnCalendar=*-*-* *:03/5:00" in timer
+    assert "OnUnitActiveSec" not in timer
 
 
 def test_gateway_shutdown_is_bounded_for_stuck_workers():

@@ -102,7 +102,7 @@ def test_check_jobs_stale_ignores_disabled_jobs(hermes_home):
     assert report["stale_jobs"] == []
 
 
-def test_check_jobs_stale_flags_overdue_job_that_never_ran(hermes_home):
+def test_check_jobs_stale_allows_due_job_startup_grace(hermes_home):
     now = datetime(2026, 6, 10, 12, 0, tzinfo=PACIFIC)
     jobs_path = hermes_home / "cron" / "jobs.json"
     jobs_path.write_text(
@@ -124,7 +124,34 @@ def test_check_jobs_stale_flags_overdue_job_that_never_ran(hermes_home):
 
     report = ch.check_jobs_stale(jobs_path, now=now)
 
+    assert report["healthy"] is True
+    assert report["stale_jobs"] == []
+
+
+def test_check_jobs_stale_flags_job_beyond_startup_grace(hermes_home):
+    now = datetime(2026, 6, 10, 12, 0, tzinfo=PACIFIC)
+    jobs_path = hermes_home / "cron" / "jobs.json"
+    jobs_path.write_text(
+        json.dumps(
+            {
+                "jobs": [
+                    {
+                        "id": "late",
+                        "name": "papers-digest",
+                        "enabled": True,
+                        "last_run_at": None,
+                        "next_run_at": _iso(now - timedelta(minutes=16)),
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    report = ch.check_jobs_stale(jobs_path, now=now)
+
     assert report["healthy"] is False
+    assert report["overdue_grace_minutes"] == 15
     assert report["stale_jobs"][0]["hours_since_last_run"] is None
     assert report["stale_jobs"][0]["overdue_next_run"] is True
 

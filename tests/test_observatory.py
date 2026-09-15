@@ -540,6 +540,15 @@ def test_review_action_is_explicit_and_new_problem_action_stays_new(study_store)
     assert review['item_id'] == 'contains-duplicate'
     assert review['reason'] == 'requested review'
 
+    new_assignment = study_store.study_action(
+        {'action': 'plan', 'track': 'coding', 'mode': 'next'}
+    )['result']
+    bench = study_store.workbench('coding')
+    assert new_assignment['item_id'] == 'valid-anagram'
+    assert bench['pending'][0]['id'] == new_assignment['id']
+    assert bench['pending'][0]['session_type'] == 'new'
+    assert bench['pending_reviews'][0]['id'] == review['id']
+
 
 def test_srs_review_stale_click_does_not_promote_twice(study_store):
     request = {'action': 'srs_review', 'card': 'one', 'result': 'correct', 'expected_reviews': 0}

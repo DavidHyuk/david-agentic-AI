@@ -242,11 +242,17 @@ class Observatory:
             state = self.coach_state()
             catalog = read_json(self.catalog_path(), {})
             items = {p['id']: p for p in catalog.get('problems' if track == 'coding' else 'system_design', [])}
-            pending = [a for a in self.pending_assignments() if a['track'] == track]
+            track_pending = [a for a in self.pending_assignments() if a['track'] == track]
+            pending = [a for a in track_pending if a.get('session_type') != 'review']
+            pending_reviews = [a for a in track_pending if a.get('session_type') == 'review']
             pending.sort(key=lambda a: a['date'], reverse=True)
+            pending_reviews.sort(key=lambda a: a['date'], reverse=True)
             today_assignments = [a for a in state['assignments'].values()
-                                 if a['track'] == track and a['date'] == today]
+                                 if a['track'] == track and a['date'] == today
+                                 and a.get('session_type') != 'review']
             data.update(track=track, pending=[{**a, 'item': items.get(a['item_id'], {})} for a in pending],
+                        pending_reviews=[{**a, 'item': items.get(a['item_id'], {})}
+                                         for a in pending_reviews],
                         completed=sorted(state[track], key=lambda a: a['date'], reverse=True),
                         today_assignment=today_assignments[-1] if today_assignments else None,
                         catalog_available=bool(items))

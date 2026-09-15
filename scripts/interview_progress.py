@@ -179,7 +179,8 @@ def plan(state: dict, catalog: dict, track: str, today: str,
                          if assignment['track'] == track and assignment['date'] == today]
     if next_assignment or review_assignment:
         unfinished = [assignment for assignment in today_assignments
-                      if not assignment['completed']]
+                      if not assignment['completed'] and
+                      (assignment.get('session_type') == 'review') == review_assignment]
         if unfinished:
             return unfinished[-1]
     assignment_id = daily_id

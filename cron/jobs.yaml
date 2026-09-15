@@ -13,7 +13,7 @@ defaults:
 
 jobs:
   - name: leetcode-history-sync
-    schedule: "15 */4 * * *"        # every four hours; no Telegram delivery
+    schedule: "35 */4 * * *"        # every four hours; staggered, no Telegram delivery
     deliver: null
     skills: [interview-prep]
     prompt: >
@@ -25,7 +25,7 @@ jobs:
       LeetCode account. Reply only [SILENT] after a successful sync as well.
 
   - name: papers-digest
-    schedule: "30 8 * * 2,5"         # 08:30 Tue/Fri, after the daily 08:00 ingestion timer
+    schedule: "50 8 * * 2,5"         # 08:50 Tue/Fri, after ingestion and podcast prefetch
     skills: [papers-digest]
     deliver_chat_id_env: PAPERS_TELEGRAM_CHAT_ID
     prompt: >
@@ -41,7 +41,7 @@ jobs:
       unavailable. Keep it skimmable.
 
   - name: interview-prep
-    schedule: "0 12 * * 1,3,5"      # 12:00 Mon/Wed/Fri
+    schedule: "5 12 * * 1,3,5"      # 12:05 Mon/Wed/Fri
     skills: [interview-prep]
     deliver_chat_id_env: INTERVIEW_TELEGRAM_CHAT_ID
     prompt: >
@@ -54,7 +54,7 @@ jobs:
       exactly; the python command is unavailable.
 
   - name: coding-coach
-    schedule: "0 12 * * 2,4,6"      # 12:00 Tue/Thu/Sat
+    schedule: "10 12 * * 2,4,6"     # 12:10 Tue/Thu/Sat
     skills: [interview-prep]
     deliver_chat_id_env: LEETCODE_TELEGRAM_CHAT_ID
     prompt: >
@@ -62,16 +62,18 @@ jobs:
       procedure. First run python3 ~/.hermes/scripts/leetcode_sync.py sync; if
       it is unlinked or unavailable, keep the existing coach state and continue
       without inventing account activity. Read the safe local history snapshot
-      when it exists, then run python3 ~/.hermes/scripts/interview_progress.py plan coding
+      when it exists, then run python3 ~/.hermes/scripts/interview_progress.py plan coding --next
       and send the actual study message it returns. Include the concrete problem,
       pattern, goal, 35-minute target, and visible clickable canonical NeetCode and
-      LeetCode URLs. Due weak reviews take priority over new curriculum problems.
+      LeetCode URLs. Always assign the latest uncompleted new curriculum problem;
+      never create a review assignment from this scheduled job. If a weak review
+      is due, suggest the separate workbench Review button in one short line only.
       Start as a beginner; try 20 minutes without AI first. Offer only staged hints,
       never a solution first. Do not log a completed session until I report results.
       Never replace the study item with a generic reminder.
 
   - name: system-design-coach
-    schedule: "0 12 * * 0"          # 12:00 Sunday
+    schedule: "15 12 * * 0"         # 12:15 Sunday
     skills: [interview-prep]
     deliver_chat_id_env: SYSTEM_DESIGN_TELEGRAM_CHAT_ID
     prompt: >
@@ -86,7 +88,7 @@ jobs:
       Never replace the study item with a generic reminder.
 
   - name: english-podcast-daily
-    schedule: "0 9 * * *"           # 09:00 daily, after the 08:30 transcript sync
+    schedule: "15 9 * * *"          # 09:15 daily, after the 08:25 transcript sync
     profile: english
     deliver_chat_id_env: ENGLISH_PODCAST_TELEGRAM_CHAT_ID
     skills: [english-podcast-coach]
@@ -104,11 +106,11 @@ jobs:
       transcript. Mark the assigned video only after composing the complete lesson.
 
   - name: english-intake
-    schedule: "0 20 * * 1-6"        # 20:00 Mon-Sat coaching
+    schedule: "5 20 * * 1-6"        # 20:05 Mon-Sat coaching
     profile: english
     skills: [english-practice]
     prompt: >
-      Deliver the 20:00 English coaching using the english-practice skill. First
+      Deliver the 20:05 English coaching using the english-practice skill. First
       run english_intake.py with python3 and process any new KakaoTalk or lesson
       feedback through Procedure A. With no new feedback, follow Procedure D: use
       english_srs.py weaknesses and stats to explain one or two evidence-backed
@@ -117,7 +119,7 @@ jobs:
       lesson arrived, and never invent a teacher correction.
 
   - name: english-drill
-    schedule: "0 21 * * *"          # 21:00 every day
+    schedule: "10 21 * * *"         # 21:10 every day
     profile: english
     skills: [english-practice]
     prompt: >
@@ -130,7 +132,7 @@ jobs:
       reply only [SILENT].
 
   - name: english-weekly-review
-    schedule: "0 20 * * 0"          # 20:00 Sunday, dedicated English review
+    schedule: "15 20 * * 0"         # 20:15 Sunday, dedicated English review
     profile: english
     skills: [english-practice]
     prompt: >
@@ -144,7 +146,7 @@ jobs:
       corrections. This is a standalone weekly review, not a daily intake message.
 
   - name: weekly-review
-    schedule: "0 18 * * 0"          # 18:00 Sunday
+    schedule: "5 18 * * 0"          # 18:05 Sunday
     skills: [papers-digest, interview-prep]
     prompt: >
       Write my weekly review. Summarize: (1) the most important LLM/LVM papers this

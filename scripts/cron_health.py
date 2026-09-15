@@ -29,6 +29,7 @@ from typing import Any
 DEFAULT_HERMES_HOME = Path(os.path.expanduser("~/.hermes"))
 DEFAULT_LOCK_STALE_MINUTES = 30
 DEFAULT_JOB_STALE_HOURS = 36
+DEFAULT_JOB_OVERDUE_GRACE_MINUTES = 15
 DEFAULT_GATEWAY_SERVICE = "hermes-gateway.service"
 DEFAULT_RESTART_TIMEOUT_SECONDS = 75
 DEFAULT_CRON_RUN_TIMEOUT_SECONDS = 20
@@ -127,9 +128,10 @@ def check_jobs_stale(
     jobs_path: Path,
     *,
     stale_hours: int = DEFAULT_JOB_STALE_HOURS,
+    overdue_grace_minutes: int = DEFAULT_JOB_OVERDUE_GRACE_MINUTES,
     now: datetime | None = None,
 ) -> dict[str, Any]:
-    """Flag jobs with overdue next runs or stale jobs lacking a next run."""
+    """Flag jobs overdue beyond startup grace or stale without a next run."""
     current = now or _now()
     if not jobs_path.exists():
         return {
@@ -144,7 +146,10 @@ def check_jobs_stale(
         last_run = _parse_iso(job.get("last_run_at"))
         next_run = _parse_iso(job.get("next_run_at"))
         name = job.get("name") or job.get("id", "?")
-        overdue_next = next_run is not None and next_run < current
+        overdue_next = (
+            next_run is not None
+            and (current - next_run).total_seconds() >= overdue_grace_minutes * 60
+        )
         hours_since = (
             (current - last_run).total_seconds() / 3600.0
             if last_run is not None
@@ -175,6 +180,7 @@ def check_jobs_stale(
         "stale_jobs": stale_jobs,
         "healthy": not stale_jobs,
         "stale_hours": stale_hours,
+        "overdue_grace_minutes": overdue_grace_minutes,
         "failed_jobs": _failed_jobs(doc),
     }
 
@@ -216,6 +222,7 @@ def assess_health(
     *,
     lock_stale_minutes: int = DEFAULT_LOCK_STALE_MINUTES,
     job_stale_hours: int = DEFAULT_JOB_STALE_HOURS,
+    job_overdue_grace_minutes: int = DEFAULT_JOB_OVERDUE_GRACE_MINUTES,
     check_api: bool = False,
     now: datetime | None = None,
 ) -> dict[str, Any]:
@@ -226,6 +233,7 @@ def assess_health(
     jobs = check_jobs_stale(
         hermes_home / "cron" / "jobs.json",
         stale_hours=job_stale_hours,
+        overdue_grace_minutes=job_overdue_grace_minutes,
         now=now,
     )
     api = check_api_health() if check_api else None
@@ -435,6 +443,12 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Warn when enabled jobs last ran longer ago than this (default: 36)",
     )
     parser.add_argument(
+        "--job-overdue-grace-minutes",
+        type=int,
+        default=DEFAULT_JOB_OVERDUE_GRACE_MINUTES,
+        help="Allow a due cron job this many minutes to start (default: 15)",
+    )
+    parser.add_argument(
         "--restart",
         action="store_true",
         help="Restart the gateway when health check is critical",
@@ -476,6 +490,7 @@ def main(argv: list[str] | None = None) -> int:
         home,
         lock_stale_minutes=args.lock_stale_minutes,
         job_stale_hours=args.job_stale_hours,
+        job_overdue_grace_minutes=args.job_overdue_grace_minutes,
         check_api=args.check_api,
     )
     if args.json:

@@ -30,7 +30,7 @@ def test_defaults_applied_deliver_telegram():
 def test_leetcode_history_sync_is_read_only_and_has_no_delivery():
     jobs = {job["name"]: job for job in rc.load_jobs(JOBS)}
     sync = jobs["leetcode-history-sync"]
-    assert sync["schedule"] == "15 */4 * * *"
+    assert sync["schedule"] == "35 */4 * * *"
     assert "leetcode_sync.py sync" in sync["prompt"]
     assert "read-only" in sync["prompt"]
     assert "--deliver" not in rc.build_create_command(sync, environment={})
@@ -51,7 +51,7 @@ def test_papers_digest_uses_dedicated_telegram_chat_from_environment():
 def test_papers_digest_runs_twice_weekly_and_selects_three():
     jobs = {job["name"]: job for job in rc.load_jobs(JOBS)}
     papers = jobs["papers-digest"]
-    assert papers["schedule"] == "30 8 * * 2,5"
+    assert papers["schedule"] == "50 8 * * 2,5"
     assert "exactly the three hottest high-signal papers" in papers["prompt"]
 
 
@@ -105,6 +105,15 @@ def test_papers_digest_requires_valid_dedicated_chat_id():
         )
 
 
+def test_scheduled_coding_assigns_new_work_and_only_suggests_review():
+    jobs = {job["name"]: job for job in rc.load_jobs(JOBS)}
+    prompt = jobs["coding-coach"]["prompt"]
+
+    assert "plan coding --next" in prompt
+    assert "never create a review assignment" in prompt
+    assert "suggest the separate workbench Review button" in prompt
+
+
 def test_env_file_loader_supports_export_and_quotes(tmp_path):
     env_file = tmp_path / ".env"
     env_file.write_text(
@@ -125,10 +134,10 @@ def test_english_jobs_use_the_isolated_english_profile():
     assert "english-practice" not in jobs["weekly-review"]["skills"]
 
 
-def test_english_podcast_job_is_daily_at_nine_in_existing_english_profile():
+def test_english_podcast_job_is_daily_after_prefetch_in_existing_english_profile():
     jobs = {job["name"]: job for job in rc.load_jobs(JOBS)}
     podcast = jobs["english-podcast-daily"]
-    assert podcast["schedule"] == "0 9 * * *"
+    assert podcast["schedule"] == "15 9 * * *"
     assert podcast["profile"] == "english"
     assert podcast["deliver_chat_id_env"] == "ENGLISH_PODCAST_TELEGRAM_CHAT_ID"
     assert podcast["skills"] == ["english-podcast-coach"]
@@ -151,14 +160,14 @@ def test_english_intake_coaches_without_feedback_on_weekdays():
     prompt = jobs["english-intake"]["prompt"]
     assert "Do not stay silent" in prompt
     assert "weaknesses" in prompt
-    assert jobs["english-intake"]["schedule"] == "0 20 * * 1-6"
+    assert jobs["english-intake"]["schedule"] == "5 20 * * 1-6"
     assert "[SILENT]" not in prompt
 
 
 def test_english_weekly_review_is_a_dedicated_sunday_job():
     jobs = {job["name"]: job for job in rc.load_jobs(JOBS)}
     review = jobs["english-weekly-review"]
-    assert review["schedule"] == "0 20 * * 0"
+    assert review["schedule"] == "15 20 * * 0"
     assert "Procedure E" in review["prompt"]
     assert "standalone weekly review" in review["prompt"]
 
@@ -309,16 +318,16 @@ def test_main_can_register_one_named_job(monkeypatch, capsys):
 
 def test_interview_coaches_fill_noon_without_replacing_mle_drills():
     jobs = {j['name']: j for j in rc.load_jobs(JOBS)}
-    for name, schedule in {'interview-prep': '0 12 * * 1,3,5',
-                           'coding-coach': '0 12 * * 2,4,6',
-                           'system-design-coach': '0 12 * * 0'}.items():
+    for name, schedule in {'interview-prep': '5 12 * * 1,3,5',
+                           'coding-coach': '10 12 * * 2,4,6',
+                           'system-design-coach': '15 12 * * 0'}.items():
         assert jobs[name]['schedule'] == schedule
         assert jobs[name]['skills'] == ['interview-prep']
         assert not jobs[name].get('profile')
         assert jobs[name]['deliver'] == 'telegram'
     assert 'interview_trends.py' in jobs['interview-prep']['prompt']
-    assert jobs['papers-digest']['schedule'] == '30 8 * * 2,5'
-    assert jobs['english-drill']['schedule'] == '0 21 * * *'
+    assert jobs['papers-digest']['schedule'] == '50 8 * * 2,5'
+    assert jobs['english-drill']['schedule'] == '10 21 * * *'
 
 
 def test_coach_cron_requires_material_canonical_links_and_real_feedback():
@@ -341,7 +350,7 @@ def test_coach_cron_requires_material_canonical_links_and_real_feedback():
 def test_sunday_weekly_review_keeps_papers_and_adds_coach_metrics():
     jobs = {j['name']: j for j in rc.load_jobs(JOBS)}
     job = jobs['weekly-review']
-    assert job['schedule'] == '0 18 * * 0'
+    assert job['schedule'] == '5 18 * * 0'
     assert job['skills'] == ['papers-digest', 'interview-prep']
     for phrase in ('papers', 'interview_progress.py weekly', 'new vs review',
                    'weak patterns', 'solving time', 'hint usage', 'topics covered',

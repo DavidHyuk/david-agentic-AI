@@ -110,7 +110,7 @@ David-Agent/
 │   ├── stage_english_profile.py # profile → ~/.hermes/profiles/english
 │   ├── stage_specialist_profiles.py # headless 전문 profile staging
 │   ├── install_english_bot.sh # English Telegram bot gateway 설치
-│   ├── hermes-english-podcast-sync.{service,timer} # 08:30 대본 선다운로드
+│   ├── hermes-english-podcast-sync.{service,timer} # 08:25 대본 선다운로드
 │   ├── install_observatory.sh # 관제실 UI staging + Tailscale IP 전용 서비스
 │   ├── hermes-gateway-english-vllm.conf # 모델 readiness + 종료 제한
 │   ├── stage.py               # repo → ~/.hermes 멱등 동기화
@@ -139,7 +139,7 @@ David-Agent/
 │   ├── Qwen/                  # Qwen 계열 모델
 │   └── MiniMax/               # MiniMax-M2.7 모델
 │
-├── tests/                     # pytest 테스트 (300개)
+├── tests/                     # pytest 테스트 (304개)
 │   ├── conftest.py
 │   ├── test_papers_ingest.py
 │   ├── test_papers_digest.py
@@ -149,7 +149,7 @@ David-Agent/
 │   ├── test_english_intake.py
 │   ├── test_english_srs.py
 │   ├── test_english_podcast.py # 자막 파싱·일일 배정·멱등 상태
-│   ├── test_english_podcast_service.py # 08:30 선다운로드 timer
+│   ├── test_english_podcast_service.py # 08:25 선다운로드 timer
 │   ├── test_agenda.py
 │   ├── test_skills.py         # 스킬 frontmatter 스키마 검증
 │   ├── test_cron_jobs.py      # cron 스키마 검증
@@ -191,7 +191,7 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 | `papers-digest` | research | 새 논문 카탈로그에서 LLM/LVM 후보를 뽑아 인터뷰 관련성과 항목별 원문 링크 제공 |
 | `interview-prep` | career | 월/수/금 Staff MLE 드릴 + 화/목/토 NeetCode/LeetCode 입문 코딩 + 일요일 Hello Interview 설계 코칭 |
 | `english-practice` | English profile / learning | 레슨 녹음/교정 파일 → SRS 카드 생성 + 전용 Telegram bot 매일 리뷰 |
-| `english-podcast-coach` | English profile / learning | 다운로드한 YouTube 대본 + tutor 취약점 → 같은 bot의 09:00 듣기·표현 학습 |
+| `english-podcast-coach` | English profile / learning | 다운로드한 YouTube 대본 + tutor 취약점 → 같은 bot의 09:15 듣기·표현 학습 |
 | `calendar-assistant` | productivity | **비활성/보존** — 추후 Google Calendar 브리핑 |
 
 새 agent형 기능은 audience·credential·privacy·identity/memory·model/tool
@@ -228,16 +228,16 @@ Calendar 연동을 재개할 때까지 `morning-brief`는 등록하지 않습니
 
 | 잡 | 시간 | 내용 |
 |----|------|------|
-| `papers-digest` | 08:30 화/금 | 전용 Telegram 논문 그룹: 가장 핫한 LLM/LVM 논문 3편 |
-| `interview-prep` | 12:00 월/수/금 | 전용 Interview 그룹: 실시간 트렌드 기반 Staff 레벨 드릴 1개 |
-| `coding-coach` | 12:00 화/목/토 | 전용 LeetCode 그룹: 35분 문제·목표·canonical URL |
-| `leetcode-history-sync` | 매 4시간 15분 | 전송 없음: 연결된 LeetCode 세션의 읽기 전용 풀이 이력 snapshot 갱신 |
-| `system-design-coach` | 12:00 일요일 | 전용 System Design 그룹: Hello Interview 설계 과제 |
-| `english-podcast-daily` | 09:00 매일 | 기존 English bot의 `🎧 Morning Echo` 전용 그룹: 다운로드된 대본 기반 개인화 학습 1편 |
-| `english-intake` | 월–토 20:00 | English bot: 새 피드백 분석 또는 취약 패턴 코칭 |
-| `english-drill` | 21:00 매일 | English bot: SRS 드릴 전달 |
-| `english-weekly-review` | 일요일 20:00 | English bot: tutor feedback + 취약 SRS 누적 복습 |
-| `weekly-review` | 18:00 일요일 | David bot: 논문 + MLE coverage + 코딩/설계 실측 진도·다음 주 집중 영역 |
+| `papers-digest` | 08:50 화/금 | 전용 Telegram 논문 그룹: 가장 핫한 LLM/LVM 논문 3편 |
+| `interview-prep` | 12:05 월/수/금 | 전용 Interview 그룹: 실시간 트렌드 기반 Staff 레벨 드릴 1개 |
+| `coding-coach` | 12:10 화/목/토 | 전용 LeetCode 그룹: 35분 문제·목표·canonical URL |
+| `leetcode-history-sync` | 매 4시간 35분 | 전송 없음: 연결된 LeetCode 세션의 읽기 전용 풀이 이력 snapshot 갱신 |
+| `system-design-coach` | 12:15 일요일 | 전용 System Design 그룹: Hello Interview 설계 과제 |
+| `english-podcast-daily` | 09:15 매일 | 기존 English bot의 `🎧 Morning Echo` 전용 그룹: 다운로드된 대본 기반 개인화 학습 1편 |
+| `english-intake` | 월–토 20:05 | English bot: 새 피드백 분석 또는 취약 패턴 코칭 |
+| `english-drill` | 21:10 매일 | English bot: SRS 드릴 전달 |
+| `english-weekly-review` | 일요일 20:15 | English bot: tutor feedback + 취약 SRS 누적 복습 |
+| `weekly-review` | 18:05 일요일 | David bot: 논문 + MLE coverage + 코딩/설계 실측 진도·다음 주 집중 영역 |
 
 Podcast 알림은 daily content feed이므로 기존 English bot을 유지하면서 Podcast
 전용 Telegram group으로만 destination을 분리하는 것이 권장 구조입니다. Tutor
@@ -253,7 +253,7 @@ Practical Coding 자동 알림은 아직 구현 전이며 현재 cron 일정은 
 
 논문 수집은 Hermes cron이 아니라 별도 `hermes-papers-ingest.timer`가 매일
 08:00에 수행합니다. 따라서 모델이나 gateway가 일시적으로 내려가도
-메타데이터 수집은 독립적으로 실행되며, 08:30 digest는 완성된 카탈로그만
+메타데이터 수집은 독립적으로 실행되며, 08:50 digest는 완성된 카탈로그만
 읽습니다.
 
 주제별 전송 대상은 저장소에 chat ID를 기록하지 않고 `~/.hermes/.env`의
@@ -266,9 +266,10 @@ Design, Coding Coach는 각각 Interview, System Design, LeetCode 그룹을
 사용합니다. 모든 진도를 함께 다루는 `weekly-review`는 David의 기존 개인
 채팅에 유지됩니다.
 
-`hermes-cron-watchdog.timer`는 1분마다 David와 설치된 English profile의
-tick lock과 다음 실행 시각을 각각 검사합니다. lock이 20분 넘게 유지되거나
-다음 실행 시각이 지났으면 해당 profile의 gateway를 재시작하고,
+`hermes-cron-watchdog.timer`는 다른 예약 작업과 시작 분이 겹치지 않는 5분
+간격으로 David와 설치된 English profile의 tick lock과 다음 실행 시각을
+각각 검사합니다. 예약 직후 15분은 정상 기동 유예로 처리합니다. lock이
+20분 넘게 유지되거나 다음 실행 시각이 유예를 넘기면 해당 profile의 gateway를 재시작하고,
 `hermes-gateway-cron-recovery.conf`가 멈춘 worker의 종료 대기를 45초로
 제한합니다. 따라서 하나의 agent job이 영구 대기해도 이후 스케줄 전체가
 며칠간 조용히 멈추지 않습니다. 마지막 실행 상태가 실패이면 gateway를
@@ -471,7 +472,7 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
 - `english_podcast.py`는 고정 channel ID로 English Goal Podcast handle을
   검증하고, 최신 미배정 영상 한 편의 영문 자막을 JSON3 원본과 타임스탬프
   텍스트로 모두 로컬 보존합니다.
-- 08:30 systemd timer가 LLM과 독립적으로 대본을 먼저 준비하고, 09:00 Hermes
+- 08:25 systemd timer가 LLM과 독립적으로 대본을 먼저 준비하고, 09:15 Hermes
   job은 같은 날짜 assignment를 재사용합니다. 따라서 cron 재시도도 같은 날
   두 영상을 소비하지 않습니다.
 - podcast skill은 tutor SRS deck과 기존 English profile memory를 읽기 전용
@@ -498,9 +499,9 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   기록합니다. 설계는 주제·시간·요구사항/구조/trade-off/failure-mode 점수·자신감·다음
   개선점을 기록하며 점수는 1–5입니다.
 - 해설 열람/자신감 ≤2 → 2일, 힌트 2/3 또는 자신감 3 → 7일, 독립 해결/자신감 ≥4 →
-  21일. 정기 코칭은 취약 due 복습을 새 문제보다 우선합니다. 단, Coding 작업실의
-  **작업 이어가기 · 새 문제**는 이전 문제를 절대 재배정하지 않으며, 이전 문제는
-  별도 **복습하기**에서만 고릅니다. 설계는 최저 차원 점수/자신감으로 같은 간격을
+  21일. 정기 코칭과 Coding 작업실의 **작업 이어가기 · 새 문제**는 항상 최신
+  미완료 새 문제를 유지합니다. Jun은 취약 due 복습을 제안만 할 수 있고, 이전
+  문제 배정은 사용자가 누른 별도 **복습하기**에서만 생성합니다. 설계는 최저 차원 점수/자신감으로 같은 간격을
   적용하고 일요일에 전달합니다.
 - 힌트는 관찰 → 알고리즘/자료구조 → 의사코드 순서로 요청당 하나씩 제공합니다.
   전체 해설은 3단계 이후 다시 명시적으로 요청해야 합니다.

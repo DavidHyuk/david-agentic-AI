@@ -137,12 +137,12 @@ from candidate anecdotes. The automated coach currently implements the LeetCode
 foundation phase; do not imply that a scheduled Practical Coding track is active
 until its catalog, progress tracking, and job have actually been added.
 
-1. Scheduled Coding Coach runs use `python3 ~/.hermes/scripts/interview_progress.py
-   plan coding`, which may select a due weak review. The workbench's **작업
-   이어가기** action and any explicit request for a new problem use
-   `python3 ~/.hermes/scripts/interview_progress.py plan coding --next` instead.
+1. Scheduled Coding Coach runs, the workbench's **작업 이어가기** action, and
+   any explicit request for a new problem use `python3
+   ~/.hermes/scripts/interview_progress.py plan coding --next`.
    It always selects the next uncompleted curriculum problem; never substitute
-   an already attempted review. **복습하기** is the separate explicit path:
+   an already attempted review. Jun may add one short suggestion when a weak
+   review is due, but must not assign it. **복습하기** is the separate explicit path:
    `python3 ~/.hermes/scripts/interview_progress.py plan coding --review`.
    It selects the highest-value completed problem, preferring a due weak one.
    Each path is retry-safe and returns an already-open same-day assignment on
@@ -175,11 +175,11 @@ Nominal first five weeks (three completed study slots per week):
 | 4 | Stack → Binary Search → Trees | Min Stack / Binary Search / Invert Binary Tree |
 | 5 | Tree BFS/DFS → Heap → Graph | Maximum Depth of Binary Tree / Kth Largest Element in a Stream / Number of Islands |
 
-The scheduled helper chooses due weak reviews before new problems, resumes
-interrupted slots, and enforces attempted prerequisites. **작업 이어가기** is
-deliberately different: it advances only to a new, uncompleted curriculum
-problem. Missed sessions do not advance slots; reviews can extend the nominal
-five weeks. **복습하기** chooses the weakest/due previously attempted problem.
+The scheduled helper and **작업 이어가기** both advance only to a new,
+uncompleted curriculum problem while enforcing attempted prerequisites. A due
+weak review can be suggested by Jun, but only an explicit **복습하기** request
+creates that assignment. Missed sessions do not advance slots and can extend the
+nominal five weeks. **복습하기** chooses the weakest/due previously attempted problem.
 After the seed curriculum, continue concrete consolidation reviews; extend the
 curated catalog in source before introducing a new curriculum. Do not silently
 jump to advanced problems.

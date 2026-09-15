@@ -132,6 +132,26 @@ def test_explicit_review_plan_returns_prior_problem_only_on_review_request(catal
                 review_assignment=True)
 
 
+def test_new_and_review_requests_resume_only_their_own_assignment_type(catalog):
+    state = ip.empty_state()
+    first = complete(state, catalog, '2026-09-08', confidence=2)
+    new_assignment = ip.plan(
+        state, catalog, 'coding', '2026-09-10', next_assignment=True)
+    review_assignment = ip.plan(
+        state, catalog, 'coding', '2026-09-10', review_assignment=True)
+
+    assert new_assignment['item_id'] == 'valid-anagram'
+    assert new_assignment['session_type'] == 'new'
+    assert review_assignment['item_id'] == first['item_id']
+    assert review_assignment['session_type'] == 'review'
+    assert ip.plan(
+        state, catalog, 'coding', '2026-09-10', next_assignment=True
+    ) == new_assignment
+    assert ip.plan(
+        state, catalog, 'coding', '2026-09-10', review_assignment=True
+    ) == review_assignment
+
+
 def test_due_review_displaces_then_resumes_new_slot(catalog):
     state = ip.empty_state()
     first = complete(state, catalog, '2026-09-08', confidence=2)
