@@ -3,6 +3,16 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.17.2 — 2026-09-15 (patch: add Fold-readable office layout)
+
+- Added a compact office mode based on the actual office container width rather
+  than only the full viewport, covering Galaxy Fold landscape layouts whose
+  sidebar leaves a narrow content canvas.
+- Replaced large in-world name/purpose cards with small name pills and multiple
+  overlapping speech bubbles with one accessible caption rail in compact mode.
+  The detailed next-action roster becomes a readable two-column layout while the
+  desktop office remains unchanged.
+
 ## v1.17.1 — 2026-09-15 (patch: randomize short office interactions)
 
 - Replaced Hermes' fixed specialist visit loop with randomized visits that avoid

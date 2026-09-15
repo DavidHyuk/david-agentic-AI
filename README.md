@@ -953,7 +953,10 @@ for that room without interrupting an active team exchange.
 Character name/purpose cards use high-contrast type. The `−/＋` controls and a
 two-finger pinch scale the complete office, furniture and cast from 60–140% on mobile;
 the mobile floor preserves workstation spacing so room names and character cards
-do not collapse into one another at the minimum zoom.
+do not collapse into one another at the minimum zoom. On narrow office containers,
+including Galaxy Fold landscape with the navigation sidebar open, compact mode
+replaces the large character cards with name pills, moves speech into one caption
+rail below the office, and renders next-action cards in two readable columns.
 
 Office conversations use separate persisted `office_<room>` sessions on the
 existing HQ API, classified into their matching Observatory rooms. They are
