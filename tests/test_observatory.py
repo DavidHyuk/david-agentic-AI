@@ -187,7 +187,10 @@ def test_office_randomizes_short_next_action_conversations():
 
     assert 'lastVisitRoom' in office
     assert 'lastNoticeRoom' in office
-    assert 'randomItem(choices.length ? choices : leaderVisits)' in office
+    assert 'visitDeck = shuffled(leaderVisits)' in office
+    assert 'visitDeck.splice(index, 1)[0]' in office
+    assert 'lastLeaderTalk.set(partner, lines)' in office
+    assert 'variants.filter(lines => lines !== previous)' in office
     assert 'return `${action.title} · ${action.detail}`' in office
     assert '3200 + Math.random() * 2800' in office
     assert 'routineIndex++ % leaderVisits.length' not in office

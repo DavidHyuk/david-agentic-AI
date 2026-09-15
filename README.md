@@ -938,7 +938,9 @@ keeps this same room in a horizontally scrollable viewport, with named character
 shortcuts and visible next-action cards beneath it. Browser-only animation is
 intentionally calm: idle specialists stay in their work areas, while Hermes
 makes randomized leadership visits that avoid immediately repeating a teammate
-and begin within seconds. Every room displays an evidence-backed next
+and begin within seconds. A shuffled visit deck covers the whole team before a
+teammate can recur, while per-teammate dialogue variants prevent the same exchange
+from playing on consecutive visits. Every room displays an evidence-backed next
 action such as due English reviews, unread papers, or an unfinished assignment;
 clicking it opens the matching workbench. Hidden tabs and other views suspend animation.
 Automatic speech now prioritizes each character's evidence-backed next action,

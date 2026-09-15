@@ -3,6 +3,15 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.17.3 — 2026-09-15 (patch: prevent repetitive office visits)
+
+- Replaced independent random Hermes destinations with a shuffled visit deck, so
+  every teammate is visited once before anyone can recur and deck boundaries do
+  not immediately repeat the previous teammate.
+- Added three dialogue variants per teammate with immediate line-pair exclusion,
+  preventing Iris' coffee exchange or another fixed greeting from repeating on
+  consecutive visits.
+
 ## v1.17.2 — 2026-09-15 (patch: add Fold-readable office layout)
 
 - Added a compact office mode based on the actual office container width rather

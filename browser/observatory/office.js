@@ -76,12 +76,36 @@ window.sharedOffice = (() => {
     ["interview", "design", "Mina, 이 답변의 약점도 봐줄래요?", "실패 시나리오를 하나 더 붙여봐요."],
   ];
   const leaderSmallTalk = {
-    papers: ["Iris, 커피는 챙겼어요?", "네, 논문보다 따뜻해요."],
-    interview: ["Theo, 오늘 질문이 너무 어렵진 않죠?", "좋은 질문은 조금 어려워야죠."],
-    coding: ["Jun, 키보드 소리만 들려도 든든하네요.", "버그도 그 소리를 들으면 도망가면 좋겠어요."],
-    design: ["Mina, 화이트보드 자리가 아직 남았나요?", "좋은 생각 하나만 가져오시면요."],
-    english: ["Ellie, 오늘도 한 문장 배워볼까요?", "물론이죠. 부담 없이 시작해요."],
-    podcast: ["Rina, 음악은 너무 크게 틀지 말아줘요.", "좋은 부분만 살짝 들려드릴게요!"],
+    papers: [
+      ["Iris, 커피는 챙겼어요?", "네, 논문보다 따뜻해요."],
+      ["Iris, 오늘 눈에 띈 아이디어가 있나요?", "하나 골라 면접 관점으로 정리해볼게요."],
+      ["Iris, 읽을 순서를 같이 줄여볼까요?", "좋아요. 가장 중요한 근거부터 볼게요."],
+    ],
+    interview: [
+      ["Theo, 오늘 질문이 너무 어렵진 않죠?", "좋은 질문은 조금 어려워야죠."],
+      ["Theo, 답변 하나만 다듬어볼까요?", "결론부터 또렷하게 만들어보죠."],
+      ["Theo, 오늘은 어떤 역량을 보여줄까요?", "영향력과 판단 근거를 연결해볼게요."],
+    ],
+    coding: [
+      ["Jun, 키보드 소리만 들려도 든든하네요.", "버그도 그 소리를 들으면 도망가면 좋겠어요."],
+      ["Jun, 다음 문제 준비됐나요?", "네, 지금 수준에 맞춰 골라뒀어요."],
+      ["Jun, 오늘은 어떤 패턴인가요?", "풀이 전에 단서부터 같이 찾아보죠."],
+    ],
+    design: [
+      ["Mina, 화이트보드 자리가 아직 남았나요?", "좋은 생각 하나만 가져오시면요."],
+      ["Mina, 오늘 병목은 어디일까요?", "요청 흐름부터 좁혀볼게요."],
+      ["Mina, 설계를 한 장으로 줄일 수 있을까요?", "핵심 경계부터 그려보죠."],
+    ],
+    english: [
+      ["Ellie, 오늘도 한 문장 배워볼까요?", "물론이죠. 부담 없이 시작해요."],
+      ["Ellie, 오늘 표현은 짧게 갈까요?", "네, 바로 쓸 수 있는 문장으로요."],
+      ["Ellie, 복습할 표현이 남았나요?", "가장 헷갈린 것부터 꺼내볼게요."],
+    ],
+    podcast: [
+      ["Rina, 음악은 너무 크게 틀지 말아줘요.", "좋은 부분만 살짝 들려드릴게요!"],
+      ["Rina, 오늘 들을 구간은 골랐나요?", "짧고 따라 하기 좋은 부분으로요."],
+      ["Rina, 귀에 남은 표현이 있나요?", "한 번 더 들으면 확실히 남을 거예요."],
+    ],
   };
   const jobLabels = {
     "papers-digest": "연구 다이제스트", "interview-prep": "MLE 면접 드릴",
@@ -100,6 +124,8 @@ window.sharedOffice = (() => {
   let talkTimer = 0, replyTimer = 0, followupTimer = 0, closingTimer = 0;
   let lastVisitRoom = null, lastNoticeRoom = null;
   let lastDialogue = null, lastAmbientRoom = null;
+  let visitDeck = [];
+  const lastLeaderTalk = new Map();
   const speakingRooms = new Set();
   const conversation = (room) => {
     if (!conversations.has(room))
@@ -352,8 +378,8 @@ window.sharedOffice = (() => {
       } else if (!held && room === "hq" && actor.mode === "ambient") {
         actor.wait -= delta;
         if (actor.wait <= 0) {
-          const choices = leaderVisits.filter(visit => visit.room !== lastVisitRoom && visit.room !== selected);
-          const visit = randomItem(choices.length ? choices : leaderVisits);
+          const visit = nextLeaderVisit();
+          if (!visit) continue;
           lastVisitRoom = visit.room;
           route(actor, visit.point, visit.label, visit.room === "hq" ? null : visit.room);
           actor.wait = 12 + Math.random() * 12;
@@ -471,8 +497,12 @@ window.sharedOffice = (() => {
     finishTalk(6500);
   }
   function startLeaderSmallTalk(partner) {
-    const lines = leaderSmallTalk[partner];
-    if (!lines || selected || state.replay || document.hidden || state.view !== "office") return;
+    const variants = leaderSmallTalk[partner];
+    if (!variants || selected || state.replay || document.hidden || state.view !== "office") return;
+    const previous = lastLeaderTalk.get(partner);
+    const choices = variants.filter(lines => lines !== previous);
+    const lines = randomItem(choices.length ? choices : variants);
+    lastLeaderTalk.set(partner, lines);
     stopTalk();
     showBubble("hq", lines[0], "dialogue");
     replyTimer = setTimeout(() => showBubble(partner, lines[1], "dialogue"), 1100);
@@ -489,6 +519,24 @@ window.sharedOffice = (() => {
   }
   function randomItem(items) {
     return items?.length ? items[Math.floor(Math.random() * items.length)] : null;
+  }
+  function shuffled(items) {
+    const result = [...items];
+    for (let index = result.length - 1; index > 0; index--) {
+      const swap = Math.floor(Math.random() * (index + 1));
+      [result[index], result[swap]] = [result[swap], result[index]];
+    }
+    return result;
+  }
+  function nextLeaderVisit() {
+    if (!visitDeck.length) {
+      visitDeck = shuffled(leaderVisits);
+      if (visitDeck[0]?.room === lastVisitRoom && visitDeck.length > 1)
+        [visitDeck[0], visitDeck[1]] = [visitDeck[1], visitDeck[0]];
+    }
+    let index = visitDeck.findIndex(visit => visit.room !== selected && visit.room !== lastVisitRoom);
+    if (index < 0) index = visitDeck.findIndex(visit => visit.room !== selected);
+    return index < 0 ? null : visitDeck.splice(index, 1)[0];
   }
   function scheduleTalk() {
     if (talkTimer || document.hidden || state.view !== "office" || state.replay || !actors.size) return;
