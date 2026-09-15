@@ -1,6 +1,20 @@
 // Author: David Choi. Purpose: real-data campus, searchable archives and transcripts.
 "use strict";
 const $ = (id) => document.getElementById(id);
+function readUiPreference(key, fallback) {
+  try {
+    return JSON.parse(localStorage.getItem(key)) ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+function writeUiPreference(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {}
+}
+let sidebarCollapsed = Boolean(readUiPreference("hermes-sidebar-collapsed", false));
+document.documentElement.classList.toggle("sidebar-collapsed", sidebarCollapsed);
 const state = {
   overview: null,
   view: "office",
@@ -478,6 +492,21 @@ async function loadLibrary() {
 document
   .querySelectorAll("nav button")
   .forEach((b) => (b.onclick = () => view(b.dataset.view)));
+function renderSidebar() {
+  const button = $("sidebar-toggle");
+  const label = sidebarCollapsed ? "사이드바 펼치기" : "사이드바 접기";
+  document.documentElement.classList.toggle("sidebar-collapsed", sidebarCollapsed);
+  button.setAttribute("aria-expanded", String(!sidebarCollapsed));
+  button.title = label;
+  button.querySelector("[aria-hidden]").textContent = sidebarCollapsed ? "›" : "‹";
+  button.querySelector(".sr-only").textContent = label;
+}
+$("sidebar-toggle").onclick = () => {
+  sidebarCollapsed = !sidebarCollapsed;
+  writeUiPreference("hermes-sidebar-collapsed", sidebarCollapsed);
+  renderSidebar();
+};
+renderSidebar();
 $("all-history").onclick = () => view("sessions");
 $("refresh").onclick = refresh;
 $("search-form").onsubmit = (e) => {

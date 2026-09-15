@@ -3,6 +3,14 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.18.0 — 2026-09-15 (minor: add collapsible responsive sidebar)
+
+- Added an accessible `‹`/`›` control that slides the desktop or laptop sidebar
+  off canvas and restores it, persisting the choice in browser-local storage.
+- The main area expands immediately after collapse, allowing the office's resize
+  observer to refill the available width; compact mobile navigation remains visible
+  regardless of the saved desktop preference.
+
 ## v1.17.4 — 2026-09-15 (patch: auto-fit office in split windows)
 
 - Added container resize observation and a separate automatic fit scale for the

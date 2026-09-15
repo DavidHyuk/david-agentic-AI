@@ -114,6 +114,30 @@ a {
   display: flex;
   flex-direction: column;
   z-index: 10;
+  transition: transform 220ms ease;
+}
+.sidebar-toggle {
+  position: fixed;
+  z-index: 20;
+  top: 88px;
+  left: 226px;
+  width: 32px;
+  height: 42px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 0 10px 10px 0;
+  background: #eeefe6;
+  color: var(--green);
+  box-shadow: 3px 2px 8px #52604b1f;
+  font-size: 24px;
+  line-height: 1;
+  transition: left 220ms ease, border-radius 220ms ease;
+}
+.sidebar-toggle:hover { background: #dfe6d2; }
+html.sidebar-collapsed .sidebar { transform: translateX(-100%); }
+html.sidebar-collapsed .sidebar-toggle {
+  left: 0;
+  border-radius: 0 10px 10px 0;
 }
 .brand {
   display: flex;
@@ -271,7 +295,9 @@ nav small {
 }
 main {
   margin-left: 242px;
+  transition: margin-left 220ms ease;
 }
+html.sidebar-collapsed main { margin-left: 0; }
 header {
   height: 73px;
   border-bottom: 1px solid var(--line);
@@ -1059,6 +1085,8 @@ dialog::backdrop {
   main {
     margin-left: 195px;
   }
+  .sidebar-toggle { left: 179px; }
+  html.sidebar-collapsed .sidebar-toggle { left: 0; }
   .content {
     padding: 28px 23px 0;
   }
@@ -1091,6 +1119,8 @@ dialog::backdrop {
     border-right: 0;
     border-bottom: 1px solid var(--line);
   }
+  .sidebar-toggle { display: none; }
+  html.sidebar-collapsed .sidebar { transform: none; }
   .brand {
     font-size: 24px;
     gap: 10px;

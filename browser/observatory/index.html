@@ -14,7 +14,7 @@
     <script src="office.js" defer></script>
   </head>
   <body>
-    <aside class="sidebar">
+    <aside class="sidebar" id="sidebar">
       <a href="#office" class="brand"
         ><span class="brand-icon">h<span>✦</span></span
         ><span
@@ -43,6 +43,9 @@
         <small>PERSONAL WORKSPACE · v1.15</small>
       </div>
     </aside>
+    <button class="sidebar-toggle" id="sidebar-toggle" type="button" aria-controls="sidebar" aria-expanded="true" title="사이드바 접기">
+      <span aria-hidden="true">‹</span><span class="sr-only">사이드바 접기</span>
+    </button>
     <main>
       <header>
         <div class="breadcrumb">

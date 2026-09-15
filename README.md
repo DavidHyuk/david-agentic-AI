@@ -961,6 +961,9 @@ room names and character cards do not collapse into one another. On narrow conta
 including Galaxy Fold landscape with the navigation sidebar open, compact mode
 replaces the large character cards with name pills, moves speech into one caption
 rail below the office, and renders next-action cards in two readable columns.
+On laptop and desktop, use the `‹` control on the sidebar edge to slide navigation
+away and let the office fill the window; `›` restores it. The preference persists
+in that browser, while the compact mobile navigation always remains available.
 
 Office conversations use separate persisted `office_<room>` sessions on the
 existing HQ API, classified into their matching Observatory rooms. They are

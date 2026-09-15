@@ -223,6 +223,22 @@ def test_office_auto_fits_partial_laptop_windows_before_manual_zoom():
     assert 'min-width: 0; aspect-ratio: 1000 / 560' in css
 
 
+def test_desktop_sidebar_collapses_and_persists_without_hiding_mobile_nav():
+    root = Path(__file__).resolve().parents[1] / 'browser/observatory'
+    html = (root / 'index.html').read_text()
+    app = (root / 'app.js').read_text()
+    css = (root / 'style.css').read_text()
+
+    assert 'id="sidebar-toggle"' in html
+    assert 'aria-controls="sidebar"' in html
+    assert 'readUiPreference("hermes-sidebar-collapsed", false)' in app
+    assert 'writeUiPreference("hermes-sidebar-collapsed", sidebarCollapsed)' in app
+    assert 'document.documentElement.classList.toggle("sidebar-collapsed"' in app
+    assert 'html.sidebar-collapsed main { margin-left: 0; }' in css
+    assert 'html.sidebar-collapsed .sidebar { transform: translateX(-100%); }' in css
+    assert '.sidebar-toggle { display: none; }' in css
+
+
 def test_missing_sources_are_empty_and_db_is_readonly(store):
     assert store.library('learning')['total'] == 0
     assert store.library('memory')['total'] == 0
