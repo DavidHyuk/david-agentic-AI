@@ -175,14 +175,28 @@ def plan(state: dict, catalog: dict, track: str, today: str,
     daily_id = f'{track}:{today}'
     if not next_assignment and not review_assignment and daily_id in state['assignments']:
         return state['assignments'][daily_id]
-    today_assignments = [assignment for assignment in state['assignments'].values()
-                         if assignment['track'] == track and assignment['date'] == today]
+    track_assignments = [assignment for assignment in state['assignments'].values()
+                         if assignment['track'] == track and assignment['date'] <= today]
+    today_assignments = [assignment for assignment in track_assignments
+                         if assignment['date'] == today]
     if next_assignment or review_assignment:
-        unfinished = [assignment for assignment in today_assignments
+        unfinished = [assignment for assignment in track_assignments
                       if not assignment['completed'] and
+                      not assignment.get('superseded') and
                       (assignment.get('session_type') == 'review') == review_assignment]
         if unfinished:
-            return unfinished[-1]
+            if not next_assignment:
+                return unfinished[-1]
+            expected = select_item(state, catalog, track, today, prefer_new=True)
+            matching = [assignment for assignment in unfinished
+                        if assignment['item_id'] == expected['item_id']]
+            if matching:
+                return matching[-1]
+            # A versioned curriculum change may make an open assignment
+            # jump ahead of the active pattern block. Preserve it for history,
+            # but remove it from the active workbench instead of calling it done.
+            for current in unfinished:
+                current['superseded'] = True
     assignment_id = daily_id
     sequence = 2
     while assignment_id in state['assignments']:
@@ -190,6 +204,10 @@ def plan(state: dict, catalog: dict, track: str, today: str,
         sequence += 1
     selection = (select_review_item(state, catalog, track, today) if review_assignment
                  else select_item(state, catalog, track, today, prefer_new=next_assignment))
+    if track == 'coding' and selection['curriculum_slot'] is not None:
+        slot = catalog['coding_curriculum'][selection['curriculum_slot']]
+        selection.update(pattern_block=slot['pattern_block'],
+                         block_index=slot['block_index'], block_size=slot['block_size'])
     # Preserve hint/solution exposure if an unfinished exercise is pushed again.
     previous = [a for a in state['assignments'].values()
                 if a['track'] == track and a['item_id'] == selection['item_id']
@@ -205,7 +223,10 @@ def plan(state: dict, catalog: dict, track: str, today: str,
 def render_message(assignment: dict, catalog: dict) -> str:
     if assignment['track'] == 'coding':
         item = next(p for p in catalog['problems'] if p['id'] == assignment['item_id'])
-        return (f"💻 Coding Interview — 35 min\nPattern: {item['pattern']}\n"
+        block = (f"Pattern block: {assignment['pattern_block']} · "
+                 f"{assignment['block_index']}/{assignment['block_size']}\n"
+                 if assignment.get('pattern_block') else '')
+        return (f"💻 Coding Interview — 35 min\n{block}Pattern: {item['pattern']}\n"
                 f"Today: {item['name']} ({assignment['session_type']})\n\n"
                 f"🎯 Goal\n{item['goal']}\n\nNeetCode:\n{item['neetcode_url']}\n\n"
                 f"LeetCode:\n{item['leetcode_url']}\n\n"

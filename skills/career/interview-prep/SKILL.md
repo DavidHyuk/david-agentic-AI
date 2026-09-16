@@ -1,7 +1,7 @@
 ---
 name: interview-prep
 description: Drive David's Staff/Senior ML Engineer interview prep in Silicon Valley with company-aware planning, focused drills, NeetCode/LeetCode foundations, practical coding strategy, Hello Interview system design, and adaptive progress.
-version: 1.4.0
+version: 1.5.0
 metadata:
   hermes:
     category: career
@@ -140,13 +140,15 @@ until its catalog, progress tracking, and job have actually been added.
 1. Scheduled Coding Coach runs, the workbench's **작업 이어가기** action, and
    any explicit request for a new problem use `python3
    ~/.hermes/scripts/interview_progress.py plan coding --next`.
-   It always selects the next uncompleted curriculum problem; never substitute
+   It always selects the next uncompleted curriculum problem inside the active
+   six-problem pattern block; never substitute
    an already attempted review. Jun may add one short suggestion when a weak
    review is due, but must not assign it. **복습하기** is the separate explicit path:
    `python3 ~/.hermes/scripts/interview_progress.py plan coding --review`.
    It selects the highest-value completed problem, preferring a due weak one.
    Each path is retry-safe and returns an already-open same-day assignment on
-   retry. Never propose an untracked replacement problem from memory or the
+   retry; an unfinished active-block problem is also resumed across later dates
+   rather than duplicated by the next cron run. Never propose an untracked replacement problem from memory or the
    catalog alone.
 2. Send the returned study message as the scheduled Telegram response, preserving
    the concrete problem, pattern, goal, 35-minute target, **both canonical URLs**,
@@ -161,22 +163,29 @@ until its catalog, progress tracking, and job have actually been added.
 
 The preparation pace is three completed 35-minute problems per week (Tue/Thu/Sat).
 It keeps David at beginner implementation depth while building toward Staff/Senior
-MLE interviews: require the prerequisite pattern before changing families, use
+MLE interviews. Complete **six consecutive new problems per pattern block** so
+the trigger, invariant, and implementation template become automatic. Require
+the prerequisite pattern before changing families, use
 feedback to make weak work prominent in **복습하기**, and do not jump to trees,
 heaps, or graphs early merely to increase difficulty.
 
-Nominal first five weeks (three completed study slots per week):
+Nominal progression (three completed study slots per week, two weeks per block):
 
-| Week | Pattern | Tue / Thu / Sat |
+| Weeks | Pattern block | Goal |
 |---|---|---|
-| 1 | Two Sum → HashMap foundations | Contains Duplicate / Valid Anagram / Two Sum |
-| 2 | HashMap extension → Two Pointers | Group Anagrams / Valid Palindrome / Two Sum II |
-| 3 | Sliding Window → Stack | Best Time to Buy and Sell Stock / Longest Substring Without Repeating Characters / Valid Parentheses |
-| 4 | Stack → Binary Search → Trees | Min Stack / Binary Search / Invert Binary Tree |
-| 5 | Tree BFS/DFS → Heap → Graph | Maximum Depth of Binary Tree / Kth Largest Element in a Stream / Number of Islands |
+| 1–2 | HashMap (Two Sum foundation) | recognize lookup/count/signature templates |
+| 3–4 | Two Pointers | recognize inward/forward pointer invariants |
+| 5–6 | Sliding Window | recognize fixed/variable window state |
+| 7–8 | Stack | recognize LIFO parsing and monotonic state |
+| 9–10 | Binary Search | reproduce boundary invariants |
+| 11–12 | Tree / BFS / DFS | reproduce recursive and level-order traversal |
+| 13–14 | Heap | recognize bounded top-k / priority state |
+| 15–16 | Graph | recognize components, traversal, and dependency graphs |
 
 The scheduled helper and **작업 이어가기** both advance only to a new,
-uncompleted curriculum problem while enforcing attempted prerequisites. A due
+uncompleted problem in the current six-item block while enforcing attempted
+prerequisites. The next block remains locked until all six new problems in the
+current block are completed. A due
 weak review can be suggested by Jun, but only an explicit **복습하기** request
 creates that assignment. Missed sessions do not advance slots and can extend the
 nominal five weeks. **복습하기** chooses the weakest/due previously attempted problem.

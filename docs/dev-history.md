@@ -3,6 +3,17 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.19.0 — 2026-09-16 (minor: drill six problems per coding pattern)
+
+- Expanded the curated coding curriculum from 15 to 48 exercises grouped into
+  eight ordered six-problem blocks from HashMap through Graph.
+- Updated the Coding Coach cron and shared workbench planner to finish all six new
+  exercises in the active pattern before advancing, while keeping explicit review
+  assignments separate.
+- Added block progress to each assignment and safe supersession for open tasks from
+  an older curriculum version. David's four completed HashMap exercises now lead
+  to Top K Frequent Elements (5/6), not the previously opened Two Pointers task.
+
 ## v1.18.2 — 2026-09-16 (patch: stabilize compact office conversations)
 
 - Kept the stage edge-to-edge at user zoom levels below 100%, eliminating the

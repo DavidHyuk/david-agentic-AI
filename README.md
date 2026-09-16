@@ -568,13 +568,11 @@ slots with a 60-minute Practical Coding exercise covering incremental features,
 state, concurrency, retries, debugging, and tests. That future scheduled track is
 not active until its catalog, progress tracking, and cron job are implemented.
 
-| Nominal week | Coding: Tue / Thu / Sat | System design: Sunday |
-|---|---|---|
-| 1 | Contains Duplicate / Valid Anagram / Two Sum | Delivery framework, requirements, relevant estimation |
-| 2 | Group Anagrams / Valid Palindrome / Two Sum II | API design and data modeling through URL Shortener |
-| 3 | Best Time to Buy and Sell Stock / Longest Substring Without Repeating Characters / Valid Parentheses | Cache, queue, load balancer, DB replication |
-| 4 | Min Stack / Binary Search / Invert Binary Tree | 45-minute Design a Notification System mock + 5-minute self-review |
-| 5 | Maximum Depth of Binary Tree / Kth Largest Element in a Stream / Number of Islands | Evidence-backed consolidation from the completed design topics |
+Coding follows eight six-problem blocks: **HashMap (including the Two Sum
+foundation) → Two Pointers → Sliding Window → Stack → Binary Search → Tree /
+BFS / DFS → Heap → Graph**. At three sessions per week, each block normally lasts
+two weeks. Every push shows progress such as `HashMap · 5/6`; the next family
+stays locked until all six new problems in the current block are completed.
 
 Start as a coding beginner. Each coding push includes a goal, both problem links,
 a 35-minute budget, and “try 20 minutes without AI first.” Ask for a hint when
@@ -586,7 +584,11 @@ Reply with your actual results. Coding tracks minutes, independent yes/no,
 highest hint 0–3, solution viewed yes/no, confidence 1–5, and a lesson/mistake.
 Design tracks minutes, requirements/architecture/trade-off/failure-mode scores
 (each 1–5), confidence, and next improvement. Sending a lesson never counts as
-completing it. Missing feedback keeps the current curriculum slot pending.
+completing it. Missing feedback keeps the current curriculum slot pending. A
+curriculum update preserves an obsolete open assignment as `superseded` history
+rather than falsely completing it, while removing it from the active workbench.
+The active block's unfinished problem is resumed across later cron dates instead
+of creating duplicate assignments.
 
 Solution viewed or confidence ≤2 schedules a review in 2 days; hint 2/3 or
 confidence 3 in 7 days; independent work with confidence ≥4 in 21 days. Other

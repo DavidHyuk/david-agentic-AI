@@ -140,7 +140,7 @@ David-Agent/
 │   ├── Qwen/                  # Qwen 계열 모델
 │   └── MiniMax/               # MiniMax-M2.7 모델
 │
-├── tests/                     # pytest 테스트 (316개)
+├── tests/                     # pytest 테스트 (318개)
 │   ├── conftest.py
 │   ├── test_papers_ingest.py
 │   ├── test_papers_digest.py
@@ -232,7 +232,7 @@ Calendar 연동을 재개할 때까지 `morning-brief`는 등록하지 않습니
 |----|------|------|
 | `papers-digest` | 08:50 화/금 | 전용 Telegram 논문 그룹: 가장 핫한 LLM/LVM 논문 3편 |
 | `interview-prep` | 12:05 월/수/금 | 전용 Interview 그룹: 실시간 트렌드 기반 Staff 레벨 드릴 1개 |
-| `coding-coach` | 12:10 화/목/토 | 전용 LeetCode 그룹: 35분 문제·목표·canonical URL |
+| `coding-coach` | 12:10 화/목/토 | 전용 LeetCode 그룹: 같은 패턴 6문제 블록의 다음 35분 문제 |
 | `leetcode-history-sync` | 매 4시간 35분 | 전송 없음: 연결된 LeetCode 세션의 읽기 전용 풀이 이력 snapshot 갱신 |
 | `system-design-coach` | 12:15 일요일 | 전용 System Design 그룹: Hello Interview 설계 과제 |
 | `english-podcast-daily` | 09:15 매일 | 기존 English bot의 `🎧 Morning Echo` 전용 그룹: 다운로드된 대본 기반 개인화 학습 1편 |
@@ -503,16 +503,19 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
 - 기존 `interview-prep` 스킬 안에서 동작하며, `stage.py`가 standalone helper와
   `references/coach_catalog.json`을 그대로 배포합니다. 모델/엔진 구성은 기존
   Qwen3.6 FP8 vLLM 128K 설정과 지원 대안을 사용합니다.
-- NeetCode roadmap/150의 15문제 경로는 Two Sum/HashMap → Two Pointers →
-  Sliding Window → Stack → Binary Search → Tree/BFS/DFS → Heap → Graph 순서입니다.
-  주 3회 35분 페이스에서 현재 완료·힌트·자신감·선행 패턴을 반영해 다음 단계를
-  고르며, 각 문제에 ID·이름·난도·선행 문제·권장 순서·NeetCode/LeetCode URL을 저장합니다.
+- 48문제 경로는 HashMap(Two Sum 기초 포함) → Two Pointers → Sliding Window →
+  Stack → Binary Search → Tree/BFS/DFS → Heap → Graph 순서의 8개 블록입니다.
+  각 블록에서 신규 문제 6개를 연속 완료한 뒤에만 다음 유형으로 이동하며, cron과
+  작업실은 `HashMap 5/6`처럼 현재 진척을 표시합니다. 주 3회 35분 페이스에서
+  완료·힌트·자신감·선행 패턴을 반영하고 각 문제의 canonical URL을 저장합니다.
 - Hello Interview: framework/요구사항/추정 → URL Shortener의 API/데이터 모델 →
   cache/queue/load balancer/DB replication → 45분 Notification System mock.
   마지막 문서의 Premium 제한을 표시하고 무료 보조 링크와 자체 과제를 제공합니다.
 - 새 cron push는 날짜별 assignment일 뿐 완료가 아닙니다. 실제 결과를 받은 후에만
   `~/.hermes/data/interview/coach_state.json`에 기록하고 커리큘럼을 진행합니다.
-  놓친 세션과 취약 복습 때문에 기본 5주 일정이 늘어날 수 있습니다.
+  놓친 세션과 취약 복습 때문에 기본 16주 일정이 늘어날 수 있습니다. 이전 curriculum의
+  열린 과제가 현재 패턴을 건너뛰면 완료로 위조하지 않고 `superseded` 이력으로 보존하며
+  활성 작업실에서는 제외합니다.
 - 코딩은 날짜·문제·패턴·시간·독립 해결 여부·최고 힌트·해설 열람·자신감·교훈·복습일을
   기록합니다. 설계는 주제·시간·요구사항/구조/trade-off/failure-mode 점수·자신감·다음
   개선점을 기록하며 점수는 1–5입니다.

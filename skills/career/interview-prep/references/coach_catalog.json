@@ -1,6 +1,6 @@
 {
-  "version": 1,
-  "links_checked": "2026-09-05",
+  "version": 2,
+  "links_checked": "2026-09-16",
   "curriculum_sources": [
     "https://neetcode.io/roadmap",
     "https://neetcode.io/practice/practice/neetcode150"
@@ -214,53 +214,758 @@
       ],
       "recommended_order": 15,
       "goal": "Model a grid as a graph, mark a component once, and compare iterative BFS with recursive DFS for large inputs."
+    },
+    {
+      "id": "top-k-frequent-elements",
+      "leetcode_id": 347,
+      "name": "Top K Frequent Elements",
+      "pattern": "HashMap",
+      "difficulty": "Medium",
+      "neetcode_url": "https://neetcode.io/problems/top-k-elements-in-list/question",
+      "leetcode_url": "https://leetcode.com/problems/top-k-frequent-elements/",
+      "prerequisites": [
+        "group-anagrams"
+      ],
+      "recommended_order": 16,
+      "goal": "Solve Top K Frequent Elements by recognizing and reproducing the HashMap invariant; explain boundary cases and time/space complexity."
+    },
+    {
+      "id": "product-of-array-except-self",
+      "leetcode_id": 238,
+      "name": "Product of Array Except Self",
+      "pattern": "HashMap",
+      "difficulty": "Medium",
+      "neetcode_url": "https://neetcode.io/problems/products-of-array-discluding-self/question",
+      "leetcode_url": "https://leetcode.com/problems/product-of-array-except-self/",
+      "prerequisites": [
+        "two-sum"
+      ],
+      "recommended_order": 17,
+      "goal": "Solve Product of Array Except Self by recognizing and reproducing the HashMap invariant; explain boundary cases and time/space complexity."
+    },
+    {
+      "id": "3sum",
+      "leetcode_id": 15,
+      "name": "3Sum",
+      "pattern": "Two Pointers",
+      "difficulty": "Medium",
+      "neetcode_url": "https://neetcode.io/problems/three-integer-sum/question",
+      "leetcode_url": "https://leetcode.com/problems/3sum/",
+      "prerequisites": [
+        "two-sum-ii-input-array-is-sorted"
+      ],
+      "recommended_order": 18,
+      "goal": "Solve 3Sum by recognizing and reproducing the Two Pointers invariant; explain boundary cases and time/space complexity."
+    },
+    {
+      "id": "container-with-most-water",
+      "leetcode_id": 11,
+      "name": "Container With Most Water",
+      "pattern": "Two Pointers",
+      "difficulty": "Medium",
+      "neetcode_url": "https://neetcode.io/problems/max-water-container/question",
+      "leetcode_url": "https://leetcode.com/problems/container-with-most-water/",
+      "prerequisites": [
+        "two-sum-ii-input-array-is-sorted"
+      ],
+      "recommended_order": 19,
+      "goal": "Solve Container With Most Water by recognizing and reproducing the Two Pointers invariant; explain boundary cases and time/space complexity."
+    },
+    {
+      "id": "move-zeroes",
+      "leetcode_id": 283,
+      "name": "Move Zeroes",
+      "pattern": "Two Pointers",
+      "difficulty": "Easy",
+      "neetcode_url": "https://neetcode.io/problems/move-zeroes/question",
+      "leetcode_url": "https://leetcode.com/problems/move-zeroes/",
+      "prerequisites": [
+        "valid-palindrome"
+      ],
+      "recommended_order": 20,
+      "goal": "Solve Move Zeroes by recognizing and reproducing the Two Pointers invariant; explain boundary cases and time/space complexity."
+    },
+    {
+      "id": "trapping-rain-water",
+      "leetcode_id": 42,
+      "name": "Trapping Rain Water",
+      "pattern": "Two Pointers",
+      "difficulty": "Hard",
+      "neetcode_url": "https://neetcode.io/problems/trapping-rain-water/question",
+      "leetcode_url": "https://leetcode.com/problems/trapping-rain-water/",
+      "prerequisites": [
+        "two-sum-ii-input-array-is-sorted"
+      ],
+      "recommended_order": 21,
+      "goal": "Solve Trapping Rain Water by recognizing and reproducing the Two Pointers invariant; explain boundary cases and time/space complexity."
+    },
+    {
+      "id": "longest-repeating-character-replacement",
+      "leetcode_id": 424,
+      "name": "Longest Repeating Character Replacement",
+      "pattern": "Sliding Window",
+      "difficulty": "Medium",
+      "neetcode_url": "https://neetcode.io/problems/longest-repeating-substring-with-replacement/question",
+      "leetcode_url": "https://leetcode.com/problems/longest-repeating-character-replacement/",
+      "prerequisites": [
+        "longest-substring-without-repeating-characters"
+      ],
+      "recommended_order": 22,
+      "goal": "Solve Longest Repeating Character Replacement by recognizing and reproducing the Sliding Window invariant; explain boundary cases and time/space complexity."
+    },
+    {
+      "id": "permutation-in-string",
+      "leetcode_id": 567,
+      "name": "Permutation in String",
+      "pattern": "Sliding Window",
+      "difficulty": "Medium",
+      "neetcode_url": "https://neetcode.io/problems/permutation-string/question",
+      "leetcode_url": "https://leetcode.com/problems/permutation-in-string/",
+      "prerequisites": [
+        "valid-anagram"
+      ],
+      "recommended_order": 23,
+      "goal": "Solve Permutation in String by recognizing and reproducing the Sliding Window invariant; explain boundary cases and time/space complexity."
+    },
+    {
+      "id": "minimum-window-substring",
+      "leetcode_id": 76,
+      "name": "Minimum Window Substring",
+      "pattern": "Sliding Window",
+      "difficulty": "Hard",
+      "neetcode_url": "https://neetcode.io/problems/minimum-window-with-characters/question",
+      "leetcode_url": "https://leetcode.com/problems/minimum-window-substring/",
+      "prerequisites": [
+        "longest-substring-without-repeating-characters"
+      ],
+      "recommended_order": 24,
+      "goal": "Solve Minimum Window Substring by recognizing and reproducing the Sliding Window invariant; explain boundary cases and time/space complexity."
+    },
+    {
+      "id": "sliding-window-maximum",
+      "leetcode_id": 239,
+      "name": "Sliding Window Maximum",
+      "pattern": "Sliding Window",
+      "difficulty": "Hard",
+      "neetcode_url": "https://neetcode.io/problems/sliding-window-maximum/question",
+      "leetcode_url": "https://leetcode.com/problems/sliding-window-maximum/",
+      "prerequisites": [
+        "longest-substring-without-repeating-characters"
+      ],
+      "recommended_order": 25,
+      "goal": "Solve Sliding Window Maximum by recognizing and reproducing the Sliding Window invariant; explain boundary cases and time/space complexity."
+    },
+    {
+      "id": "evaluate-reverse-polish-notation",
+      "leetcode_id": 150,
+      "name": "Evaluate Reverse Polish Notation",
+      "pattern": "Stack",
+      "difficulty": "Medium",
+      "neetcode_url": "https://neetcode.io/problems/evaluate-reverse-polish-notation/question",
+      "leetcode_url": "https://leetcode.com/problems/evaluate-reverse-polish-notation/",
+      "prerequisites": [
+        "valid-parentheses"
+      ],
+      "recommended_order": 26,
+      "goal": "Solve Evaluate Reverse Polish Notation by recognizing and reproducing the Stack invariant; explain boundary cases and time/space complexity."
+    },
+    {
+      "id": "generate-parentheses",
+      "leetcode_id": 22,
+      "name": "Generate Parentheses",
+      "pattern": "Stack",
+      "difficulty": "Medium",
+      "neetcode_url": "https://neetcode.io/problems/generate-parentheses/question",
+      "leetcode_url": "https://leetcode.com/problems/generate-parentheses/",
+      "prerequisites": [
+        "valid-parentheses"
+      ],
+      "recommended_order": 27,
+      "goal": "Solve Generate Parentheses by recognizing and reproducing the Stack invariant; explain boundary cases and time/space complexity."
+    },
+    {
+      "id": "daily-temperatures",
+      "leetcode_id": 739,
+      "name": "Daily Temperatures",
+      "pattern": "Stack",
+      "difficulty": "Medium",
+      "neetcode_url": "https://neetcode.io/problems/daily-temperatures/question",
+      "leetcode_url": "https://leetcode.com/problems/daily-temperatures/",
+      "prerequisites": [
+        "valid-parentheses"
+      ],
+      "recommended_order": 28,
+      "goal": "Solve Daily Temperatures by recognizing and reproducing the Stack invariant; explain boundary cases and time/space complexity."
+    },
+    {
+      "id": "car-fleet",
+      "leetcode_id": 853,
+      "name": "Car Fleet",
+      "pattern": "Stack",
+      "difficulty": "Medium",
+      "neetcode_url": "https://neetcode.io/problems/car-fleet/question",
+      "leetcode_url": "https://leetcode.com/problems/car-fleet/",
+      "prerequisites": [
+        "valid-parentheses"
+      ],
+      "recommended_order": 29,
+      "goal": "Solve Car Fleet by recognizing and reproducing the Stack invariant; explain boundary cases and time/space complexity."
+    },
+    {
+      "id": "search-a-2d-matrix",
+      "leetcode_id": 74,
+      "name": "Search a 2D Matrix",
+      "pattern": "Binary Search",
+      "difficulty": "Medium",
+      "neetcode_url": "https://neetcode.io/problems/search-2d-matrix/question",
+      "leetcode_url": "https://leetcode.com/problems/search-a-2d-matrix/",
+      "prerequisites": [
+        "binary-search"
+      ],
+      "recommended_order": 30,
+      "goal": "Solve Search a 2D Matrix by recognizing and reproducing the Binary Search invariant; explain boundary cases and time/space complexity."
+    },
+    {
+      "id": "koko-eating-bananas",
+      "leetcode_id": 875,
+      "name": "Koko Eating Bananas",
+      "pattern": "Binary Search",
+      "difficulty": "Medium",
+      "neetcode_url": "https://neetcode.io/problems/eating-bananas/question",
+      "leetcode_url": "https://leetcode.com/problems/koko-eating-bananas/",
+      "prerequisites": [
+        "binary-search"
+      ],
+      "recommended_order": 31,
+      "goal": "Solve Koko Eating Bananas by recognizing and reproducing the Binary Search invariant; explain boundary cases and time/space complexity."
+    },
+    {
+      "id": "find-minimum-in-rotated-sorted-array",
+      "leetcode_id": 153,
+      "name": "Find Minimum in Rotated Sorted Array",
+      "pattern": "Binary Search",
+      "difficulty": "Medium",
+      "neetcode_url": "https://neetcode.io/problems/find-minimum-in-rotated-sorted-array/question",
+      "leetcode_url": "https://leetcode.com/problems/find-minimum-in-rotated-sorted-array/",
+      "prerequisites": [
+        "binary-search"
+      ],
+      "recommended_order": 32,
+      "goal": "Solve Find Minimum in Rotated Sorted Array by recognizing and reproducing the Binary Search invariant; explain boundary cases and time/space complexity."
+    },
+    {
+      "id": "search-in-rotated-sorted-array",
+      "leetcode_id": 33,
+      "name": "Search in Rotated Sorted Array",
+      "pattern": "Binary Search",
+      "difficulty": "Medium",
+      "neetcode_url": "https://neetcode.io/problems/search-in-rotated-sorted-array/question",
+      "leetcode_url": "https://leetcode.com/problems/search-in-rotated-sorted-array/",
+      "prerequisites": [
+        "binary-search"
+      ],
+      "recommended_order": 33,
+      "goal": "Solve Search in Rotated Sorted Array by recognizing and reproducing the Binary Search invariant; explain boundary cases and time/space complexity."
+    },
+    {
+      "id": "time-based-key-value-store",
+      "leetcode_id": 981,
+      "name": "Time Based Key Value Store",
+      "pattern": "Binary Search",
+      "difficulty": "Medium",
+      "neetcode_url": "https://neetcode.io/problems/time-based-key-value-store/question",
+      "leetcode_url": "https://leetcode.com/problems/time-based-key-value-store/",
+      "prerequisites": [
+        "binary-search"
+      ],
+      "recommended_order": 34,
+      "goal": "Solve Time Based Key Value Store by recognizing and reproducing the Binary Search invariant; explain boundary cases and time/space complexity."
+    },
+    {
+      "id": "diameter-of-binary-tree",
+      "leetcode_id": 543,
+      "name": "Diameter of Binary Tree",
+      "pattern": "Tree / BFS / DFS",
+      "difficulty": "Easy",
+      "neetcode_url": "https://neetcode.io/problems/diameter-of-binary-tree/question",
+      "leetcode_url": "https://leetcode.com/problems/diameter-of-binary-tree/",
+      "prerequisites": [
+        "maximum-depth-of-binary-tree"
+      ],
+      "recommended_order": 35,
+      "goal": "Solve Diameter of Binary Tree by recognizing and reproducing the Tree / BFS / DFS invariant; explain boundary cases and time/space complexity."
+    },
+    {
+      "id": "balanced-binary-tree",
+      "leetcode_id": 110,
+      "name": "Balanced Binary Tree",
+      "pattern": "Tree / BFS / DFS",
+      "difficulty": "Easy",
+      "neetcode_url": "https://neetcode.io/problems/balanced-binary-tree/question",
+      "leetcode_url": "https://leetcode.com/problems/balanced-binary-tree/",
+      "prerequisites": [
+        "maximum-depth-of-binary-tree"
+      ],
+      "recommended_order": 36,
+      "goal": "Solve Balanced Binary Tree by recognizing and reproducing the Tree / BFS / DFS invariant; explain boundary cases and time/space complexity."
+    },
+    {
+      "id": "same-tree",
+      "leetcode_id": 100,
+      "name": "Same Tree",
+      "pattern": "Tree / BFS / DFS",
+      "difficulty": "Easy",
+      "neetcode_url": "https://neetcode.io/problems/same-binary-tree/question",
+      "leetcode_url": "https://leetcode.com/problems/same-tree/",
+      "prerequisites": [
+        "invert-binary-tree"
+      ],
+      "recommended_order": 37,
+      "goal": "Solve Same Tree by recognizing and reproducing the Tree / BFS / DFS invariant; explain boundary cases and time/space complexity."
+    },
+    {
+      "id": "subtree-of-another-tree",
+      "leetcode_id": 572,
+      "name": "Subtree of Another Tree",
+      "pattern": "Tree / BFS / DFS",
+      "difficulty": "Easy",
+      "neetcode_url": "https://neetcode.io/problems/subtree-of-a-binary-tree/question",
+      "leetcode_url": "https://leetcode.com/problems/subtree-of-another-tree/",
+      "prerequisites": [
+        "same-tree"
+      ],
+      "recommended_order": 38,
+      "goal": "Solve Subtree of Another Tree by recognizing and reproducing the Tree / BFS / DFS invariant; explain boundary cases and time/space complexity."
+    },
+    {
+      "id": "last-stone-weight",
+      "leetcode_id": 1046,
+      "name": "Last Stone Weight",
+      "pattern": "Heap",
+      "difficulty": "Easy",
+      "neetcode_url": "https://neetcode.io/problems/last-stone-weight/question",
+      "leetcode_url": "https://leetcode.com/problems/last-stone-weight/",
+      "prerequisites": [
+        "kth-largest-element-in-a-stream"
+      ],
+      "recommended_order": 39,
+      "goal": "Solve Last Stone Weight by recognizing and reproducing the Heap invariant; explain boundary cases and time/space complexity."
+    },
+    {
+      "id": "k-closest-points-to-origin",
+      "leetcode_id": 973,
+      "name": "K Closest Points to Origin",
+      "pattern": "Heap",
+      "difficulty": "Medium",
+      "neetcode_url": "https://neetcode.io/problems/k-closest-points-to-origin/question",
+      "leetcode_url": "https://leetcode.com/problems/k-closest-points-to-origin/",
+      "prerequisites": [
+        "kth-largest-element-in-a-stream"
+      ],
+      "recommended_order": 40,
+      "goal": "Solve K Closest Points to Origin by recognizing and reproducing the Heap invariant; explain boundary cases and time/space complexity."
+    },
+    {
+      "id": "kth-largest-element-in-an-array",
+      "leetcode_id": 215,
+      "name": "Kth Largest Element in an Array",
+      "pattern": "Heap",
+      "difficulty": "Medium",
+      "neetcode_url": "https://neetcode.io/problems/kth-largest-element-in-an-array/question",
+      "leetcode_url": "https://leetcode.com/problems/kth-largest-element-in-an-array/",
+      "prerequisites": [
+        "kth-largest-element-in-a-stream"
+      ],
+      "recommended_order": 41,
+      "goal": "Solve Kth Largest Element in an Array by recognizing and reproducing the Heap invariant; explain boundary cases and time/space complexity."
+    },
+    {
+      "id": "task-scheduler",
+      "leetcode_id": 621,
+      "name": "Task Scheduler",
+      "pattern": "Heap",
+      "difficulty": "Medium",
+      "neetcode_url": "https://neetcode.io/problems/task-scheduling/question",
+      "leetcode_url": "https://leetcode.com/problems/task-scheduler/",
+      "prerequisites": [
+        "kth-largest-element-in-a-stream"
+      ],
+      "recommended_order": 42,
+      "goal": "Solve Task Scheduler by recognizing and reproducing the Heap invariant; explain boundary cases and time/space complexity."
+    },
+    {
+      "id": "design-twitter",
+      "leetcode_id": 355,
+      "name": "Design Twitter",
+      "pattern": "Heap",
+      "difficulty": "Medium",
+      "neetcode_url": "https://neetcode.io/problems/design-twitter-feed/question",
+      "leetcode_url": "https://leetcode.com/problems/design-twitter/",
+      "prerequisites": [
+        "kth-largest-element-in-a-stream"
+      ],
+      "recommended_order": 43,
+      "goal": "Solve Design Twitter by recognizing and reproducing the Heap invariant; explain boundary cases and time/space complexity."
+    },
+    {
+      "id": "max-area-of-island",
+      "leetcode_id": 695,
+      "name": "Max Area of Island",
+      "pattern": "Graph / BFS / DFS",
+      "difficulty": "Medium",
+      "neetcode_url": "https://neetcode.io/problems/max-area-of-island/question",
+      "leetcode_url": "https://leetcode.com/problems/max-area-of-island/",
+      "prerequisites": [
+        "number-of-islands"
+      ],
+      "recommended_order": 44,
+      "goal": "Solve Max Area of Island by recognizing and reproducing the Graph / BFS / DFS invariant; explain boundary cases and time/space complexity."
+    },
+    {
+      "id": "clone-graph",
+      "leetcode_id": 133,
+      "name": "Clone Graph",
+      "pattern": "Graph / BFS / DFS",
+      "difficulty": "Medium",
+      "neetcode_url": "https://neetcode.io/problems/clone-graph/question",
+      "leetcode_url": "https://leetcode.com/problems/clone-graph/",
+      "prerequisites": [
+        "number-of-islands"
+      ],
+      "recommended_order": 45,
+      "goal": "Solve Clone Graph by recognizing and reproducing the Graph / BFS / DFS invariant; explain boundary cases and time/space complexity."
+    },
+    {
+      "id": "rotting-oranges",
+      "leetcode_id": 994,
+      "name": "Rotting Oranges",
+      "pattern": "Graph / BFS / DFS",
+      "difficulty": "Medium",
+      "neetcode_url": "https://neetcode.io/problems/rotting-fruit/question",
+      "leetcode_url": "https://leetcode.com/problems/rotting-oranges/",
+      "prerequisites": [
+        "number-of-islands"
+      ],
+      "recommended_order": 46,
+      "goal": "Solve Rotting Oranges by recognizing and reproducing the Graph / BFS / DFS invariant; explain boundary cases and time/space complexity."
+    },
+    {
+      "id": "pacific-atlantic-water-flow",
+      "leetcode_id": 417,
+      "name": "Pacific Atlantic Water Flow",
+      "pattern": "Graph / BFS / DFS",
+      "difficulty": "Medium",
+      "neetcode_url": "https://neetcode.io/problems/pacific-atlantic-water-flow/question",
+      "leetcode_url": "https://leetcode.com/problems/pacific-atlantic-water-flow/",
+      "prerequisites": [
+        "number-of-islands"
+      ],
+      "recommended_order": 47,
+      "goal": "Solve Pacific Atlantic Water Flow by recognizing and reproducing the Graph / BFS / DFS invariant; explain boundary cases and time/space complexity."
+    },
+    {
+      "id": "course-schedule",
+      "leetcode_id": 207,
+      "name": "Course Schedule",
+      "pattern": "Graph / BFS / DFS",
+      "difficulty": "Medium",
+      "neetcode_url": "https://neetcode.io/problems/course-schedule/question",
+      "leetcode_url": "https://leetcode.com/problems/course-schedule/",
+      "prerequisites": [
+        "number-of-islands"
+      ],
+      "recommended_order": 48,
+      "goal": "Solve Course Schedule by recognizing and reproducing the Graph / BFS / DFS invariant; explain boundary cases and time/space complexity."
     }
   ],
   "coding_curriculum": [
     {
-      "problem": "contains-duplicate"
+      "problem": "contains-duplicate",
+      "pattern_block": "HashMap",
+      "block_index": 1,
+      "block_size": 6
     },
     {
-      "problem": "valid-anagram"
+      "problem": "valid-anagram",
+      "pattern_block": "HashMap",
+      "block_index": 2,
+      "block_size": 6
     },
     {
-      "problem": "two-sum"
+      "problem": "two-sum",
+      "pattern_block": "HashMap",
+      "block_index": 3,
+      "block_size": 6
     },
     {
-      "problem": "group-anagrams"
+      "problem": "group-anagrams",
+      "pattern_block": "HashMap",
+      "block_index": 4,
+      "block_size": 6
     },
     {
-      "problem": "valid-palindrome"
+      "problem": "top-k-frequent-elements",
+      "pattern_block": "HashMap",
+      "block_index": 5,
+      "block_size": 6
     },
     {
-      "problem": "two-sum-ii-input-array-is-sorted"
+      "problem": "product-of-array-except-self",
+      "pattern_block": "HashMap",
+      "block_index": 6,
+      "block_size": 6
     },
     {
-      "problem": "best-time-to-buy-and-sell-stock"
+      "problem": "valid-palindrome",
+      "pattern_block": "Two Pointers",
+      "block_index": 1,
+      "block_size": 6
     },
     {
-      "problem": "longest-substring-without-repeating-characters"
+      "problem": "two-sum-ii-input-array-is-sorted",
+      "pattern_block": "Two Pointers",
+      "block_index": 2,
+      "block_size": 6
     },
     {
-      "problem": "valid-parentheses"
+      "problem": "3sum",
+      "pattern_block": "Two Pointers",
+      "block_index": 3,
+      "block_size": 6
     },
     {
-      "problem": "min-stack"
+      "problem": "container-with-most-water",
+      "pattern_block": "Two Pointers",
+      "block_index": 4,
+      "block_size": 6
     },
     {
-      "problem": "binary-search"
+      "problem": "move-zeroes",
+      "pattern_block": "Two Pointers",
+      "block_index": 5,
+      "block_size": 6
     },
     {
-      "problem": "invert-binary-tree"
+      "problem": "trapping-rain-water",
+      "pattern_block": "Two Pointers",
+      "block_index": 6,
+      "block_size": 6
     },
     {
-      "problem": "maximum-depth-of-binary-tree"
+      "problem": "best-time-to-buy-and-sell-stock",
+      "pattern_block": "Sliding Window",
+      "block_index": 1,
+      "block_size": 6
     },
     {
-      "problem": "kth-largest-element-in-a-stream"
+      "problem": "longest-substring-without-repeating-characters",
+      "pattern_block": "Sliding Window",
+      "block_index": 2,
+      "block_size": 6
     },
     {
-      "problem": "number-of-islands"
+      "problem": "longest-repeating-character-replacement",
+      "pattern_block": "Sliding Window",
+      "block_index": 3,
+      "block_size": 6
+    },
+    {
+      "problem": "permutation-in-string",
+      "pattern_block": "Sliding Window",
+      "block_index": 4,
+      "block_size": 6
+    },
+    {
+      "problem": "minimum-window-substring",
+      "pattern_block": "Sliding Window",
+      "block_index": 5,
+      "block_size": 6
+    },
+    {
+      "problem": "sliding-window-maximum",
+      "pattern_block": "Sliding Window",
+      "block_index": 6,
+      "block_size": 6
+    },
+    {
+      "problem": "valid-parentheses",
+      "pattern_block": "Stack",
+      "block_index": 1,
+      "block_size": 6
+    },
+    {
+      "problem": "min-stack",
+      "pattern_block": "Stack",
+      "block_index": 2,
+      "block_size": 6
+    },
+    {
+      "problem": "evaluate-reverse-polish-notation",
+      "pattern_block": "Stack",
+      "block_index": 3,
+      "block_size": 6
+    },
+    {
+      "problem": "generate-parentheses",
+      "pattern_block": "Stack",
+      "block_index": 4,
+      "block_size": 6
+    },
+    {
+      "problem": "daily-temperatures",
+      "pattern_block": "Stack",
+      "block_index": 5,
+      "block_size": 6
+    },
+    {
+      "problem": "car-fleet",
+      "pattern_block": "Stack",
+      "block_index": 6,
+      "block_size": 6
+    },
+    {
+      "problem": "binary-search",
+      "pattern_block": "Binary Search",
+      "block_index": 1,
+      "block_size": 6
+    },
+    {
+      "problem": "search-a-2d-matrix",
+      "pattern_block": "Binary Search",
+      "block_index": 2,
+      "block_size": 6
+    },
+    {
+      "problem": "koko-eating-bananas",
+      "pattern_block": "Binary Search",
+      "block_index": 3,
+      "block_size": 6
+    },
+    {
+      "problem": "find-minimum-in-rotated-sorted-array",
+      "pattern_block": "Binary Search",
+      "block_index": 4,
+      "block_size": 6
+    },
+    {
+      "problem": "search-in-rotated-sorted-array",
+      "pattern_block": "Binary Search",
+      "block_index": 5,
+      "block_size": 6
+    },
+    {
+      "problem": "time-based-key-value-store",
+      "pattern_block": "Binary Search",
+      "block_index": 6,
+      "block_size": 6
+    },
+    {
+      "problem": "invert-binary-tree",
+      "pattern_block": "Tree / BFS / DFS",
+      "block_index": 1,
+      "block_size": 6
+    },
+    {
+      "problem": "maximum-depth-of-binary-tree",
+      "pattern_block": "Tree / BFS / DFS",
+      "block_index": 2,
+      "block_size": 6
+    },
+    {
+      "problem": "diameter-of-binary-tree",
+      "pattern_block": "Tree / BFS / DFS",
+      "block_index": 3,
+      "block_size": 6
+    },
+    {
+      "problem": "balanced-binary-tree",
+      "pattern_block": "Tree / BFS / DFS",
+      "block_index": 4,
+      "block_size": 6
+    },
+    {
+      "problem": "same-tree",
+      "pattern_block": "Tree / BFS / DFS",
+      "block_index": 5,
+      "block_size": 6
+    },
+    {
+      "problem": "subtree-of-another-tree",
+      "pattern_block": "Tree / BFS / DFS",
+      "block_index": 6,
+      "block_size": 6
+    },
+    {
+      "problem": "kth-largest-element-in-a-stream",
+      "pattern_block": "Heap",
+      "block_index": 1,
+      "block_size": 6
+    },
+    {
+      "problem": "last-stone-weight",
+      "pattern_block": "Heap",
+      "block_index": 2,
+      "block_size": 6
+    },
+    {
+      "problem": "k-closest-points-to-origin",
+      "pattern_block": "Heap",
+      "block_index": 3,
+      "block_size": 6
+    },
+    {
+      "problem": "kth-largest-element-in-an-array",
+      "pattern_block": "Heap",
+      "block_index": 4,
+      "block_size": 6
+    },
+    {
+      "problem": "task-scheduler",
+      "pattern_block": "Heap",
+      "block_index": 5,
+      "block_size": 6
+    },
+    {
+      "problem": "design-twitter",
+      "pattern_block": "Heap",
+      "block_index": 6,
+      "block_size": 6
+    },
+    {
+      "problem": "number-of-islands",
+      "pattern_block": "Graph",
+      "block_index": 1,
+      "block_size": 6
+    },
+    {
+      "problem": "max-area-of-island",
+      "pattern_block": "Graph",
+      "block_index": 2,
+      "block_size": 6
+    },
+    {
+      "problem": "clone-graph",
+      "pattern_block": "Graph",
+      "block_index": 3,
+      "block_size": 6
+    },
+    {
+      "problem": "rotting-oranges",
+      "pattern_block": "Graph",
+      "block_index": 4,
+      "block_size": 6
+    },
+    {
+      "problem": "pacific-atlantic-water-flow",
+      "pattern_block": "Graph",
+      "block_index": 5,
+      "block_size": 6
+    },
+    {
+      "problem": "course-schedule",
+      "pattern_block": "Graph",
+      "block_index": 6,
+      "block_size": 6
     }
   ],
   "system_design": [

@@ -57,21 +57,23 @@ def test_catalog_is_ordered_and_links_are_problem_specific(catalog):
         assert set(problem['prerequisites']) <= seen
         seen.add(problem['id'])
         assert problem['recommended_order'] == order
-        assert problem['difficulty'] in ('Easy', 'Medium')
+        assert problem['difficulty'] in ('Easy', 'Medium', 'Hard')
         assert problem['name'] and problem['pattern'] and problem['goal']
         assert isinstance(problem['leetcode_id'], int)
         for key, domain in [('neetcode_url', 'neetcode.io'), ('leetcode_url', 'leetcode.com')]:
             parsed = urlparse(problem[key])
             assert parsed.scheme == 'https' and parsed.netloc == domain
             assert parsed.path.startswith('/problems/') and not parsed.query
-    assert len(catalog['coding_curriculum']) == 15
-    assert [s.get('problem') for s in catalog['coding_curriculum']] == [
-        'contains-duplicate', 'valid-anagram', 'two-sum', 'group-anagrams',
-        'valid-palindrome', 'two-sum-ii-input-array-is-sorted', 'best-time-to-buy-and-sell-stock',
-        'longest-substring-without-repeating-characters', 'valid-parentheses',
-        'min-stack', 'binary-search', 'invert-binary-tree',
-        'maximum-depth-of-binary-tree', 'kth-largest-element-in-a-stream',
-        'number-of-islands']
+    assert len(catalog['coding_curriculum']) == 48
+    blocks = {}
+    for slot in catalog['coding_curriculum']:
+        blocks.setdefault(slot['pattern_block'], []).append(slot)
+    assert list(blocks) == ['HashMap', 'Two Pointers', 'Sliding Window', 'Stack',
+                            'Binary Search', 'Tree / BFS / DFS', 'Heap', 'Graph']
+    assert all(len(slots) == 6 for slots in blocks.values())
+    assert all([slot['block_index'] for slot in slots] == list(range(1, 7))
+               and all(slot['block_size'] == 6 for slot in slots)
+               for slots in blocks.values())
     for item in catalog['system_design']:
         assert urlparse(item['url']).netloc == 'www.hellointerview.com'
         assert 45 <= item['target_minutes'] <= 60
@@ -100,6 +102,23 @@ def test_explicit_next_plan_tracks_a_second_same_day_problem(catalog):
     assert not second['completed']
     assert ip.plan(state, catalog, 'coding', '2026-09-08', next_assignment=True) == second
     assert ip.plan(state, catalog, 'coding', '2026-09-08') == first
+
+
+def test_curriculum_change_supersedes_open_problem_that_skips_active_block(catalog):
+    state = ip.empty_state()
+    for offset in range(4):
+        complete(state, catalog, f'2026-09-{8 + offset:02d}')
+    stale = ip.plan(state, catalog, 'coding', '2026-09-12', next_assignment=True)
+    stale['item_id'] = 'valid-palindrome'
+
+    replacement = ip.plan(state, catalog, 'coding', '2026-09-12', next_assignment=True)
+
+    assert stale['superseded'] is True
+    assert replacement['item_id'] == 'top-k-frequent-elements'
+    assert replacement['pattern_block'] == 'HashMap'
+    assert replacement['block_index'] == 5 and replacement['block_size'] == 6
+    assert 'Pattern block: HashMap · 5/6' in ip.render_message(replacement, catalog)
+    assert ip.plan(state, catalog, 'coding', '2026-09-13', next_assignment=True) == replacement
 
 
 def test_explicit_next_plan_skips_due_review_for_next_unseen_problem(catalog):
@@ -191,10 +210,11 @@ def test_seed_sequence_and_reserved_reviews(catalog):
             assert row['session_type'] == 'review'
         else:
             assert row['item_id'] == slot['problem']
-    assert ip.select_item(state, catalog, 'coding', '2026-09-20')['reason'] == 'consolidation review'
+    assert ip.select_item(state, catalog, 'coding', '2026-10-20')['reason'] in {
+        'due review', 'consolidation review'}
 
 
-def test_scheduled_first_four_weeks_keep_sliding_window_reachable(catalog):
+def test_scheduled_first_six_weeks_complete_three_pattern_blocks(catalog):
     state = ip.empty_state()
     start = date(2026, 9, 8)
     items = []
@@ -203,17 +223,20 @@ def test_scheduled_first_four_weeks_keep_sliding_window_reachable(catalog):
         if day.weekday() in (1, 3, 5):
             items.append(complete(state, catalog, day.isoformat())['item_id'])
     assert 'longest-substring-without-repeating-characters' in items
-    assert ip.curriculum_cursor(state, 'coding', '2026-10-20') == 15
+    assert ip.curriculum_cursor(state, 'coding', '2026-10-20') == 18
+    assert items[-1] == 'sliding-window-maximum'
 
 
-def test_week_three_min_stack_can_be_replaced_by_due_weak_review(catalog):
+def test_due_weak_review_does_not_interrupt_explicit_pattern_block(catalog):
     state = ip.empty_state()
     for i in range(8):
         complete(state, catalog, f'2026-09-{i+1:02}')
     state['coding'][-1].update(confidence=2, next_review_date='2026-09-09')
-    chosen = ip.select_item(state, catalog, 'coding', '2026-09-09')
-    assert chosen['item_id'] == 'longest-substring-without-repeating-characters'
-    assert chosen['curriculum_slot'] is None
+    chosen = ip.plan(state, catalog, 'coding', '2026-09-09', next_assignment=True)
+    assert chosen['item_id'] == '3sum'
+    assert chosen['session_type'] == 'new'
+    assert chosen['pattern_block'] == 'Two Pointers'
+    assert chosen['block_index'] == 3
 
 
 def test_prerequisite_recovery(catalog):

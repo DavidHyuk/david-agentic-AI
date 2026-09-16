@@ -232,7 +232,7 @@ class Observatory:
         state = self.coach_state()
         latest = {}
         for assignment in sorted(state['assignments'].values(), key=lambda a: a['date']):
-            if not assignment.get('completed'):
+            if not assignment.get('completed') and not assignment.get('superseded'):
                 latest[(assignment['track'], assignment['item_id'])] = assignment
         return list(latest.values())
 

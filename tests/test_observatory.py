@@ -250,6 +250,19 @@ def test_desktop_sidebar_collapses_and_persists_without_hiding_mobile_nav():
 def test_missing_sources_are_empty_and_db_is_readonly(store):
     assert store.library('learning')['total'] == 0
     assert store.library('memory')['total'] == 0
+
+
+def test_superseded_coach_assignments_leave_the_active_workbench(store):
+    state = store.home / 'data/interview/coach_state.json'
+    state.parent.mkdir(parents=True)
+    state.write_text(json.dumps({'coding': [], 'system_design': [], 'assignments': {
+        'old': {'id': 'old', 'track': 'coding', 'item_id': 'old', 'date': '2026-09-16',
+                'completed': False, 'superseded': True},
+        'new': {'id': 'new', 'track': 'coding', 'item_id': 'new', 'date': '2026-09-16',
+                'completed': False},
+    }}))
+
+    assert [item['id'] for item in store.pending_assignments()] == ['new']
     conn = store.connect('david')
     try:
         with pytest.raises(sqlite3.OperationalError):

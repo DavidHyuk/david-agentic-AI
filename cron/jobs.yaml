@@ -66,7 +66,10 @@ jobs:
       and send the actual study message it returns. Include the concrete problem,
       pattern, goal, 35-minute target, and visible clickable canonical NeetCode and
       LeetCode URLs. Always assign the latest uncompleted new curriculum problem;
-      never create a review assignment from this scheduled job. If a weak review
+      keep six consecutive new problems in the current pattern block before
+      advancing to the next pattern. State the block progress such as HashMap 5/6.
+      Always keep review separate; never create a review assignment from this
+      scheduled job. If a weak review
       is due, suggest the separate workbench Review button in one short line only.
       Start as a beginner; try 20 minutes without AI first. Offer only staged hints,
       never a solution first. Do not log a completed session until I report results.
