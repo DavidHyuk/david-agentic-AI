@@ -200,7 +200,7 @@
 [data-presence="blocked"] .walk-name i { background: #c37b5d; }
 .walk-bubble {
   position: absolute; bottom: 100%; left: 50%; width: max-content; max-width: 205px;
-  transform: translateX(-50%) translateY(5px); background: #fffdf2; border: 1px solid #d3d5c6;
+  transform: translateX(-50%) translateX(var(--bubble-shift, 0px)) translateY(5px); background: #fffdf2; border: 1px solid #d3d5c6;
   padding: 8px 10px; border-radius: 10px 10px 10px 2px; color: #405146; font-size: 12px;
   line-height: 1.4; white-space: pre-line; box-shadow: 0 3px 8px #6d674526; opacity: 0; visibility: hidden;
   transition: opacity .25s, transform .25s; pointer-events: none;
@@ -214,8 +214,10 @@
 .walk-bubble[data-kind="reward"] { background: #fff6c7; border-color: #d9b84f; color: #634d10; }
 .walk-bubble[data-kind="reward"]:before { content: "REWARD UNLOCKED"; color: #a27813; }
 .is-speaking .walk-bubble, .is-hovering .walk-bubble {
-  opacity: 1; visibility: visible; transform: translateX(-50%) translateY(0);
+  opacity: 1; visibility: visible; transform: translateX(-50%) translateX(var(--bubble-shift, 0px)) translateY(0);
 }
+.bubble-shift-left { --bubble-shift: -42px; }
+.bubble-shift-right { --bubble-shift: 42px; }
 .walking-agent.is-speaking { z-index: 800 !important; }
 .is-walking .cast-art { animation: office-walk .42s ease-in-out infinite alternate; }
 .is-selected .walk-name, .walking-agent:hover .walk-name { background: #e4f1d5; border-color: #6f9863; box-shadow: 0 0 0 3px #b2d69c55; }
@@ -285,9 +287,11 @@
     border-radius: 999px; text-align: center; box-shadow: 0 2px 5px #35412f25; }
   .walk-name b { font-size: 11px; line-height: 1; }
   .walk-name small, .walk-name i { display: none; }
-  .walk-bubble { max-width: 165px; padding: 6px 8px; border-radius: 8px 8px 8px 2px;
+  .walk-bubble { max-width: 150px; padding: 6px 8px; border-radius: 8px 8px 8px 2px;
     font-size: 10px; line-height: 1.3; }
   .walk-bubble:before { margin-bottom: 2px; font-size: 6px; letter-spacing: .7px; }
+  .bubble-shift-left { --bubble-shift: -55px; }
+  .bubble-shift-right { --bubble-shift: 55px; }
   #office-roster { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   #office-roster button { min-height: 88px; padding: 11px 12px; }
   #office-roster > button > b { font-size: 14px; }
@@ -331,8 +335,10 @@
   .walk-name { bottom: 2px; width: auto; min-width: 54px; display: block; padding: 4px 7px; border-radius: 999px; text-align: center; }
   .walk-name b { font-size: 11px; line-height: 1; }
   .walk-name small, .walk-name i { display: none !important; }
-  .walk-bubble { max-width: 165px; padding: 6px 8px; border-radius: 8px 8px 8px 2px; font-size: 10px; line-height: 1.3; }
+  .walk-bubble { max-width: 150px; padding: 6px 8px; border-radius: 8px 8px 8px 2px; font-size: 10px; line-height: 1.3; }
   .walk-bubble:before { margin-bottom: 2px; font-size: 6px; letter-spacing: .7px; }
+  .bubble-shift-left { --bubble-shift: -55px; }
+  .bubble-shift-right { --bubble-shift: 55px; }
   #office-roster { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
   #office-roster button { min-height: 88px; padding: 11px 12px; }
   .roster-action em { font-size: 10px; white-space: normal; line-height: 1.35; }

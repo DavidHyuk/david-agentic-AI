@@ -206,8 +206,14 @@ def test_fold_layout_keeps_small_bubbles_attached_to_characters():
     assert 'container: office / inline-size' in css
     assert '@container office (max-width: 900px)' in css
     assert '.walk-name small, .walk-name i { display: none; }' in css
-    assert '.walk-bubble { max-width: 165px; padding: 6px 8px' in css
+    assert '.walk-bubble { max-width: 150px; padding: 6px 8px' in css
     assert '.walk-bubble { display: none' not in css
+    assert 'separateBubbles("hq", partner)' in office
+    assert 'finishTalk(8000)' in office
+    assert 'followupTimer = setTimeout(() => showBubble(partner' not in office
+    assert '.bubble-shift-left { --bubble-shift: -55px; }' in css
+    assert '.bubble-shift-right { --bubble-shift: 55px; }' in css
+    assert 'translateX(-50%) translateX(var(--bubble-shift, 0px))' in css
     assert '#office-roster { grid-template-columns: repeat(2' in css
 
 
@@ -217,8 +223,9 @@ def test_office_auto_fits_partial_laptop_windows_before_manual_zoom():
     css = (root / 'office.css').read_text()
 
     assert 'new ResizeObserver(() => setOfficeZoom(officeZoom, null, false))' in office
-    assert 'const floorWidth = Math.max(780, viewport.clientWidth)' in office
-    assert 'const fitScale = Math.min(1, viewport.clientWidth / floorWidth)' in office
+    assert 'const referenceWidth = Math.max(780, viewport.clientWidth)' in office
+    assert 'const fitScale = Math.min(1, viewport.clientWidth / referenceWidth)' in office
+    assert 'const floorWidth = referenceWidth / Math.min(1, officeZoom)' in office
     assert 'const scale = Math.round(fitScale * officeZoom * 1000) / 1000' in office
     assert 'floor.dataset.scale = String(scale)' in office
     assert 'min-width: 0; aspect-ratio: 1000 / 560' in css

@@ -3,6 +3,16 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.18.2 — 2026-09-16 (patch: stabilize compact office conversations)
+
+- Kept the stage edge-to-edge at user zoom levels below 100%, eliminating the
+  right-side empty strip visible on Galaxy Fold while still shrinking fixed-size
+  characters and labels.
+- Extended teammate replies during Hermes visits to roughly six seconds and
+  removed the premature next-action overwrite.
+- Shifted nearby leader and teammate bubbles outward with compact-specific widths,
+  preventing their dialogue from covering each other.
+
 ## v1.18.1 — 2026-09-15 (patch: restore in-scene bubbles on small screens)
 
 - Restored speech bubbles directly above their speaking characters in compact

@@ -956,12 +956,17 @@ Character name/purpose cards use high-contrast type. The `−/＋` controls and 
 two-finger pinch scale the complete office, furniture and cast from 60–140% on mobile.
 The stage first auto-fits its actual container, so a full-screen or split-window
 MacBook view shows the same complete office; horizontal scrolling appears only
-after deliberate magnification. The mobile floor preserves workstation spacing so
+after deliberate magnification. Zooming below 100% keeps the stage background
+edge-to-edge instead of leaving an empty strip, while shrinking fixed-size cast and
+labels. The mobile floor preserves workstation spacing so
 room names and character cards do not collapse into one another. On narrow containers,
 including Galaxy Fold landscape with the navigation sidebar open, compact mode
 replaces the large character cards with name pills, keeps smaller live speech
 bubbles attached directly above each speaking character, and renders next-action
 cards in two readable columns.
+During a Hermes visit, the two nearby bubbles shift away from each other. The
+teammate's reply remains visible for about six seconds and is no longer immediately
+replaced by a next-action notice while Hermes is still speaking.
 On laptop and desktop, use the `‹` control on the sidebar edge to slide navigation
 away and let the office fill the window; `›` restores it. The preference persists
 in that browser, while the compact mobile navigation always remains available.

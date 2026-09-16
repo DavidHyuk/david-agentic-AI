@@ -232,8 +232,9 @@ window.sharedOffice = (() => {
     officeZoom = Math.round(Math.min(1.4, Math.max(0.6, value)) * 20) / 20;
     const center = focusX ?? viewport.clientWidth / 2;
     const contentPoint = (viewport.scrollLeft + center) / previousScale;
-    const floorWidth = Math.max(780, viewport.clientWidth);
-    const fitScale = Math.min(1, viewport.clientWidth / floorWidth);
+    const referenceWidth = Math.max(780, viewport.clientWidth);
+    const fitScale = Math.min(1, viewport.clientWidth / referenceWidth);
+    const floorWidth = referenceWidth / Math.min(1, officeZoom);
     const scale = Math.round(fitScale * officeZoom * 1000) / 1000;
     floor.style.width = floorWidth + "px";
     floor.style.zoom = String(scale);
@@ -421,8 +422,17 @@ window.sharedOffice = (() => {
     replyTimer = 0;
     followupTimer = 0;
     closingTimer = 0;
-    for (const room of speakingRooms) actors.get(room)?.node.classList.remove("is-speaking");
+    for (const actor of actors.values())
+      actor.node.classList.remove("is-speaking", "bubble-shift-left", "bubble-shift-right");
     speakingRooms.clear();
+  }
+  function separateBubbles(firstRoom, secondRoom) {
+    const first = actors.get(firstRoom), second = actors.get(secondRoom);
+    if (!first || !second || Math.abs(first.x - second.x) > 220) return;
+    const left = first.x <= second.x ? first : second;
+    const right = left === first ? second : first;
+    left.node.classList.add("bubble-shift-left");
+    right.node.classList.add("bubble-shift-right");
   }
   function showBubble(room, text, kind) {
     const actor = actors.get(room);
@@ -496,10 +506,10 @@ window.sharedOffice = (() => {
     const lines = randomItem(choices.length ? choices : variants);
     lastLeaderTalk.set(partner, lines);
     stopTalk();
+    separateBubbles("hq", partner);
     showBubble("hq", lines[0], "dialogue");
-    replyTimer = setTimeout(() => showBubble(partner, lines[1], "dialogue"), 1100);
-    followupTimer = setTimeout(() => showBubble(partner, notificationLine(partner), "notice"), 2400);
-    finishTalk(5200);
+    replyTimer = setTimeout(() => showBubble(partner, lines[1], "dialogue"), 1400);
+    finishTalk(8000);
   }
   function speakAmbient() {
     const rooms = [...actors.keys()].filter((room) => room !== selected && room !== lastAmbientRoom);
