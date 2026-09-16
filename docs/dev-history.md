@@ -3,6 +3,17 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.19.1 — 2026-09-16 (patch: make office conversations multi-turn)
+
+- Expanded every Hermes teammate visit and every paired team chat into four
+  alternating lines, so conversations complete two coherent exchanges instead
+  of ending after one reply.
+- Rewrote all team-pair scripts around their actual roles, increased the pause
+  between lines, and kept the final reply visible long enough to read.
+- Removed next-action notifications that previously replaced both team-chat
+  bubbles mid-conversation, while retaining those notices as separate office
+  events.
+
 ## v1.19.0 — 2026-09-16 (minor: drill six problems per coding pattern)
 
 - Expanded the curated coding curriculum from 15 to 48 exercises grouped into

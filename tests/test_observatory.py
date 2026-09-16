@@ -191,6 +191,13 @@ def test_office_randomizes_short_next_action_conversations():
     assert 'visitDeck.splice(index, 1)[0]' in office
     assert 'lastLeaderTalk.set(partner, lines)' in office
     assert 'variants.filter(lines => lines !== previous)' in office
+    assert 'scene.rooms.every(room => actors.has(room))' in office
+    assert 'scene.turns[3][0], scene.turns[3][1]' in office
+    assert 'showBubble("hq", lines[2], "dialogue")' in office
+    assert 'showBubble(partner, lines[3], "dialogue")' in office
+    assert 'finishTalk(11800)' in office
+    assert 'showBubble(scene[0], notificationLine(scene[0])' not in office
+    assert 'showBubble(scene[1], notificationLine(scene[1])' not in office
     assert 'return `${action.title} · ${action.detail}`' in office
     assert '3200 + Math.random() * 2800' in office
     assert 'routineIndex++ % leaderVisits.length' not in office
@@ -209,8 +216,8 @@ def test_fold_layout_keeps_small_bubbles_attached_to_characters():
     assert '.walk-bubble { max-width: 150px; padding: 6px 8px' in css
     assert '.walk-bubble { display: none' not in css
     assert 'separateBubbles("hq", partner)' in office
-    assert 'finishTalk(8000)' in office
-    assert 'followupTimer = setTimeout(() => showBubble(partner' not in office
+    assert 'finishTalk(11800)' in office
+    assert 'followupTimer = setTimeout(() => showBubble("hq", lines[2]' in office
     assert '.bubble-shift-left { --bubble-shift: -55px; }' in css
     assert '.bubble-shift-right { --bubble-shift: 55px; }' in css
     assert 'translateX(-50%) translateX(var(--bubble-shift, 0px))' in css

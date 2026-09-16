@@ -947,6 +947,9 @@ action such as due English reviews, unread papers, or an unfinished assignment;
 clicking it opens the matching workbench. Hidden tabs and other views suspend animation.
 Automatic speech now prioritizes each character's evidence-backed next action,
 with randomized role lines and paired agent exchanges as supporting variety.
+Both Hermes visits and teammate chats use four alternating lines (two complete
+exchanges), with readable pauses between replies and no unrelated next-action
+notice replacing either speaker before the conversation ends.
 Rooms and dialogue scenes avoid immediate repeats, and a new bubble begins about
 3.2–6 seconds after the previous exchange so a short office visit still shows
 useful activity. Ambient team exchanges are scripted and never presented as actual

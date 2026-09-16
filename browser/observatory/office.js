@@ -69,42 +69,67 @@ window.sharedOffice = (() => {
     podcast: ["이 표현, 귀에 익혀봐요!", "짧게 따라 말해볼까요?", "오늘은 어떤 이야기를 들어볼까요?"],
   };
   const dialogueScenes = [
-    ["papers", "interview", "Theo, 논문 근거를 답변에 넣어볼까요?", "좋아요, 사례까지 이어서 말해볼게요."],
-    ["coding", "design", "Mina, 이 구조의 병목은 어디일까요?", "트래픽부터 같이 계산해보죠."],
-    ["english", "podcast", "Rina, 오늘 표현 하나 골라줄래요?", "Ellie, 셰도잉하기 좋은 걸로 찾아볼게요!"],
-    ["hq", "papers", "Iris, 요즘 어떤 주제가 눈에 띄나요?", "추론과 에이전트 흐름을 보고 있어요."],
-    ["interview", "design", "Mina, 이 답변의 약점도 봐줄래요?", "실패 시나리오를 하나 더 붙여봐요."],
+    {rooms: ["papers", "interview"], turns: [
+      ["papers", "Theo, 논문 근거를 답변에 넣어볼까요?"],
+      ["interview", "좋아요. 어떤 근거가 가장 설득력 있을까요?"],
+      ["papers", "결론을 직접 뒷받침하는 실험 결과부터 골라봐요."],
+      ["interview", "그럼 결과와 실제 사례를 한 문장씩 이어볼게요."],
+    ]},
+    {rooms: ["coding", "design"], turns: [
+      ["coding", "Mina, 이 구조에서 먼저 볼 병목은 어디일까요?"],
+      ["design", "요청이 몰리는 입구부터 볼게요. 피크 트래픽은 어느 정도예요?"],
+      ["coding", "평소의 다섯 배를 가정하고, 쓰기 요청이 더 많아요."],
+      ["design", "그럼 큐로 흡수하고 소비자 확장 기준까지 같이 정해보죠."],
+    ]},
+    {rooms: ["english", "podcast"], turns: [
+      ["english", "Rina, 오늘 연습할 자연스러운 표현 하나 골라줄래요?"],
+      ["podcast", "좋아요. 짧고 또렷하게 들리는 구간으로 찾아볼게요!"],
+      ["english", "강세랑 소리가 줄어드는 부분도 표시해줄 수 있죠?"],
+      ["podcast", "그럼요. 한 번 듣고 두 번 따라 하기 좋게 잘라둘게요."],
+    ]},
+    {rooms: ["hq", "papers"], turns: [
+      ["hq", "Iris, 요즘 어떤 연구 주제가 눈에 띄나요?"],
+      ["papers", "추론과 에이전트 신뢰성 흐름을 보고 있어요."],
+      ["hq", "David에게 전할 핵심 하나만 먼저 고른다면요?"],
+      ["papers", "평가 결과와 실제 실패 사례가 함께 있는 연구부터 볼게요."],
+    ]},
+    {rooms: ["interview", "design"], turns: [
+      ["interview", "Mina, 이 시스템 디자인 답변의 약점도 봐줄래요?"],
+      ["design", "실패 조건과 복구 방법이 아직 조금 모호해요."],
+      ["interview", "큐가 밀리는 상황을 구체적인 예로 붙여볼게요."],
+      ["design", "좋아요. 감지 지표와 복구 트레이드오프까지 연결해봐요."],
+    ]},
   ];
   const leaderSmallTalk = {
     papers: [
-      ["Iris, 커피는 챙겼어요?", "네, 논문보다 따뜻해요."],
-      ["Iris, 오늘 눈에 띈 아이디어가 있나요?", "하나 골라 면접 관점으로 정리해볼게요."],
-      ["Iris, 읽을 순서를 같이 줄여볼까요?", "좋아요. 가장 중요한 근거부터 볼게요."],
+      ["Iris, 커피는 챙겼어요?", "네, 논문보다 따뜻해요.", "다 읽고 나면 핵심 한 줄도 들려주세요.", "커피가 식기 전에 하나 골라둘게요."],
+      ["Iris, 오늘 눈에 띈 아이디어가 있나요?", "하나 골라 면접 관점으로 정리해볼게요.", "David가 바로 써먹을 만한 부분도 있을까요?", "실험 결과와 연결되는 사례를 함께 찾아볼게요."],
+      ["Iris, 읽을 순서를 같이 줄여볼까요?", "좋아요. 가장 중요한 근거부터 볼게요.", "그다음은 반례를 확인하면 될까요?", "네, 결론과 한계를 나란히 정리해둘게요."],
     ],
     interview: [
-      ["Theo, 오늘 질문이 너무 어렵진 않죠?", "좋은 질문은 조금 어려워야죠."],
-      ["Theo, 답변 하나만 다듬어볼까요?", "결론부터 또렷하게 만들어보죠."],
-      ["Theo, 오늘은 어떤 역량을 보여줄까요?", "영향력과 판단 근거를 연결해볼게요."],
+      ["Theo, 오늘 질문이 너무 어렵진 않죠?", "좋은 질문은 조금 어려워야죠.", "David가 막히면 어디부터 풀어줄까요?", "결론 한 문장부터 세우게 해볼게요."],
+      ["Theo, 답변 하나만 다듬어볼까요?", "결론부터 또렷하게 만들어보죠.", "근거가 길어지면 무엇을 덜어낼까요?", "상황 설명을 줄이고 판단과 결과를 남길게요."],
+      ["Theo, 오늘은 어떤 역량을 보여줄까요?", "영향력과 판단 근거를 연결해볼게요.", "협업 장면도 하나 들어가면 좋겠네요.", "네, 반대 의견을 조율한 순간을 붙여볼게요."],
     ],
     coding: [
-      ["Jun, 키보드 소리만 들려도 든든하네요.", "버그도 그 소리를 들으면 도망가면 좋겠어요."],
-      ["Jun, 다음 문제 준비됐나요?", "네, 지금 수준에 맞춰 골라뒀어요."],
-      ["Jun, 오늘은 어떤 패턴인가요?", "풀이 전에 단서부터 같이 찾아보죠."],
+      ["Jun, 키보드 소리만 들려도 든든하네요.", "버그도 그 소리를 들으면 도망가면 좋겠어요.", "오늘은 어떤 실수를 먼저 잡을까요?", "경계 조건을 놓치지 않게 체크할게요."],
+      ["Jun, 다음 문제 준비됐나요?", "네, 지금 수준에 맞춰 골라뒀어요.", "같은 패턴이 눈에 익을 만한 문제죠?", "네, 여섯 문제 블록 안에서 한 단계만 올렸어요."],
+      ["Jun, 오늘은 어떤 패턴인가요?", "풀이 전에 단서부터 같이 찾아보죠.", "단서를 찾으면 바로 코드로 가도 될까요?", "먼저 자료구조와 복잡도를 말한 뒤 시작해봐요."],
     ],
     design: [
-      ["Mina, 화이트보드 자리가 아직 남았나요?", "좋은 생각 하나만 가져오시면요."],
-      ["Mina, 오늘 병목은 어디일까요?", "요청 흐름부터 좁혀볼게요."],
-      ["Mina, 설계를 한 장으로 줄일 수 있을까요?", "핵심 경계부터 그려보죠."],
+      ["Mina, 화이트보드 자리가 아직 남았나요?", "좋은 생각 하나만 가져오시면요.", "그럼 실패 경로부터 하나 그려볼까요?", "좋아요. 정상 흐름 옆에 바로 붙여둘게요."],
+      ["Mina, 오늘 병목은 어디일까요?", "요청 흐름부터 좁혀볼게요.", "트래픽이 몰리는 순간부터 보면 될까요?", "네, 피크 수치와 허용 지연을 먼저 정해봐요."],
+      ["Mina, 설계를 한 장으로 줄일 수 있을까요?", "핵심 경계부터 그려보죠.", "컴포넌트보다 데이터 흐름이 먼저겠네요.", "맞아요. 쓰기와 읽기 경로를 나눠 표시할게요."],
     ],
     english: [
-      ["Ellie, 오늘도 한 문장 배워볼까요?", "물론이죠. 부담 없이 시작해요."],
-      ["Ellie, 오늘 표현은 짧게 갈까요?", "네, 바로 쓸 수 있는 문장으로요."],
-      ["Ellie, 복습할 표현이 남았나요?", "가장 헷갈린 것부터 꺼내볼게요."],
+      ["Ellie, 오늘도 한 문장 배워볼까요?", "물론이죠. 부담 없이 시작해요.", "실제로 면접에서 쓸 수 있는 문장이면 좋겠어요.", "그럼 경험을 설명할 때 바로 쓰는 표현으로 골라볼게요."],
+      ["Ellie, 오늘 표현은 짧게 갈까요?", "네, 바로 쓸 수 있는 문장으로요.", "소리 내어 말할 때 어려운 부분도 있나요?", "연결되는 소리 하나만 짚고 세 번 연습해봐요."],
+      ["Ellie, 복습할 표현이 남았나요?", "가장 헷갈린 것부터 꺼내볼게요.", "오늘 새 표현과도 연결할 수 있을까요?", "네, 두 표현을 한 답변 안에서 써보게 만들게요."],
     ],
     podcast: [
-      ["Rina, 음악은 너무 크게 틀지 말아줘요.", "좋은 부분만 살짝 들려드릴게요!"],
-      ["Rina, 오늘 들을 구간은 골랐나요?", "짧고 따라 하기 좋은 부분으로요."],
-      ["Rina, 귀에 남은 표현이 있나요?", "한 번 더 들으면 확실히 남을 거예요."],
+      ["Rina, 음악은 너무 크게 틀지 말아줘요.", "좋은 부분만 살짝 들려드릴게요!", "David가 한 번에 따라 할 수 있을까요?", "긴 문장은 둘로 잘라서 들려줄게요."],
+      ["Rina, 오늘 들을 구간은 골랐나요?", "짧고 따라 하기 좋은 부분으로요.", "왜 그 구간을 골랐는지도 알려줄래요?", "실제 대화에서 자주 쓰는 리듬이 잘 들리거든요."],
+      ["Rina, 귀에 남은 표현이 있나요?", "한 번 더 들으면 확실히 남을 거예요.", "뜻보다 소리에 먼저 집중해볼까요?", "좋아요. 듣고 따라 한 뒤 마지막에 뜻을 확인해요."],
     ],
   };
   const jobLabels = {
@@ -486,17 +511,18 @@ window.sharedOffice = (() => {
   }
   function speakDialogue() {
     const scenes = dialogueScenes.filter(scene => scene !== lastDialogue
-      && scene[0] !== selected && scene[1] !== selected
-      && actors.has(scene[0]) && actors.has(scene[1]));
+      && !scene.rooms.includes(selected)
+      && scene.rooms.every(room => actors.has(room)));
     const scene = randomItem(scenes);
     if (!scene) return speakNotification();
     lastDialogue = scene;
     stopTalk();
-    showBubble(scene[0], scene[2], "dialogue");
-    replyTimer = setTimeout(() => showBubble(scene[1], scene[3], "dialogue"), 1200);
-    followupTimer = setTimeout(() => showBubble(scene[0], notificationLine(scene[0]), "notice"), 2600);
-    closingTimer = setTimeout(() => showBubble(scene[1], notificationLine(scene[1]), "notice"), 4000);
-    finishTalk(6500);
+    separateBubbles(scene.rooms[0], scene.rooms[1]);
+    showBubble(scene.turns[0][0], scene.turns[0][1], "dialogue");
+    replyTimer = setTimeout(() => showBubble(scene.turns[1][0], scene.turns[1][1], "dialogue"), 2400);
+    followupTimer = setTimeout(() => showBubble(scene.turns[2][0], scene.turns[2][1], "dialogue"), 5200);
+    closingTimer = setTimeout(() => showBubble(scene.turns[3][0], scene.turns[3][1], "dialogue"), 8000);
+    finishTalk(11800);
   }
   function startLeaderSmallTalk(partner) {
     const variants = leaderSmallTalk[partner];
@@ -508,8 +534,10 @@ window.sharedOffice = (() => {
     stopTalk();
     separateBubbles("hq", partner);
     showBubble("hq", lines[0], "dialogue");
-    replyTimer = setTimeout(() => showBubble(partner, lines[1], "dialogue"), 1400);
-    finishTalk(8000);
+    replyTimer = setTimeout(() => showBubble(partner, lines[1], "dialogue"), 2400);
+    followupTimer = setTimeout(() => showBubble("hq", lines[2], "dialogue"), 5200);
+    closingTimer = setTimeout(() => showBubble(partner, lines[3], "dialogue"), 8000);
+    finishTalk(11800);
   }
   function speakAmbient() {
     const rooms = [...actors.keys()].filter((room) => room !== selected && room !== lastAmbientRoom);
