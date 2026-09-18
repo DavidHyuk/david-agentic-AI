@@ -181,6 +181,26 @@ def test_office_visually_celebrates_verified_rewards():
     assert 'CAREER CASH · GAME REWARD' in workbench
 
 
+def test_office_reward_hud_opens_cash_earning_guide():
+    root = Path(__file__).resolve().parents[1] / 'browser/observatory'
+    office = (root / 'office.js').read_text()
+    office_css = (root / 'office.css').read_text()
+
+    assert 'id="reward-guide"' in office
+    assert 'toggleRewardGuide' in office
+    assert 'renderRewardGuide' in office
+    assert 'data-reward-room' in office
+    assert '이번 주 미션 전체 완료' in office
+    assert '.reward-guide' in office_css
+
+
+def test_design_workbench_does_not_render_coding_only_leetcode_card():
+    workbench = (Path(__file__).resolve().parents[1] /
+                 'browser/observatory/workbench.js').read_text()
+
+    assert 'const lcSummary = d.room !== "coding" ? "" : lc' in workbench
+
+
 def test_office_randomizes_short_next_action_conversations():
     office = (Path(__file__).resolve().parents[1] /
               'browser/observatory/office.js').read_text()

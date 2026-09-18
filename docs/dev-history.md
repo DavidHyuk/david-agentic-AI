@@ -3,6 +3,19 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.20.1 — 2026-09-18 (patch: keep LeetCode out of the design studio)
+
+- Fixed the shared coach workbench fallback that displayed the coding-only
+  LeetCode connection card in Mina's System Design Studio when no LeetCode
+  record was available.
+
+## v1.20.0 — 2026-09-18 (minor: explain remaining Career Cash in the office)
+
+- Made the office Career Cash HUD an accessible button that opens a focused
+  earning guide instead of leaving the next-offer remainder unexplained.
+- The guide shows the remaining amount, verified activity rewards, current weekly
+  progress, combo and weekly bonuses, and direct workbench links for each activity.
+
 ## v1.19.1 — 2026-09-16 (patch: make office conversations multi-turn)
 
 - Expanded every Hermes teammate visit and every paired team chat into four

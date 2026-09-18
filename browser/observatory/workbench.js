@@ -139,8 +139,8 @@ function activeCoachAssignment(d) {
 }
 function coachDesk(d) {
   const a = activeCoachAssignment(d);
-  const lc = d.room === "coding" ? d.leetcode_history : null;
-  const lcSummary = lc
+  const lc = d.leetcode_history;
+  const lcSummary = d.room !== "coding" ? "" : lc
     ? `<article class="desk-card"><span class="tag">LEETCODE · READ ONLY</span><h2>${esc(lc.username)} 풀이 기록</h2><p class="muted">${esc(lc.synced_at || "동기화 시각 미확인")} · 제출이나 계정 변경 없이 동기화됩니다.</p><div class="desk-metrics"><div><b>${Number(lc.total_solved || 0)}</b><span>해결한 문제</span></div><div><b>${Number(lc.solved_by_difficulty?.easy || 0)} / ${Number(lc.solved_by_difficulty?.medium || 0)} / ${Number(lc.solved_by_difficulty?.hard || 0)}</b><span>Easy / Medium / Hard</span></div></div>${lc.recent_accepted?.length ? `<p class="muted">최근 정답: ${esc(lc.recent_accepted.slice(0, 3).map((item) => item.title).join(", "))}</p>` : ""}</article>`
     : `<article class="desk-card"><span class="tag">LEETCODE · OPTIONAL</span><h2>LeetCode 기록 미연동</h2><p class="muted">터미널에서 세션을 연결하면 이곳에 읽기 전용 풀이 기록이 나타납니다.</p></article>`;
   if (!a)

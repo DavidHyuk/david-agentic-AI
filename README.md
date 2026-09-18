@@ -615,7 +615,10 @@ adds a `$15` combo. The weekly mission is 3 coding sessions, 1 design session,
 agent messages, and reminders do not count until David records the actual result.
 
 The office shows the wallet, streak, weekly checklist, next unlock progress, coin
-animation, and a celebration from the relevant character followed by Hermes.
+animation, and a celebration from the relevant character followed by Hermes. Click
+the Career Cash HUD to open a remaining-cash guide: it shows the current amount to
+the next card, each verified earning activity and amount, weekly progress, bonuses,
+and a direct link to the relevant workbench.
 At cumulative `$250/$500/$1000/$2000`, fictional recruiter/offer cards unlock.
 They are game achievements—not cash, hiring contact, or real offers. HQ owns this
 cross-room workflow, so the existing David profile, private Telegram chat, and

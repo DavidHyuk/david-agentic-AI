@@ -169,7 +169,7 @@ window.sharedOffice = (() => {
     $("rooms").innerHTML = `<div class="office-viewport" tabindex="0" aria-label="창 너비에 맞춘 사무실. 직접 확대하면 좌우로 스크롤할 수 있습니다.">
       <div class="shared-floor">
         <div class="back-wall" aria-hidden="true"><div class="wide-window"></div><span>HERMES<br><small>IDEAS LIVE HERE</small></span><div class="wide-window"></div></div>
-        <div class="reward-hud" id="reward-hud" hidden><span class="reward-wallet">$<b id="reward-balance">0</b></span><div><small id="reward-streak">TODAY'S MISSION</small><strong id="reward-offer">첫 보상을 준비 중</strong><i><em id="reward-progress"></em></i></div></div>
+        <button class="reward-hud" id="reward-hud" type="button" hidden aria-expanded="false" aria-controls="reward-guide" title="남은 Career Cash를 채우는 활동 보기"><span class="reward-wallet">$<b id="reward-balance">0</b></span><span><small id="reward-streak">TODAY'S MISSION</small><strong id="reward-offer">첫 보상을 준비 중</strong><i><em id="reward-progress"></em></i><small class="reward-hint">클릭해서 남은 CASH 확인</small></span></button>
         <div class="reward-shower" id="reward-shower" aria-hidden="true"></div>
         <div class="floor-sign">THE STUDIO <span>↙ LOUNGE · COFFEE ↗</span></div>
         <div class="wall-board research-board" aria-hidden="true"><b>RESEARCH PULSE</b><i></i><i></i><i></i></div>
@@ -202,8 +202,16 @@ window.sharedOffice = (() => {
           <div class="conversation-footer"><span id="office-chat-status" role="status"></span><button class="text-button" id="conversation-reload">기록 새로고침</button><button class="text-button" id="conversation-workbench">작업실 열기 ↗</button></div>
           <small class="conversation-note">사무실 대화는 웹에 저장됩니다 · Telegram 전송 없음</small>
         </div>
+      </section>
+      <section id="reward-guide" class="reward-guide" aria-labelledby="reward-guide-title" hidden tabindex="-1">
+        <div class="reward-guide-heading"><div><small>CAREER CASH PLAN</small><h2 id="reward-guide-title">남은 CASH 채우기</h2></div><button class="outline" id="reward-guide-close" type="button" aria-label="Career Cash 안내 닫기">×</button></div>
+        <p id="reward-guide-summary"></p><div id="reward-guide-content"></div>
+        <small class="reward-guide-note">Career Cash와 오퍼 카드는 실제 현금·채용 제안이 아닌 동기부여용 게임 보상입니다.</small>
       </section>`;
     $("conversation-close").onclick = close;
+    $("reward-hud").onclick = toggleRewardGuide;
+    $("reward-guide-close").onclick = () => toggleRewardGuide(false);
+    $("reward-guide").onkeydown = (event) => { if (event.key === "Escape") toggleRewardGuide(false); };
     $("conversation-workbench").onclick = () => { if (selected) openWorkbench(selected); };
     $("conversation-reload").onclick = () => { if (selected) loadHistory(selected); };
     $("office-chat-form").onsubmit = send;
@@ -333,9 +341,43 @@ window.sharedOffice = (() => {
       : "ALL VIRTUAL OFFERS UNLOCKED";
     const threshold = Number(rewards.next_offer?.threshold || balance || 1);
     $("reward-progress").style.width = `${Math.min(100, balance / threshold * 100)}%`;
+    renderRewardGuide(rewards);
     const previousBalance = Number(localRead("career-cash-seen", 0) || 0);
     if (balance > previousBalance) celebrateReward(rewards, balance - previousBalance);
     localWrite("career-cash-seen", balance);
+  }
+  function toggleRewardGuide(force) {
+    const guide = $("reward-guide"), shouldOpen = force ?? guide.hidden;
+    guide.hidden = !shouldOpen;
+    $("reward-hud").setAttribute("aria-expanded", String(shouldOpen));
+    if (shouldOpen) {
+      guide.focus({preventScroll: true});
+      guide.scrollIntoView({block: "nearest", behavior: reduced.matches ? "instant" : "smooth"});
+    } else $("reward-hud").focus({preventScroll: true});
+  }
+  function renderRewardGuide(rewards) {
+    const balance = Number(rewards.balance || 0), next = rewards.next_offer;
+    const weekly = rewards.weekly || {counts: {}, goals: {}};
+    const sources = [
+      {room: "coding", label: "코딩 문제 완료", amount: 30, key: "coding"},
+      {room: "design", label: "시스템 설계 완료", amount: 45, key: "design"},
+      {room: "english", label: "영어 SRS 하루 복습", amount: 10, key: "english"},
+      {room: "papers", label: "논문 완독", amount: 20, key: "paper"},
+    ];
+    $("reward-guide-summary").textContent = next
+      ? `현재 $${balance.toLocaleString()} / $${Number(next.threshold).toLocaleString()} · ${next.label}까지 $${Number(next.remaining).toLocaleString()} 남았습니다.`
+      : `현재 $${balance.toLocaleString()} · 모든 가상 오퍼 카드를 해금했습니다.`;
+    const rows = sources.map(source => {
+      const count = Math.min(Number(weekly.counts?.[source.key] || 0), Number(weekly.goals?.[source.key] || 0));
+      const goal = Number(weekly.goals?.[source.key] || 0);
+      return `<button class="reward-source" type="button" data-reward-room="${source.room}"><span><b>${source.label}</b><small>이번 주 ${count}/${goal}</small></span><strong>+$${source.amount}</strong><em>작업실 열기 →</em></button>`;
+    }).join("");
+    const combo = `<div class="reward-bonus"><b>서로 다른 두 영역을 같은 날 완료</b><span>일일 콤보 +$15</span></div>`;
+    const weeklyBonus = `<div class="reward-bonus"><b>이번 주 미션 전체 완료</b><span>주간 보너스 +$150</span></div>`;
+    $("reward-guide-content").innerHTML = `<p class="reward-guide-intro">아래의 실제 완료 기록이 Career Cash에 반영됩니다. 필요한 활동을 열어 바로 시작하세요.</p><div class="reward-sources">${rows}</div><div class="reward-bonuses">${combo}${weeklyBonus}</div>`;
+    $("reward-guide-content").querySelectorAll("[data-reward-room]").forEach(button => {
+      button.onclick = () => openWorkbench(button.dataset.rewardRoom);
+    });
   }
   function celebrateReward(rewards, earned) {
     const latest = (rewards.recent || []).find(item => item.kind === "activity") || rewards.recent?.[0];
