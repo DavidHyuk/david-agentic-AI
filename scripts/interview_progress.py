@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 # __author__ = 'David Choi (bestshoot21@gmail.com)'
-"""Select concrete interview lessons and persist evidence-backed progress.
+"""Select interview work and persist evidence-backed coding/design progress.
 
 Standalone, standard-library CLI. Catalog defaults to the staged interview-prep
 references; state defaults to $HERMES_HOME/data/interview/coach_state.json.
-Plans are retry-safe daily assignments, never completed sessions. Only explicit
-feedback advances the curriculum. CLI writes use a lock and atomic replacement.
+Coding plans are retry-safe daily assignments. System design is a gated weekly
+interview with saved answers, follow-ups, rubric feedback, and delayed reference
+solutions. Only explicit feedback advances either curriculum. CLI writes use a
+lock and atomic replacement.
 """
 from __future__ import annotations
 
@@ -22,10 +24,39 @@ import tempfile
 
 DIMENSIONS = ('requirements', 'architecture', 'trade_off', 'failure_mode')
 TRACKS = ('coding', 'system_design')
+DESIGN_CORE_DIMENSIONS = (
+    'requirement_clarification', 'high_level_architecture', 'data_model',
+    'api_design', 'scalability', 'reliability', 'failure_handling',
+    'trade_off_reasoning', 'observability', 'communication',
+)
+DESIGN_TRACK_DIMENSIONS = {
+    'general': (),
+    'ml': ('ml_problem_formulation', 'data_strategy', 'model_choice',
+           'evaluation', 'serving', 'monitoring'),
+    'agent': ('agent_loop_design', 'tool_execution', 'context_management',
+              'memory', 'retry_recovery', 'evaluation', 'safety_sandboxing',
+              'cost_latency_awareness'),
+}
+DESIGN_TRACK_TARGETS = {'general': 0.40, 'ml': 0.25, 'agent': 0.35}
+DESIGN_DIFFICULTIES = {
+    1: 'Fundamentals', 2: 'Standard senior interview',
+    3: 'Senior deep dive', 4: 'Staff-level trade-offs',
+}
 
 
 def empty_state() -> dict:
     return {'version': 1, 'coding': [], 'system_design': [], 'assignments': {}}
+
+
+def normalize_state(state: dict) -> dict:
+    """Preserve old evidence while retiring pre-interview design assignments."""
+    for assignment in state['assignments'].values():
+        if (assignment.get('track') == 'system_design'
+                and not assignment.get('completed')
+                and 'phase' not in assignment):
+            assignment['superseded'] = True
+            assignment['superseded_reason'] = 'replaced by adaptive interview workflow'
+    return state
 
 
 def load_state(path: Path) -> dict:
@@ -36,7 +67,7 @@ def load_state(path: Path) -> dict:
             any(not isinstance(state.get(k), list) for k in TRACKS) or
             not isinstance(state.get('assignments'), dict)):
         raise ValueError('Unsupported or malformed coach state; preserve it for recovery.')
-    return state
+    return normalize_state(state)
 
 
 def save_state(path: Path, state: dict) -> None:
@@ -94,9 +125,278 @@ def curriculum_cursor(state: dict, track: str, today: str) -> int:
     return cursor
 
 
+def design_score_dimensions(track: str) -> tuple[str, ...]:
+    if track not in DESIGN_TRACK_DIMENSIONS:
+        raise ValueError(f'Unknown system-design track: {track}')
+    return DESIGN_CORE_DIMENSIONS + DESIGN_TRACK_DIMENSIONS[track]
+
+
+def design_difficulty(state: dict, today: str) -> int:
+    """Advance only on repeated strong evidence; regress after a weak session."""
+    completed = [row for row in state['system_design'] if row['date'] <= today]
+    recent = sorted(completed, key=lambda row: row['date'])[-3:]
+    if not recent:
+        return 2
+    levels = [int(row.get('difficulty_level', 2)) for row in recent]
+    scores = [float(row.get('overall_score', 0)) for row in recent
+              if row.get('overall_score') is not None]
+    current = levels[-1]
+    if scores and scores[-1] < 2.75:
+        return max(1, current - 1)
+    if len(scores) >= 2 and all(score >= 4.0 for score in scores[-2:]):
+        return min(4, current + 1)
+    return current
+
+
+def recurring_design_weaknesses(state: dict, today: str) -> Counter:
+    weaknesses = Counter()
+    for row in state['system_design']:
+        if row['date'] > today:
+            continue
+        for value in row.get('weaknesses', []):
+            weaknesses[str(value).strip().lower()] += 1
+        for value in row.get('recommended_review_topics', []):
+            weaknesses[str(value).strip().lower()] += 1
+        for name, score in row.get('scores', {}).items():
+            if score <= 2:
+                weaknesses[name.replace('_', ' ')] += 1
+    return weaknesses
+
+
+def design_progress(state: dict, catalog: dict, today: str) -> dict:
+    completed = [row for row in state['system_design'] if row['date'] <= today]
+    track_counts = Counter(row.get('design_track', 'general') for row in completed)
+    score_totals = Counter()
+    score_counts = Counter()
+    for row in completed:
+        for name, score in row.get('scores', {}).items():
+            score_totals[name] += score
+            score_counts[name] += 1
+    averages = {name: round(score_totals[name] / score_counts[name], 2)
+                for name in score_totals}
+    recent_scores = [row.get('overall_score') for row in completed[-4:]
+                     if row.get('overall_score') is not None]
+    return {
+        'sessions_completed': len(completed),
+        'track_counts': dict(track_counts),
+        'target_mix': DESIGN_TRACK_TARGETS,
+        'current_difficulty_level': design_difficulty(state, today),
+        'current_difficulty': DESIGN_DIFFICULTIES[design_difficulty(state, today)],
+        'recent_average': (round(sum(recent_scores) / len(recent_scores), 2)
+                           if recent_scores else None),
+        'dimension_averages': averages,
+        'recurring_weaknesses': recurring_design_weaknesses(state, today).most_common(8),
+    }
+
+
+def select_design_problem(state: dict, catalog: dict, today: str) -> dict:
+    """Select deterministically from balance, weakness overlap, and demonstrated level."""
+    items = catalog['system_design']
+    completed = [row for row in state['system_design'] if row['date'] <= today]
+    used = {row['item_id'] for row in completed}
+    candidates = [item for item in items if item['id'] not in used]
+    if not candidates:
+        recent_ids = {row['item_id'] for row in completed[-3:]}
+        candidates = [item for item in items if item['id'] not in recent_ids] or items
+    difficulty = design_difficulty(state, today)
+    same_level = [item for item in candidates if item['difficulty_level'] == difficulty]
+    if same_level:
+        candidates = same_level
+
+    track_counts = Counter(row.get('design_track', 'general') for row in completed)
+    next_total = len(completed) + 1
+    weakness_counts = recurring_design_weaknesses(state, today)
+
+    def rank(item: dict) -> tuple:
+        track = item['track']
+        balance_deficit = DESIGN_TRACK_TARGETS[track] * next_total - track_counts[track]
+        topic_match = sum(weakness_counts.get(topic.lower(), 0)
+                          for topic in item.get('topics', []))
+        # Prefer a different scenario sharing a weak concept, then restore mix.
+        return (topic_match, round(balance_deficit, 4), -item['recommended_order'])
+
+    return max(candidates, key=rank)
+
+
+def active_design_assignment(state: dict, today: str) -> dict | None:
+    active = [assignment for assignment in state['assignments'].values()
+              if assignment.get('track') == 'system_design'
+              and assignment['date'] <= today
+              and not assignment.get('completed')
+              and not assignment.get('superseded')
+              and assignment.get('session_type') == 'new']
+    return sorted(active, key=lambda assignment: (assignment['date'], assignment['id']))[-1] if active else None
+
+
+def plan_design(state: dict, catalog: dict, today: str) -> dict:
+    """Return the sole active weekly interview, never opening a second one."""
+    date.fromisoformat(today)
+    active = active_design_assignment(state, today)
+    if active:
+        return active
+    week = date.fromisoformat(today).isocalendar()[:2]
+    same_week = [assignment for assignment in state['assignments'].values()
+                 if assignment.get('track') == 'system_design'
+                 and date.fromisoformat(assignment['date']).isocalendar()[:2] == week
+                 and not assignment.get('superseded')
+                 and assignment.get('session_type') == 'new']
+    if same_week:
+        return sorted(same_week, key=lambda assignment: assignment['id'])[-1]
+    item = select_design_problem(state, catalog, today)
+    assignment_id = f'system_design:{today}'
+    sequence = 2
+    while assignment_id in state['assignments']:
+        assignment_id = f'system_design:{today}:{sequence}'
+        sequence += 1
+    assignment = {
+        'id': assignment_id, 'track': 'system_design', 'date': today,
+        'completed': False, 'superseded': False, 'item_id': item['id'],
+        'reason': 'adaptive weekly selection', 'curriculum_slot': None,
+        'session_type': 'new', 'design_track': item['track'],
+        'difficulty_level': item['difficulty_level'],
+        'topics': item['topics'], 'phase': 'problem', 'answer': '',
+        'followups': [], 'feedback': None, 'solution_viewed': False,
+    }
+    state['assignments'][assignment_id] = assignment
+    return assignment
+
+
+def _design_assignment(state: dict, assignment_id: str) -> dict:
+    assignment = state['assignments'].get(assignment_id)
+    if not assignment or assignment.get('track') != 'system_design':
+        raise ValueError('Unknown system-design assignment.')
+    return assignment
+
+
+def record_design_answer(state: dict, assignment_id: str, answer: str) -> dict:
+    assignment = _design_assignment(state, assignment_id)
+    if assignment.get('completed'):
+        raise ValueError('This interview already has feedback.')
+    answer = answer.strip()
+    if not answer:
+        raise ValueError('Answer must not be empty.')
+    if assignment.get('answer') and assignment['answer'] != answer:
+        raise ValueError('An answer is already saved; append through a follow-up instead.')
+    assignment['answer'] = answer
+    assignment['phase'] = 'followup'
+    return assignment
+
+
+def record_design_followup(state: dict, assignment_id: str, question: str,
+                           answer: str = '') -> dict:
+    assignment = _design_assignment(state, assignment_id)
+    if not assignment.get('answer'):
+        raise ValueError('Save the proposed design before interviewer follow-ups.')
+    if assignment.get('completed'):
+        raise ValueError('This interview already has feedback.')
+    question = question.strip()
+    answer = answer.strip()
+    if not question:
+        raise ValueError('Follow-up question must not be empty.')
+    row = {'question': question, 'answer': answer}
+    if (assignment['followups'] and assignment['followups'][-1]['question'] == question
+            and not assignment['followups'][-1]['answer']):
+        assignment['followups'][-1]['answer'] = answer
+    elif not assignment['followups'] or assignment['followups'][-1] != row:
+        assignment['followups'].append(row)
+    return assignment
+
+
+def record_design_evaluation(state: dict, catalog: dict, assignment_id: str,
+                             today: str, duration: int, evaluation: dict) -> dict:
+    assignment = _design_assignment(state, assignment_id)
+    date.fromisoformat(today)
+    if today < assignment['date']:
+        raise ValueError('Completion cannot precede the assignment date.')
+    if not assignment.get('answer'):
+        raise ValueError('Feedback requires a saved proposed design.')
+    if not any(row.get('answer') for row in assignment.get('followups', [])):
+        raise ValueError('Feedback requires at least one answered interviewer follow-up.')
+    _integer(duration, 'duration in minutes', 1, 180)
+    item = next(item for item in catalog['system_design']
+                if item['id'] == assignment['item_id'])
+    expected = design_score_dimensions(item['track'])
+    scores = evaluation.get('scores')
+    if not isinstance(scores, dict) or set(scores) != set(expected):
+        raise ValueError('Evaluation scores must contain exactly the rubric dimensions for this track.')
+    for name in expected:
+        _integer(scores[name], name + ' score', 1, 5)
+    for key in ('strengths', 'weaknesses', 'mistakes', 'recommended_review_topics'):
+        values = evaluation.get(key)
+        if not isinstance(values, list) or not all(isinstance(value, str) and value.strip()
+                                                   for value in values):
+            raise ValueError(f'{key} must be a list of non-empty strings.')
+    top = evaluation.get('top_3_improvements')
+    if not isinstance(top, list) or len(top) != 3 or not all(
+            isinstance(value, str) and value.strip() for value in top):
+        raise ValueError('top_3_improvements must contain exactly three items.')
+    strongest = evaluation.get('strongest_area')
+    weakest = evaluation.get('weakest_area')
+    if strongest not in expected or weakest not in expected:
+        raise ValueError('strongest_area and weakest_area must name scored rubric dimensions.')
+    overall = round(sum(scores.values()) / len(scores), 2)
+    row = {
+        'id': assignment_id, 'date': today, 'item_id': item['id'],
+        'topic': item['name'], 'design_track': item['track'],
+        'difficulty_level': assignment['difficulty_level'],
+        'difficulty': DESIGN_DIFFICULTIES[assignment['difficulty_level']],
+        'topics': item['topics'], 'duration': duration,
+        'answer': assignment['answer'], 'followups': assignment['followups'],
+        'scores': scores, 'overall_score': overall,
+        'strongest_area': strongest, 'weakest_area': weakest,
+        'strengths': evaluation['strengths'], 'weaknesses': evaluation['weaknesses'],
+        'mistakes': evaluation['mistakes'],
+        'top_3_improvements': top,
+        'recommended_review_topics': evaluation['recommended_review_topics'],
+        'session_type': 'new', 'curriculum_slot': None,
+    }
+    minimum = min(scores.values())
+    interval = 2 if minimum <= 2 else 7 if minimum == 3 else 21
+    row['next_review_date'] = (date.fromisoformat(today) + timedelta(days=interval)).isoformat()
+    existing = next((current for current in state['system_design']
+                     if current['id'] == assignment_id), None)
+    if existing:
+        if existing != row:
+            raise ValueError('This assignment is already logged with different feedback.')
+        return existing
+    state['system_design'].append(row)
+    assignment['feedback'] = evaluation
+    assignment['overall_score'] = overall
+    assignment['phase'] = 'feedback'
+    assignment['completed'] = True
+    return row
+
+
+def reveal_design_solution(state: dict, catalog: dict, assignment_id: str) -> dict:
+    assignment = _design_assignment(state, assignment_id)
+    if not assignment.get('completed') or not assignment.get('feedback'):
+        raise ValueError('Reference solution unlocks only after feedback is saved.')
+    item = next(item for item in catalog['system_design']
+                if item['id'] == assignment['item_id'])
+    assignment['solution_viewed'] = True
+    assignment['phase'] = 'solution'
+    return {'assignment': assignment_id, 'problem': item['name'],
+            'reference_solution': item['reference_solution']}
+
+
+def design_review_exercise(state: dict, today: str) -> dict:
+    weaknesses = recurring_design_weaknesses(state, today)
+    focus = weaknesses.most_common(1)[0][0] if weaknesses else 'trade-off reasoning'
+    return {
+        'focus': focus,
+        'exercise': (f'In 10 minutes, revisit {focus}. State one concrete design choice, '
+                     'one rejected alternative, one failure scenario, and one observable signal.'),
+        'counts_as_weekly_problem': False,
+    }
+
+
 def select_item(state: dict, catalog: dict, track: str, today: str,
                 prefer_new: bool = False) -> dict:
     """Choose a scheduled item, or the next unseen curriculum item on request."""
+    if track == 'system_design':
+        item = select_design_problem(state, catalog, today)
+        return {'item_id': item['id'], 'reason': 'adaptive weekly selection',
+                'curriculum_slot': None, 'session_type': 'new'}
     latest = latest_sessions(state, track, today)
     items = catalog['problems' if track == 'coding' else 'system_design']
     by_id = {p['id']: p for p in items}
@@ -171,6 +471,8 @@ def plan(state: dict, catalog: dict, track: str, today: str,
     """
     if next_assignment and review_assignment:
         raise ValueError('Choose either a new problem or a review, not both.')
+    if track == 'system_design' and not review_assignment:
+        return plan_design(state, catalog, today)
     date.fromisoformat(today)
     daily_id = f'{track}:{today}'
     if not next_assignment and not review_assignment and daily_id in state['assignments']:
@@ -236,16 +538,21 @@ def render_message(assignment: dict, catalog: dict) -> str:
                 "Afterward, reply with minutes, solved independently yes/no, highest hint 0–3, "
                 "solution viewed yes/no, confidence 1–5, and one lesson/mistake.")
     item = next(p for p in catalog['system_design'] if p['id'] == assignment['item_id'])
-    focus = '\n'.join(f'- {point}' for point in item['focus'])
-    message = (f"🏗 System Design — {item['target_minutes']} min\nToday: {item['name']}\n\n"
-               f"Hello Interview:\n{item['url']}\n\nStudy task:\n{item['exercise']}\n\n"
-               f"🎯 After studying, be able to explain:\n{focus}\n\n"
-               f"Hermes connection: {item['hermes_connection']}\n\n"
-               "Reply with minutes, requirements/architecture/trade-off/failure-mode scores "
-               "(each 1–5), confidence (1–5), and one next improvement.")
-    if item.get('access_note'):
-        message += '\n\n' + item['access_note'] + '\n' + '\n'.join(item['supporting_urls'])
-    return message
+    if assignment.get('completed'):
+        return (f"✅ This week's system-design interview is complete: {item['name']}.\n"
+                "Use /review for a short weakness drill or /progress for the current summary. "
+                "A new interview opens next week.")
+    questions = '\n'.join(f'{index}. {question}' for index, question in
+                          enumerate(item['clarification_questions'], 1))
+    return (f"🏗 Weekly System Design Interview — 45 min\n"
+            f"Today: {item['name']}\n"
+            f"Track: {item['track']} · Difficulty: "
+            f"{DESIGN_DIFFICULTIES[assignment['difficulty_level']]}\n\n"
+            f"Problem\n{item['prompt']}\n\n"
+            "Clarification questions an interviewer expects you to consider\n"
+            f"{questions}\n\n"
+            "Do not look for a solution yet. Ask your clarification questions, then submit "
+            "your proposed design with /answer. I will interview you before giving feedback.")
 
 
 def record_hint(state: dict, assignment_id: str, solution: bool = False) -> dict:
@@ -306,6 +613,9 @@ def record_session(state: dict, catalog: dict, assignment_id: str,
             raise ValueError('Record one concrete next improvement.')
         item = next(p for p in catalog['system_design'] if p['id'] == row['item_id'])
         row['topic'] = item['name']
+        row['design_track'] = item.get('track', 'general')
+        row['difficulty_level'] = item.get('difficulty_level', 2)
+        row['topics'] = item.get('topics', [])
         score = min(row[d + '_score'] for d in DIMENSIONS)
         interval = review_days(score >= 4, 0, min(score, row['confidence']))
     row['next_review_date'] = (date.fromisoformat(today) + timedelta(days=interval)).isoformat()
@@ -341,8 +651,16 @@ def weekly_report(state: dict, catalog: dict, today: str) -> dict:
     coding, design = sessions['coding'], sessions['system_design']
     latest = latest_sessions(state, 'coding', today)
     weak_patterns = Counter(s['pattern'] for s in latest.values() if weakness(s, 'coding')[0] <= 7)
-    averages = {d: round(sum(s[d + '_score'] for s in design) / len(design), 2)
-                for d in DIMENSIONS} if design else {}
+    score_rows = [s.get('scores', {}) for s in design]
+    score_names = sorted({name for scores in score_rows for name in scores})
+    averages = {
+        name: round(sum(scores[name] for scores in score_rows if name in scores)
+                    / sum(name in scores for scores in score_rows), 2)
+        for name in score_names
+    }
+    if design and not averages:
+        averages = {d: round(sum(s[d + '_score'] for s in design) / len(design), 2)
+                    for d in DIMENSIONS}
     weakest = [d for d in averages if averages[d] == min(averages.values())]
     next_coding = select_item(state, catalog, 'coding', today)
     next_design = select_item(state, catalog, 'system_design', today)
@@ -359,6 +677,7 @@ def weekly_report(state: dict, catalog: dict, today: str) -> dict:
             'solutions_viewed': sum(s['solution_viewed'] for s in coding),
             'system_design_topics_covered': list(dict.fromkeys(s['topic'] for s in design)),
             'design_dimension_averages': averages, 'weakest_design_dimensions': weakest,
+            'design_progress': design_progress(state, catalog, today),
             'next_week_recommended_focus': focus}
 
 
@@ -396,6 +715,21 @@ def parse_args(argv=None) -> argparse.Namespace:
             for dimension in DIMENSIONS:
                 log.add_argument('--' + dimension.replace('_', '-') + '-score', required=True, type=int)
             log.add_argument('--next-improvement', required=True)
+    answer = sub.add_parser('design-answer')
+    answer.add_argument('--assignment', required=True)
+    answer.add_argument('--answer', required=True)
+    followup = sub.add_parser('design-followup')
+    followup.add_argument('--assignment', required=True)
+    followup.add_argument('--question', required=True)
+    followup.add_argument('--answer', default='')
+    evaluation = sub.add_parser('design-feedback')
+    evaluation.add_argument('--assignment', required=True)
+    evaluation.add_argument('--duration', required=True, type=int)
+    evaluation.add_argument('--evaluation-json', required=True)
+    solution = sub.add_parser('design-solution')
+    solution.add_argument('--assignment', required=True)
+    for command in ('design-history', 'design-weakness', 'design-progress', 'design-review'):
+        sub.add_parser(command)
     sub.add_parser('weekly')
     return parser.parse_args(argv)
 
@@ -430,6 +764,32 @@ def main(argv=None) -> int:
                         feedback[key] = feedback[key] == 'yes'
                 result = record_session(state, catalog, args.assignment, args.date, feedback)
                 output = json.dumps(result, indent=2, ensure_ascii=False)
+            elif args.command == 'design-answer':
+                result = record_design_answer(state, args.assignment, args.answer)
+                output = json.dumps(result, indent=2, ensure_ascii=False)
+            elif args.command == 'design-followup':
+                result = record_design_followup(
+                    state, args.assignment, args.question, args.answer)
+                output = json.dumps(result, indent=2, ensure_ascii=False)
+            elif args.command == 'design-feedback':
+                evaluation = json.loads(args.evaluation_json)
+                result = record_design_evaluation(
+                    state, catalog, args.assignment, args.date, args.duration, evaluation)
+                output = json.dumps(result, indent=2, ensure_ascii=False)
+            elif args.command == 'design-solution':
+                result = reveal_design_solution(state, catalog, args.assignment)
+                output = json.dumps(result, indent=2, ensure_ascii=False)
+            elif args.command == 'design-history':
+                output = json.dumps(state['system_design'], indent=2, ensure_ascii=False)
+            elif args.command == 'design-weakness':
+                output = json.dumps(recurring_design_weaknesses(state, args.date).most_common(),
+                                    indent=2, ensure_ascii=False)
+            elif args.command == 'design-progress':
+                output = json.dumps(design_progress(state, catalog, args.date),
+                                    indent=2, ensure_ascii=False)
+            elif args.command == 'design-review':
+                output = json.dumps(design_review_exercise(state, args.date),
+                                    indent=2, ensure_ascii=False)
             else:
                 output = json.dumps(weekly_report(state, catalog, args.date), indent=2, ensure_ascii=False)
             if state != before:

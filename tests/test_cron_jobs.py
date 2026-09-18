@@ -352,10 +352,10 @@ def test_coach_cron_requires_material_canonical_links_and_real_feedback():
     assert 'never a solution first' in coding
     assert 'until I report results' in coding
     design = jobs['system-design-coach']['prompt']
-    assert 'plan system_design' in design and 'canonical Hello Interview URL' in design
-    assert '45–60 minute' in design and '3–5' in design
-    assert '45-minute mock' in design and 'Agent/Hermes' in design
-    assert 'without my results' in design
+    assert 'plan system_design' in design and 'exactly one 45-minute' in design
+    assert 'General, ML, or LLM/Agent' in design and '3–5 clarification questions' in design
+    assert 'no solution' in design and 'same ISO week' in design
+    assert 'Do not record completion until I submit a design' in design
 
 
 def test_sunday_weekly_review_keeps_papers_and_adds_coach_metrics():

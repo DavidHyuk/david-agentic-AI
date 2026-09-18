@@ -80,8 +80,9 @@ ROOM_CHAT_INSTRUCTIONS = {
     'coding': ('Use the interview-prep Coding Coach procedure and its persisted assignment state. '
                'Follow the hint ladder and never reveal a solution before an explicit request after hint 3. '
                'Do not send messages; the observatory delivers your final answer.'),
-    'design': ('Use the interview-prep System Design Coach procedure. Ask about requirements first, '
-               'then coach trade-offs and failure scenarios from the persisted assignment state. '
+    'design': ('Use the interview-prep adaptive System Design Coach procedure and map slash commands '
+               'to its persisted state. Ask about requirements first, then interview one question at '
+               'a time. Never reveal the reference design before saved structured feedback. '
                'Do not send messages; the observatory delivers your final answer.'),
 }
 
@@ -252,7 +253,14 @@ class Observatory:
             track = 'coding' if room == 'coding' else 'system_design'
             state = self.coach_state()
             catalog = read_json(self.catalog_path(), {})
-            items = {p['id']: p for p in catalog.get('problems' if track == 'coding' else 'system_design', [])}
+            items = {p['id']: p for p in catalog.get(
+                'problems' if track == 'coding' else 'system_design', [])}
+            if track == 'system_design':
+                items = {
+                    item_id: {key: value for key, value in item.items()
+                              if key not in ('hidden_constraints', 'reference_solution')}
+                    for item_id, item in items.items()
+                }
             track_pending = [a for a in self.pending_assignments() if a['track'] == track]
             pending = [a for a in track_pending if a.get('session_type') != 'review']
             pending_reviews = [a for a in track_pending if a.get('session_type') == 'review']

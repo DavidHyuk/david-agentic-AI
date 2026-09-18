@@ -1,5 +1,6 @@
 # __author__ = 'David Choi (bestshoot21@gmail.com)'
 """Offline coach scheduling, evidence, hint gating, reporting, and staged CLI tests."""
+from collections import Counter
 from copy import deepcopy
 from datetime import date, timedelta
 import json
@@ -74,11 +75,20 @@ def test_catalog_is_ordered_and_links_are_problem_specific(catalog):
     assert all([slot['block_index'] for slot in slots] == list(range(1, 7))
                and all(slot['block_size'] == 6 for slot in slots)
                for slots in blocks.values())
-    for item in catalog['system_design']:
-        assert urlparse(item['url']).netloc == 'www.hellointerview.com'
-        assert 45 <= item['target_minutes'] <= 60
-        assert 3 <= len(item['focus']) <= 5
-        assert item['exercise'] and item['hermes_connection']
+    design = catalog['system_design']
+    assert Counter(item['track'] for item in design) == {
+        'general': 6, 'ml': 4, 'agent': 5,
+    }
+    assert [item['recommended_order'] for item in design] == list(range(1, 16))
+    assert len({item['id'] for item in design}) == len(design)
+    for item in design:
+        assert item['track'] in ip.DESIGN_TRACK_TARGETS
+        assert item['difficulty_level'] in ip.DESIGN_DIFFICULTIES
+        assert item['target_minutes'] == 45
+        assert 3 <= len(item['clarification_questions']) <= 5
+        assert item['prompt'] and item['topics'] and item['hidden_constraints']
+        assert item['reference_solution']
+        assert 'reference_solution' not in item['prompt'].lower()
 
 
 def test_plan_retries_and_missed_days_do_not_count_as_completion(catalog):
@@ -303,22 +313,109 @@ def test_design_progress_and_weak_dimension_review(catalog):
     row = complete(state, catalog, '2026-09-13', 'system_design', failure_mode_score=2)
     assert row['topic'] == catalog['system_design'][0]['name']
     assert row['next_review_date'] == '2026-09-15'
-    assert ip.select_item(state, catalog, 'system_design', '2026-09-20')['item_id'] == 'delivery-framework'
+    assert ip.select_item(state, catalog, 'system_design', '2026-09-20')['item_id'] != row['item_id']
     report = ip.weekly_report(state, catalog, '2026-09-13')
     assert report['weakest_design_dimensions'] == ['failure_mode']
     assert report['system_design_topics_covered'] == [row['topic']]
 
 
-def test_design_curriculum_has_timed_notification_mock(catalog):
+def test_design_curriculum_balances_tracks_and_enforces_one_active_problem(catalog):
     state = ip.empty_state()
-    for day, item in zip(('2026-09-06', '2026-09-13', '2026-09-20'), catalog['system_design']):
-        assert complete(state, catalog, day, 'system_design')['item_id'] == item['id']
-    # Strong review eligibility must not displace the week-four mock.
-    chosen = ip.plan(state, catalog, 'system_design', '2026-09-27')
-    assert chosen['item_id'] == 'notification-system'
-    message = ip.render_message(chosen, catalog)
-    assert '45-minute mock' in message and 'Premium' in message
-    assert catalog['system_design'][-1]['url'] in message
+    first = ip.plan(state, catalog, 'system_design', '2026-09-06')
+    assert first['item_id'] == 'notification-system'
+    assert ip.plan(state, catalog, 'system_design', '2026-09-13') == first
+    complete(state, catalog, '2026-09-06', 'system_design')
+    second = ip.plan(state, catalog, 'system_design', '2026-09-13')
+    complete(state, catalog, '2026-09-13', 'system_design')
+    third = ip.plan(state, catalog, 'system_design', '2026-09-20')
+    assert [first['design_track'], second['design_track'], third['design_track']] == [
+        'general', 'agent', 'ml',
+    ]
+
+
+def design_evaluation(track='general', score=4):
+    dimensions = ip.design_score_dimensions(track)
+    return {
+        'scores': {name: score for name in dimensions},
+        'strongest_area': dimensions[0],
+        'weakest_area': dimensions[-1],
+        'strengths': ['Clear architecture'],
+        'weaknesses': ['idempotency'],
+        'mistakes': ['Did not quantify retry traffic'],
+        'top_3_improvements': ['Quantify load', 'Trace one failure', 'Compare alternatives'],
+        'recommended_review_topics': ['idempotency'],
+    }
+
+
+def test_design_interview_lifecycle_and_solution_gate(catalog):
+    state = ip.empty_state()
+    assignment = ip.plan(state, catalog, 'system_design', '2026-09-06')
+    with pytest.raises(ValueError, match='only after feedback'):
+        ip.reveal_design_solution(state, catalog, assignment['id'])
+    ip.record_design_answer(state, assignment['id'], 'Use an API, queue, and workers.')
+    ip.record_design_followup(state, assignment['id'], 'What if a provider times out?',
+                              'Retry with an idempotency key.')
+    row = ip.record_design_evaluation(
+        state, catalog, assignment['id'], '2026-09-06', 45,
+        design_evaluation('general'))
+    assert row['overall_score'] == 4
+    assert row['answer'].startswith('Use an API')
+    assert row['followups'][0]['answer'].startswith('Retry')
+    solution = ip.reveal_design_solution(state, catalog, assignment['id'])
+    assert solution['reference_solution']
+    assert state['assignments'][assignment['id']]['solution_viewed'] is True
+
+
+def test_design_difficulty_changes_only_from_performance(catalog):
+    state = ip.empty_state()
+    for day in ('2026-09-06', '2026-09-13'):
+        assignment = ip.plan(state, catalog, 'system_design', day)
+        track = assignment['design_track']
+        ip.record_design_answer(state, assignment['id'], 'A complete proposed design.')
+        ip.record_design_followup(state, assignment['id'], 'Defend one trade-off.',
+                                  'I prefer durability over lower write latency.')
+        ip.record_design_evaluation(
+            state, catalog, assignment['id'], day, 45,
+            design_evaluation(track, score=4))
+    assert ip.design_difficulty(state, '2026-09-20') == 3
+    assert ip.plan(state, catalog, 'system_design', '2026-09-20')['difficulty_level'] == 3
+
+
+def test_design_weakness_selects_a_different_scenario(catalog):
+    state = ip.empty_state()
+    assignment = ip.plan(state, catalog, 'system_design', '2026-09-06')
+    ip.record_design_answer(state, assignment['id'], 'Queue notifications by channel.')
+    ip.record_design_followup(state, assignment['id'], 'How do you retry?',
+                              'Use an idempotency key.')
+    ip.record_design_evaluation(
+        state, catalog, assignment['id'], '2026-09-06', 45,
+        design_evaluation('general'))
+
+    next_assignment = ip.plan(state, catalog, 'system_design', '2026-09-13')
+
+    assert next_assignment['item_id'] == 'distributed-task-queue'
+    assert next_assignment['item_id'] != assignment['item_id']
+    assert 'idempotency' in next_assignment['topics']
+
+
+def test_loading_legacy_state_preserves_and_supersedes_open_design_work(tmp_path):
+    path = tmp_path / 'coach_state.json'
+    path.write_text(json.dumps({
+        'version': 1, 'coding': [], 'system_design': [],
+        'assignments': {
+            'system_design:2026-09-13': {
+                'id': 'system_design:2026-09-13', 'track': 'system_design',
+                'date': '2026-09-13', 'completed': False,
+                'item_id': 'delivery-framework', 'session_type': 'new',
+            },
+        },
+    }))
+
+    state = ip.load_state(path)
+
+    legacy = state['assignments']['system_design:2026-09-13']
+    assert legacy['superseded'] is True
+    assert 'adaptive interview' in legacy['superseded_reason']
 
 
 def test_telegram_messages_contain_actual_study_material(catalog):
@@ -327,13 +424,15 @@ def test_telegram_messages_contain_actual_study_material(catalog):
         assignment = ip.plan(state, catalog, track, '2026-09-08')
         message = ip.render_message(assignment, catalog)
         assert len(message) < 4000
-        assert 'Today:' in message and 'https://' in message
+        assert 'Today:' in message
         if track == 'coding':
+            assert 'https://' in message
             assert '35 min' in message and '20 minutes without AI first' in message
             assert 'Contains Duplicate' in message and 'LeetCode:' in message and 'NeetCode:' in message
             assert 'def ' not in message and 'pseudocode' not in message
         else:
-            assert 'Hermes connection:' in message and 'After studying' in message
+            assert 'Clarification questions' in message and '/answer' in message
+            assert 'Reference solution' not in message
 
 
 def test_weekly_report_uses_completed_sessions_and_monday_window(catalog):

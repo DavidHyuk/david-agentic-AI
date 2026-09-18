@@ -3,6 +3,29 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.21.0 — 2026-09-18 (minor: make system design an adaptive interview)
+
+- Replaced the four-step Hello Interview reading sequence with a curated General,
+  ML, and LLM/Agent interview bank targeting an initial 40/25/35 mix. Selection is
+  deterministic, revisits recurring weak concepts through different scenarios,
+  starts at Standard senior level, and changes difficulty only from recent scores.
+- Added a durable interview phase machine for the original answer, interviewer
+  follow-ups, full core and track-specific 1–5 rubrics, strengths, weaknesses,
+  mistakes, review topics, progress summaries, and a reference-design gate that
+  cannot open before feedback. Legacy unfinished reading assignments are retained
+  as superseded history rather than marked complete.
+- Enforced one new 45-minute problem per ISO week. Scheduler retries and later
+  weeks resume an unfinished interview; `/review` remains a separate 10-minute
+  active-recall exercise and does not count as another weekly problem.
+- Updated the existing Design Studio workbench and System Design Telegram job to
+  expose the phase, clarification questions, chat commands, and solution gate.
+  The `design` specialist, existing David bot, dedicated System Design chat,
+  shared interview state path, and Observatory room remain the correct ownership
+  boundaries, so no new profile, gateway, bot, token, chat, or service was added.
+- Kept model choice behind Hermes' existing provider configuration: the skill owns
+  interviewer prompts while the standalone helper owns deterministic logic,
+  JSON validation, locking, and persistence for both local vLLM and API models.
+
 ## v1.20.1 — 2026-09-18 (patch: keep LeetCode out of the design studio)
 
 - Fixed the shared coach workbench fallback that displayed the coding-only

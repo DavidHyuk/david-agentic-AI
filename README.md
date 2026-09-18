@@ -7,7 +7,7 @@ with research and interview preparation delivered to the David **Telegram**
 bot, plus English feedback delivered to a dedicated English **Telegram** bot:
 
 1. **LLM/LVM research** — daily arXiv + Hugging Face ingestion and a personalized twice-weekly digest.
-2. **Staff/Senior MLE interview prep** — MLE drills plus beginner coding and system-design study delivered daily at noon.
+2. **Staff/Senior MLE interview prep** — MLE drills, beginner coding, and a weekly adaptive system-design interview on a noon schedule.
 3. **English practice** — turns tutor recordings + corrections into spaced-repetition drills.
 4. **Daily podcast English** — pre-downloads one English Goal Podcast transcript
    and turns it into a personalized 09:15 listening/expression lesson in the
@@ -75,7 +75,8 @@ Local DGX Spark (vLLM @ :8003, Qwen3.6 FP8, 128K ctx)
 | `scripts/interview_progress.py` | Concrete study messages, feedback, hints, adaptive reviews, weekly metrics |
 | `scripts/reward_system.py` | Evidence-backed Career Cash, streaks, weekly missions, and virtual offer unlocks |
 | `scripts/leetcode_sync.py` | Owner-only LeetCode session link and read-only solved-history snapshot |
-| `skills/career/interview-prep/references/coach_catalog.json` | Curated NeetCode/LeetCode problems and Hello Interview lessons |
+| `skills/career/interview-prep/references/coach_catalog.json` | Curated coding curriculum plus General/ML/Agent design interviews |
+| `skills/career/interview-prep/references/system-design-interviewer.md` | Stateful interview flow, commands, rubric, and solution gate |
 | `skills/career/interview-prep/references/company-coding-strategy.md` | Company-aware LeetCode/practical-coding preparation strategy |
 | `browser/setup_browser.sh` | Pin agent-browser + install the local Chromium CDP service |
 | `browser/browser_smoke.py` | Verify browser navigation, click, DOM read, and snapshot |
@@ -538,7 +539,7 @@ coding, and system-design progress.
 | `papers-digest` | 08:50 Tue/Fri | Dedicated paper group: three hottest LLM/LVM papers after 08:00 ingestion |
 | `interview-prep` | 12:05 Mon/Wed/Fri | Interview group: one focused Staff/Senior MLE drill |
 | `coding-coach` | 12:10 Tue/Thu/Sat | LeetCode group: 35-minute beginner problem with canonical links |
-| `system-design-coach` | 12:15 Sunday | System-design group: Hello Interview exercise |
+| `system-design-coach` | 12:15 Sunday | System-design group: one adaptive 45-minute interview |
 | `english-podcast-daily` | 09:15 daily | `🎧 Morning Echo` group on the existing English bot: one downloaded transcript + personalized three-point lesson |
 | `english-intake` | 20:05 Mon–Sat | Dedicated English bot: feedback analysis or weakness coaching |
 | `english-drill` | 21:10 daily | Dedicated English bot: tonight's spaced-repetition drill |
@@ -550,11 +551,11 @@ coding, and system-design progress.
 
 The existing `interview-prep` skill owns all interview coaching. The catalog at
 [`coach_catalog.json`](skills/career/interview-prep/references/coach_catalog.json)
-contains problem IDs, names, patterns, difficulty, canonical exercise URLs,
-prerequisites, recommended order, and concrete study goals. It uses the
+contains problem IDs, names, patterns, difficulty, and concrete study goals. It uses the
 [NeetCode roadmap](https://neetcode.io/roadmap) and
 [NeetCode 150](https://neetcode.io/practice/practice/neetcode150) as the backbone,
-LeetCode for practice, and Hello Interview for system design. Daily pushes are
+LeetCode for coding practice, plus a curated General/ML/LLM-Agent interview bank.
+Daily pushes are
 rendered locally from curated content; no scraping, login cookies, or live
 lookups are required. Web lookup is only for maintaining links.
 
@@ -582,9 +583,9 @@ hint 3. The helper retains hint levels across fresh cron sessions.
 
 Reply with your actual results. Coding tracks minutes, independent yes/no,
 highest hint 0–3, solution viewed yes/no, confidence 1–5, and a lesson/mistake.
-Design tracks minutes, requirements/architecture/trade-off/failure-mode scores
-(each 1–5), confidence, and next improvement. Sending a lesson never counts as
-completing it. Missing feedback keeps the current curriculum slot pending. A
+System design stores the original answer, interviewer follow-ups, all ten core
+rubric scores, track-specific ML or Agent scores, strengths, weaknesses, mistakes,
+and review topics. Missing feedback keeps the current interview pending. A
 curriculum update preserves an obsolete open assignment as `superseded` history
 rather than falsely completing it, while removing it from the active workbench.
 The active block's unfinished problem is resumed across later cron dates instead
@@ -595,9 +596,15 @@ confidence 3 in 7 days; independent work with confidence ≥4 in 21 days. Other
 assisted attempts use 7 days. Scheduled Jun and **작업 이어가기 · 새 문제** always
 keep the latest uncompleted new curriculum problem. Jun may suggest a due weak
 review without assigning it; use **복습하기** to request a prior problem. A review
-due date means eligibility when that explicit review path is used. Design
-uses its lowest dimension/confidence score with the same 2/7/21-day intervals.
-After the seed curriculum, concrete consolidation reviews continue.
+due date means eligibility when that explicit review path is used.
+
+The design coach gives exactly one new 45-minute problem per ISO week and resumes
+it until feedback is saved. Selection targets General 40%, ML 25%, and Agent 35%,
+then favors different scenarios covering recurring weaknesses. It starts at
+Standard senior level; two recent overall scores of at least 4.0 advance it, while
+a score below 2.75 lowers it. `/review` is a separate 10-minute active-recall drill
+and never counts as another weekly problem. Reference designs stay locked until
+the original design and at least one follow-up have been evaluated.
 
 Sunday's existing 18:05 review includes completed coding sessions, new/review
 counts, weak patterns, average session minutes (including unsuccessful attempts),
@@ -662,6 +669,33 @@ python3 ~/.hermes/scripts/interview_progress.py plan system_design
 python3 ~/.hermes/scripts/interview_progress.py weekly
 ```
 
+The Telegram and Design Studio chat support `/next`, `/answer`, `/followup`,
+`/feedback`, `/solution`, `/history`, `/weakness`, `/progress`, and `/review`.
+The same complete General-track session can be exercised from the CLI:
+
+```bash
+python3 ~/.hermes/scripts/interview_progress.py plan system_design --format json
+python3 ~/.hermes/scripts/interview_progress.py design-answer \
+  --assignment system_design:2026-09-20 \
+  --answer "I would separate ingestion, preference filtering, queues, and channel workers."
+python3 ~/.hermes/scripts/interview_progress.py design-followup \
+  --assignment system_design:2026-09-20 \
+  --question "What happens after an ambiguous provider timeout?" \
+  --answer "Retry with a stable idempotency key and reconcile provider status."
+python3 ~/.hermes/scripts/interview_progress.py design-feedback \
+  --assignment system_design:2026-09-20 --duration 45 \
+  --evaluation-json '{"scores":{"requirement_clarification":4,"high_level_architecture":4,"data_model":3,"api_design":3,"scalability":4,"reliability":4,"failure_handling":3,"trade_off_reasoning":4,"observability":3,"communication":4},"strongest_area":"high_level_architecture","weakest_area":"failure_handling","strengths":["Clear async boundaries"],"weaknesses":["Ambiguous delivery outcomes"],"mistakes":["Did not quantify retry load"],"top_3_improvements":["Quantify peak load","Trace timeout recovery","Define SLO alerts"],"recommended_review_topics":["idempotency"]}'
+python3 ~/.hermes/scripts/interview_progress.py design-solution \
+  --assignment system_design:2026-09-20
+python3 ~/.hermes/scripts/interview_progress.py design-progress
+```
+
+The helper deliberately contains no model client. Hermes is the common provider
+interface for both the local OpenAI-compatible vLLM endpoint and API models; the
+skill owns interviewer prompts, while the helper owns deterministic selection,
+validation, phase gates, and persistence. Invalid evaluation JSON is rejected,
+and the skill repairs and retries it once.
+
 Log the real assignment ID returned by `plan`, for example:
 
 ```bash
@@ -669,11 +703,6 @@ python3 ~/.hermes/scripts/interview_progress.py log-coding \
   --assignment coding:2026-09-08 --duration 35 --independent no \
   --hint-level 2 --solution-viewed no --confidence 3 \
   --lesson "Forgot to consider repeated values"
-python3 ~/.hermes/scripts/interview_progress.py log-design \
-  --assignment system_design:2026-09-13 --duration 50 \
-  --requirements-score 4 --architecture-score 3 --trade-off-score 3 \
-  --failure-mode-score 2 --confidence 3 \
-  --next-improvement "Explain retry behavior after an ambiguous provider timeout"
 ```
 
 Global `--state PATH`, `--catalog PATH`, and `--date YYYY-MM-DD` options go before
@@ -681,11 +710,6 @@ the subcommand. Use a temporary state for previews/simulations. Logs must be
 chronological. Identical completion retries are ignored; conflicting feedback
 for the same assignment fails explicitly. Locked atomic writes preserve concurrent
 updates, and corrupt state is retained for recovery instead of silently reset.
-
-[Hello Interview's Notification System](https://www.hellointerview.com/learn/system-design/problem-breakdowns/notification-system)
-full walkthrough is Premium. Its public problem prompt plus the coach's timed
-exercise and free delivery-framework/key-technologies links support practice
-without a subscription. The coach does not claim access to gated content.
 
 ### LeetCode account history (optional, read-only)
 
@@ -990,17 +1014,17 @@ four workbench Telegram composers remain separately labeled.
 Session setup fails with a visible gateway error after 15 seconds instead of
 hanging indefinitely; an active local-model turn may run for up to ten minutes.
 
-- **LeetCode / System Design**: resume unfinished assignments, prepare today's
-  assignment, or open another same-day assignment after completing one. In the
+- **LeetCode / System Design**: resume unfinished assignments or prepare today's
+  assignment. System Design allows only one new interview per ISO week. In the
   LeetCode room, **작업 이어가기 · 새 문제** always selects the next uncompleted
   curriculum problem; **복습하기** is the separate action that selects a prior
   weak or due problem. Scheduled sessions still prioritize weak due reviews.
   The new-problem path follows the 35-minute Tue/Thu/Sat progression from Two
   Sum/HashMap through Two Pointers, Sliding Window, Stack, Binary Search,
   Tree/BFS/DFS, Heap, and Graph. Use a
-  timer and submit actual practice results. Coding feedback
-  records duration, confidence, hints and solution use; design feedback records
-  your self-assessment and improvement notes. These update the existing coach
+  timer and submit actual practice results. Coding feedback records duration,
+  confidence, hints and solution use. Design chat persists the answer, follow-ups,
+  complete rubric, evidence-backed feedback, and the gated solution state. These update the existing coach
   state and review schedule. Opening a room alone does not assign or complete work.
 - **English**: reveal due-card answers and mark each attempt correct or needing
   more practice. Results update the shared SRS deck used by Telegram drills.

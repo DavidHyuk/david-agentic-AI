@@ -143,40 +143,28 @@ function coachDesk(d) {
   const lcSummary = d.room !== "coding" ? "" : lc
     ? `<article class="desk-card"><span class="tag">LEETCODE · READ ONLY</span><h2>${esc(lc.username)} 풀이 기록</h2><p class="muted">${esc(lc.synced_at || "동기화 시각 미확인")} · 제출이나 계정 변경 없이 동기화됩니다.</p><div class="desk-metrics"><div><b>${Number(lc.total_solved || 0)}</b><span>해결한 문제</span></div><div><b>${Number(lc.solved_by_difficulty?.easy || 0)} / ${Number(lc.solved_by_difficulty?.medium || 0)} / ${Number(lc.solved_by_difficulty?.hard || 0)}</b><span>Easy / Medium / Hard</span></div></div>${lc.recent_accepted?.length ? `<p class="muted">최근 정답: ${esc(lc.recent_accepted.slice(0, 3).map((item) => item.title).join(", "))}</p>` : ""}</article>`
     : `<article class="desk-card"><span class="tag">LEETCODE · OPTIONAL</span><h2>LeetCode 기록 미연동</h2><p class="muted">터미널에서 세션을 연결하면 이곳에 읽기 전용 풀이 기록이 나타납니다.</p></article>`;
-  if (!a)
-    return lcSummary + `<article class="desk-card"><span class="tag">TODAY</span><h2>${d.today_assignment?.completed ? "오늘 과제를 완료했습니다" : "이어갈 미완료 과제가 없습니다"}</h2><p><b>작업 이어가기</b>는 항상 다음 미해결 커리큘럼의 새 문제를 배정합니다. 이전 문제는 <b>복습하기</b>로만 다시 배정합니다. 과제 배정은 학습 완료로 기록되지 않습니다.</p><div class="desk-actions"><button id="desk-plan" class="primary" ${!d.catalog_available ? "disabled" : ""}>작업 이어가기 · 새 문제</button>${d.completed?.length ? `<button id="desk-review" class="outline" ${!d.catalog_available ? "disabled" : ""}>복습하기</button>` : ""}</div>${!d.catalog_available ? "<p>커리큘럼 카탈로그가 아직 설치되지 않았습니다.</p>" : ""}</article>`;
+  if (!a) {
+    const design = d.track === "system_design";
+    return lcSummary + `<article class="desk-card"><span class="tag">TODAY</span><h2>${d.today_assignment?.completed ? "이번 주 인터뷰를 완료했습니다" : "이어갈 미완료 과제가 없습니다"}</h2><p>${design ? "새 인터뷰는 ISO 주당 하나만 열립니다. 추가 연습은 채팅의 /review로 짧게 진행하세요." : "<b>작업 이어가기</b>는 항상 다음 미해결 커리큘럼의 새 문제를 배정합니다. 이전 문제는 <b>복습하기</b>로만 다시 배정합니다."} 과제 배정은 학습 완료로 기록되지 않습니다.</p><div class="desk-actions"><button id="desk-plan" class="primary" ${!d.catalog_available ? "disabled" : ""}>${design ? "주간 인터뷰 열기" : "작업 이어가기 · 새 문제"}</button>${!design && d.completed?.length ? `<button id="desk-review" class="outline" ${!d.catalog_available ? "disabled" : ""}>복습하기</button>` : ""}</div>${!d.catalog_available ? "<p>커리큘럼 카탈로그가 아직 설치되지 않았습니다.</p>" : ""}</article>`;
+  }
   const item = a.item,
     coding = d.track === "coding";
-  return lcSummary + `<article class="desk-card mission"><span class="tag">이어하기 · ${esc(a.date)} 배정 · ${a.session_type === "review" ? "복습" : "새 과제"}</span><h2>${esc(item.name || a.item_id)}</h2><p>${esc(coding ? item.goal : item.exercise)}</p><div class="desk-tags"><span>${esc(item.pattern || "System design")}</span><span>목표 ${coding ? 35 : item.target_minutes}분</span><span>결과 미입력</span>${coding ? `<span>기록된 힌트 ${a.hint_level} / 3</span>` : ""}</div>
-    <div class="desk-actions">${coding ? safeLink(item.leetcode_url, "LeetCode 문제") + safeLink(item.neetcode_url, "NeetCode 문제") : safeLink(item.url, "Hello Interview")}${a.session_type === "review" ? '<button id="desk-current" class="primary">최신 문제로 돌아가기</button>' : d.completed?.length ? '<button id="desk-review" class="outline">복습하기</button>' : ""}</div>
-    ${coding ? '<p class="muted">먼저 20분 동안 스스로 시도하고, 경계 조건과 시간·공간 복잡도를 설명해 보세요.</p>' : `<ul class="desk-focus">${(item.focus || []).map((f) => `<li>${esc(f)}</li>`).join("")}</ul><p>${esc(item.hermes_connection || "")}</p>${item.access_note ? `<p class="muted">${esc(item.access_note)}</p>` : ""}`}
+  return lcSummary + `<article class="desk-card mission"><span class="tag">이어하기 · ${esc(a.date)} 배정 · ${coding ? (a.session_type === "review" ? "복습" : "새 과제") : esc(a.phase || "problem")}</span><h2>${esc(item.name || a.item_id)}</h2><p>${esc(coding ? item.goal : item.prompt)}</p><div class="desk-tags"><span>${esc(item.pattern || item.track || "System design")}</span><span>목표 ${coding ? 35 : item.target_minutes}분</span><span>결과 미입력</span>${coding ? `<span>기록된 힌트 ${a.hint_level} / 3</span>` : `<span>난이도 ${Number(a.difficulty_level || 2)} / 4</span>`}</div>
+    <div class="desk-actions">${coding ? safeLink(item.leetcode_url, "LeetCode 문제") + safeLink(item.neetcode_url, "NeetCode 문제") : ""}${coding && a.session_type === "review" ? '<button id="desk-current" class="primary">최신 문제로 돌아가기</button>' : coding && d.completed?.length ? '<button id="desk-review" class="outline">복습하기</button>' : ""}</div>
+    ${coding ? '<p class="muted">먼저 20분 동안 스스로 시도하고, 경계 조건과 시간·공간 복잡도를 설명해 보세요.</p>' : `<h3>먼저 생각할 명확화 질문</h3><ul class="desk-focus">${(item.clarification_questions || []).map((q) => `<li>${esc(q)}</li>`).join("")}</ul><p class="muted">솔루션은 피드백 저장 후에만 열립니다.</p>`}
     <div class="study-timer"><span id="study-time">00:00</span><div><button class="outline" id="timer-toggle">타이머 시작</button><button class="text-button" id="timer-reset">초기화</button></div><small>이 브라우저에서 이어집니다 · 타이머 종료는 완료 처리되지 않습니다</small></div>
-  </article>${telegramComposer(d, `현재 ${item.name || a.item_id} 과제를 공부 중이야. 과제 ID는 ${a.id}야. ${coding ? "내 접근 방법을 먼저 물어보고, 요청하면 현재 힌트 단계 다음의 힌트 하나만 줘. 정답부터 보여주지 마." : "내 설계의 요구사항을 먼저 물어보고, 답변을 바탕으로 트레이드오프와 실패 시나리오를 질문해줘."}`)}
-  <article class="desk-card"><h2>실제 학습 결과 남기기</h2><p class="muted">본인이 보고한 결과만 저장합니다. 저장하면 다음 복습과 주간 리뷰에 반영됩니다.</p><form id="coach-feedback"><div class="feedback-grid">
+  </article>${telegramComposer(d, `현재 ${item.name || a.item_id} 과제를 공부 중이야. 과제 ID는 ${a.id}야. ${coding ? "내 접근 방법을 먼저 물어보고, 요청하면 현재 힌트 단계 다음의 힌트 하나만 줘. 정답부터 보여주지 마." : "명확화 질문부터 시작할게. 내 설계를 /answer로 보내면 면접관 추가 질문을 하나씩 줘. /feedback 전에는 솔루션을 보여주지 마."}`)}
+  ${coding ? `<article class="desk-card"><h2>실제 학습 결과 남기기</h2><p class="muted">본인이 보고한 결과만 저장합니다. 저장하면 다음 복습과 주간 리뷰에 반영됩니다.</p><form id="coach-feedback"><div class="feedback-grid">
     ${field("공부한 시간 (분)", "duration", "number", 'min="1" max="1440"')}${selectField(
       "자신감",
       "confidence",
       [1, 2, 3, 4, 5].map((n) => [n, n + " / 5"]),
+    )}${selectField("독립적으로 풀었나요?", "independent", yesNo)}${selectField("정답·해설을 봤나요?", "solution_viewed", yesNo)}${selectField(
+      "가장 높은 힌트 단계",
+      "hint_level",
+      [0, 1, 2, 3].map((n) => [n, String(n)]),
     )}
-    ${
-      coding
-        ? `${selectField("독립적으로 풀었나요?", "independent", yesNo)}${selectField("정답·해설을 봤나요?", "solution_viewed", yesNo)}${selectField(
-            "가장 높은 힌트 단계",
-            "hint_level",
-            [0, 1, 2, 3].map((n) => [n, String(n)]),
-          )}`
-        : ["requirements", "architecture", "trade_off", "failure_mode"]
-            .map((k, i) =>
-              selectField(
-                ["요구사항", "아키텍처", "트레이드오프", "실패 시나리오"][i] +
-                  " 자기 평가",
-                k + "_score",
-                [1, 2, 3, 4, 5].map((n) => [n, n + " / 5"]),
-              ),
-            )
-            .join("")
-    }
-    </div><label class="desk-field">${coding ? "배운 점 또는 실수" : "다음에 개선할 점"}<textarea name="${coding ? "lesson" : "next_improvement"}" required maxlength="16000" rows="4" placeholder="구체적인 경험을 남겨주세요."></textarea></label><button class="primary">결과 저장 · 완료 기록</button></form></article>`;
+    </div><label class="desk-field">배운 점 또는 실수<textarea name="lesson" required maxlength="16000" rows="4" placeholder="구체적인 경험을 남겨주세요."></textarea></label><button class="primary">결과 저장 · 완료 기록</button></form></article>` : `<article class="desk-card"><h2>면접 진행</h2><p><code>/answer</code>로 설계를 제출하고, 추가 질문에 답한 뒤 <code>/feedback</code>을 요청하세요. 피드백이 저장되면 <code>/solution</code>이 열립니다.</p><p class="muted">현재 단계: ${esc(a.phase || "problem")} · 저장된 추가 질문 ${(a.followups || []).length}개</p></article>`}`;
 }
 function englishDesk(d) {
   return `<div class="desk-metrics"><div><b>${d.due_count}</b><span>오늘 복습할 카드</span></div><div><b>${d.total_cards}</b><span>전체 교정 카드</span></div></div><article class="desk-card"><h2>오늘의 영어 복습</h2><p class="muted">먼저 문장을 고쳐 말해보세요. 정답은 각 문장 바로 아래에 있습니다. 자기 채점 결과를 저장하면 다음 복습일이 바뀝니다.</p>${d.due.length ? d.due.map((c, i) => `<section class="srs-card"><span class="tag">${i + 1} · Box ${c.box} · ${esc(c.due)}</span><h3>${esc(c.wrong)}</h3><p class="srs-answer"><b>정답</b> ${esc(c.correct)}</p><p class="muted">${esc(c.note || "")}</p><div class="desk-actions"><button class="outline" data-srs="${i}" data-result="wrong">다시 연습할래요</button><button class="primary" data-srs="${i}" data-result="correct">맞혔어요</button></div></section>`).join("") : '<div class="empty">오늘 복습할 카드를 모두 마쳤습니다.</div>'}${d.due_count > 30 ? "<p>한 번에 30개씩 표시합니다. 복습하면 다음 카드가 나타납니다.</p>" : ""}</article>`;

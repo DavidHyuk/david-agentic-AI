@@ -501,6 +501,17 @@ def test_workbench_get_never_assigns_or_completes(study_store):
     assert not (study_store.home / 'data/observatory/workspace.json').exists()
 
 
+def test_design_workbench_never_exposes_hidden_constraints_or_solution(study_store):
+    study_store.study_action({'action': 'plan', 'track': 'system_design'})
+
+    assignment = study_store.workbench('design')['pending'][0]
+
+    assert assignment['item']['prompt']
+    assert assignment['item']['clarification_questions']
+    assert 'hidden_constraints' not in assignment['item']
+    assert 'reference_solution' not in assignment['item']
+
+
 def test_podcast_workbench_reports_downloaded_transcripts_without_exposing_paths(store):
     root = store.home / 'data/english-podcast'
     (root / 'metadata').mkdir(parents=True)

@@ -1,7 +1,7 @@
 ---
 name: interview-prep
-description: Drive David's Staff/Senior ML Engineer interview prep in Silicon Valley with company-aware planning, focused drills, NeetCode/LeetCode foundations, practical coding strategy, Hello Interview system design, and adaptive progress.
-version: 1.5.0
+description: Drive David's Staff/Senior ML Engineer interview prep in Silicon Valley with company-aware drills, NeetCode/LeetCode foundations, practical coding strategy, and adaptive General/ML/Agent system design interviews.
+version: 1.6.0
 metadata:
   hermes:
     category: career
@@ -255,33 +255,12 @@ reminders are created.
 
 ## System Design Coach
 
-1. Run `python3 ~/.hermes/scripts/interview_progress.py plan system_design`.
-2. Deliver its concrete study task, canonical **Hello Interview** URL, 45–60
-   minute target, 3–5 after-study explanation goals, and a connection to David's
-   actual Agent/Hermes experience. Preserve the access note and free supporting
-   URLs when the full walkthrough is Premium. No cookies or subscription needed
-   to generate or attempt the mock; do not claim to have read gated content.
-3. First four completed new topics: delivery framework / requirements / relevant
-   estimation; API design + data modeling through URL Shortener; cache / queue /
-   load balancer / DB replication; timed **45-minute Design a Notification System**
-   plus 5 minutes of self-review. Weak due topics may delay the next new topic.
-4. After David shares his explanation, collect duration, requirements,
-   architecture, trade-off and failure-mode scores (each **1–5**), confidence
-   (1–5), and one next improvement. Use David's ratings or explain a rating based
-   on his actual answer; never grade a scheduled push as if he completed it.
-   Rubric: 1 missing/incorrect; 2 substantial gaps; 3 workable with prompting;
-   4 independently justified; 5 clear reasoning including alternatives/failures.
-
-```bash
-python3 ~/.hermes/scripts/interview_progress.py log-design \
-  --assignment system_design:2026-09-13 --duration 50 \
-  --requirements-score 4 --architecture-score 3 --trade-off-score 3 \
-  --failure-mode-score 2 --confidence 3 \
-  --next-improvement "Explain retries when the provider accepts a send but times out"
-```
-
-The lowest dimension score or confidence determines the design review interval:
-≤2 → 2 days, 3 → 7 days, ≥4 → 21 days, delivered on a subsequent Sunday.
+Read `references/system-design-interviewer.md` and follow it exactly. This is a
+stateful interview, not a reading assignment: one adaptive General, ML, or Agent
+problem per week; clarification before design; interviewer follow-ups before
+feedback; the full track-specific rubric; and a reference design only after
+saved feedback. The OS cron owns the weekly time. The helper owns selection,
+phase gates, structured local history, difficulty progression, and summaries.
 
 ## Weekly report
 

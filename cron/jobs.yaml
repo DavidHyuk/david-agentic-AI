@@ -82,13 +82,13 @@ jobs:
     prompt: >
       Deliver today's System Design Coach using the interview-prep skill's System
       Design Coach procedure. Run python3 ~/.hermes/scripts/interview_progress.py
-      plan system_design and send the actual study message it returns. Include
-      the concrete Hello Interview topic/problem and visible clickable canonical
-      Hello Interview URL, a 45–60 minute target, 3–5 things I should be able to
-      explain afterward, and its connection to my real Agent/Hermes experience.
-      Retain the timed 45-minute mock for Design a Notification System and any
-      access note/free supporting links. Do not log completion without my results.
-      Never replace the study item with a generic reminder.
+      plan system_design and send the actual interview prompt it returns. Give
+      exactly one 45-minute General, ML, or LLM/Agent system-design problem and
+      3–5 clarification questions, with no solution, rubric, hidden constraints,
+      architecture hints, or study links. If an interview is unfinished, resume
+      it instead of opening another; a repeated run in the same ISO week must not
+      create a second problem. Do not record completion until I submit a design,
+      answer interviewer follow-ups, and receive structured feedback.
 
   - name: english-podcast-daily
     schedule: "15 9 * * *"          # 09:15 daily, after the 08:25 transcript sync
