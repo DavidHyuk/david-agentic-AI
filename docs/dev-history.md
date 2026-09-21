@@ -3,6 +3,15 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.21.1 — 2026-09-21 (patch: quiet LeetCode snapshot maintenance)
+
+- Reduced the no-delivery LeetCode history refresh from every four hours to once
+  daily at 06:35. The Coding Coach still refreshes immediately before each
+  scheduled lesson, preserving lesson freshness with fewer background runs.
+- Kept maintenance sessions searchable in the Observatory archive while omitting
+  them from global and LeetCode Gym recent-activity lists and latest-session cards,
+  so internal `[SILENT]` work no longer buries study history.
+
 ## v1.21.0 — 2026-09-18 (minor: make system design an adaptive interview)
 
 - Replaced the four-step Hello Interview reading sequence with a curated General,

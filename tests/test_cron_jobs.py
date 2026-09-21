@@ -31,7 +31,7 @@ def test_defaults_applied_deliver_telegram():
 def test_leetcode_history_sync_is_read_only_and_has_no_delivery():
     jobs = {job["name"]: job for job in rc.load_jobs(JOBS)}
     sync = jobs["leetcode-history-sync"]
-    assert sync["schedule"] == "35 */4 * * *"
+    assert sync["schedule"] == "35 6 * * *"
     assert "leetcode_sync.py sync" in sync["prompt"]
     assert "read-only" in sync["prompt"]
     assert "--deliver" not in rc.build_create_command(sync, environment={})

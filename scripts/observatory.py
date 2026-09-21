@@ -46,6 +46,7 @@ JOB_ROOMS = {'papers-digest': 'papers', 'interview-prep': 'interview',
              'weekly-review': 'hq', 'english-intake': 'english',
              'english-drill': 'english', 'english-weekly-review': 'english',
              'english-podcast-daily': 'podcast', 'career-rewards-daily': 'hq'}
+BACKGROUND_MAINTENANCE_JOBS = frozenset({'leetcode-history-sync'})
 ROOM_PROFILES = {'hq': 'david', 'podcast': 'english'}
 SECRET_KEY = re.compile(r'(token|secret|password|api[_-]?key|authorization|cookie|credential)', re.I)
 TASK_ID = re.compile(r't_[0-9a-f]{8}')
@@ -166,6 +167,19 @@ def room_for(profile, session_id, prompt, jobs):
     return 'hq'
 
 
+def cron_job_name(session_id, prompt, jobs):
+    """Resolve current and retained cron sessions to their declarative job name."""
+    for job in jobs:
+        job_id = str(job.get('id', ''))
+        if job_id and session_id.startswith('cron_' + job_id + '_'):
+            return str(job.get('name', ''))
+    task = task_prompt(prompt).lower()
+    if ('refresh the opt-in leetcode history snapshot' in task
+            and 'leetcode_sync.py sync' in task):
+        return 'leetcode-history-sync'
+    return ''
+
+
 def date_range(start='', end=''):
     """Local calendar dates, inclusive end date, converted to epoch bounds."""
     lo = datetime.strptime(start, '%Y-%m-%d').replace(tzinfo=TZ).timestamp() if start else 0
@@ -246,8 +260,9 @@ class Observatory:
         data = {'room': room, 'today': today, 'revision': notebook['revision'],
                 'note': notebook['notes'].get(room, ''),
                 'events': [e for e in reversed(notebook['events']) if e['room'] == room][:12]}
-        history = self.sessions(room=room, limit=5)
-        data['recent'] = history['items']
+        history = self.sessions(room=room, limit=100)
+        data['recent'] = [session for session in history['items']
+                          if not session['background_maintenance']][:5]
         data['errors'] = history['errors']
         if room in ('coding', 'design'):
             track = 'coding' if room == 'coding' else 'system_design'
@@ -858,6 +873,9 @@ class Observatory:
                     task = task_prompt(prompt) if row['source'] == 'cron' else prompt
                     row['preview'] = task[:240]
                     row['title'] = row['title'] or task[:100] or row['id']
+                    row['background_maintenance'] = (
+                        row['source'] == 'cron'
+                        and cron_job_name(row['id'], prompt, jobs) in BACKGROUND_MAINTENANCE_JOBS)
                     # ended_at=NULL is not proof that an agent is running.
                     row['status'] = '종료 기록 있음' if row['ended_at'] else '종료 기록 없음'
                     rows.append(row)
@@ -1022,8 +1040,9 @@ class Observatory:
                                for n in self.profiles() if n not in room_ids | {'david'}]
         for key, title, subtitle, icon, color in definitions:
             history = [s for s in sessions['items'] if s['room'] == key]
+            visible_history = [s for s in history if not s['background_maintenance']]
             room_jobs = [j for j in jobs if j['room'] == key]
-            latest = history[0] if history else None
+            latest = visible_history[0] if visible_history else None
             rooms.append({'id': key, 'title': title, 'subtitle': subtitle, 'icon': icon,
                           'color': color, 'sessions': len(history), 'latest': latest,
                           'jobs': room_jobs, 'notice': self.recent_notification(history),
@@ -1040,7 +1059,9 @@ class Observatory:
                 'rooms': rooms, 'total_sessions': sessions['total'],
                 'today_sessions': sum(s['started_at'] >= today_start for s in sessions['items']),
                 'total_messages': sum(s['message_count'] or 0 for s in sessions['items']),
-                'recent': sessions['items'][:12], 'errors': errors + sessions['errors']}
+                'recent': [session for session in sessions['items']
+                           if not session['background_maintenance']][:12],
+                'errors': errors + sessions['errors']}
 
     def library(self, kind, profile='david', q='', offset=0, limit=40):
         home = self.profile_home(profile)

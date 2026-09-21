@@ -121,6 +121,36 @@ def test_overview_exposes_actual_cron_response_as_room_notice(store):
     assert coding['action']['title'] == '코딩 과제'
 
 
+def test_background_sync_stays_searchable_but_not_in_recent_activity(store):
+    jobs_path = store.home / 'cron/jobs.json'
+    jobs = json.loads(jobs_path.read_text())
+    jobs['jobs'].append({
+        'id': 'sync', 'name': 'leetcode-history-sync', 'deliver': None, 'enabled': True,
+    })
+    jobs_path.write_text(json.dumps(jobs))
+    conn = sqlite3.connect(store.home / 'state.db')
+    conn.execute('''INSERT INTO sessions VALUES(
+        'cron_sync_20260921','cron','Refresh snapshot',1789152000,1789152010,
+        'done','local',2,1,20,2)''')
+    conn.execute('''INSERT INTO messages VALUES(
+        20,'cron_sync_20260921','user',
+        'Refresh the opt-in LeetCode history snapshot. Run python3 ~/.hermes/scripts/leetcode_sync.py sync.',
+        NULL,NULL,1789152001,NULL)''')
+    conn.execute('''INSERT INTO messages VALUES(
+        21,'cron_sync_20260921','assistant','[SILENT]',NULL,NULL,1789152002,'stop')''')
+    conn.commit()
+    conn.close()
+
+    archived = store.sessions(q='opt-in LeetCode history')['items']
+    assert archived[0]['id'] == 'cron_sync_20260921'
+    assert archived[0]['background_maintenance'] is True
+    assert [item['id'] for item in store.workbench('coding')['recent']] == ['s1']
+    overview = store.overview()
+    assert 'cron_sync_20260921' not in {item['id'] for item in overview['recent']}
+    coding = next(room for room in overview['rooms'] if room['id'] == 'coding')
+    assert coding['latest']['id'] == 's1'
+
+
 def test_reward_digest_routes_to_existing_hq_room():
     jobs = [{"id": "reward", "name": "career-rewards-daily"}]
     prompt = "Run reward_system.py notify for Career Cash."

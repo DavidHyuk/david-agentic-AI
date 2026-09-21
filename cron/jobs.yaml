@@ -13,7 +13,7 @@ defaults:
 
 jobs:
   - name: leetcode-history-sync
-    schedule: "35 */4 * * *"        # every four hours; staggered, no Telegram delivery
+    schedule: "35 6 * * *"          # 06:35 daily; staggered, no Telegram delivery
     deliver: null
     skills: [interview-prep]
     prompt: >

@@ -140,7 +140,7 @@ David-Agent/
 │   ├── Qwen/                  # Qwen 계열 모델
 │   └── MiniMax/               # MiniMax-M2.7 모델
 │
-├── tests/                     # pytest 테스트 (325개)
+├── tests/                     # pytest 테스트 (326개)
 │   ├── conftest.py
 │   ├── test_papers_ingest.py
 │   ├── test_papers_digest.py
@@ -233,7 +233,7 @@ Calendar 연동을 재개할 때까지 `morning-brief`는 등록하지 않습니
 | `papers-digest` | 08:50 화/금 | 전용 Telegram 논문 그룹: 가장 핫한 LLM/LVM 논문 3편 |
 | `interview-prep` | 12:05 월/수/금 | 전용 Interview 그룹: 실시간 트렌드 기반 Staff 레벨 드릴 1개 |
 | `coding-coach` | 12:10 화/목/토 | 전용 LeetCode 그룹: 같은 패턴 6문제 블록의 다음 35분 문제 |
-| `leetcode-history-sync` | 매 4시간 35분 | 전송 없음: 연결된 LeetCode 세션의 읽기 전용 풀이 이력 snapshot 갱신 |
+| `leetcode-history-sync` | 매일 06:35 | 전송 없음: 연결된 LeetCode 세션의 읽기 전용 풀이 이력 snapshot 갱신 |
 | `system-design-coach` | 12:15 일요일 | 전용 System Design 그룹: 주 1회 45분 General/ML/Agent 인터뷰 |
 | `english-podcast-daily` | 09:15 매일 | 기존 English bot의 `🎧 Morning Echo` 전용 그룹: 다운로드된 대본 기반 개인화 학습 1편 |
 | `english-intake` | 월–토 20:05 | English bot: 새 피드백 분석 또는 취약 패턴 코칭 |
@@ -541,9 +541,10 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   비밀번호는 저장하지 않습니다. snapshot은 최근 문제별 최신 Accepted 실제 코드도
   owner-only로 보관해 과거 풀이 설명에 쓰며, headless 로그인은 Cloudflare를 우회하지 않고 차단을
   명시하며, GUI가 없을 때 숨김 세션 입력 `connect`가 fallback입니다. `0600` 세션 파일과
-  별도 `0600` 풀이 snapshot을 만들며 코드 제출·계정 변경은 없습니다. 4시간 cron과
+  별도 `0600` 풀이 snapshot을 만들며 코드 제출·계정 변경은 없습니다. 매일 06:35 cron과
   Coding Coach 직전 동기화가 최근 정답/난이도별 해결 수를 갱신하고 LeetCode Gym
-  Observatory는 안전한 필드만 읽습니다.
+  Observatory는 안전한 필드만 읽습니다. 백그라운드 동기화 세션은 archive 검색에는
+  남지만 전체 및 LeetCode Gym 최근 기록과 최신 세션 카드에서는 숨깁니다.
 - 일요일 18시 보고서는 월요일부터의 완료 세션, 신규/복습, 평균 시간, 힌트/해설 사용,
   최신 취약 패턴, 설계 주제, 최저 설계 차원과 다음 주 집중 영역을 논문 리뷰에 합칩니다.
   CLI 배포/기록 예시는 README의 Interview study coach 절을 참조합니다.
