@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # __author__ = 'David Choi (bestshoot21@gmail.com)'
-"""Smoke-test the local vLLM endpoint and Qwen tool-calling response shape."""
+"""Smoke-test the local model endpoint and Qwen tool-calling response shape."""
 
 from __future__ import annotations
 
@@ -120,7 +120,7 @@ def run_smoke_test(base_url: str, model: str, timeout: int = 180) -> None:
 def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--base-url", default="http://localhost:8003/v1")
-    parser.add_argument("--model", default="Qwen3.6-35B-A3B-FP8")
+    parser.add_argument("--model", default="Qwen3.8-Flash-Next-UD-IQ4_XS")
     parser.add_argument("--timeout", type=int, default=180)
     return parser.parse_args(argv)
 

@@ -1,14 +1,14 @@
 # __author__ = 'David Choi (bestshoot21@gmail.com)'
-"""Tests for the standalone vLLM readiness gate."""
+"""Tests for the standalone model readiness gate."""
 from __future__ import annotations
 
 import wait_for_vllm as wait
 
 
 def test_response_has_expected_model():
-    payload = {"data": [{"id": "Qwen3.6-35B-A3B-FP8"}]}
+    payload = {"data": [{"id": "Qwen3.8-Flash-Next-UD-IQ4_XS"}]}
 
-    assert wait.response_has_model(payload, "Qwen3.6-35B-A3B-FP8") is True
+    assert wait.response_has_model(payload, "Qwen3.8-Flash-Next-UD-IQ4_XS") is True
     assert wait.response_has_model(payload, "other-model") is False
     assert wait.response_has_model({"data": []}, None) is False
 
@@ -17,7 +17,7 @@ def test_wait_until_ready_retries_then_succeeds():
     responses = iter(
         [
             OSError("connection refused"),
-            {"data": [{"id": "Qwen3.6-35B-A3B-FP8"}]},
+            {"data": [{"id": "Qwen3.8-Flash-Next-UD-IQ4_XS"}]},
         ]
     )
     times = iter([0.0, 0.0, 0.2, 0.2])

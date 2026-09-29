@@ -1,13 +1,13 @@
-# Purpose: keep the Hermes Qwen3.6 FP8 vLLM endpoint alive across logouts/reboots.
+# Purpose: keep the Hermes Qwen3.8 Flash-Next endpoint alive across logouts/reboots.
 [Unit]
-Description=Hermes Qwen3.6 FP8 vLLM Server
+Description=Hermes Qwen3.8 Flash-Next 4-bit Model Server
 After=network.target
 
 [Service]
 Type=simple
 WorkingDirectory=%h/workspace/David-Agent
-ExecStartPre=/usr/bin/test -x %h/workspace/David-Agent/local-model/.venv/bin/vllm
-ExecStart=/usr/bin/bash %h/workspace/David-Agent/local-model/run_model.sh qwen36
+ExecStartPre=/usr/bin/test -x %h/workspace/llama.cpp/build-qwen38/bin/llama-server
+ExecStart=/usr/bin/bash %h/workspace/David-Agent/local-model/run_flash_next.sh
 Restart=on-failure
 RestartSec=10
 KillSignal=SIGINT

@@ -30,7 +30,7 @@ disposable cache.
 ## Architecture
 
 ```
-Local DGX Spark (vLLM @ :8003, Qwen3.6 FP8, 128K ctx)
+Local DGX Spark (llama.cpp @ :8003, Qwen3.8 Flash-Next IQ4_XS, 64K ctx)
         │  OpenAI-compatible API
         ▼
    David Hermes profile ───────────────────────────────────────► David Telegram bot
@@ -83,9 +83,10 @@ Local DGX Spark (vLLM @ :8003, Qwen3.6 FP8, 128K ctx)
 | `mcp/setup_google_calendar.py` | Securely configure Google's official Calendar MCP |
 | `mcp/calendar_smoke.py` | Verify MCP discovery and a read-only Hermes calendar call |
 | `docs/next-steps.md` | Agreed paper/job questions and Kakao English E2E checklist |
-| `local-model/setup_vllm.sh` | Create an isolated CUDA-compatible vLLM runtime |
-| `local-model/run_model.sh` | Launch Qwen3.6 FP8 or an alternative local model |
-| `local-model/restart_service.sh` | Restart the always-on vLLM service and optionally wait for API readiness |
+| `local-model/run_flash_next.sh` | Launch Qwen3.8 Flash-Next UD-IQ4_XS on llama.cpp |
+| `local-model/setup_vllm.sh` | Create an isolated CUDA-compatible vLLM runtime for legacy models |
+| `local-model/run_model.sh` | Launch Qwen3.6 FP8 or another legacy vLLM model |
+| `local-model/restart_service.sh` | Restart a legacy vLLM service and optionally wait for API readiness |
 | `local-model/model_preflight.py` | Validate checkpoint quantization and context |
 | `/home/david/workspace/models/download_model.py` | Download and manage Hugging Face checkpoints outside this config repo |
 | `config/config.fragment.minimax.yaml` | Hermes provider config for MiniMax |
@@ -100,9 +101,16 @@ python3 -m pip install -r requirements.txt
 # 1. Run the bootstrap (installs Hermes if missing, stages config, sets model)
 bash bootstrap/install.sh
 
-# 2. Create the isolated runtime once, then start Qwen3.6 FP8
-bash local-model/setup_vllm.sh
-bash local-model/run_model.sh qwen36
+# 2. Download the 4-bit GGUF into the models workspace and build llama.cpp with CUDA
+hf download unsloth/Qwen3.8-Flash-Next-GGUF \
+  --include 'UD-IQ4_XS/*' --include 'mmproj-F16.gguf' \
+  --local-dir /home/david/workspace/models/unsloth/Qwen3.8-Flash-Next-GGUF
+git clone https://github.com/ggml-org/llama.cpp /home/david/workspace/llama.cpp
+git -C /home/david/workspace/llama.cpp switch --detach 526c43b8f
+cmake -S /home/david/workspace/llama.cpp -B /home/david/workspace/llama.cpp/build-qwen38 \
+  -DGGML_CUDA=ON -DCMAKE_CUDA_COMPILER=/usr/local/cuda/bin/nvcc
+cmake --build /home/david/workspace/llama.cpp/build-qwen38 -j 8 --target llama-server
+bash local-model/run_flash_next.sh
 
 # In another shell, verify model discovery and OpenAI tool calling
 python3 local-model/smoke_test.py
@@ -144,13 +152,14 @@ Then complete the **interactive, one-time** steps `install.sh` prints:
 - Follow [Kakao Channel setup](docs/kakao-channel-setup.md) to receive tutor feedback
   through the Channel chatbot, then turn it into Telegram drills.
 
-### Always-on vLLM service
+### Always-on model service
 
 `local-model/install_service.sh` installs and enables the user-level
 `hermes-vllm.service`. It also installs a gateway systemd drop-in that requires
 the model service and runs `wait_for_vllm.py` before Hermes starts. This prevents
 fresh cron jobs from racing the several-minute model load after a reboot.
-Manage the Qwen3.6 endpoint with:
+The service name is retained for compatibility; it now runs the Qwen3.8
+Flash-Next 4-bit GGUF through llama.cpp. Manage it with:
 
 ```bash
 # Start, stop, and inspect the service
@@ -162,27 +171,20 @@ systemctl --user status hermes-vllm.service
 journalctl --user -u hermes-vllm.service -f
 ```
 
-The Qwen3.6 launcher and restart helper both default to a `0.50` GPU
-reservation. Use the helper to persist a different reservation and restart the
-service; add `--wait` when an operational task must wait for model loading to
-finish:
+To restart and wait for the correct model to appear:
 
 ```bash
-# Reserve 50% of usable GPU memory for vLLM (default)
-bash local-model/restart_service.sh
-
-# Reserve 60% and wait for the API to become ready
-bash local-model/restart_service.sh 0.60 --wait
-
-# Equivalent explicit option
-bash local-model/restart_service.sh --gpu-util 0.60 --wait
+systemctl --user restart hermes-vllm.service
+python3 scripts/wait_for_vllm.py --url http://127.0.0.1:8003/v1/models \
+  --expected-model Qwen3.8-Flash-Next-UD-IQ4_XS --timeout 900
 ```
 
-The helper writes a service-specific systemd override at
-`~/.config/systemd/user/hermes-vllm.service.d/gpu-memory.conf`, so the selected
-value survives reboots. `--gpu-memory-utilization` is an upper bound for all
-vLLM allocations (weights, CUDA workspaces, and KV cache); it does not make the
-KV cache exactly that percentage or create persistent Hermes memory.
+`run_flash_next.sh` uses one 64K request slot and lets llama.cpp fit layers to the
+DGX Spark's available unified memory. Its server binds only `127.0.0.1:8003`.
+An existing swap file can absorb ordinary host memory pressure, but model and
+CUDA allocations must still fit in available unified memory. The legacy
+`restart_service.sh` GPU reservation setting applies only when the service is
+restored to the vLLM launcher.
 
 ## Automatic verified commit and push
 
@@ -861,19 +863,19 @@ the isolated tutor-English jobs plus the 09:15 transcript-backed lesson. Run eac
 profile's E2E message only after its Telegram bot has completed pairing.
 
 The gateway only starts after `/v1/models` contains
-`Qwen3.6-35B-A3B-FP8`. Calendar is not part of the active agent runtime.
+`Qwen3.8-Flash-Next-UD-IQ4_XS`. Calendar is not part of the active agent runtime.
 
 ## Local model note
-Hermes requires a model with **≥64K context**. Qwen3.6 is served at 128K on
-`:8003`. Paper metadata ingestion itself is zero-LLM and does not require a
-second model server. Checkpoints are managed separately in
-`/home/david/workspace/models`; install its dependencies once, then download by
-Hugging Face repository ID:
+Hermes requires a model with **≥64K context**. The Qwen3.8 Flash-Next
+`UD-IQ4_XS` checkpoint is served at 64K on `:8003`. Its three GGUF shards
+total about 93.7GB. Paper metadata ingestion itself is zero-LLM and does not
+require a second model server. The model stays outside this configuration repo
+under `/home/david/workspace/models`:
 
 ```bash
-cd /home/david/workspace/models
-python3 -m pip install -r requirements.txt
-python3 download_model.py Qwen/Qwen3.6-35B-A3B-FP8
+hf download unsloth/Qwen3.8-Flash-Next-GGUF \
+  --include 'UD-IQ4_XS/*' --include 'mmproj-F16.gguf' \
+  --local-dir /home/david/workspace/models/unsloth/Qwen3.8-Flash-Next-GGUF
 ```
 
 ## Browser note

@@ -38,16 +38,15 @@ def test_config_merge_preserves_existing(tmp_path):
     import yaml
     cfg = yaml.safe_load((home / "config.yaml").read_text())
     assert cfg["existing_key"] == 123                              # preserved
-    assert cfg["model"]["provider"] == "custom:qwen36-fp8-hermes"  # merged from fragment
+    assert cfg["model"]["provider"] == "custom:qwen38-flash-next-hermes"  # merged from fragment
     assert cfg["model"]["foo"] == "bar"                            # preserved alongside merge
-    assert "qwen36-fp8-hermes" in cfg["providers"]
-    provider = cfg["providers"]["qwen36-fp8-hermes"]
+    assert "qwen38-flash-next-hermes" in cfg["providers"]
+    provider = cfg["providers"]["qwen38-flash-next-hermes"]
     assert provider["base_url"] == "http://localhost:8003/v1"
-    assert provider["model"] == "Qwen3.6-35B-A3B-FP8"
-    assert provider["context_length"] == 131072
+    assert provider["model"] == "Qwen3.8-Flash-Next-UD-IQ4_XS"
+    assert provider["context_length"] == 65536
     eb = provider["extra_body"]
     assert eb["presence_penalty"] == 1.5
-    assert eb["repetition_penalty"] == 1.0
     assert cfg["browser"] == {
         "cloud_provider": "local",
         "engine": "chrome",

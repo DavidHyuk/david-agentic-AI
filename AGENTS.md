@@ -31,8 +31,8 @@ English Telegram chat.
 - `cron/jobs.yaml` — declarative Telegram notification schedule.
 - `bootstrap/` — staging, cron registration, and systemd service installers,
   including the automatic cron watchdog.
-- `local-model/run_model.sh` — launch the default Qwen3.6 FP8 vLLM backend at
-  128K context or a supported alternative model.
+- `local-model/run_flash_next.sh` — launch the default Qwen3.8 Flash-Next
+  4-bit llama.cpp backend at 64K context; `run_model.sh` retains vLLM alternatives.
 - `browser/` — Hermes Built-in Browser backed by localhost-only Chromium CDP.
 - `mcp/` — deferred Google Calendar read-only MCP setup retained for later.
 - `tests/` — pytest suite for the scripts, skill frontmatter, and cron schema.
@@ -182,6 +182,6 @@ instead.
 - Subscribe-Papers DB: `/home/david/workspace/Subscribe-Papers/data/papers.db`
 - Hermes paper catalog: `~/.hermes/data/papers/papers.db`
 - Local LLM checkpoint:
-  `/home/david/workspace/models/Qwen/Qwen3.6-35B-A3B-FP8`
-- Local LLM endpoint: `http://localhost:8003/v1` (vLLM, 128K context)
+  `/home/david/workspace/models/unsloth/Qwen3.8-Flash-Next-GGUF/UD-IQ4_XS`
+- Local LLM endpoint: `http://localhost:8003/v1` (llama.cpp, 64K context)
 - English lessons inbox: `~/english-lessons/`

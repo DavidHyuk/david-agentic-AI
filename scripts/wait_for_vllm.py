@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # __author__ = 'David Choi (bestshoot21@gmail.com)'
-"""Wait until the local vLLM model-discovery endpoint is ready.
+"""Wait until the local OpenAI-compatible model endpoint is ready.
 
 This standalone helper is used by the Hermes gateway systemd drop-in.  It
 requires a successful ``/v1/models`` response containing the configured served
@@ -19,7 +19,7 @@ from collections.abc import Callable, Sequence
 from typing import Any
 
 DEFAULT_URL = "http://127.0.0.1:8003/v1/models"
-DEFAULT_MODEL = "Qwen3.6-35B-A3B-FP8"
+DEFAULT_MODEL = "Qwen3.8-Flash-Next-UD-IQ4_XS"
 
 
 def response_has_model(payload: Any, expected_model: str | None) -> bool:
@@ -103,11 +103,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     if ok:
         print(
-            f"vLLM ready: {args.expected_model or 'a served model'} ({detail})",
+            f"Model ready: {args.expected_model or 'a served model'} ({detail})",
             file=sys.stderr,
         )
         return 0
-    print(f"vLLM readiness timed out: {detail}", file=sys.stderr)
+    print(f"Model readiness timed out: {detail}", file=sys.stderr)
     return 1
 
 

@@ -11,9 +11,9 @@ profile을 `~/.hermes/profiles/english`로 동기화합니다.
 ## 전체 아키텍처
 
 ```
-DGX Spark (128GB VRAM)
-  └── vLLM 서버 :8003
-        └── Qwen3.6-35B-A3B-FP8 (128K 컨텍스트)
+DGX Spark (128GB 통합 메모리)
+  └── llama.cpp 서버 :8003
+        └── Qwen3.8-Flash-Next-UD-IQ4_XS (64K 컨텍스트)
                 │
                 ├── David Hermes gateway ── David Telegram bot
                 │     ├── dedicated paper group: Tue/Fri top-three papers digest
@@ -54,7 +54,7 @@ David-Agent/
 │   ├── memory/
 │   │   ├── USER.md            # David에 대한 고정 프로필 (≤1375자)
 │   │   └── MEMORY.md          # 런타임 장기 기억 시드 (≤2200자)
-│   ├── config.fragment.yaml       # 기본 설정 (Qwen3.6 FP8)
+│   ├── config.fragment.yaml       # 기본 설정 (Qwen3.8 Flash-Next IQ4_XS)
 │   ├── config.fragment.qwen36.yaml  # Qwen3.6 FP8 설정
 │   └── config.fragment.minimax.yaml # MiniMax-M2.7 설정
 │
@@ -120,8 +120,9 @@ David-Agent/
 ├── local-model/               # 로컬 LLM 서버 관리
 │   ├── setup_vllm.sh          # 격리된 CUDA 호환 vLLM 환경 생성
 │   ├── model_preflight.py     # 체크포인트 양자화·컨텍스트 사전검사
-│   ├── run_model.sh           # vLLM 서버 실행 (qwen/qwen-hybrid/qwen36/minimax)
-│   ├── install_service.sh     # Qwen3.6 vLLM user systemd 서비스 설치
+│   ├── run_flash_next.sh      # 현재 4비트 GGUF llama.cpp 서버 실행
+│   ├── run_model.sh           # 레거시 vLLM 서버 실행 (qwen/qwen-hybrid/qwen36/minimax)
+│   ├── install_service.sh     # 현재 모델 user systemd 서비스 설치
 │   ├── hermes-gateway-vllm.conf # gateway → vLLM 의존성/readiness drop-in
 │   ├── restart_service.sh     # vLLM 서비스 재시작 및 API 준비 대기
 │
@@ -140,7 +141,7 @@ David-Agent/
 │   ├── Qwen/                  # Qwen 계열 모델
 │   └── MiniMax/               # MiniMax-M2.7 모델
 │
-├── tests/                     # pytest 테스트 (326개)
+├── tests/                     # pytest 테스트 (328개)
 │   ├── conftest.py
 │   ├── test_papers_ingest.py
 │   ├── test_papers_digest.py
@@ -289,25 +290,23 @@ English profile에서는 background skill creation과 curator를 비활성화합
 
 
 ### 6. `local-model/` — LLM 백엔드
-`run_model.sh` 는 4가지 모델을 하나의 스크립트로 지원하며, 인자 없이 실행해도
-Qwen3.6 FP8을 기본 운영 모델로 사용합니다. Hermes는 ≥64K 컨텍스트가 필요해 포트
-`:8003`에서 128K로 실행됩니다. `install_service.sh`는 이를 로그인·재부팅 후에도
-유지하는 `hermes-vllm.service` user service를 설치합니다. 서비스는
-`bash local-model/restart_service.sh`로 재시작하며, `--wait`을 붙이면 모델 API가
-준비될 때까지 대기합니다.
+`run_flash_next.sh`가 현재 운영 모델인 Qwen3.8 Flash-Next 4비트
+`UD-IQ4_XS` GGUF를 llama.cpp로 `127.0.0.1:8003`에서 서빙합니다. 세 GGUF
+샤드는 약 93.7GB이며 64K 컨텍스트 슬롯 하나를 사용합니다. 128GB 통합 메모리의 여유에
+맞춰 GPU layer 수를 자동 조정합니다. `install_service.sh`는 이를 로그인·재부팅
+후에도 유지하는 기존 이름의 `hermes-vllm.service` user service를 설치합니다.
+`run_model.sh`는 Qwen3.6 FP8 등 4가지 vLLM 대안용으로 유지합니다.
 설치기는 `hermes-gateway.service`에 systemd drop-in도 배치합니다. Gateway는
 `hermes-vllm.service`를 요구하고 `wait_for_vllm.py`가
-`Qwen3.6-35B-A3B-FP8`을 확인한 뒤에만 시작하므로, 재부팅 직후 cron이 모델
+`Qwen3.8-Flash-Next-UD-IQ4_XS`를 확인한 뒤에만 시작하므로, 재부팅 직후 cron이 모델
 로딩보다 먼저 실행되는 경합을 방지합니다.
 `journalctl --user -u hermes-vllm.service -f`로 로그를 확인합니다.
 
-Qwen3.6 launcher와 `restart_service.sh`는 기본 GPU 예약 비율 50%를 사용한다.
-재시작 helper는 이를 service override에 저장하며, 첫 번째 인자로 바꿀 수 있다
-(예: `restart_service.sh 0.60 --wait`). 이 값은 vLLM의
-모델·workspace·공유 KV-cache pool 전체의 상한이며 Hermes의 영구 기억과는 별개다.
-새 논문 메타데이터 수집에는 LLM이 필요 없습니다. 모델 가중치의 다운로드·저장 관리는 이 설정 repo 밖의
-`/home/david/workspace/models/download_model.py`가 담당하며, `run_model.sh`는 해당
-경로의 체크포인트를 vLLM service에 전달하는 실행 계층으로 유지됩니다.
+현재 서비스는 `systemctl --user restart hermes-vllm.service`로 재시작합니다.
+`restart_service.sh`의 GPU 예약 옵션은 레거시 vLLM 런처용입니다. 기존 SSD
+스왑은 일반 호스트 메모리 압박에 대응하지만, GPU 할당까지 보장하지는 않습니다.
+모델 가중치는 이 설정 repo 밖의 `/home/david/workspace/models/`에 보관합니다.
+새 논문 메타데이터 수집에는 LLM이 필요 없습니다.
 
 ### 7. browser 격리
 
@@ -330,11 +329,12 @@ Hermes가 고정된 `agent-browser 0.33.0`을 통해 연결합니다. 외부 클
 | v0.1.0 | gpt-oss-120b | llama.cpp | 기준 | 64K | 구버전 |
 | v0.1.1 | Qwen3.5-122B-A10B-AWQ | vLLM | ~14 tok/s | 64K | 레거시 (`qwen`) |
 | v0.1.1 | Qwen3.5-122B AutoRound INT4 | vLLM | ~51 tok/s | 64K | 다운로드 완료 (`qwen-hybrid`) |
-| v0.4.0 | Qwen3.6-35B-A3B-FP8 | vLLM | 운영 검증 완료 | 128K | 기본값 (`qwen36`) |
+| v0.4.0 | Qwen3.6-35B-A3B-FP8 | vLLM | 운영 검증 완료 | 128K | 레거시 대안 (`qwen36`) |
+| v1.22.0 | Qwen3.8-Flash-Next-UD-IQ4_XS | llama.cpp | 도구 호출 검증, 약 29 tok/s | 64K | 현재 기본 서비스 |
 | — | MiniMax-M2.7-AWQ-4bit | vLLM | 대안 MoE | 64K | 옵션 (`minimax`) |
 
-핵심 흐름: **llama.cpp → vLLM** 전환으로 배치 처리·KV캐시·prefix caching 등 프로덕션급 최적화를 확보했습니다.
-모델 전환은 `bash local-model/run_model.sh <모델명>` 하나로 가능합니다.
+현재 모델은 4비트 GGUF 지원과 메모리 적합성을 위해 llama.cpp를 사용합니다.
+레거시 모델은 `bash local-model/run_model.sh <모델명>`으로 실행할 수 있습니다.
 
 ### 방향 2 — 기억(Memory) 품질 향상
 
@@ -503,8 +503,8 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
 
 ### 인터뷰 학습 코치 (interview_progress.py)
 - 기존 `interview-prep` 스킬 안에서 동작하며, `stage.py`가 standalone helper와
-  `references/coach_catalog.json`을 그대로 배포합니다. 모델/엔진 구성은 기존
-  Qwen3.6 FP8 vLLM 128K 설정과 지원 대안을 사용합니다.
+  `references/coach_catalog.json`을 그대로 배포합니다. 모델/엔진 구성은 현재
+  Qwen3.8 Flash-Next 4비트 llama.cpp 64K 설정을 공유합니다.
 - 48문제 경로는 HashMap(Two Sum 기초 포함) → Two Pointers → Sliding Window →
   Stack → Binary Search → Tree/BFS/DFS → Heap → Graph 순서의 8개 블록입니다.
   각 블록에서 신규 문제 6개를 연속 완료한 뒤에만 다음 유형으로 이동하며, cron과

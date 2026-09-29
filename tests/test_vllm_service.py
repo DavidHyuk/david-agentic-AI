@@ -49,7 +49,7 @@ def test_gateway_dropin_waits_for_expected_vllm_model():
     assert "Requires=hermes-vllm.service" in text
     assert "After=hermes-vllm.service" in text
     assert "wait_for_vllm.py" in text
-    assert "--expected-model Qwen3.6-35B-A3B-FP8" in text
+    assert "--expected-model Qwen3.8-Flash-Next-UD-IQ4_XS" in text
     assert "TimeoutStartSec=930" in text
 
 
@@ -66,6 +66,7 @@ def test_vllm_unit_uses_the_renamed_checkout() -> None:
 
     assert "%h/workspace/David-Agent" in text
     assert "%h/workspace/david-agentic-ai" not in text
+    assert "run_flash_next.sh" in text
 
 
 def test_restart_helper_rejects_an_invalid_gpu_util_before_touching_service():

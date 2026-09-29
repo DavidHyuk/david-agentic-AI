@@ -2,7 +2,7 @@ Host: DGX Spark workstation (Linux). David's code lives under /home/david/worksp
 §
 Paper ingestion: independent systemd timer at 08:00 collects arXiv cs.AI/cs.CL/cs.LG/cs.CV + Hugging Face metadata into ~/.hermes/data/papers/papers.db. Existing Subscribe-Papers DB/PDFs are preserved as the one-time migration source.
 §
-Local LLM: Qwen3.6-35B-A3B-FP8 via vLLM at http://localhost:8003/v1 (run local-model/run_model.sh qwen36). 128K context; qwen3 reasoning + qwen3_coder tool parsers. Paper metadata ingestion uses no LLM.
+Local LLM: Qwen3.8-Flash-Next-UD-IQ4_XS via llama.cpp at http://localhost:8003/v1 (run local-model/run_flash_next.sh). 64K context. Paper metadata ingestion uses no LLM.
 §
 Staged helper scripts in ~/.hermes/scripts/: papers_ingest.py, papers_digest.py, english_intake.py, english_srs.py, agenda.py. English profile stages its own copies of the English helpers.
 §

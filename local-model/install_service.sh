@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # __author__ = 'David Choi (bestshoot21@gmail.com)'
 #
-# Install and optionally start the Qwen3.6 vLLM user service.
+# Install and optionally start the shared Hermes model user service.
 
 set -euo pipefail
 

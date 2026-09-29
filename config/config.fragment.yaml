@@ -1,31 +1,25 @@
 # Non-secret Hermes config merged into ~/.hermes/config.yaml by stage.py.
 # Secrets (the local endpoint API key) go in ~/.hermes/.env instead.
 
-# --- Named provider: Qwen3.6-35B-A3B-FP8 via vLLM on the DGX Spark ------------
+# --- Named provider: Qwen3.8 Flash-Next 4-bit via llama.cpp on DGX Spark -----
 # model.provider points to the named provider below (base_url + served model id).
 #
-# Sampling penalties: vllm serve has NO --presence-penalty / --repetition-penalty
-# CLI flags (they fail at startup). Hermes forwards these via extra_body on each
-# chat/completions call; vLLM accepts them as top-level sampling fields.
-#
-# If vLLM runs in Docker without -p 8003:8003, point base_url at the container
-# IP instead of localhost, e.g. http://172.17.0.2:8003/v1
+# The local llama-server binds loopback port 8003 and exposes an OpenAI API.
 providers:
-  qwen36-fp8-hermes:
+  qwen38-flash-next-hermes:
     base_url: http://localhost:8003/v1
-    model: Qwen3.6-35B-A3B-FP8
-    context_length: 131072
+    model: Qwen3.8-Flash-Next-UD-IQ4_XS
+    context_length: 65536
     extra_body:
       presence_penalty: 1.5
-      repetition_penalty: 1.0
       top_k: 20
       min_p: 0.0
 
 # --- Main model: reference the named provider above --------------------------
 model:
-  provider: custom:qwen36-fp8-hermes
-  default: Qwen3.6-35B-A3B-FP8
-  context_length: 131072
+  provider: custom:qwen38-flash-next-hermes
+  default: Qwen3.8-Flash-Next-UD-IQ4_XS
+  context_length: 65536
 
 # Finish gateway draining before the 45-second systemd recovery boundary.
 agent:

@@ -3,6 +3,24 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.22.0 — 2026-09-28 (minor: serve Qwen3.8 Flash-Next in 4-bit)
+
+- Switched the existing shared model service to the 93.7GB Unsloth
+  `Qwen3.8-Flash-Next-UD-IQ4_XS` GGUF plus F16 vision projector on CUDA-enabled
+  llama.cpp (tested at commit `526c43b8f`). The 64K
+  context and automatic GPU-layer fit target the DGX Spark's 128GB unified
+  memory; the existing SSD swap remains available for host memory pressure.
+- Kept the existing `:8003` OpenAI API, David and English profiles, gateways,
+  and Telegram bots. Both gateway readiness gates now require the new model ID.
+  This is a backend replacement for existing workflows, so it does not create
+  a new agent, bot, chat, or Observatory room.
+- Retained Qwen3.6 FP8 and other vLLM launch options as manual alternatives.
+  Added launcher checks for all three GGUF shards and updated the operating
+  instructions, memory seed, and model smoke test.
+- Verified model discovery, forced tool calling, short David and English Hermes
+  replies, and all 328 repository tests on the deployed server. The existing
+  16GiB SSD swap was sufficient; no additional swap file was created.
+
 ## v1.21.1 — 2026-09-21 (patch: quiet LeetCode snapshot maintenance)
 
 - Reduced the no-delivery LeetCode history refresh from every four hours to once
