@@ -13,7 +13,7 @@ profile을 `~/.hermes/profiles/english`로 동기화합니다.
 ```
 DGX Spark (128GB 통합 메모리)
   └── llama.cpp 서버 :8003
-        └── Qwen3.8-Flash-Next-UD-IQ4_XS (64K 컨텍스트)
+        └── Qwen3.8-Flash-Next-UD-IQ4_XS (64K × 2 슬롯)
                 │
                 ├── David Hermes gateway ── David Telegram bot
                 │     ├── dedicated paper group: Tue/Fri top-three papers digest
@@ -292,8 +292,12 @@ English profile에서는 background skill creation과 curator를 비활성화합
 ### 6. `local-model/` — LLM 백엔드
 `run_flash_next.sh`가 현재 운영 모델인 Qwen3.8 Flash-Next 4비트
 `UD-IQ4_XS` GGUF를 llama.cpp로 `127.0.0.1:8003`에서 서빙합니다. 세 GGUF
-샤드는 약 93.7GB이며 64K 컨텍스트 슬롯 하나를 사용합니다. 128GB 통합 메모리의 여유에
-맞춰 GPU layer 수를 자동 조정합니다. `install_service.sh`는 이를 로그인·재부팅
+샤드는 약 93.7GB이며 64K 컨텍스트 슬롯 둘(총 128K)을 사용합니다. 메인·English
+게이트웨이의 동시 요청을 받되 각 요청의 64K 한도를 유지합니다. 약 27GiB n-gram
+임베딩은 CPU RAM에 상주시키고, 나머지 transformer/expert 층은 GPU에 배치합니다.
+128GB 통합 메모리의 여유에 맞춰 GPU layer 수를 자동 조정하며 8GiB fit target을
+유지합니다. `nvidia-smi`의 GPU 프로세스 사용량은 별도 VRAM 풀이 아니므로
+`free -h`의 실제 메모리 여유와 함께 확인해야 합니다. `install_service.sh`는 이를 로그인·재부팅
 후에도 유지하는 기존 이름의 `hermes-vllm.service` user service를 설치합니다.
 `run_model.sh`는 Qwen3.6 FP8 등 4가지 vLLM 대안용으로 유지합니다.
 설치기는 `hermes-gateway.service`에 systemd drop-in도 배치합니다. Gateway는
@@ -330,7 +334,7 @@ Hermes가 고정된 `agent-browser 0.33.0`을 통해 연결합니다. 외부 클
 | v0.1.1 | Qwen3.5-122B-A10B-AWQ | vLLM | ~14 tok/s | 64K | 레거시 (`qwen`) |
 | v0.1.1 | Qwen3.5-122B AutoRound INT4 | vLLM | ~51 tok/s | 64K | 다운로드 완료 (`qwen-hybrid`) |
 | v0.4.0 | Qwen3.6-35B-A3B-FP8 | vLLM | 운영 검증 완료 | 128K | 레거시 대안 (`qwen36`) |
-| v1.22.0 | Qwen3.8-Flash-Next-UD-IQ4_XS | llama.cpp | 도구 호출 검증, 약 29 tok/s | 64K | 현재 기본 서비스 |
+| v1.22.1 | Qwen3.8-Flash-Next-UD-IQ4_XS | llama.cpp | 도구 호출 검증, 약 28 tok/s | 64K × 2 | 현재 기본 서비스 |
 | — | MiniMax-M2.7-AWQ-4bit | vLLM | 대안 MoE | 64K | 옵션 (`minimax`) |
 
 현재 모델은 4비트 GGUF 지원과 메모리 적합성을 위해 llama.cpp를 사용합니다.

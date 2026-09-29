@@ -3,6 +3,23 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.22.1 — 2026-09-28 (patch: rebalance single-Spark model memory and slots)
+
+- Inspected the GGUF tensors and DGX Spark unified-memory accounting: the
+  26.8GiB n-gram/PLE embedding explains most host RAM use, while the roughly
+  60.4GiB of remaining weights explains the approximately 64GiB GPU allocation.
+  GPU process usage is not a separate pool with unused 128GB VRAM.
+- Kept GPU-layer auto-fit with its 8GiB reserve and made n-gram RAM residency
+  explicit with `--lazy-mode off`. For the same 13.7K-token prompt, RAM residency
+  measured 822 prompt / 25.1 decode tok/s versus 798 / 23.5 with on-demand
+  SSD reads. RAM residency better suits interactive English, research,
+  interview, and coding agent traffic here; SSD lazy mode remains an option
+  if host-memory pressure becomes more important than latency.
+- Expanded the server from one 64K slot to two 64K slots (128K aggregate) so
+  David and English requests can overlap. Both Hermes profiles retain their
+  64K per-request limit, the same model endpoint, and the existing single
+  Kanban worker. No new agent, bot, or Observatory room was needed.
+
 ## v1.22.0 — 2026-09-28 (minor: serve Qwen3.8 Flash-Next in 4-bit)
 
 - Switched the existing shared model service to the 93.7GB Unsloth

@@ -25,7 +25,7 @@ def test_launcher_requires_every_shard(tmp_path: Path) -> None:
     assert "00002-of-00003.gguf" in result.stderr
 
 
-def test_launcher_uses_64k_context_and_expected_alias(tmp_path: Path) -> None:
+def test_launcher_uses_two_64k_slots_and_ram_resident_ngram(tmp_path: Path) -> None:
     for shard in range(1, 4):
         (tmp_path / f"{PREFIX}-{shard:05d}-of-00003.gguf").write_bytes(b"GGUF")
     fake_server = tmp_path / "llama-server"
@@ -49,6 +49,8 @@ def test_launcher_uses_64k_context_and_expected_alias(tmp_path: Path) -> None:
     assert result.returncode == 0
     assert "--alias Qwen3.8-Flash-Next-UD-IQ4_XS" in result.stdout
     assert f"--mmproj {projector}" in result.stdout
-    assert "--ctx-size 65536" in result.stdout
-    assert "--parallel 1" in result.stdout
+    assert "--ctx-size 131072" in result.stdout
+    assert "--parallel 2" in result.stdout
+    assert "--gpu-layers auto" in result.stdout
+    assert "--lazy-mode off" in result.stdout
     assert "--host 127.0.0.1" in result.stdout

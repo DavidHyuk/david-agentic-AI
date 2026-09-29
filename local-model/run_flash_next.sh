@@ -10,7 +10,8 @@ MODEL_PATH="${MODEL_DIR}/${MODEL_PREFIX}-00001-of-00003.gguf"
 MMPROJ_PATH="${HERMES_FLASH_NEXT_MMPROJ:-${MODEL_DIR}/../mmproj-F16.gguf}"
 SERVER_BIN="${HERMES_LLAMA_SERVER_BIN:-/home/david/workspace/llama.cpp/build-qwen38/bin/llama-server}"
 PORT="${HERMES_MODEL_PORT:-8003}"
-CONTEXT="${HERMES_MODEL_CONTEXT:-65536}"
+CONTEXT="${HERMES_MODEL_CONTEXT:-131072}"
+PARALLEL="${HERMES_MODEL_PARALLEL:-2}"
 SERVED_NAME="${HERMES_MODEL_NAME:-Qwen3.8-Flash-Next-UD-IQ4_XS}"
 
 for shard in 1 2 3; do
@@ -40,8 +41,9 @@ ARGS=(
   --host 127.0.0.1
   --port "${PORT}"
   --ctx-size "${CONTEXT}"
-  --parallel 1
+  --parallel "${PARALLEL}"
   --gpu-layers auto
+  --lazy-mode off
   --fit on
   --fit-target 8192
   --fit-ctx "${CONTEXT}"

@@ -30,7 +30,7 @@ disposable cache.
 ## Architecture
 
 ```
-Local DGX Spark (llama.cpp @ :8003, Qwen3.8 Flash-Next IQ4_XS, 64K ctx)
+Local DGX Spark (llama.cpp @ :8003, Qwen3.8 Flash-Next IQ4_XS, 2 × 64K slots)
         │  OpenAI-compatible API
         ▼
    David Hermes profile ───────────────────────────────────────► David Telegram bot
@@ -867,8 +867,16 @@ The gateway only starts after `/v1/models` contains
 
 ## Local model note
 Hermes requires a model with **≥64K context**. The Qwen3.8 Flash-Next
-`UD-IQ4_XS` checkpoint is served at 64K on `:8003`. Its three GGUF shards
-total about 93.7GB. Paper metadata ingestion itself is zero-LLM and does not
+`UD-IQ4_XS` checkpoint is served on `:8003` with two 64K slots (128K total),
+so the main and English gateways can overlap without shrinking either context.
+The transformer/expert layers remain GPU-offloaded; the roughly 27GiB n-gram
+embedding stays in CPU RAM. This Spark's CPU and GPU share one 128GB memory pool,
+so `nvidia-smi` process usage is not an independent VRAM-free figure. The launcher
+keeps an 8GiB fit target and avoids SSD-backed lazy n-gram reads for lower
+prompt/decode latency. Override `HERMES_MODEL_CONTEXT` and
+`HERMES_MODEL_PARALLEL` together if changing the per-slot context; keep their
+ratio at least 65536. Its three GGUF shards total about 93.7GB. Paper metadata
+ingestion itself is zero-LLM and does not
 require a second model server. The model stays outside this configuration repo
 under `/home/david/workspace/models`:
 
