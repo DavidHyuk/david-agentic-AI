@@ -88,6 +88,7 @@ Local DGX Spark (llama.cpp @ :8003, Qwen3.8 Flash-Next IQ4_XS, 2 × 64K slots)
 | `local-model/run_model.sh` | Launch Qwen3.6 FP8 or another legacy vLLM model |
 | `local-model/restart_service.sh` | Restart a legacy vLLM service and optionally wait for API readiness |
 | `local-model/model_preflight.py` | Validate checkpoint quantization and context |
+| `local-model/eval/` | Reproducible local agent-task model benchmark and synthetic cases |
 | `/home/david/workspace/models/download_model.py` | Download and manage Hugging Face checkpoints outside this config repo |
 | `config/config.fragment.minimax.yaml` | Hermes provider config for MiniMax |
 | `tests/` | Pytest suite |
@@ -179,12 +180,24 @@ python3 scripts/wait_for_vllm.py --url http://127.0.0.1:8003/v1/models \
   --expected-model Qwen3.8-Flash-Next-UD-IQ4_XS --timeout 900
 ```
 
-`run_flash_next.sh` uses one 64K request slot and lets llama.cpp fit layers to the
+`run_flash_next.sh` uses two 64K request slots and lets llama.cpp fit layers to the
 DGX Spark's available unified memory. Its server binds only `127.0.0.1:8003`.
 An existing swap file can absorb ordinary host memory pressure, but model and
 CUDA allocations must still fit in available unified memory. The legacy
 `restart_service.sh` GPU reservation setting applies only when the service is
 restored to the vLLM launcher.
+
+### Agent-task model benchmark
+
+The synthetic, version-controlled [benchmark cases and runner](local-model/eval/README.md)
+compare the current Qwen3.8 IQ4_XS llama.cpp service with the Qwen3.6 35B FP8
+vLLM alternative on papers, interview, coding, English, podcast, tool use,
+vision, and long-context tasks. Run both checkpoints sequentially on the same
+Spark, blind their answers, grade the fixed task rubrics, and summarize latency
+and parsed tool-call accuracy. The [2026-09-29 benchmark report](docs/benchmarks/qwen36-vs-qwen38-2026-09-29.md)
+contains the first 14-case comparison and its limitations. This is an internal
+evaluation helper; it does not add a Hermes agent, cron job, bot, or Observatory
+room.
 
 ## Automatic verified commit and push
 

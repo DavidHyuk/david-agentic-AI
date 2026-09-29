@@ -3,6 +3,24 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.23.0 — 2026-09-29 (minor: add reproducible agent-task model evaluation)
+
+- Added a version-controlled 14-case synthetic fixture and standalone local
+  benchmark runner for papers, interview, design, coding, English tutor/SRS,
+  podcast, parsed tool calls, vision, and long-context retrieval. It records
+  client latency, first-token delay, and approximate decode throughput; fixed
+  task rubrics are graded from a model-name-blinded bundle.
+- Ran Qwen3.8 Flash-Next IQ4_XS/llama.cpp and Qwen3.6 35B FP8/vLLM
+  sequentially on the DGX Spark at 64K per request. Qwen3.6 had 2.24 s median
+  latency and 51.22 decode tok/s, versus 5.57 s and 28.84 for Qwen3.8.
+  Blinded Codex-adjudicated rubric scores were 37/45 and 36/45 respectively;
+  both passed 2/2 parsed tool calls. Documented the small-sample and judge
+  limitations in the benchmark report. Production remains Qwen3.8.
+- Added seven runner/fixture unit tests and documented use in README and the
+  project overview. This is an internal evaluation helper, without a
+  user-facing schedule, history, mutable workbench state, or action, so no new
+  Hermes profile, Telegram bot, cron job, or Observatory room is warranted.
+
 ## v1.22.1 — 2026-09-28 (patch: rebalance single-Spark model memory and slots)
 
 - Inspected the GGUF tensors and DGX Spark unified-memory accounting: the

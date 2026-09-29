@@ -118,6 +118,7 @@ David-Agent/
 │   └── register_cron.py       # jobs.yaml → hermes cron 등록
 │
 ├── local-model/               # 로컬 LLM 서버 관리
+│   ├── eval/                  # 합성 에이전트 과제·블라인드 평가·속도 측정
 │   ├── setup_vllm.sh          # 격리된 CUDA 호환 vLLM 환경 생성
 │   ├── model_preflight.py     # 체크포인트 양자화·컨텍스트 사전검사
 │   ├── run_flash_next.sh      # 현재 4비트 GGUF llama.cpp 서버 실행
@@ -141,8 +142,9 @@ David-Agent/
 │   ├── Qwen/                  # Qwen 계열 모델
 │   └── MiniMax/               # MiniMax-M2.7 모델
 │
-├── tests/                     # pytest 테스트 (328개)
+├── tests/                     # pytest 테스트 (335개)
 │   ├── conftest.py
+│   ├── test_benchmark_agents.py # 평가 데이터·요청 동등성·도구/블라인드 검증
 │   ├── test_papers_ingest.py
 │   ├── test_papers_digest.py
 │   ├── test_papers_service.py
@@ -163,6 +165,7 @@ David-Agent/
 │   └── test_stage_specialist_profiles.py # 전문 profile 격리·재현성
 │
 └── docs/
+    └── benchmarks/           # 모델별 에이전트 과제 비교·해석·한계
     ├── dev-history.md         # 버전 이력
     ├── project-overview.md    # 이 문서
     └── study/
@@ -312,6 +315,15 @@ English profile에서는 background skill creation과 curator를 비활성화합
 모델 가중치는 이 설정 repo 밖의 `/home/david/workspace/models/`에 보관합니다.
 새 논문 메타데이터 수집에는 LLM이 필요 없습니다.
 
+`local-model/eval/`은 모델 서빙 계층용 내부 벤치마크입니다. 합성된 14개
+에이전트 과제에 동일한 요청을 보내고, 첫 토큰·전체 지연·대략적인 디코드 속도,
+파싱된 도구 호출, 사전 정의된 의미 기준의 블라인드 채점을 기록합니다. 2026-09-29
+[비교 결과](benchmarks/qwen36-vs-qwen38-2026-09-29.md)는 Qwen3.6 FP8이
+중앙 지연 2.24초로 Qwen3.8 IQ4_XS의 5.57초보다 빨랐고, 의미 기준은
+37/45 대 36/45로 작은 차이였습니다. 이는 단일 샘플의 모델·양자화·엔진 조합
+비교일 뿐, 실제 Hermes E2E나 동시 요청 성능은 아닙니다. 내부 평가 도구이므로
+별도 에이전트·cron·Telegram 목적지·Observatory room을 만들지 않습니다.
+
 ### 7. browser 격리
 
 Hermes 내장 브라우저 도구를 그대로 사용하고 직접 Playwright 코드는 추가하지
@@ -333,8 +345,8 @@ Hermes가 고정된 `agent-browser 0.33.0`을 통해 연결합니다. 외부 클
 | v0.1.0 | gpt-oss-120b | llama.cpp | 기준 | 64K | 구버전 |
 | v0.1.1 | Qwen3.5-122B-A10B-AWQ | vLLM | ~14 tok/s | 64K | 레거시 (`qwen`) |
 | v0.1.1 | Qwen3.5-122B AutoRound INT4 | vLLM | ~51 tok/s | 64K | 다운로드 완료 (`qwen-hybrid`) |
-| v0.4.0 | Qwen3.6-35B-A3B-FP8 | vLLM | 운영 검증 완료 | 128K | 레거시 대안 (`qwen36`) |
-| v1.22.1 | Qwen3.8-Flash-Next-UD-IQ4_XS | llama.cpp | 도구 호출 검증, 약 28 tok/s | 64K × 2 | 현재 기본 서비스 |
+| v0.4.0 | Qwen3.6-35B-A3B-FP8 | vLLM | 진단 평가 중앙값 51.22 decode tok/s | 운영 128K, 비교는 64K | 레거시 대안 (`qwen36`) |
+| v1.22.1 | Qwen3.8-Flash-Next-UD-IQ4_XS | llama.cpp | 진단 평가 중앙값 28.84 decode tok/s | 64K × 2 | 현재 기본 서비스 |
 | — | MiniMax-M2.7-AWQ-4bit | vLLM | 대안 MoE | 64K | 옵션 (`minimax`) |
 
 현재 모델은 4비트 GGUF 지원과 메모리 적합성을 위해 llama.cpp를 사용합니다.
