@@ -54,3 +54,33 @@ def test_launcher_uses_two_64k_slots_and_ram_resident_ngram(tmp_path: Path) -> N
     assert "--gpu-layers auto" in result.stdout
     assert "--lazy-mode off" in result.stdout
     assert "--host 127.0.0.1" in result.stdout
+
+
+def test_launcher_rejects_cpu_only_fallback_when_gpu_is_missing(tmp_path: Path) -> None:
+    for shard in range(1, 4):
+        (tmp_path / f"{PREFIX}-{shard:05d}-of-00003.gguf").write_bytes(b"GGUF")
+    fake_server = tmp_path / "llama-server"
+    fake_server.write_text("#!/bin/sh\nexit 0\n")
+    fake_server.chmod(0o755)
+    projector = tmp_path / "mmproj-F16.gguf"
+    projector.write_bytes(b"GGUF")
+    result = subprocess.run(
+        ["bash", str(LAUNCHER)],
+        env={
+            **os.environ,
+            "HERMES_FLASH_NEXT_DIR": str(tmp_path),
+            "HERMES_FLASH_NEXT_MMPROJ": str(projector),
+            "HERMES_LLAMA_SERVER_BIN": str(fake_server),
+            "HERMES_GPU_CHECK_BIN": "/usr/bin/false",
+        },
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 78
+    assert "refusing CPU-only model fallback" in result.stderr
+
+
+def test_model_service_does_not_retry_missing_gpu_forever() -> None:
+    unit = LAUNCHER.with_name("hermes-vllm.service").read_text(encoding="utf-8")
+    assert "RestartPreventExitStatus=78" in unit

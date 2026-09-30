@@ -1,5 +1,5 @@
 # __author__ = 'David Choi (bestshoot21@gmail.com)'
-"""Black-box tests for the Qwen3.6 FP8 vLLM launcher command."""
+"""Black-box tests for the Qwen FP8 vLLM launcher commands."""
 
 import json
 import os
@@ -31,13 +31,14 @@ def _checkpoint(tmp_path, quantization="fp8"):
     return model
 
 
-def _run(model, *model_args):
+def _run(model, *model_args, **env_overrides):
     env = {
         **os.environ,
         "HERMES_MODEL_PATH": str(model),
         "HERMES_VLLM_BIN": "/usr/bin/true",
         "HERMES_VLLM_DRY_RUN": "1",
     }
+    env.update(env_overrides)
     return subprocess.run(
         ["bash", str(RUNNER), *model_args],
         cwd=REPO_ROOT,
@@ -64,6 +65,19 @@ def test_qwen36_rejects_awq_checkpoint(tmp_path):
     result = _run(_checkpoint(tmp_path, quantization="awq"), "qwen36")
     assert result.returncode == 1
     assert "quantization mismatch" in result.stdout
+
+
+def test_qwen38_27b_fp8_uses_local_host_and_matching_parser(tmp_path):
+    result = _run(
+        _checkpoint(tmp_path), "qwen38-27b", HERMES_VLLM_HOST="127.0.0.1",
+        HERMES_VLLM_PORT="8004",
+    )
+    assert result.returncode == 0, result.stderr
+    assert "--served-model-name Qwen3.8-27B-FP8" in result.stdout
+    assert "--max-model-len 65536" in result.stdout
+    assert "--tool-call-parser qwen3_xml" in result.stdout
+    assert "--host 127.0.0.1 --port 8004" in result.stdout
+    assert "--quantization" not in result.stdout
 
 
 def test_launcher_defaults_to_qwen36(tmp_path):

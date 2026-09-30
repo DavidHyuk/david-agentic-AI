@@ -9,6 +9,7 @@ WorkingDirectory=%h/workspace/David-Agent
 ExecStartPre=/usr/bin/test -x %h/workspace/llama.cpp/build-qwen38/bin/llama-server
 ExecStart=/usr/bin/bash %h/workspace/David-Agent/local-model/run_flash_next.sh
 Restart=on-failure
+RestartPreventExitStatus=78
 RestartSec=10
 KillSignal=SIGINT
 TimeoutStartSec=900

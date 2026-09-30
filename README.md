@@ -85,7 +85,7 @@ Local DGX Spark (llama.cpp @ :8003, Qwen3.8 Flash-Next IQ4_XS, 2 × 64K slots)
 | `docs/next-steps.md` | Agreed paper/job questions and Kakao English E2E checklist |
 | `local-model/run_flash_next.sh` | Launch Qwen3.8 Flash-Next UD-IQ4_XS on llama.cpp |
 | `local-model/setup_vllm.sh` | Create an isolated CUDA-compatible vLLM runtime for legacy models |
-| `local-model/run_model.sh` | Launch Qwen3.6 FP8 or another legacy vLLM model |
+| `local-model/run_model.sh` | Launch Qwen3.6 FP8, Qwen3.8 27B FP8, or another vLLM alternative |
 | `local-model/restart_service.sh` | Restart a legacy vLLM service and optionally wait for API readiness |
 | `local-model/model_preflight.py` | Validate checkpoint quantization and context |
 | `local-model/eval/` | Reproducible local agent-task model benchmark and synthetic cases |
@@ -186,6 +186,24 @@ An existing swap file can absorb ordinary host memory pressure, but model and
 CUDA allocations must still fit in available unified memory. The legacy
 `restart_service.sh` GPU reservation setting applies only when the service is
 restored to the vLLM launcher.
+The Flash-Next launcher now refuses to start without a working NVIDIA GPU;
+an `active` CPU-only fallback is not a healthy agent endpoint. The user service
+does not repeatedly restart on this missing-GPU exit; restore driver access
+before starting the model and gateways again.
+
+For a temporary local test of the separately downloaded official Qwen3.8 27B
+FP8 checkpoint, stop the shared model and both gateways first, then run:
+
+```bash
+HERMES_VLLM_HOST=127.0.0.1 HERMES_VLLM_PORT=8004 \
+  bash local-model/run_model.sh qwen38-27b
+```
+
+This uses a 64K context and does not change Hermes's default model. A
+2026-09-29 run passed tool and vision smoke checks but was interrupted by a
+host-level outage before the full benchmark finished; do not treat it as a
+validated production replacement. On this Spark, restore the NVIDIA driver
+and verify `nvidia-smi` before launching either GPU backend.
 
 ### Agent-task model benchmark
 

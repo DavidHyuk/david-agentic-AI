@@ -142,7 +142,7 @@ David-Agent/
 │   ├── Qwen/                  # Qwen 계열 모델
 │   └── MiniMax/               # MiniMax-M2.7 모델
 │
-├── tests/                     # pytest 테스트 (335개)
+├── tests/                     # pytest 테스트 (338개)
 │   ├── conftest.py
 │   ├── test_benchmark_agents.py # 평가 데이터·요청 동등성·도구/블라인드 검증
 │   ├── test_papers_ingest.py
@@ -302,7 +302,11 @@ English profile에서는 background skill creation과 curator를 비활성화합
 유지합니다. `nvidia-smi`의 GPU 프로세스 사용량은 별도 VRAM 풀이 아니므로
 `free -h`의 실제 메모리 여유와 함께 확인해야 합니다. `install_service.sh`는 이를 로그인·재부팅
 후에도 유지하는 기존 이름의 `hermes-vllm.service` user service를 설치합니다.
-`run_model.sh`는 Qwen3.6 FP8 등 4가지 vLLM 대안용으로 유지합니다.
+`run_model.sh`는 Qwen3.6 FP8 등 5가지 vLLM 대안용으로 유지합니다.
+Qwen3.8 27B FP8도 `qwen38-27b` 선택지로 실행할 수 있으나, 2026-09-29
+시험은 도구·이미지 smoke 후 호스트 장애로 중단돼 운영 대안으로 검증되지 않았습니다.
+Flash-Next 런처는 NVIDIA GPU가 없으면 CPU-only 대체 실행을 거부하며,
+systemd는 이 특정 종료 코드에 대해 자동 재시작하지 않습니다.
 설치기는 `hermes-gateway.service`에 systemd drop-in도 배치합니다. Gateway는
 `hermes-vllm.service`를 요구하고 `wait_for_vllm.py`가
 `Qwen3.8-Flash-Next-UD-IQ4_XS`를 확인한 뒤에만 시작하므로, 재부팅 직후 cron이 모델
@@ -347,6 +351,7 @@ Hermes가 고정된 `agent-browser 0.33.0`을 통해 연결합니다. 외부 클
 | v0.1.1 | Qwen3.5-122B AutoRound INT4 | vLLM | ~51 tok/s | 64K | 다운로드 완료 (`qwen-hybrid`) |
 | v0.4.0 | Qwen3.6-35B-A3B-FP8 | vLLM | 진단 평가 중앙값 51.22 decode tok/s | 운영 128K, 비교는 64K | 레거시 대안 (`qwen36`) |
 | v1.22.1 | Qwen3.8-Flash-Next-UD-IQ4_XS | llama.cpp | 진단 평가 중앙값 28.84 decode tok/s | 64K × 2 | 현재 기본 서비스 |
+| v1.24.0 | Qwen3.8-27B-FP8 | vLLM | 부분 실행 약 7.9 decode tok/s; 호스트 장애로 미완료 | 비교 설정 64K | 실험용 (`qwen38-27b`), 운영 미검증 |
 | — | MiniMax-M2.7-AWQ-4bit | vLLM | 대안 MoE | 64K | 옵션 (`minimax`) |
 
 현재 모델은 4비트 GGUF 지원과 메모리 적합성을 위해 llama.cpp를 사용합니다.

@@ -3,6 +3,27 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.24.0 — 2026-09-29 (minor: add Qwen3.8 27B FP8 local trial and GPU fail-closed guard)
+
+- Downloaded and checksum-verified the official Qwen3.8-27B-FP8 checkpoint
+  outside this configuration repo. Added a localhost-capable `qwen38-27b`
+  vLLM launcher option at 64K context with FP8 weights, automatic tool choice,
+  and a matching XML tool parser. Tool-call and chart-vision smoke checks passed.
+- The same 14-case benchmark was interrupted by a host-level outage after 10
+  results. Its partial decode rate was about 7.9 tok/s; no quality ranking is
+  claimed. The previous boot journal has no OOM, Xid, or kernel-panic record
+  establishing the cause, so temporal overlap with this trial is not proof.
+- After the host came back it booted kernel `6.17.0-1029-nvidia`, which has no
+  installed NVIDIA GPU module here; the previously working `6.14` kernel has
+  one. `nvidia-smi` failed and the default llama.cpp service silently loaded
+  in CPU-only mode. Stopped the model, gateways, and watchdog pending GPU
+  repair, and made the launcher reject CPU-only fallback without a restart
+  loop. A system-wide driver
+  package upgrade or kernel-selection reboot requires an explicit operator
+  decision. No new agent, cron job, bot, or Observatory room was created.
+- Added launcher regression tests and updated operating instructions. The
+  Qwen3.8 27B option remains experimental, not the production default.
+
 ## v1.23.0 — 2026-09-29 (minor: add reproducible agent-task model evaluation)
 
 - Added a version-controlled 14-case synthetic fixture and standalone local

@@ -9,6 +9,7 @@ MODEL_PREFIX="Qwen3.8-Flash-Next-UD-IQ4_XS"
 MODEL_PATH="${MODEL_DIR}/${MODEL_PREFIX}-00001-of-00003.gguf"
 MMPROJ_PATH="${HERMES_FLASH_NEXT_MMPROJ:-${MODEL_DIR}/../mmproj-F16.gguf}"
 SERVER_BIN="${HERMES_LLAMA_SERVER_BIN:-/home/david/workspace/llama.cpp/build-qwen38/bin/llama-server}"
+GPU_CHECK_BIN="${HERMES_GPU_CHECK_BIN:-nvidia-smi}"
 PORT="${HERMES_MODEL_PORT:-8003}"
 CONTEXT="${HERMES_MODEL_CONTEXT:-131072}"
 PARALLEL="${HERMES_MODEL_PARALLEL:-2}"
@@ -56,6 +57,11 @@ if [ "${HERMES_MODEL_DRY_RUN:-0}" = "1" ]; then
   printf ' %q' "${ARGS[@]}"
   printf '\n'
   exit 0
+fi
+
+if ! "${GPU_CHECK_BIN}" -L >/dev/null 2>&1; then
+  echo "ERROR: NVIDIA GPU is unavailable; refusing CPU-only model fallback." >&2
+  exit 78
 fi
 
 exec "${ARGS[@]}"

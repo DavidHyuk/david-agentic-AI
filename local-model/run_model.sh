@@ -11,6 +11,7 @@
 #   qwen           Qwen3.5-122B-A10B-AWQ    — legacy baseline
 #   qwen-hybrid    Qwen3.5-122B AR-INT4+FP8 — legacy hybrid checkpoint
 #   qwen36         Qwen3.6-35B-A3B-FP8      — Hermes default, fast MoE
+#   qwen38-27b     Qwen3.8-27B-FP8          — dense multimodal alternative
 #   minimax        MiniMax-M2.7-AWQ-4bit    — alternative MoE
 #
 # MTP (Multi-Token Prediction) is disabled by default. Enable only after the
@@ -24,6 +25,7 @@
 #
 # Environment overrides (any model):
 #   HERMES_VLLM_PORT          default 8003
+#   HERMES_VLLM_HOST          default 0.0.0.0; use 127.0.0.1 for local tests
 #   HERMES_VLLM_GPU_UTIL      override gpu-memory-utilization
 #   HERMES_VLLM_MAX_MODEL_LEN override max-model-len
 #   HERMES_MODEL_PATH         override model directory
@@ -39,6 +41,7 @@ WORKSPACE_ROOT="$(cd "${REPO_ROOT}/.." && pwd)"
 
 MODEL_TYPE="${1:-qwen36}"
 PORT="${HERMES_VLLM_PORT:-8003}"
+HOST="${HERMES_VLLM_HOST:-0.0.0.0}"
 MTP_TOKENS="${MTP_TOKENS:-0}"
 MODEL_BASE_DIR="${HERMES_MODEL_DIR:-${WORKSPACE_ROOT}/models}"
 LANGUAGE_MODEL_ONLY="${HERMES_VLLM_LANGUAGE_MODEL_ONLY:-0}"
@@ -107,6 +110,23 @@ case "${MODEL_TYPE}" in
     )
     ;;
 
+  qwen38-27b|qwen38-27b-fp8)
+    MODEL_PATH="${HERMES_MODEL_PATH:-${MODEL_BASE_DIR}/Qwen/Qwen3.8-27B-FP8}"
+    SERVED_NAME="Qwen3.8-27B-FP8"
+    GPU_UTIL="${HERMES_VLLM_GPU_UTIL:-0.50}"
+    MAX_MODEL_LEN="${HERMES_VLLM_MAX_MODEL_LEN:-65536}"
+    REASONING_PARSER="qwen3"
+    TOOL_CALL_PARSER="qwen3_xml"
+    QUANTIZATION=""
+    EXPECTED_QUANTIZATION="fp8"
+    KV_CACHE_DTYPE="auto"
+    MTP_METHOD="qwen3_5_mtp"
+    EXTRA_FLAGS=(
+      --enable-prefix-caching
+      --max-num-batched-tokens 8192
+    )
+    ;;
+
   minimax)
     MODEL_PATH="${HERMES_MODEL_PATH:-${MODEL_BASE_DIR}/cyankiwi/MiniMax-M2.7-AWQ-4bit}"
     SERVED_NAME="MiniMax-M2.7-AWQ-4bit"
@@ -124,7 +144,7 @@ case "${MODEL_TYPE}" in
 
   *)
     echo "ERROR: Unknown model '${MODEL_TYPE}'" >&2
-    echo "Usage: $0 [qwen|qwen-hybrid|qwen36|minimax]" >&2
+    echo "Usage: $0 [qwen|qwen-hybrid|qwen36|qwen38-27b|minimax]" >&2
     exit 1
     ;;
 esac
@@ -161,6 +181,7 @@ echo "Starting Hermes vLLM server"
 echo "  model   : ${MODEL_TYPE} (${SERVED_NAME})"
 echo "  path    : ${MODEL_PATH}"
 echo "  port    : ${PORT}"
+echo "  host    : ${HOST}"
 echo "  gpu_util: ${GPU_UTIL}"
 echo "  max_len : ${MAX_MODEL_LEN}"
 echo "  weights : ${EXPECTED_QUANTIZATION:-auto}"
@@ -182,7 +203,7 @@ VLLM_ARGS=(
   --trust-remote-code
   --enable-auto-tool-choice
   --tool-call-parser "${TOOL_CALL_PARSER}"
-  --host 0.0.0.0
+  --host "${HOST}"
   --port "${PORT}"
   --uvicorn-log-level warning
 )
