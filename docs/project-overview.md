@@ -142,9 +142,11 @@ David-Agent/
 │   ├── Qwen/                  # Qwen 계열 모델
 │   └── MiniMax/               # MiniMax-M2.7 모델
 │
-├── tests/                     # pytest 테스트 (338개)
+├── tests/                     # pytest suite
 │   ├── conftest.py
-│   ├── test_benchmark_agents.py # 평가 데이터·요청 동등성·도구/블라인드 검증
+│   ├── test_benchmark_agents.py # 이전 평가 데이터·요청/도구/블라인드 검증
+│   ├── test_agent_suite_v2.py # 120개 합성 사례와 네 버킷 검증
+│   ├── test_benchmark_suite_v2.py # 로컬 API runner·점수·resume·paired 요약
 │   ├── test_papers_ingest.py
 │   ├── test_papers_digest.py
 │   ├── test_papers_service.py
@@ -319,14 +321,33 @@ systemd는 이 특정 종료 코드에 대해 자동 재시작하지 않습니�
 모델 가중치는 이 설정 repo 밖의 `/home/david/workspace/models/`에 보관합니다.
 새 논문 메타데이터 수집에는 LLM이 필요 없습니다.
 
-`local-model/eval/`은 모델 서빙 계층용 내부 벤치마크입니다. 합성된 14개
-에이전트 과제에 동일한 요청을 보내고, 첫 토큰·전체 지연·대략적인 디코드 속도,
-파싱된 도구 호출, 사전 정의된 의미 기준의 블라인드 채점을 기록합니다. 2026-09-29
-[비교 결과](benchmarks/qwen36-vs-qwen38-2026-09-29.md)는 Qwen3.6 FP8이
-중앙 지연 2.24초로 Qwen3.8 IQ4_XS의 5.57초보다 빨랐고, 의미 기준은
-37/45 대 36/45로 작은 차이였습니다. 이는 단일 샘플의 모델·양자화·엔진 조합
-비교일 뿐, 실제 Hermes E2E나 동시 요청 성능은 아닙니다. 내부 평가 도구이므로
-별도 에이전트·cron·Telegram 목적지·Observatory room을 만들지 않습니다.
+`local-model/eval/`은 120개 합성 사례로 모델 서빙 계층을 비교하는 내부 평가
+도구입니다. 30개씩 `short_task`, `multi_tool`, `long_horizon`, `context_heavy`
+네 버킷으로 구성합니다. 도구 결과는 고정된 합성 스크립트만 사용하고, 응답의
+JSON 필수 부분집합을 결정적으로 채점하며, 일부 근거 문자열은 명시적이고
+대소문자를 구분하지 않는 `$contains` 기대값을 사용합니다. 한국어 요약 필드는
+`$language: ko`로 한글 포함 여부를 확인하고 사실 필드를 별도로 채점합니다.
+`run_overnight_v2.sh`
+한 번으로 main/English gateway와 cron watchdog을 일시 중지하고 Flash-Next,
+Qwen3.6 35B를 순차 실행한 뒤 EXIT trap으로 원래 운영 상태를 복원할 수 있습니다.
+원시 로그와 결과는 git-ignored run directory에 저장합니다. 같은 사례를 두
+모델에 순차 실행하고, 사례별 paired 성공·실패와 버킷별 지연 및 토큰 수를
+요약합니다. context 크기는 문자 수에서 추산하므로 tokenizer 실측이 아닙니다.
+완료된 결과는 `blind_judge_bundle_v2.py`로 모델명과 자동 점수를 제거한
+A/B 묶음(전체 120개면 위치 60/60 균형)과 별도 매핑으로 분리하고,
+`judge_rubric_v2.md`에 고정한 의미 기준으로 추가 검토할 수 있습니다.
+호스트 중단 시 `--allow-partial`은 공통 완료 사례만 익명화하고 제외 사례를
+명시합니다. [2026-09-30 v2 비교](benchmarks/qwen36-vs-flashnext-v2-2026-09-30.md)는
+short/multi-tool/long-horizon 각 30개가 완료됐고 context-heavy는 2/30에서
+중단된 결과입니다. 블라인드 LLM 판정과 모호한 문항 제외 민감도 분석을
+결정적 점수와 분리해 기록합니다. Qwen3.6 실행 중 호스트가 재부팅됐으나
+마지막 계측에 메모리 압박은 없고 원인은 확정되지 않아 자동 재시도하지 않습니다.
+이는 실제 Hermes E2E, 실도구, 외부 데이터 조회 또는 운영 품질을 측정하지
+않으며, 프로덕션 전환 근거로 단독 사용하지 않습니다. 사용자 대상 일정이나
+동작이 없는 내부 도구이므로 별도 에이전트·cron·Telegram 목적지·Observatory
+room을 만들지 않습니다. 사용법과 제한은 [벤치마크 안내](../local-model/eval/README.md)에
+있습니다. 이전 14개 사례의 기록은 [2026-09-29 비교 보고서](benchmarks/qwen36-vs-qwen38-2026-09-29.md)에
+남아 있으며 새 v2 결과로 취급하지 않습니다.
 
 ### 7. browser 격리
 

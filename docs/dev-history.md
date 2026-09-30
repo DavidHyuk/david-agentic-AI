@@ -3,6 +3,47 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.25.1 — 2026-09-30 (patch: preserve interrupted benchmark and audit paired subset)
+
+- Classified a synthetic tool-loop limit as a recorded failed case rather
+  than a transport failure, so strict-resume runs continue without deleting
+  evidence. A completed Flash-Next arm no longer reloads unnecessarily on
+  resume. Added regression coverage for this behavior.
+- Added opt-in partial blind-bundle generation. The default still requires all
+  120 cases; partial mode validates both result files, balances A/B over only
+  paired completed cases, and records every excluded ID. Added tests and usage
+  documentation.
+- Ran 120 Flash-Next cases and 92 Qwen3.6 cases before an abrupt host stop.
+  Published a [partial comparison](benchmarks/qwen36-vs-flashnext-v2-2026-09-30.md)
+  covering three complete buckets, separate deterministic and blinded semantic
+  scores, a reverse-order second review of 22 cases, latency, ambiguity
+  sensitivity, and the missing long-context results. The stop has no confirmed
+  OOM, GPU Xid, panic, or dump cause; production Flash-Next and gateways were
+  restored. No further Qwen3.6 stress run was started automatically.
+
+## v1.25.0 — 2026-09-29 (minor: expand local synthetic benchmark to 120 cases)
+
+- Added a deterministic 120-case suite split evenly across short tasks,
+  scripted multi-tool workflows, multi-turn long-horizon scenarios, and
+  context-heavy retrieval. Scoring checks expected JSON subsets, with an
+  explicit case-insensitive `$contains` operator for selected evidence strings
+  and a Hangul check for Korean summary fields;
+  mock tools return only fixture-defined results. The runner records per-case
+  results with fsync-backed persistence and validates run identity for safe
+  resume, then summarizes paired cases by bucket.
+- Added a separate complete-run blind bundle builder and frozen semantic-audit
+  rubric. The bundle balances anonymous A/B placement and excludes model names,
+  automatic scores, and timing metadata; its mapping remains separate until
+  independent judgments are recorded.
+- Documented validation, sequential runs against already-served local models,
+  summary usage, and limits. Added a one-command overnight orchestrator that
+  pauses the main/English gateways and cron watchdog, runs Flash-Next and Qwen3.6
+  sequentially, and restores the prior service state through an EXIT trap. This
+  remains a synthetic local serving-layer benchmark: it does not execute Hermes
+  helpers or real tools, and context size is estimated rather than
+  tokenizer-measured. No performance results are claimed for this expanded
+  suite and no user-facing agent or Observatory room was added.
+
 ## v1.24.0 — 2026-09-29 (minor: add Qwen3.8 27B FP8 local trial and GPU fail-closed guard)
 
 - Downloaded and checksum-verified the official Qwen3.8-27B-FP8 checkpoint

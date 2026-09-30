@@ -207,15 +207,28 @@ and verify `nvidia-smi` before launching either GPU backend.
 
 ### Agent-task model benchmark
 
-The synthetic, version-controlled [benchmark cases and runner](local-model/eval/README.md)
-compare the current Qwen3.8 IQ4_XS llama.cpp service with the Qwen3.6 35B FP8
-vLLM alternative on papers, interview, coding, English, podcast, tool use,
-vision, and long-context tasks. Run both checkpoints sequentially on the same
-Spark, blind their answers, grade the fixed task rubrics, and summarize latency
-and parsed tool-call accuracy. The [2026-09-29 benchmark report](docs/benchmarks/qwen36-vs-qwen38-2026-09-29.md)
-contains the first 14-case comparison and its limitations. This is an internal
-evaluation helper; it does not add a Hermes agent, cron job, bot, or Observatory
-room.
+The version-controlled [120-case synthetic benchmark](local-model/eval/README.md)
+uses four balanced buckets: short tasks, scripted multi-tool calls, multi-turn
+long-horizon state, and context-heavy retrieval. Validate the fixture, then run
+the two already-served local model endpoints sequentially into separate JSONL
+files and summarize paired cases by bucket. The optional overnight orchestrator
+temporarily pauses the main/English gateways and cron watchdog, runs Flash-Next
+then Qwen3.6 35B, and restores the original service state through an EXIT trap;
+see [benchmark instructions](local-model/eval/README.md). Scoring checks an
+exact JSON subset with explicit case-insensitive `$contains` and Korean-language
+`$language` checks where appropriate; tool results come only from predefined
+mock scripts.
+This measures local API behavior, not live Hermes end-to-end execution, real
+tools, or source fetching.
+Complete paired runs, or explicitly labeled paired subsets after an outage,
+can additionally be anonymized for a separate
+[blind semantic audit](local-model/eval/README.md) using a frozen rubric; keep
+those judgments distinct from the deterministic score.
+It is an internal, nonproduction evaluation helper and does not add a Hermes
+agent, cron job, bot, or Observatory room. The
+[2026-09-30 partial comparison](docs/benchmarks/qwen36-vs-flashnext-v2-2026-09-30.md)
+reports three complete buckets and explicitly leaves the interrupted
+long-context comparison unresolved.
 
 ## Automatic verified commit and push
 
