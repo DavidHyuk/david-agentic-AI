@@ -20,7 +20,7 @@ KAKAO_USER_UNITS="$HOME/.config/systemd/user"
 KAKAO_ENV_FILE="$KAKAO_HERMES_HOME/.env"
 
 mkdir -p "$KAKAO_HERMES_HOME/scripts" \
-  "$KAKAO_HERMES_HOME/skills/learning/english-practice" \
+  "$KAKAO_HERMES_HOME/profiles/english/skills/learning/english-practice" \
   "$KAKAO_USER_BIN" "$KAKAO_USER_UNITS"
 install -d -m 0700 \
   "$KAKAO_HERMES_HOME/data/english" \
@@ -32,8 +32,8 @@ install -m 0755 "$REPO_ROOT/scripts/english_intake.py" \
   "$KAKAO_HERMES_HOME/scripts/english_intake.py"
 install -m 0755 "$REPO_ROOT/scripts/english_srs.py" \
   "$KAKAO_HERMES_HOME/scripts/english_srs.py"
-install -m 0644 "$REPO_ROOT/skills/learning/english-practice/SKILL.md" \
-  "$KAKAO_HERMES_HOME/skills/learning/english-practice/SKILL.md"
+install -m 0644 "$REPO_ROOT/profiles/english/skills/learning/english-practice/SKILL.md" \
+  "$KAKAO_HERMES_HOME/profiles/english/skills/learning/english-practice/SKILL.md"
 
 touch "$KAKAO_ENV_FILE"
 chmod 600 "$KAKAO_ENV_FILE"

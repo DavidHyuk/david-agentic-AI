@@ -3,6 +3,15 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.25.2 — 2026-09-30 (patch: repair Kakao feedback collector installer)
+
+- Updated the Kakao installer to stage the English practice skill from its
+  isolated profile location. The old source path made installation stop before
+  it could refresh a stale Cloudflare Quick Tunnel URL.
+- The collector remains on the existing English profile and bot. Quick Tunnel
+  hostnames still change after a tunnel restart, so the refreshed private URL
+  must be entered in Open Builder when that happens.
+
 ## v1.25.1 — 2026-09-30 (patch: preserve interrupted benchmark and audit paired subset)
 
 - Classified a synthetic tool-loop limit as a recorded failed case rather
