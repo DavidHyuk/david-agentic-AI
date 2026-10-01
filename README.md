@@ -224,11 +224,21 @@ Complete paired runs, or explicitly labeled paired subsets after an outage,
 can additionally be anonymized for a separate
 [blind semantic audit](local-model/eval/README.md) using a frozen rubric; keep
 those judgments distinct from the deterministic score.
+The runner also records client TTFT and decoding estimates, llama.cpp native
+phase timings, and optional vLLM prefill/decode TPS plus server TTFT via
+`--server-metrics-url`. It keeps exporter overhead and missing measurements
+visible; see [performance measurement instructions](local-model/eval/README.md#ttft-and-phase-throughput).
+Use fresh output files when the runner or serving configuration changes.
 It is an internal, nonproduction evaluation helper and does not add a Hermes
 agent, cron job, bot, or Observatory room. The
 [2026-09-30 partial comparison](docs/benchmarks/qwen36-vs-flashnext-v2-2026-09-30.md)
 records the original three complete buckets and 2/30 context pairs separately
-from the supervised October 1 retry. Codex authored the 120 cases and expected
+from the supervised October 1 retry, which completed all 120 Qwen cases
+(72 deterministic passes, including 29/30 contexts), with 290 requests measured.
+The preserved original Flash arm passed 110/120. A separate Flash audit without
+forced pauses measured 50 requests across 15 cases before stopping on observed
+thermal slowdown; it provides no completed unpaused long-context comparison.
+Codex authored the 120 cases and expected
 answers; they are not sampled Hermes usage or human-labeled ground truth.
 Repeated templates, mock tools, six-turn conversations, generated long archives,
 and JSON requirements limit representativeness; 12/92 original paired judgments

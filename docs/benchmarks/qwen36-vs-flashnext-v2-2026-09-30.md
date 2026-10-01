@@ -1,14 +1,18 @@
-# Qwen3.6 35B vs Flash-Next: 120-case agent suite, interrupted at 92 pairs
+# Qwen3.6 35B vs Flash-Next: original 92 pairs and separate 120-case retry
 
-2026-09-30, one DGX Spark (GB10), kernel `6.14.0-1015-nvidia`.
+Original run: 2026-09-30; separate diagnostic retry: 2026-10-01.
+One DGX Spark (GB10), kernel `6.14.0-1015-nvidia`.
 
 ## Assessment of the original run
 
 Three buckets finished with 30 paired cases each. Flash-Next had higher fixture
 pass counts on this synthetic serving-layer suite; Qwen3.6 was about twice as
-fast on the short and six-turn tasks. The long-context comparison is **incomplete**: the
+fast on the short and six-turn tasks. The original long-context comparison is **incomplete**: the
 host stopped after only two of Qwen3.6's 30 context cases. These results do
 not isolate model architecture from engine, quantization, or tool parser.
+A subsequent **separate** Qwen3.6 configuration completed all 120 cases on
+October 1; see the diagnostic results below. It does not fill the original
+run's missing rows or inherit its blind semantic judgments.
 
 | Bucket | Pairs | Deterministic pass: 3.6 / Flash | Blind semantic pass: 3.6 / Flash | Median client time: 3.6 / Flash |
 | --- | ---: | ---: | ---: | ---: |
@@ -207,13 +211,223 @@ no inference results. Original result SHA-256 values were verified unchanged:
 - Flash-Next 120 rows: `15d26d3a50541ae98384b717aeb7fc89f7bcd6c5c5d38d0114225dfce45d3bd7`.
 - Qwen3.6 92 rows: `4f4ab4d39724665dfd8d2f051fe2ab225ed3b41aa126571c3ab73bb77a696705`.
 
+## Subsequent October 1 KV and thermal diagnostics
+
+The user requested further diagnosis and actual TTFT, prefill TPS, and decoding
+TPS measurements. All subsequent directories are separate runs; none appends
+to the original 92-row Qwen3.6 file or the earlier stopped smoke.
+
+### What the evidence does and does not identify
+
+The September 30 interrupted server logged **19.92 GiB** of available KV budget,
+**260,832 cache tokens**, and **2.8% KV usage** in its final throughput log.
+The earlier October 1 eager/prefix-on server had 20.44 GiB and 267,168 tokens.
+Neither log suggests ordinary KV-pool saturation at that point. The original
+reset remains unexplained: the final log precedes the unrecorded outcome of the
+40K request, and cannot rule out a later transient allocation, kernel, driver,
+power, or thermal failure.
+
+Before switching again, `/proc/*/status` attributed 9,373,768 KiB of swapped
+pages to the restored Flash-Next `llama-server`. Most swap was freed when that
+process was stopped. This distinguished existing production-model swap from
+new Qwen3.6 inference pressure. Unused pages of the unloaded model's weight
+files were discarded with `posix_fadvise(DONTNEED)` before switching back;
+no files or unrelated caches were deleted. GPU allocations are not fully
+represented by the service's cgroup memory peak on this unified-memory host,
+so host availability, swap changes, pressure, and GPU process state were also
+monitored.
+
+Three configurations progressively narrowed the problem:
+
+| Separate directory under `runtime/model-benchmarks/` | Observation |
+| --- | --- |
+| `2026-10-01-qwen36-kv8-noprefix/` | Explicit 8 GiB BF16 KV pool, eager, prefix off, language only, one sequence, 1024-token prefill batches. Short smoke and 8K/24K/40K targets passed. A conservative 80°C guard stopped the 55K request without a durable response; no memory pressure, KV saturation, Xid, or host reset was observed. |
+| `2026-10-01-qwen36-kv8-cooled-metrics/` | Added phase measurement and cooldown between cases. Short smoke and 8K/24K passed with server metrics; a temperature-limit margin guard stopped the 40K request. Memory availability remained about 65 GiB and memory-full PSI was zero. |
+| `2026-10-01-qwen36-kv8-governed-metrics/` | Reduced prefill batch to 512, applied `CPUQuota=100%` (one aggregate CPU), cooled before cases, and paused/resumed the engine as temperature-limit margin decreased. First 8K/24K/40K/55K targets passed with complete server phase measurements. Full-run results are recorded separately below. |
+
+The explicit 8 GiB pool advertised **104,544 cache tokens**, and 64K requests
+fit at startup. `kv-cache-memory-bytes` overrides utilization-based KV sizing;
+`gpu-memory-utilization=0.50` is not an additional total-memory cap in this
+mode. This behavior was verified in installed vLLM code/startup logs and the
+[vLLM cache documentation](https://docs.vllm.ai/en/v0.19.1/api/vllm/config/cache/).
+Weights remain FP8 and KV remains automatic/BF16; KV quantization was not used.
+
+The observed constraint in these retries was thermal margin under sustained
+prefill, rather than exhausted memory. An initial fixed 80°C stop was overly
+conservative without device-specific margin information. The subsequent
+margin guard also ended a run even though thermal slowdown was not active.
+GPU clock limiting was attempted but denied by driver permissions; no clocks
+were changed. The final diagnostic therefore used smaller work batches and
+adaptive pauses instead of raising a stop threshold and proceeding unchecked.
+It pauses when margin is at most 15°C or GPU temperature reaches 74°C, resumes
+at at most 65°C with at least 25°C margin, and aborts on margin at most 2°C,
+thermal slowdown, GPU/kernel errors, material new swap growth, or host memory
+pressure. The pauses and their durations are saved separately. This is an
+operationally constrained configuration, not a claim that temperature caused
+the old reboot, that another flag was responsible, or that reboot prevention
+is guaranteed.
+
+### Measurement definitions
+
+Runner 2.3 preserves per-request client TTFT and separates server phase rates
+from client estimates. vLLM metrics are differences of request histogram
+sums/counts before/after one isolated request, with newly computed KV tokens
+used when exported. Prefill time is initial scheduling to first output token;
+decode time is first to last output token, with `(generation_tokens - 1)` in
+the decode-rate numerator. These times include scheduling/preemption and
+thermal pauses. They are not pure GPU kernel durations. Metric-exporter
+failures are labeled unavailable and never counted as task failures; exporter
+query time is excluded from case wall time.
+
+llama.cpp native timings preserve processed prompt tokens, cached tokens,
+prompt/decode seconds, and native rates. Its cached-prefix work must be visible
+when comparing prefill TPS. Client TTFT spans request start to first streamed
+content; current nonstreaming tool requests have no client TTFT, whereas vLLM
+server TTFT is still available. The paired original results contain client
+TTFT but no retained native phase timings, so pure server TPS cannot be
+retroactively invented from their wall time. See
+[measurement usage](../../local-model/eval/README.md#ttft-and-phase-throughput).
+
+### Completed Qwen3.6 diagnostic: 120/120 cases, 290/290 measured requests
+
+`2026-10-01-qwen36-kv8-governed-metrics/qwen36.jsonl` completed **120 cases**
+with **72 deterministic passes** and **zero transport/runtime errors**. All
+**290 individual API requests** have attributed vLLM phase metrics. The
+following pairs the new Qwen3.6 configuration with the preserved September 30
+Flash-Next arm on the same fixture; these are different served configurations
+and dates, not a controlled single-flag ablation. No new blind semantic audit
+or human judgment was performed, so the original semantic counts must not be
+transferred to the new run.
+
+| Bucket | New Qwen3.6 deterministic pass | Original Flash-Next deterministic pass | Median client case time: new Qwen / original Flash |
+| --- | ---: | ---: | ---: |
+| Short task | 25/30 | 30/30 | 1.71 / 1.96 s |
+| Multi-tool | 6/30 | 26/30 | 2.21 / 5.12 s |
+| Six-turn conversation | 12/30 | 24/30 | 10.26 / 11.83 s |
+| Context-heavy | **29/30** | **30/30** | 27.84 / 38.81 s |
+| Total | **72/120** | **110/120** | — |
+
+The sole context failure, `context_24`, returned `assignment_status: "open"`
+instead of the exact source value `"open; same weekly assignment"`. It was
+recorded as an answer failure, with no server error, and the run continued.
+The three noncontext buckets improved from 38/90 to 43/90 deterministic passes,
+but multiple serving and resource settings changed; this does not establish
+that prefix caching, KV size, or any other individual flag caused the change.
+All-case multi-tool medians include skipped/failed tool workflows and remain
+unsuitable for claiming a successful-work speed win.
+
+| Qwen target context | Cases / pass | Median actual input tokens | Median client TTFT | Median server prefill TPS | Median server decode TPS |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 8K | 8 / 7 | 7,900 | 2.82 s | 2,827 | 26.4 |
+| 24K | 8 / 8 | 23,456 | 24.23 s | 971 | 25.7 |
+| 40K | 7 / 7 | 38,974 | 49.12 s | 796 | 25.7 |
+| 55K | 7 / 7 | 52,564 | 73.15 s | 720 | 25.3 |
+
+These are **thermally governed, CPU-limited rates**, not unconstrained model
+throughput. The first 55K target had TTFT 40.25 s; the seven-case median was
+73.15 s as repeated load increased the required pauses. The governor paused
+264 times for **637.59 s total**, within request/phase timing. Cooldown before
+cases and a three-second stage gap are outside case wall time; exporter
+collection time is also separately excluded. The first short request was cold
+and retained as `short_01`, not removed from the score. The suite runs once per
+case, in context-first staged order, with prefix caching disabled for Qwen3.6.
+
+Across inference samples: minimum available host memory **64.69 GiB**,
+memory-full PSI `avg10` maximum **0.00**, maximum GPU temperature **77°C**,
+minimum temperature-limit margin **7°C**, and **zero thermal-slowdown samples**.
+No new GPU allocation/Xid/kernel error or host reboot occurred during inference.
+These observations validate this constrained run, not future reliability or
+the cause of the previous host reset. Production restore transients are
+logged separately and excluded from the inference resource summary.
+
+The durable file SHA-256 is
+`91b6cce4eebb1d594054d9e263b9f786acd46eb41b47f6eee3aece53b75a7b9e`.
+The directory also contains the exact launch command, service states,
+`thermal-pauses.jsonl`, host/GPU telemetry, `context-performance-summary.json`,
+`run-summary.json`, paired summaries, and startup/server/kernel logs. The
+production launcher/profile configuration was not changed.
+
+## Separate Flash native performance audit (October 1)
+
+`runtime/model-benchmarks/2026-10-01-flash-performance-audit/` uses the
+production Flash launcher with isolated gateway traffic, native llama.cpp
+response timings, and the same thermal pause thresholds. Its declared scope
+is the first five cases in each noncontext bucket and the first four context
+sizes (19 cases), rather than a new 120-case Flash accuracy run. It retains
+normal two-slot prompt caching and has no one-CPU quota; Qwen's diagnostic
+run uses one sequence, prefix-off, and a one-CPU quota. These are observations
+of different served configurations, not a controlled model speed ranking.
+
+The first audit attempt stopped at a 10 GiB available-memory threshold despite
+zero memory-full PSI and no growing swap; normal resident Flash memory already
+left roughly 7 GiB available. The resumed monitor used a 4 GiB floor plus PSI,
+new swap growth, thermal margin/slowdown and GPU/kernel error checks. A user
+interruption then stopped the supervisor at 16 durable cases. Owned runtime
+guards were removed, the model resumed, and prior service starts restored
+before resuming the same declared audit. Completed rows remain preserved.
+The interrupted 24K request left cached work: its recorded retry processes
+4,968 new tokens and reuses 18,481. Its low TTFT is therefore a cache-assisted
+measurement and must not be treated as a cold full-prefill comparison.
+Native prefill TPS uses processed tokens; client TTFT includes thermal pauses.
+Neither arm provides unconstrained performance under these controls.
+
+| Flash target context | Client TTFT | Native prefill TPS | Native decode TPS | Processed / cached input tokens |
+| --- | ---: | ---: | ---: | ---: |
+| 8,192 | 31.55 s | 255 | 26.4 | 7,899 / 0 |
+| 24,576 | 10.08 s | 495 | 25.2 | 4,968 / 18,481 |
+| 40,960 | 159.82 s | 244 | 22.9 | 38,920 / 49 |
+
+The user requested less conservative Flash controls at 18 completed cases
+(17 passes, 53 native request records). The in-flight 55K request was cancelled,
+not assigned a result. The supervisor resumed the model and restored service
+starts. This partial governed audit is preserved, with a separate production
+performance run below; it is not pooled into either full original arm.
+
+
+## Flash production settings without forced pauses (October 1)
+
+At user request, a fresh run in
+`runtime/model-benchmarks/2026-10-01-flash-production-metrics/` removed all
+process pauses and forced cooldowns, retained production CPU/GPU/slot/cache
+settings, checked health every two seconds, and checked kernel logs every
+15 seconds. It completed **15 cases (14 passes), 50/50 native request timings**.
+It then stopped during `context_00` at **85°C**, reported temperature-limit
+margin **−1°C**, and an active thermal-slowdown flag. Memory-full PSI was zero,
+available memory 7.94 GiB, and swap did not grow. The cancelled context request
+has no score or phase result. No new GPU allocation/Xid error or host reset
+was observed. This thermal observation does not identify the previous reset's
+cause, establish that normal Flash use is unreliable, or invalidate its
+original completed 120-case run. It limits this sustained-load speed audit.
+
+| Served configuration | Bucket (same five case IDs) | Pass | Client TTFT median | Server prefill TPS median | Server decode TPS median |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Flash production | short_task | 5/5 | 0.42 s | 227 | 28.9 |
+| Flash production | multi_tool | 5/5 | unavailable (nonstream) | 156 | 28.4 |
+| Flash production | long_horizon | 4/5 | 0.38 s | 158 | 28.5 |
+| Qwen governed | short_task | 3/5 | 0.15 s | 819 | 26.5 |
+| Qwen governed | multi_tool | 1/5 | unavailable (nonstream) | 2102 | 27.0 |
+| Qwen governed | long_horizon | 1/5 | 0.20 s | 1857 | 26.4 |
+
+These per-request medians use only the completed shared 15-case subset.
+Flash reuses resident prompt caches, including earlier experiments; this is
+not a cold-start benchmark. Qwen still uses CPU quota and thermal pauses and
+can skip expected tools, so rates and request counts do not describe equivalent
+successful work. The preserved original Flash 120 rows have no new native
+phase measurements. There is **no completed unpaused Flash long-context phase
+comparison**; the earlier governed measurements must not fill that gap.
+
+The final production Flash endpoint, main/English gateways, and cron watchdog
+are active again; the model has no remaining process stop or benchmark guard.
+ClawGram retains its pre-existing Qwen readiness mismatch and remains in
+`activating/start-pre`, rather than being reported as healthy.
+
 ## Is Flash-Next generally better for this agent?
 
 | Dimension | Evidence and practical conclusion |
 | --- | --- |
-| Task correctness | On the original complete three-bucket fixture, Flash-Next passed 80/90 deterministic checks versus 38/90, and 71/90 provisional semantic checks versus 43/90; excluding the 12 uncertain cases gives 61/78 versus 36/78. This favors the current Flash-Next served stack on these particular synthetic tasks, especially scripted tools and six-turn state. It is not measured production accuracy. |
-| Speed | Original Qwen3.6 median client time was about half Flash-Next's on short and six-turn tasks. Multi-tool failure shortcuts invalidate the all-case median as successful-work speed. The October 1 eager run has only one cold failed short request and no new context timing; it cannot be pooled with the original run. |
-| Stability | Flash-Next completed 120 original cases; the Qwen3.6 arm ended at 92 during an unexplained host reset. The retry reached a short request without a reset, then stopped, with resource warnings during production restoration. Neither the reset nor the restore warning isolates intrinsic model reliability. Long-context Qwen3.6 stability remains untested beyond the original two cases. |
+| Task correctness | On the original complete three-bucket fixture, Flash-Next passed 80/90 deterministic checks versus 38/90, and 71/90 provisional semantic checks versus 43/90; excluding the 12 uncertain cases gives 61/78 versus 36/78. The separate completed retry gives Flash 110/120 versus Qwen 72/120 deterministic passes, including context 30/30 versus 29/30; the retry has no new semantic/human review. This favors the current Flash-Next served stack on these particular synthetic tasks, especially scripted tools and six-turn state. It is not measured production accuracy. |
+| Speed | Original Qwen3.6 median client time was about half Flash-Next's on short and six-turn tasks. Multi-tool failure shortcuts invalidate the all-case median as successful-work speed. The first October 1 eager smoke has only one cold failed short request. The subsequent governed run reports new phase metrics and slower decode than the original unconstrained Qwen run; its CPU quota, pauses, and cache policy must remain visible, and its rows cannot be pooled with the original run. The unpaused Flash audit measures only 15 noncontext cases before thermal slowdown; no unpaused long-context phase ranking is available. |
+| Stability | Flash-Next completed 120 original cases; the Qwen3.6 arm ended at 92 during an unexplained host reset. The initial retry stopped after a short request; the subsequent governed Qwen configuration completed 120 cases, including all 30 contexts, without runtime errors or a reset. That establishes feasibility under its controls, not intrinsic model reliability or the cause of the old reset. |
 
 Keeping Flash-Next as the operational default is a reasonable provisional
 choice given its higher fixture task-completion counts and the unresolved
@@ -221,7 +435,9 @@ Qwen3.6 serving/host risk. **“Flash-Next is generally better for our real agen
 is not established.** Qwen3.6 has a measured speed advantage on some original
 short tasks; realistic tool use, usefulness, durable state, and long-context
 quality need the real-trace and human-reviewed evaluation below. The original
-context-heavy comparison remains **2/30 pairs**; this retry adds none.
+context-heavy comparison remains **2/30 original pairs**. The separately
+configured retry provides **30/30 new completed contexts**, with 29 passes
+versus 30 in the preserved Flash arm; it does not rewrite the interrupted run.
 
 ## Follow-up evaluation
 

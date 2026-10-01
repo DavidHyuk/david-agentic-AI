@@ -167,7 +167,9 @@ Start with a short request, then individual `context_00`, `context_01`,
 `context_02`, and `context_03` cases (approximately 8K, 24K, 40K, 55K targets),
 using `--ids` and a fresh output path. Inspect resources and server/kernel logs
 between stages; stop on new GPU allocation/Xid errors, memory pressure, server
-exit, timeout, or failed smoke results. Restore Flash-Next, verify its `/models`
+exit, timeout, or invalid smoke transport/response. A valid response that fails
+the task rubric is an accuracy result: record it and continue when health and
+resource checks permit. Restore Flash-Next, verify its `/models`
 endpoint, and restore prior gateways/watchdog even on an aborted run.
 
 The October 1 retry uses a separate run label and directory because eager
@@ -175,3 +177,65 @@ execution, concurrency, and prefill batch limits differ. Never append its rows
 to the original `qwen36.jsonl`; report the retry independently, with any missing
 cases and configuration changes visible. A completed retrieval retry does not
 resolve the original missing pairs or establish production reliability.
+
+The completed governed run used explicit 8 GiB BF16 KV, context 65,536, eager
+execution, prefix caching off, one sequence, 512-token prefill batches,
+language-only mode, a one-CPU quota, and thermal pause/resume controls. It
+completed 120 cases with 72 passes and all 290 server phase records. Runtime
+launch commands, telemetry and pause logs are retained separately; see the
+[comparison report](../../docs/benchmarks/qwen36-vs-flashnext-v2-2026-09-30.md).
+Thermal pauses are included in request timings. Production settings are restored
+after testing; these diagnostic controls are not a general prevention claim.
+The subsequent Flash audit removed pauses and cooldowns at user request, with
+2-second health checks and 15-second kernel checks. It measured 15 cases /
+50 requests, then stopped on observed thermal slowdown in the first context
+request. Preserve that partial scope rather than combining it with governed
+Flash timings or the original full Flash score.
+
+## TTFT and phase throughput
+
+Runner 2.3 retains client TTFT and records per-request performance in each
+trace. For an isolated vLLM server, add its metrics endpoint:
+
+```bash
+python3 local-model/eval/benchmark_suite_v2.py run \
+  --model Qwen3.6-35B-A3B-FP8 --base-url http://127.0.0.1:8004/v1 \
+  --server-metrics-url http://127.0.0.1:8004/metrics \
+  --run-label 'describe the fixed serving flags here' \
+  --output runtime/model-benchmarks/new-metrics-run/qwen36.jsonl
+```
+
+Use a **fresh output**: runner-version and metrics-endpoint changes are part of
+run identity. Original 2.2 results stay untouched and can still be summarized.
+This flag only collects telemetry; it does not start, stop, or isolate services.
+
+- Client TTFT is request start to the first nonempty streamed content. Tool
+  requests currently use nonstreaming responses, so their client TTFT is absent;
+  vLLM server TTFT is still measurable for these requests.
+- vLLM server prefill time spans initial scheduling to the first output token;
+  decode time spans the first to last output token. Prefill TPS uses newly
+  computed KV tokens when that histogram is available, otherwise total input
+  tokens (with the basis recorded), divided by server prefill seconds; decode TPS is `(generation_tokens - 1)`
+  divided by server decode seconds. Server TTFT also includes server-side queue
+  time. These phase times can include scheduling/preemption, not just GPU kernel
+  time. The benchmark uses one request at a time and no other clients.
+- Histogram differences are attributed only when every required count advances
+  by exactly one. Missing, reset, or concurrent telemetry is marked unavailable;
+  exporter errors do not turn a valid task into a failed inference. Metric
+  collection time is recorded separately and excluded from case wall time.
+- llama.cpp native `timings` are retained from streaming/nonstreaming responses,
+  with its prompt/decode rates, cache count, and **actually processed** prompt
+  tokens. Native prefill rates may use fewer tokens than total input when a
+  prompt prefix is cached. Compare engines with those definitions visible.
+- Client `prompt_tps_ttft_estimate` includes network, queuing, and tokenization;
+  it is not pure prefill TPS. `decode_tps_estimate` uses client stream duration
+  and is kept distinct from measured server phase throughput.
+
+Summaries include per-bucket request counts, server-metric coverage, median
+client/server TTFT, and median server prefill/decode TPS. Counts are requests,
+not cases: a six-turn case and a tool chain contain multiple requests. Keep
+accuracy, task latency, phase throughput, and stability separate, and report
+cold/warm/cache/cooling conditions. See the
+[vLLM cache configuration](https://docs.vllm.ai/en/v0.19.1/api/vllm/config/cache/)
+for the explicit KV-byte budget; setting it overrides utilization-based KV
+sizing and does not guarantee total host/GPU memory safety.

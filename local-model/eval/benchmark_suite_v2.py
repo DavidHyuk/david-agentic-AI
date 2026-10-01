@@ -19,7 +19,7 @@ from typing import Any, Sequence
 
 DEFAULT_CASES = Path(__file__).with_name("agent_cases_v2.json")
 BUCKETS = ("short_task", "multi_tool", "long_horizon", "context_heavy")
-RUNNER_VERSION = "2.2"
+RUNNER_VERSION = "2.3"
 BOUNDED_TOOL_LOOP_ERROR = "synthetic tool loop exceeded step limit"
 CONTEXT_CHARS_PER_TARGET_TOKEN = 3.7
 FILLER = (
@@ -188,6 +188,7 @@ def parse_stream(lines: Any, started: float) -> dict[str, Any]:
     usage: dict[str, Any] = {}
     first_token: float | None = None
     finish_reason: str | None = None
+    timings: dict[str, Any] = {}
     for raw in lines:
         line = raw.decode("utf-8").strip()
         if not line.startswith("data: "):
@@ -196,6 +197,8 @@ def parse_stream(lines: Any, started: float) -> dict[str, Any]:
         if item == "[DONE]":
             break
         chunk = json.loads(item)
+        if chunk.get("timings"):
+            timings = chunk["timings"]
         if chunk.get("usage"):
             usage = chunk["usage"]
         for choice in chunk.get("choices", []):
@@ -211,6 +214,7 @@ def parse_stream(lines: Any, started: float) -> dict[str, Any]:
         "usage": usage,
         "finish_reason": finish_reason,
         "ttft_s": None if first_token is None else round(first_token - started, 3),
+        "server_timings": timings,
     }
 
 
@@ -252,9 +256,113 @@ def request_completion(
                 "usage": body.get("usage") or {},
                 "finish_reason": choice.get("finish_reason"),
                 "ttft_s": None,
+                "server_timings": body.get("timings") or {},
             }
     result["wall_s"] = round(time.monotonic() - started, 3)
     return result
+
+
+SERVER_METRICS = (
+    "request_prefill_time_seconds", "request_decode_time_seconds",
+    "time_to_first_token_seconds", "request_prompt_tokens", "request_generation_tokens",
+)
+
+
+def parse_server_metrics(body: str) -> dict[str, float]:
+    """Read vLLM histogram sums/counts, summing engine label series."""
+    values: dict[str, float] = {}
+    for line in body.splitlines():
+        match = re.fullmatch(r'vllm:([a-z_]+)(?:\{[^\n]*\})?\s+([\d.eE+\-]+)(?:\s+\d+)?', line)
+        if not match:
+            continue
+        name, value = match.groups()
+        if name in {f"{metric}_{suffix}" for metric in (*SERVER_METRICS, "request_prefill_kv_computed_tokens") for suffix in ("sum", "count")}:
+            values[name] = values.get(name, 0.0) + float(value)
+    return values
+
+
+def fetch_server_metrics(url: str) -> dict[str, float]:
+    """Fetch optional serving telemetry without changing the model request."""
+    with urllib.request.urlopen(url, timeout=3) as response:
+        return parse_server_metrics(response.read().decode("utf-8"))
+
+
+def server_metric_delta(before: dict[str, float], after: dict[str, float]) -> dict[str, Any]:
+    """Attribute histogram changes only when exactly one request completed."""
+    deltas: dict[str, float] = {}
+    for metric in SERVER_METRICS:
+        count, total = f"{metric}_count", f"{metric}_sum"
+        if count not in before or count not in after or total not in before or total not in after:
+            return {"available": False, "reason": "required server histogram missing"}
+        if after[count] - before[count] != 1:
+            return {"available": False, "reason": "snapshot does not isolate one completed request"}
+        deltas[metric] = after[total] - before[total]
+        if deltas[metric] < 0:
+            return {"available": False, "reason": "server counters reset"}
+    prefill, decode = deltas["request_prefill_time_seconds"], deltas["request_decode_time_seconds"]
+    prompt, generated = deltas["request_prompt_tokens"], deltas["request_generation_tokens"]
+    processed: float | None = None
+    computed = "request_prefill_kv_computed_tokens"
+    if before.get(computed + "_count") is not None and after.get(computed + "_count", 0) - before[computed + "_count"] == 1:
+        if computed + "_sum" in before and computed + "_sum" in after:
+            value = after[computed + "_sum"] - before[computed + "_sum"]
+            if value >= 0:
+                processed = value
+    prefill_tokens = processed if processed is not None else prompt
+    return {
+        "available": True,
+        "source": "isolated vLLM histogram deltas",
+        "prefill_s": prefill, "decode_s": decode,
+        "ttft_s": deltas["time_to_first_token_seconds"],
+        "prompt_tokens": prompt, "generation_tokens": generated,
+        "processed_prompt_tokens": processed,
+        "prefill_token_basis": "computed KV tokens" if processed is not None else "total input tokens",
+        "prefill_tps": prefill_tokens / prefill if prefill_tokens > 0 and prefill > 0 else None,
+        "decode_tps": (generated - 1) / decode if generated > 1 and decode > 0 else None,
+    }
+
+
+def collect_server_metrics(url: str, before: dict[str, float]) -> dict[str, Any]:
+    """Allow brief exporter lag; report missing/contaminated metrics explicitly."""
+    deadline = time.monotonic() + 3
+    while True:
+        after = fetch_server_metrics(url)
+        result = server_metric_delta(before, after)
+        count = "request_prefill_time_seconds_count"
+        if result["available"] or after.get(count, 0) - before.get(count, 0) != 0 or time.monotonic() >= deadline:
+            return result
+        time.sleep(0.05)
+
+
+def client_rates(response: dict[str, Any]) -> dict[str, Any]:
+    """Keep TTFT-based estimates separate from server phase measurements."""
+    ttft, wall = response.get("ttft_s"), response["wall_s"]
+    usage = response["usage"]
+    prompt, generated = usage.get("prompt_tokens") or 0, usage.get("completion_tokens") or 0
+    duration = wall - ttft if ttft is not None else 0
+    return {
+        "ttft_s": ttft,
+        "prompt_tps_ttft_estimate": prompt / ttft if ttft and prompt else None,
+        "decode_tps_estimate": (generated - 1) / duration if ttft is not None and generated > 1 and duration > 0 else None,
+    }
+
+
+def native_server_rates(response: dict[str, Any]) -> dict[str, Any]:
+    """Retain llama.cpp phase timings and its native rates, including cache work."""
+    timings = response.get("server_timings") or {}
+    if not all(key in timings for key in ("prompt_ms", "predicted_ms", "prompt_n", "predicted_n")):
+        return {"available": False, "reason": "no native server phase timings"}
+    prefill, decode = timings["prompt_ms"] / 1000, timings["predicted_ms"] / 1000
+    prompt, generated = timings["prompt_n"], timings["predicted_n"]
+    return {
+        "available": True, "source": "llama.cpp response timings", "raw_timings": timings,
+        "prefill_s": prefill, "decode_s": decode, "ttft_s": None,
+        "prompt_tokens": response["usage"].get("prompt_tokens"),
+        "processed_prompt_tokens": prompt, "cached_prompt_tokens": timings.get("cache_n"),
+        "generation_tokens": generated,
+        "prefill_tps": timings.get("prompt_per_second", prompt / prefill if prefill > 0 else None),
+        "decode_tps": timings.get("predicted_per_second", (generated - 1) / decode if generated > 1 and decode > 0 else None),
+    }
 
 
 def tool_reply(call: dict[str, Any], script: list[dict[str, Any]], index: int) -> tuple[dict[str, Any], bool]:
@@ -271,7 +379,8 @@ def tool_reply(call: dict[str, Any], script: list[dict[str, Any]], index: int) -
     return {"error": "unexpected synthetic benchmark tool call"}, False
 
 
-def run_case(case: dict[str, Any], model: str, base_url: str, timeout: int, run_id: str) -> dict[str, Any]:
+def run_case(case: dict[str, Any], model: str, base_url: str, timeout: int, run_id: str,
+             metrics_url: str | None = None) -> dict[str, Any]:
     """Execute a case's turns and synthetic tool loop with a bounded trace."""
     started = time.monotonic()
     messages: list[dict[str, Any]] = [{"role": "system", "content": case["system"]}]
@@ -282,16 +391,34 @@ def run_case(case: dict[str, Any], model: str, base_url: str, timeout: int, run_
     script_index = 0
     tool_sequence_ok = True
     error: str | None = None
+    telemetry_s = 0.0
     for turn_index, turn in enumerate(case["turns"]):
         messages.append({"role": "user", "content": user_text(case, turn_index)})
         final_text = ""
         final_finish: str | None = None
         for step_index in range(max(8, len(expected_script) + 3)):
+            before: dict[str, float] | None = None
+            metric_error: str | None = None
+            metric_started = time.monotonic()
+            if metrics_url:
+                try:
+                    before = fetch_server_metrics(metrics_url)
+                except (OSError, ValueError) as exc:
+                    metric_error = f"{type(exc).__name__}: {exc}"
+            telemetry_s += time.monotonic() - metric_started
             try:
                 response = request_completion(messages, case, model, base_url, timeout)
             except (urllib.error.URLError, TimeoutError, ValueError, KeyError) as exc:
                 error = f"{type(exc).__name__}: {exc}"
                 break
+            performance = {"client": client_rates(response), "server": native_server_rates(response)}
+            metric_started = time.monotonic()
+            if metrics_url:
+                try:
+                    performance["server"] = collect_server_metrics(metrics_url, before) if before is not None else {"available": False, "reason": metric_error}
+                except (OSError, ValueError) as exc:
+                    performance["server"] = {"available": False, "reason": f"{type(exc).__name__}: {exc}"}
+            telemetry_s += time.monotonic() - metric_started
             trace.append({
                 "turn": turn_index,
                 "step": step_index,
@@ -301,6 +428,7 @@ def run_case(case: dict[str, Any], model: str, base_url: str, timeout: int, run_
                 "finish_reason": response["finish_reason"],
                 "content": response["content"],
                 "tool_calls": response["tool_calls"],
+                "performance": performance,
             })
             calls = response["tool_calls"]
             if calls:
@@ -364,7 +492,9 @@ def run_case(case: dict[str, Any], model: str, base_url: str, timeout: int, run_
         "tool_sequence_pass": tool_sequence_ok,
         "case_pass": error is None and len(turn_scores) == len(case["turns"]) and all(turn_scores) and tool_sequence_ok,
         "error": error,
-        "wall_s": round(time.monotonic() - started, 3),
+        "wall_s": round(time.monotonic() - started - telemetry_s, 3),
+        "telemetry_wall_s": round(telemetry_s, 3),
+        "metrics_url": metrics_url,
         "prompt_tokens": prompt_tokens,
         "completion_tokens": completion_tokens,
         "trace": trace,
@@ -438,7 +568,7 @@ def run(args: argparse.Namespace) -> None:
     cases = selected_cases(all_cases, args)
     if not cases:
         raise ValueError("no selected cases")
-    run_id = digest({
+    run_settings = {
         "version": RUNNER_VERSION,
         "model": args.model,
         "base_url": args.base_url,
@@ -446,7 +576,11 @@ def run(args: argparse.Namespace) -> None:
         "temperature": 0,
         "top_p": 1,
         "thinking": False,
-    })
+    }
+    metrics_url = getattr(args, "server_metrics_url", None)
+    if metrics_url:
+        run_settings["server_metrics_url"] = metrics_url
+    run_id = digest(run_settings)
     prior = {record["id"]: record for record in load_records(args.output)}
     by_id = {case["id"]: case for case in all_cases}
     for case_id, record in prior.items():
@@ -465,7 +599,7 @@ def run(args: argparse.Namespace) -> None:
             print(f"skip {case['id']}: already recorded", flush=True)
             continue
         print(f"start {case['id']} [{case['bucket']}]", flush=True)
-        record = run_case(case, args.model, args.base_url, args.timeout, run_id)
+        record = run_case(case, args.model, args.base_url, args.timeout, run_id, metrics_url)
         save_record(args.output, record)
         print(f"done {case['id']}: pass={record['case_pass']} wall={record['wall_s']:.2f}s", flush=True)
         if record["error"] and record["error"] != BOUNDED_TOOL_LOOP_ERROR:
@@ -499,6 +633,9 @@ def summarize(args: argparse.Namespace) -> None:
             items = [side[case_id] for case_id in paired]
             other = right if name == "left" else left
             times = [item["wall_s"] for item in items if isinstance(item.get("wall_s"), (int, float))]
+            requests = [step for item in items for step in item.get("trace", [])]
+            servers = [step.get("performance", {}).get("server", {}) for step in requests]
+            servers = [value for value in servers if value.get("available")]
             print(json.dumps({
                 "bucket": bucket,
                 "side": name,
@@ -514,6 +651,12 @@ def summarize(args: argparse.Namespace) -> None:
                 "p95_wall_s": percentile(times, 0.95),
                 "total_prompt_tokens": sum(item.get("prompt_tokens") or 0 for item in items),
                 "total_completion_tokens": sum(item.get("completion_tokens") or 0 for item in items),
+                "requests": len(requests),
+                "server_metrics_requests": len(servers),
+                "p50_client_ttft_s": percentile([step["ttft_s"] for step in requests if isinstance(step.get("ttft_s"), (int, float))], 0.5),
+                "p50_server_ttft_s": percentile([value["ttft_s"] for value in servers if isinstance(value.get("ttft_s"), (int, float))], 0.5),
+                "p50_server_prefill_tps": percentile([value["prefill_tps"] for value in servers if value.get("prefill_tps") is not None], 0.5),
+                "p50_server_decode_tps": percentile([value["decode_tps"] for value in servers if value.get("decode_tps") is not None], 0.5),
             }, ensure_ascii=False))
 
 
@@ -533,6 +676,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     runner.add_argument("--bucket", choices=BUCKETS)
     runner.add_argument("--ids", help="comma-separated case IDs")
     runner.add_argument("--limit", type=int)
+    runner.add_argument("--server-metrics-url", help="isolated vLLM /metrics endpoint for request phase TPS/TTFT")
     summary = sub.add_parser("summarize")
     summary.add_argument("--cases", type=Path, default=DEFAULT_CASES)
     summary.add_argument("--left", type=Path, required=True)

@@ -200,6 +200,117 @@ def test_stream_parser_records_first_token_and_usage() -> None:
     assert result["ttft_s"] is not None
 
 
+def _metric_snapshot(count: int, prefill: float, decode: float, ttft: float,
+                     prompt: int, generated: int) -> dict:
+    values = [prefill, decode, ttft, prompt, generated]
+    return {f"{name}_{suffix}": (count if suffix == "count" else value)
+            for name, value in zip(benchmark.SERVER_METRICS, values)
+            for suffix in ("sum", "count")}
+
+
+def test_server_phase_rates_exclude_queue_and_first_generated_token() -> None:
+    before = _metric_snapshot(2, 3.0, 4.0, 5.0, 100, 20)
+    after = _metric_snapshot(3, 3.5, 6.0, 5.8, 1100, 121)
+    metrics = benchmark.server_metric_delta(before, after)
+    assert metrics["available"]
+    assert metrics["prefill_tps"] == 2000
+    assert metrics["decode_tps"] == 50
+    assert metrics["ttft_s"] == pytest.approx(0.8)
+    assert metrics["prefill_s"] == 0.5
+
+
+def test_vllm_prefill_rate_uses_computed_tokens_when_prefix_is_cached() -> None:
+    before = _metric_snapshot(2, 3, 4, 5, 100, 20)
+    after = _metric_snapshot(3, 3.5, 6, 5.8, 1100, 121)
+    before.update(request_prefill_kv_computed_tokens_count=2,
+                  request_prefill_kv_computed_tokens_sum=100)
+    after.update(request_prefill_kv_computed_tokens_count=3,
+                 request_prefill_kv_computed_tokens_sum=200)
+    result = benchmark.server_metric_delta(before, after)
+    assert result["prompt_tokens"] == 1000
+    assert result["processed_prompt_tokens"] == 100
+    assert result["prefill_tps"] == 200
+
+
+@pytest.mark.parametrize("count", [2, 4])
+def test_server_metrics_reject_missing_or_concurrent_requests(count: int) -> None:
+    before = _metric_snapshot(2, 3, 4, 5, 100, 20)
+    after = _metric_snapshot(count, 4, 5, 6, 1100, 121)
+    assert not benchmark.server_metric_delta(before, after)["available"]
+    assert not benchmark.server_metric_delta(before, {})["available"]
+
+
+def test_prometheus_histogram_parser_sums_engine_labels() -> None:
+    parsed = benchmark.parse_server_metrics('''# irrelevant comment
+vllm:request_prefill_time_seconds_sum{engine="0",model_name="local"} 2.5
+vllm:request_prefill_time_seconds_sum{engine="1",model_name="local"} 1e-1
+vllm:request_prefill_time_seconds_count{engine="0"} 1
+vllm:request_prefill_time_seconds_bucket{le="2"} 9
+''')
+    assert parsed == {"request_prefill_time_seconds_sum": 2.6,
+                      "request_prefill_time_seconds_count": 1.0}
+
+
+def test_client_rates_do_not_invent_nonstreaming_ttft() -> None:
+    assert benchmark.client_rates(_response())["decode_tps_estimate"] is None
+    response = {**_response(), "ttft_s": 0.25, "wall_s": 0.75}
+    assert benchmark.client_rates(response)["decode_tps_estimate"] == 4
+
+
+def test_metrics_export_failure_preserves_valid_task_result(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(benchmark, "request_completion", lambda *_args: _response('{"value":"ok"}'))
+
+    def unavailable(_url: str) -> dict:
+        raise OSError("exporter unavailable")
+
+    monkeypatch.setattr(benchmark, "fetch_server_metrics", unavailable)
+    record = benchmark.run_case(_base_case(), "mock", "http://local/v1", 10, "run", "http://local/metrics")
+    assert record["case_pass"]
+    assert record["error"] is None
+    assert not record["trace"][0]["performance"]["server"]["available"]
+
+
+def test_stream_keeps_native_phase_timings_and_cached_prompt_work() -> None:
+    timings = {"prompt_n": 8, "cache_n": 92, "prompt_ms": 200,
+               "predicted_n": 5, "predicted_ms": 400,
+               "prompt_per_second": 40, "predicted_per_second": 10}
+    stream = io.BytesIO(('data: '+json.dumps({"choices": [], "timings": timings,
+                                             "usage": {"prompt_tokens": 100, "completion_tokens": 5}})+'\n\ndata: [DONE]\n').encode())
+    response = benchmark.parse_stream(stream, 0)
+    measured = benchmark.native_server_rates(response)
+    assert measured["available"]
+    assert measured["prompt_tokens"] == 100
+    assert measured["processed_prompt_tokens"] == 8
+    assert measured["cached_prompt_tokens"] == 92
+    assert measured["prefill_tps"] == 40
+    assert measured["decode_tps"] == 10
+    assert measured["ttft_s"] is None
+
+
+def test_telemetry_collection_is_excluded_from_case_latency(monkeypatch: pytest.MonkeyPatch) -> None:
+    clock = [0.0]
+    monkeypatch.setattr(benchmark.time, "monotonic", lambda: clock[0])
+
+    def snapshot(_url: str) -> dict:
+        clock[0] += 4
+        return {}
+
+    def collect(_url: str, _before: dict) -> dict:
+        clock[0] += 4
+        return {"available": False, "reason": "fixture"}
+
+    def response(*_args: object) -> dict:
+        clock[0] += 2
+        return {**_response('{"value":"ok"}'), "wall_s": 2}
+
+    monkeypatch.setattr(benchmark, "fetch_server_metrics", snapshot)
+    monkeypatch.setattr(benchmark, "collect_server_metrics", collect)
+    monkeypatch.setattr(benchmark, "request_completion", response)
+    record = benchmark.run_case(_base_case(), "mock", "http://local/v1", 10, "run", "http://local/metrics")
+    assert record["wall_s"] == 2
+    assert record["telemetry_wall_s"] == 8
+
+
 def test_resume_preserves_bounded_tool_loop_failure_and_runs_next_case(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

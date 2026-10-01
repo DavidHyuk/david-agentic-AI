@@ -3,6 +3,47 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.26.0 — 2026-10-01 (minor: measure serving phases and diagnose long-context execution)
+
+- Added runner 2.3 per-request performance records: client TTFT and explicitly
+  labeled client estimates, optional vLLM histogram deltas for server TTFT and
+  prefill/decode TPS, and llama.cpp native phase timings with processed/cached
+  prompt counts. Decode rates exclude the first generated token. Server phase
+  times include scheduling and preemption; no GPU-kernel-only claim is made.
+- Require one isolated completed request for histogram attribution. Exporter
+  failures stay separate from task scores; exporter overhead is excluded from
+  case wall time. Run identity includes the optional metrics endpoint and new
+  runner version, so old result files remain preserved. Added tests for phase
+  math, cached prompt work, concurrent/missing snapshots, native streaming
+  timings, missing TTFT, exporter failures, and overhead exclusion.
+- Investigated KV capacity and thermal behavior rather than treating a format
+  score as a serving failure. The interrupted September 30 server had 19.92 GiB
+  of KV budget and 2.8% usage in the last log. A separate 8 GiB KV/prefix-off
+  eager run passed 8K/24K/40K targets; its initial 80°C guard stopped the next
+  request. A second run collected server phase metrics before its temperature
+  margin guard stopped a request. No host reset or KV saturation was observed
+  in either attempt, and neither establishes the old reset's cause.
+- Introduced a runtime-only diagnostic configuration with smaller prefill
+  batches, a CPU quota, and adaptive thermal pauses. Completed all 120 Qwen
+  cases (72 deterministic passes; 29/30 contexts) and measured all 290 requests.
+  Original Flash results remain 110/120; original Qwen 92 rows are preserved.
+  Minimum available memory was 64.69 GiB with no inference errors or reset.
+  Final service status and the separate Flash speed audit are recorded in the
+  benchmark report. Timings include
+  deliberate thermal pauses and must not be presented as unconstrained speed.
+- At user request, removed forced pauses and cooldowns from a fresh Flash
+  production-settings performance audit. Health checks use a 2-second interval
+  and kernel checks a 15-second interval; the partial governed Flash audit is
+  preserved separately. Native timings retain actual cache reuse, and Qwen
+  remains a different, CPU-limited configuration. The unpaused Flash audit
+  completed 15 cases / 50 native timings, then stopped at observed thermal
+  slowdown (85°C, margin −1°C) in the first context request. No context score
+  was invented. Flash/main/English/watchdog were restored; the pre-existing
+  ClawGram readiness mismatch remains.
+- `pytest -q`: 372 passed. Updated usage instructions and current overview.
+  These remain internal benchmark helpers, with no user-facing agent, schedule,
+  persistent interaction, or action to justify a new Observatory room.
+
 ## v1.25.3 — 2026-10-01 (patch: clarify benchmark provenance and stop supervised retry)
 
 - Documented that Codex authored the 120 synthetic cases and expected answers;

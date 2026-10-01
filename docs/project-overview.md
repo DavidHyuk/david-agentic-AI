@@ -348,7 +348,10 @@ short/multi-tool/long-horizon 각 30개가 완료됐고 context-heavy는 2/30에
 뒤 Qwen3.6 eager/동시 요청 1개/prefill 배치 2048로 별도 스모크 실행했습니다.
 첫 짧은 문항은 한국어 번역 근거와 영어 substring 기대값 차이로 채점 실패해
 중단됐습니다. 복구 중 스왑 사용 증가와 NVIDIA 할당 경고가 나타나 추가 적재를
-중단했으며 새 context 결과는 없습니다. 기존 120/92개 결과와 해시는 보존하고
+중단했습니다. 이후 별도 KV 8GiB·eager·prefix-off·prefill 배치 512·CPU quota
+및 열 제어 실행에서 Qwen 120개를 모두 완료했습니다. 결정적 통과는 72/120
+(short 25, tools 6, six-turn 12, context 29)이며 원래 Flash는 110/120입니다.
+290/290 요청의 서버 prefill/decode TPS와 TTFT를 확보했습니다. 기존 120/92개 결과와 해시는 보존하고
 변경된 서빙 설정의 결과는 합치지 않습니다. 재부팅 원인은 확정되지 않았고
 메모리 제한이나 eager 실행이 재부팅 방지를 보장하지 않습니다.
 운영 Flash-Next endpoint, main/English gateway, watchdog timer는 복구됐습니다.
@@ -356,6 +359,24 @@ ClawGram gateway의 기존 Qwen3.6 readiness 모델 불일치는 남아 있습�
 정확도·속도·안정성을 구분하며 현재 Flash-Next 운영 유지 판단은 잠정적입니다.
 실제 정답률이나 보편적 모델 우열은 개인정보를 제거한 실제 작업·도구 흐름과
 사람 검토로 후속 평가해야 합니다.
+runner 2.3은 요청별 client TTFT·추정 decode TPS, vLLM histogram 차이의
+server TTFT·prefill/decode TPS, llama.cpp native timings와 실제 처리/캐시
+prompt 토큰 수도 기록합니다. `--server-metrics-url`은 단일 요청만 완료된
+차이를 귀속하고, 측정 실패와 채점 실패를 구분하며 exporter 조회 시간을 과제
+지연에서 제외합니다. prefix 캐시가 있으면 실제 새 KV 토큰 수를 우선 사용합니다.
+현재 관련 변경 후 `pytest -q`는 372개가 통과했습니다.
+추가 KV 진단에서는 기존 19.92GiB 예산과 마지막 2.8% 사용률을 확인했고,
+KV 8GiB·prefix-off 설정에서도 40K를 통과했습니다. 온도 여유가 먼저 감소해
+작은 prefill 배치·CPU quota·열 제어를 적용한 별도 실행에서 55K와 요청별
+성능 지표까지 확보했습니다. 제어 중 대기 시간을 포함하므로 무제한 속도로
+해석하지 않습니다. 기존 재부팅 원인은 여전히 미확정이며 세부 실행/결과는
+벤치 보고서에 구분합니다. Flash의 추가 성능 측정은 사용자 요청에 따라
+강제 정지·냉각 대기를 없애고 운영 설정 그대로 별도 실행합니다. 2초 상태 조회와
+15초 커널 로그 확인만 유지하며, 이전 제어된 Flash 결과와 분리합니다.
+캐시 재사용과 Qwen의 CPU 제한 차이도 함께 기록합니다. 무정지 Flash 실행은
+15개/50요청 측정 후 첫 긴 문맥 처리에서 85°C·온도 여유 −1°C·thermal slowdown을
+관측해 중단했습니다. 새 무정지 Flash context 결과는 없으며 원래 120개 완주와
+별도로 해석합니다. endpoint/main/English/watchdog는 최종 복구됐습니다.
 이는 실제 Hermes E2E, 실도구, 외부 데이터 조회 또는 운영 품질을 측정하지
 않으며, 프로덕션 전환 근거로 단독 사용하지 않습니다. 사용자 대상 일정이나
 동작이 없는 내부 도구이므로 별도 에이전트·cron·Telegram 목적지·Observatory
