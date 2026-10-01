@@ -5,7 +5,11 @@ version-controlled suite of 120 synthetic cases: 30 each in `short_task`,
 `multi_tool`, `long_horizon`, and `context_heavy`. The scenarios borrow themes
 from papers, interview preparation, coding, English practice, and podcasts, but
 contain no real tutor messages, Telegram history, private database rows, or
-model-generated answers.
+model-generated answers. Codex authored these synthetic cases and their expected
+answers; they are not sampled Hermes traces or human-labeled ground truth.
+Repeated templates, six scripted turns, generated filler, and required JSON
+limit how well the suite represents real tasks. See the
+[provenance and limits](../../docs/benchmarks/qwen36-vs-flashnext-v2-2026-09-30.md#dataset-provenance-and-representativeness).
 
 This is a local API harness, **not** a live Hermes end-to-end benchmark. Tool
 calls receive only scripted mock results; no helper, shell command, network
@@ -30,8 +34,9 @@ python3 local-model/eval/benchmark_suite_v2.py validate
 ```
 
 For manual runner commands, use the exact model ID advertised by each local
-endpoint's `/models` route. Both models must already be served and reachable.
-Run them one at a time on the same DGX Spark, keeping their serving
+endpoint's `/models` route. Only the model for the current arm should be loaded and reachable.
+Unload it before loading the next model on the same DGX Spark; sequential HTTP
+requests alone do not prevent concurrent model memory allocation. Keep serving
 configuration fixed during each run. These examples use the existing local
 endpoints; adjust URLs and model IDs to match the services actually running:
 
@@ -42,7 +47,7 @@ python3 local-model/eval/benchmark_suite_v2.py run \
   --run-label llama.cpp-64k \
   --output runtime/model-benchmarks/v2-qwen38.jsonl
 
-# Run after the first command finishes; use the second already-served endpoint.
+# Unload Flash-Next, then load Qwen3.6 alone before running this command.
 python3 local-model/eval/benchmark_suite_v2.py run \
   --model Qwen3.6-35B-A3B-FP8 \
   --base-url http://127.0.0.1:8004/v1 \
@@ -147,3 +152,26 @@ then records every excluded ID and balances anonymous A/B placement over the
 paired subset. Report the denominator by bucket and leave missing outcomes
 unknown; a partial audit must not be presented as a 120-case comparison. The
 default remains fail-closed on any missing result.
+
+## Supervised retry after the September 30 host reset
+
+Preserve the original 120 Flash-Next and 92 Qwen3.6 rows. Inspect previous/current
+boot journals, host memory and pressure, swap, GPU processes/temperature, and
+service state before a retry. The reset has no established cause; cgroup memory
+caps and launch changes do not guarantee prevention. Do not use the full
+120-case overnight orchestrator as the first retry after this incident.
+
+Pause gateway traffic and the cron watchdog, prevent automatic model restarts,
+and verify the production model is fully unloaded before loading Qwen3.6.
+Start with a short request, then individual `context_00`, `context_01`,
+`context_02`, and `context_03` cases (approximately 8K, 24K, 40K, 55K targets),
+using `--ids` and a fresh output path. Inspect resources and server/kernel logs
+between stages; stop on new GPU allocation/Xid errors, memory pressure, server
+exit, timeout, or failed smoke results. Restore Flash-Next, verify its `/models`
+endpoint, and restore prior gateways/watchdog even on an aborted run.
+
+The October 1 retry uses a separate run label and directory because eager
+execution, concurrency, and prefill batch limits differ. Never append its rows
+to the original `qwen36.jsonl`; report the retry independently, with any missing
+cases and configuration changes visible. A completed retrieval retry does not
+resolve the original missing pairs or establish production reliability.

@@ -2,11 +2,11 @@
 
 2026-09-30, one DGX Spark (GB10), kernel `6.14.0-1015-nvidia`.
 
-## Bottom line
+## Assessment of the original run
 
-Three buckets finished with 30 paired cases each. Flash-Next was more reliable
-on this synthetic serving-layer suite; Qwen3.6 was about twice as fast on the
-short and six-turn tasks. The long-context comparison is **incomplete**: the
+Three buckets finished with 30 paired cases each. Flash-Next had higher fixture
+pass counts on this synthetic serving-layer suite; Qwen3.6 was about twice as
+fast on the short and six-turn tasks. The long-context comparison is **incomplete**: the
 host stopped after only two of Qwen3.6's 30 context cases. These results do
 not isolate model architecture from engine, quantization, or tool parser.
 
@@ -36,7 +36,9 @@ tool-sequence successes. Both metrics and their definitions are retained.
 ## What was run
 
 The version-controlled [fixture](../../local-model/eval/agent_cases_v2.json)
-contains 30 synthetic cases each for short factual/planning tasks, dependent
+contains 120 synthetic cases authored by Codex (four buckets × 30), not sampled
+from actual Hermes usage logs and not labeled with correct answers by humans.
+It contains 30 cases each for short factual/planning tasks, dependent
 mock-tool workflows, six-turn stateful conversations, and long-context fact
 retrieval. It does not execute real Hermes tools, Telegram, or user data.
 Flash-Next was served by llama.cpp with IQ4_XS weights and two 64K slots;
@@ -57,15 +59,46 @@ The [bundle builder](../../local-model/eval/blind_judge_bundle_v2.py) stripped
 model names, automatic scores, and timings and balanced A/B positions 46/46
 over the 92 paired cases. A second blind reviewer judged 22 selected cases in
 reverse candidate order: all first-review uncertain cases plus an unselected
-random spot check. Seven case-level judgments differed, all on cases marked
-uncertain. Six repeated interview cases ask for a follow-up question but
-restrict JSON output to a follow-up count; other uncertain cases have similar
+random spot check. Across the 92 paired cases, **12/92 were flagged uncertain**
+by either reviewer; all 12 fall in the three complete buckets. Seven case-level judgments
+differed, all on cases marked uncertain. Six repeated interview cases ask for a
+follow-up question but restrict JSON output to a follow-up count; other uncertain cases have similar
 instruction/schema ambiguities. The primary table retains the first review;
 the 78-case sensitivity count excludes uncertain cases instead of selecting
 whichever judgment favors a model. This is **uncalibrated LLM-as-judge**, not
 human-labeled ground truth. The blinding, fixed task rubric, and second review
 follow [OpenAI's evaluation guidance](https://developers.openai.com/api/docs/guides/evaluation-best-practices)
 and [agent trace-grading guidance](https://developers.openai.com/api/docs/guides/agent-evals).
+
+## Dataset provenance and representativeness
+
+Codex wrote the scenario generator, synthetic inputs, scripted tool outputs,
+and expected JSON answers. Workflow names were inspired by this project's
+papers, interview, coding, English, and podcast capabilities; they are thematic
+proxies, not a sample of David's requests. The equal 30-case bucket allocation
+was chosen for diagnostics and does not reflect production task frequencies.
+The fixture's programmed answers and uncalibrated LLM judgments are not
+human-verified ground truth.
+
+| Suite construction | Difference from actual Hermes work |
+| --- | --- |
+| Mock tools with fixed branches, arguments, dependency order, and responses | No real filesystem, database, browser, network, Telegram side effects, permissions, latency, partial failures, or recovery. Alternative valid tool strategies can fail the scripted check. |
+| Repeated scenario templates with substituted facts and branch variants | Cases are correlated and cover a narrow vocabulary and structure. 120 rows do not represent 120 independent real tasks or broad coverage. |
+| Six scripted turns labeled `long_horizon` | Tests brief in-session state updates. Does not test days of interaction, persistent memory, compaction, asynchronous cron/user interruptions, or extended autonomous execution. |
+| Generated long archives containing repeated filler, positioned `FACT` entries, and synthetic distractors | Primarily controlled fact retrieval, not heterogeneous papers, code, tutor messages, tool traces, source conflicts, or realistic multi-document reasoning. Target token counts are approximate. |
+| Required final JSON and exact reference subset | Easier to score, but ordinary coaching, summaries, explanations, and Telegram conversations are usually prose. Counts format compliance alongside task correctness and omits human usefulness; fenced-JSON policies also differ between the deterministic and semantic judges. |
+
+The 12/92 ambiguous judgments include instruction/schema conflicts; the
+sensitivity analysis cannot make the remaining cases representative. The
+original context-heavy comparison has only **2/30 completed pairs**, with
+28 missing Qwen3.6 outcomes. Those missing outcomes cannot be assumed correct,
+incorrect, or equivalent to the completed small-context cases.
+
+Consequently, these scores are pass counts for this synthetic fixture and
+served configuration. They are **not production accuracy**, a forecast of
+David's task success rate, or evidence of universal model superiority. Engine,
+quantization, tool parsing, evaluator design, and schema choices remain mixed
+with model behavior.
 
 ## Interruption and missing data
 
@@ -102,3 +135,18 @@ Flash-Next, both gateways, and the cron watchdog were restored and active.
   lengths. The rubric was frozen before Qwen3.6 outputs were seen, but after
   a Flash-Next pilot, so evaluator-design bias cannot be excluded. No live
   Hermes end-to-end task or human calibration was performed.
+
+## Follow-up evaluation
+
+Build a consented, privacy-redacted sample of actual Hermes tasks across the
+existing workflows, retaining the relevant tool sequence, returned evidence,
+interruptions, retries, and final user outcome. Remove personal identifiers,
+credentials, private messages, and sensitive source content before evaluation.
+Replay tools in an isolated environment with realistic failures and allow
+multiple valid approaches; assess task completion and grounding separately
+from formatting. Have people review both the task/reference quality and blind
+model outputs, resolve the 12 ambiguous fixture cases, and calibrate any LLM
+judge against that review. Report production-frequency weighting alongside
+per-workflow results, repeated-run variation, successful-work latency, and
+service stability independently. These steps are needed before a claim about
+which model is generally better for this agent.

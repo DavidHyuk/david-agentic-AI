@@ -210,8 +210,8 @@ and verify `nvidia-smi` before launching either GPU backend.
 The version-controlled [120-case synthetic benchmark](local-model/eval/README.md)
 uses four balanced buckets: short tasks, scripted multi-tool calls, multi-turn
 long-horizon state, and context-heavy retrieval. Validate the fixture, then run
-the two already-served local model endpoints sequentially into separate JSONL
-files and summarize paired cases by bucket. The optional overnight orchestrator
+each local model sequentially into separate JSONL files, unloading one before
+loading the other on the Spark, and summarize paired cases by bucket. The optional overnight orchestrator
 temporarily pauses the main/English gateways and cron watchdog, runs Flash-Next
 then Qwen3.6 35B, and restores the original service state through an EXIT trap;
 see [benchmark instructions](local-model/eval/README.md). Scoring checks an
@@ -227,8 +227,17 @@ those judgments distinct from the deterministic score.
 It is an internal, nonproduction evaluation helper and does not add a Hermes
 agent, cron job, bot, or Observatory room. The
 [2026-09-30 partial comparison](docs/benchmarks/qwen36-vs-flashnext-v2-2026-09-30.md)
-reports three complete buckets and explicitly leaves the interrupted
-long-context comparison unresolved.
+records the original three complete buckets and 2/30 context pairs separately
+from the supervised October 1 retry. Codex authored the 120 cases and expected
+answers; they are not sampled Hermes usage or human-labeled ground truth.
+Repeated templates, mock tools, six-turn conversations, generated long archives,
+and JSON requirements limit representativeness; 12/92 original paired judgments
+were uncertain. Compare fixture pass counts, successful-work speed, and service
+stability separately. These scores do not establish production accuracy or
+universal model superiority. After the unexplained reset, use
+[supervised retry guidance](local-model/eval/README.md#supervised-retry-after-the-september-30-host-reset)
+and fresh outputs for changed serving settings; memory caps cannot guarantee
+that a host reset will not recur.
 
 ## Automatic verified commit and push
 
