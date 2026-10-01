@@ -136,6 +136,93 @@ Flash-Next, both gateways, and the cron watchdog were restored and active.
   a Flash-Next pilot, so evaluator-design bias cannot be excluded. No live
   Hermes end-to-end task or human calibration was performed.
 
+## October 1 supervised retry: stopped before long-context inference
+
+This is a **separate run**, not a continuation of the original 92 rows. On
+October 1 at 04:28 PDT, Flash-Next and the main/English gateways were running;
+the cron watchdog timer was active. Only about 6.9 GiB of host memory was
+available with Flash-Next loaded. The GB10 reports no total/free GPU-memory
+value through `nvidia-smi`; its process list showed only the production
+`llama-server` as a compute process. Previous-boot logs and the final telemetry
+were rechecked: no terminal OOM-kill, Xid, or panic was recorded. Earlier NVIDIA
+allocation failures were present at loading times, including 09:00:50 before
+the 09:14:22 stop. The current boot also had a loading-time allocation warning
+at 09:29:45 on September 30. These do not establish the reset's cause.
+The original pstore/dump finding above is from the previous investigation;
+pstore could not be rechecked in this session because access was denied and
+passwordless sudo was unavailable. No new reset-prevention guarantee is made.
+
+Gateways and the watchdog were paused with temporary runtime start guards.
+Flash-Next was stopped and its GPU process absence verified before Qwen3.6
+loaded. Qwen3.6 used vLLM `0.19.0+cu130`, FP8 weights, 65,536 maximum sequence
+length, `gpu-memory-utilization=0.50`, automatic KV dtype, prefix caching,
+`qwen3_coder`, and thinking/MTP disabled. Compared with the original run,
+`--enforce-eager`, `--max-num-seqs 1`, and `--max-num-batched-tokens 2048` were
+added, with `MemoryMax=80G` and `MemorySwapMax=2G`. These are temporary
+benchmark overrides; production configuration was not edited.
+
+The plan gated a short request, then 8K/24K/40K/55K target contexts before the
+remaining context cases. Resource checks ran approximately every 2–3 seconds,
+with stops for available memory below 16 GiB, memory-full PSI `avg10` above
+1.0, free swap below 14 GiB, GPU temperature at least 80°C, new kernel GPU
+allocation/Xid/OOM/panic errors, server exit, request timeout, or a failed
+smoke. Such checks and caps cannot prevent all driver/kernel/power failures.
+
+At 04:36 PDT, the first `short_00` request returned valid JSON in **6.953 s**
+with no transport/runtime error, but failed the deterministic subset check.
+It translated the evidence into Korean, while `$contains` required the English
+phrase `21% fewer KV bytes`; the original Qwen3.6 row failed the same check,
+although the original blind semantic audit passed it. Selecting this known
+format-sensitive item as a strict smoke gate was inappropriate. The response
+is not evidence of memory failure or long-context failure. The gate nevertheless
+stopped this run and restored production before any context request. Its lone
+cold, deterministically failed request is not a speed comparison or an accuracy
+estimate.
+
+A replacement numeric/boolean smoke was prepared, but **not launched**:
+restoring Flash-Next caused swap use to rise to about 9–10 GiB, transient memory
+pressure, and a fresh NVIDIA `NV_ERR_NO_MEMORY` allocation warning at 04:38:13.
+That warning occurred during Flash-Next restoration, not Qwen3.6 context
+inference. Further model switching was stopped because these were resource
+risk signals. The host did not reboot during this attempt, but this does not
+establish stability at 40K/55K or explain the previous reset.
+
+Flash-Next `/health` and `/v1/models` were verified after restoration; the
+main/English gateways and watchdog timer are active, the benchmark server is
+stopped, and temporary guards were removed. ClawGram was already stuck in
+`activating/start-pre` before this work and remains there: its readiness check
+expects Qwen3.6 on the Flash-Next endpoint. That pre-existing external-service
+mismatch blocked the restoration script's sequential start client; the
+watchdog was restored separately and the blocking client ended, without
+changing ClawGram configuration. It is not reported as a healthy gateway.
+
+Artifacts are git-ignored under
+`runtime/model-benchmarks/2026-10-01-qwen36-eager-staged/`: fresh
+`qwen36-eager.jsonl` (one short row, **zero context rows**), serving overrides,
+supervisor/server logs, resource telemetry, boot/kernel evidence, original
+service states, and restoration notes. The prepared
+`2026-10-01-qwen36-eager-context/` directory is marked `NOT-RUN.txt` and contains
+no inference results. Original result SHA-256 values were verified unchanged:
+
+- Flash-Next 120 rows: `15d26d3a50541ae98384b717aeb7fc89f7bcd6c5c5d38d0114225dfce45d3bd7`.
+- Qwen3.6 92 rows: `4f4ab4d39724665dfd8d2f051fe2ab225ed3b41aa126571c3ab73bb77a696705`.
+
+## Is Flash-Next generally better for this agent?
+
+| Dimension | Evidence and practical conclusion |
+| --- | --- |
+| Task correctness | On the original complete three-bucket fixture, Flash-Next passed 80/90 deterministic checks versus 38/90, and 71/90 provisional semantic checks versus 43/90; excluding the 12 uncertain cases gives 61/78 versus 36/78. This favors the current Flash-Next served stack on these particular synthetic tasks, especially scripted tools and six-turn state. It is not measured production accuracy. |
+| Speed | Original Qwen3.6 median client time was about half Flash-Next's on short and six-turn tasks. Multi-tool failure shortcuts invalidate the all-case median as successful-work speed. The October 1 eager run has only one cold failed short request and no new context timing; it cannot be pooled with the original run. |
+| Stability | Flash-Next completed 120 original cases; the Qwen3.6 arm ended at 92 during an unexplained host reset. The retry reached a short request without a reset, then stopped, with resource warnings during production restoration. Neither the reset nor the restore warning isolates intrinsic model reliability. Long-context Qwen3.6 stability remains untested beyond the original two cases. |
+
+Keeping Flash-Next as the operational default is a reasonable provisional
+choice given its higher fixture task-completion counts and the unresolved
+Qwen3.6 serving/host risk. **“Flash-Next is generally better for our real agent”
+is not established.** Qwen3.6 has a measured speed advantage on some original
+short tasks; realistic tool use, usefulness, durable state, and long-context
+quality need the real-trace and human-reviewed evaluation below. The original
+context-heavy comparison remains **2/30 pairs**; this retry adds none.
+
 ## Follow-up evaluation
 
 Build a consented, privacy-redacted sample of actual Hermes tasks across the

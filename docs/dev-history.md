@@ -3,6 +3,33 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.25.3 — 2026-10-01 (patch: clarify benchmark provenance and stop supervised retry)
+
+- Documented that Codex authored the 120 synthetic cases and expected answers;
+  no real Hermes traces were sampled and no human ground-truth labeling was
+  performed. Explained mock-tool, repeated-template, six-turn, generated-context,
+  JSON-format, 12/92 ambiguous-judgment, and original 2/30 context-pair limits.
+  Separated task pass counts, speed, and service stability; recommended redacted
+  real tool traces and human review before claims about overall agent quality.
+- Rechecked boot/kernel logs, telemetry, memory, GPU processes, and services.
+  Preserved the original 120/92 result files and verified their hashes. A fresh
+  Qwen3.6 run used eager execution, one sequence, and a 2048-token prefill batch
+  with production unloaded. Its first short smoke failed an English-substring
+  check after translating the evidence into Korean, a known fixture limitation;
+  no context case ran. The failed smoke selection and result remain recorded.
+- Stopped further switching after Flash-Next restoration increased swap use and
+  produced a new NVIDIA allocation warning. The prior reset remains unexplained;
+  no reset-prevention or long-context success is claimed. Verified the production
+  endpoint, main/English gateways, and watchdog timer after restoration. Recorded
+  the pre-existing ClawGram readiness model mismatch without modifying that
+  external service. Changed settings and the aborted retry remain separate from
+  the original benchmark in ignored runtime artifacts.
+- Updated benchmark usage to require model unloading between arms and staged,
+  supervised retries after this incident. Only project documentation changed;
+  validated the fixture, original paired summaries, local documentation links,
+  and `pytest -q` (363 passed). No new user-facing agent,
+  schedule, state workflow, or action was added, so no Observatory room is needed.
+
 ## v1.25.2 — 2026-09-30 (patch: repair Kakao feedback collector installer)
 
 - Updated the Kakao installer to stage the English practice skill from its
