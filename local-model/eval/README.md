@@ -239,3 +239,26 @@ cold/warm/cache/cooling conditions. See the
 [vLLM cache configuration](https://docs.vllm.ai/en/v0.19.1/api/vllm/config/cache/)
 for the explicit KV-byte budget; setting it overrides utilization-based KV
 sizing and does not guarantee total host/GPU memory safety.
+
+### Relaxed Flash follow-up and pause-excluded Qwen timing
+
+The next Flash run uses all 120 cases with normal production flags. An in-flight
+request is never paused or cancelled solely for temperature, margin, or thermal
+throttling. At 88°C or above, wait before starting the next case until 84°C;
+record this wait outside case timings. Keep GPU/kernel-error and severe memory
+pressure checks. Preserve earlier output files and give this control policy a
+new run label. Results and restoration are in the comparison report.
+
+For the completed Qwen run, retain raw elapsed time and separately subtract
+logged stage pauses for active case time. Phase-specific subtraction requires
+absolute request/first-token/end times; the old logs do not have them. The
+report therefore reconstructs context pause overlaps using UTC supervisor
+samples, labels these values as estimates, and stores sensitivity intervals.
+Do not treat a duration-minus-pause calculation as an unconstrained rerun or
+subtract all pauses from prefill when a pause occurred during decode.
+
+The completed relaxed Flash retry measured all 120 cases / 338 requests, with
+110 deterministic passes (context 30/30), maximum sampled 87°C, and zero
+process pauses or between-case cooldowns. See the report's opening tables for
+both full runs, both-pass task latency, long-context phase throughput, raw
+observations, and Qwen pause-excluded reconstruction limitations.

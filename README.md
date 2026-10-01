@@ -235,7 +235,12 @@ agent, cron job, bot, or Observatory room. The
 records the original three complete buckets and 2/30 context pairs separately
 from the supervised October 1 retry, which completed all 120 Qwen cases
 (72 deterministic passes, including 29/30 contexts), with 290 requests measured.
-The preserved original Flash arm passed 110/120. A separate Flash audit without
+The preserved original Flash arm passed 110/120. The final relaxed Flash retry
+also completed 120 cases with 110 passes and 338/338 native phase measurements,
+no process pauses, and no between-case cooling waits. At 88°C or above it would
+wait only before starting the next case; maximum observed temperature was 87°C.
+The report includes Qwen timing estimates with logged pause waits excluded.
+An earlier separate Flash audit without
 forced pauses measured 50 requests across 15 cases before stopping on observed
 thermal slowdown; it provides no completed unpaused long-context comparison.
 Codex authored the 120 cases and expected

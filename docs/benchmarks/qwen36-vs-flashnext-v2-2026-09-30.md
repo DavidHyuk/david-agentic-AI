@@ -1,7 +1,85 @@
-# Qwen3.6 35B vs Flash-Next: original 92 pairs and separate 120-case retry
+# Qwen3.6 35B vs Flash-Next: original 92 pairs and separate completed 120-case runs
 
-Original run: 2026-09-30; separate diagnostic retry: 2026-10-01.
+Original run: 2026-09-30; separate diagnostic retries and relaxed Flash run: 2026-10-01.
 One DGX Spark (GB10), kernel `6.14.0-1015-nvidia`.
+
+## Completed October 1 comparison (separate full runs)
+
+Both new arms completed all **120 cases**. Flash uses normal production serving
+flags, no process pauses, no in-flight temperature abort, and a between-case
+cooldown only if temperature is at least 88°C (resume new cases at 84°C).
+Qwen uses the diagnostic configuration below; its active times subtract logged
+thermal waits, and its phase-specific active values are reconstructed estimates.
+Neither new arm is appended to the original September 30 files.
+
+| Bucket | New Flash pass | New Qwen pass | Flash median case time | Qwen median case time minus logged stage pauses |
+| --- | ---: | ---: | ---: | ---: |
+| Short task | 30/30 | 25/30 | 1.91 s | 1.71 s |
+| Multi-tool | 26/30 | 6/30 | 5.17 s | 2.21 s |
+| Six-turn conversation | 24/30 | 12/30 | 11.36 s | 10.26 s |
+| Context-heavy | 30/30 | 29/30 | 37.89 s | 10.62 s |
+| Total | **110/120 (91.7%)** | **72/120 (60.0%)** | — | — |
+
+These percentages are deterministic synthetic-fixture passes, not production
+accuracy. All-case latency includes failed tasks, particularly Qwen tool
+shortcuts. Successful-work latency uses only case IDs where both new arms pass:
+
+| Bucket | Both-pass pairs | Flash median case time | Qwen median case time minus stage pauses |
+| --- | ---: | ---: | ---: |
+| Short task | 25 | 1.81 s | 1.70 s |
+| Multi-tool | 5 | 5.56 s | 5.34 s |
+| Six-turn conversation | 12 | 11.52 s | 10.62 s |
+| Context-heavy | 29 | 38.00 s | 10.68 s |
+
+### Long-context TTFT, prefill and decode without explicit pause waits
+
+Medians over all cases at each target size (8/8/7/7 cases). Flash is measured;
+Qwen values marked ≈ subtract reconstructed process-pause overlap. Exact
+method and sensitivity limitations are below; these are not two unconstrained
+runs with identical serving controls.
+
+| Target | Qwen TTFT | Flash TTFT | Qwen prefill TPS | Flash prefill TPS | Qwen decode TPS | Flash decode TPS |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 8,192 | ≈2.82 s | 11.67 s | ≈2827 | 708 | ≈26.4 | 26.6 |
+| 24,576 | ≈8.47 s | 35.51 s | ≈2788 | 663 | ≈25.7 | 25.0 |
+| 40,960 | ≈14.48 s | 63.39 s | ≈2704 | 618 | ≈26.5 | 22.9 |
+| 55,296 | ≈19.67 s | 89.44 s | ≈2689 | 590 | ≈25.4 | 21.1 |
+
+Flash native prefill TPS uses actually processed tokens. Median cached input
+is 49 tokens in each long-context group, versus median total inputs around
+7,900 / 23,456 / 38,974 / 52,564. The new Flash run retains a warm server and
+its normal caches; it is not a cold-start experiment. Decode excludes the
+first generated token. Tool requests remain nonstreaming, so client TTFT is
+unavailable for those requests rather than invented.
+
+### Stability and final restoration
+
+Flash completed **338/338 requests with native phase timings**, no runtime
+errors, no reset, **zero forced pauses**, and **zero between-case cooldowns**.
+Maximum sampled GPU temperature was **87°C**, minimum reported margin **−6°C**,
+and 572 samples indicated thermal slowdown. Those observations were recorded
+without cancelling requests. Host available memory reached **6.48 GiB**, with
+memory-full PSI `avg10` **0.00** and no new GPU allocation/Xid error.
+Thermal throttling remains part of measured Flash performance; there is no
+explicit cooling wait to subtract. Qwen's 637.59 seconds of process pauses are
+separated in the active-time analysis, while CPU quota remains a confounder.
+
+The result directory is
+`runtime/model-benchmarks/2026-10-01-flash-88c-between-cases/`; it retains policy,
+full launch/supervisor script, selection, original/final service states,
+telemetry, raw results and `run-summary.json`. Full Flash result SHA-256:
+`324124c1d56570d199aff7e6b1c0925ab558d5b25a529d198f0691a023f86c02`.
+Production Flash, main/English gateways, and cron watchdog are restored and
+active. ClawGram retains its pre-existing Qwen readiness mismatch and remains
+`activating/start-pre`. Production launcher/profile settings were not changed.
+
+The completed relaxed Flash run demonstrates that the earlier conservative
+thermal stop was not necessary to finish this fixture. It does not identify
+the earlier host reset's cause or guarantee future reliability. Fixture
+correctness favors Flash, while Qwen's pause-excluded long-context estimates
+show substantially shorter prefill/TTFT in these different served stacks.
+This supports keeping Flash for the present tool/state workload, not a claim
+of general model superiority or real Hermes production accuracy.
 
 ## Assessment of the original run
 
@@ -316,6 +394,38 @@ that prefix caching, KV size, or any other individual flag caused the change.
 All-case multi-tool medians include skipped/failed tool workflows and remain
 unsuitable for claiming a successful-work speed win.
 
+### Qwen timing with explicit process-pause waits excluded
+
+At user request, the main active-time table below subtracts logged thermal
+process pauses rather than presenting those waits as inference throughput.
+Original rows and the raw timing table below remain unchanged.
+`pause-excluded-derived.json` stores per-case calculations, pause overlap,
+phase estimates, and sensitivity intervals.
+
+| Qwen target | Cases | Median case time minus stage pauses | Estimated TTFT minus pauses | Estimated prefill TPS minus pauses | Estimated decode TPS minus pauses |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 8,192 | 8 | 4.66 s | ≈2.82 s | ≈2827 | ≈26.4 |
+| 24,576 | 8 | 10.43 s | ≈8.47 s | ≈2788 | ≈25.7 |
+| 40,960 | 7 | 16.35 s | ≈14.48 s | ≈2704 | ≈26.5 |
+| 55,296 | 7 | 21.61 s | ≈19.67 s | ≈2689 | ≈25.4 |
+
+Case active time subtracts each stage's recorded `duration_s`. Phase values
+are **reconstructed estimates**, not newly measured timestamps: the old runner
+stored durations but no absolute request start/first-token/end times. Pause
+intervals are recovered from UTC resume time minus duration; response end is
+estimated between the final running supervisor sample (with an allowance for
+sampling/exporter overhead) and the stage-complete sample. We overlap these
+intervals with client TTFT and server prefill/decode durations. Endpoint
+sensitivity windows are approximately 0.66 seconds; recorded ranges describe
+this reconstruction assumption, not statistical confidence or rigorously
+proven error bounds. A pause can overlap decode (`context_20` does), so we do
+not subtract every pause from prefill or leave decode universally unchanged.
+CPU quota, polling overhead and the temperature-dependent execution state
+remain. Subtracting idle time cannot recover actual unconstrained throughput;
+fresh phase-aligned measurements are needed for an exact comparison.
+
+### Original observed Qwen timing, including process pauses
+
 | Qwen target context | Cases / pass | Median actual input tokens | Median client TTFT | Median server prefill TPS | Median server decode TPS |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | 8K | 8 / 7 | 7,900 | 2.82 s | 2,827 | 26.4 |
@@ -413,8 +523,9 @@ Flash reuses resident prompt caches, including earlier experiments; this is
 not a cold-start benchmark. Qwen still uses CPU quota and thermal pauses and
 can skip expected tools, so rates and request counts do not describe equivalent
 successful work. The preserved original Flash 120 rows have no new native
-phase measurements. There is **no completed unpaused Flash long-context phase
-comparison**; the earlier governed measurements must not fill that gap.
+phase measurements. This stopped run provides **no completed unpaused Flash long-context phase
+comparison**. The later completed 88°C-policy run at the top of this report
+provides that separate comparison; earlier governed measurements are not pooled.
 
 The final production Flash endpoint, main/English gateways, and cron watchdog
 are active again; the model has no remaining process stop or benchmark guard.
@@ -426,8 +537,16 @@ ClawGram retains its pre-existing Qwen readiness mismatch and remains in
 | Dimension | Evidence and practical conclusion |
 | --- | --- |
 | Task correctness | On the original complete three-bucket fixture, Flash-Next passed 80/90 deterministic checks versus 38/90, and 71/90 provisional semantic checks versus 43/90; excluding the 12 uncertain cases gives 61/78 versus 36/78. The separate completed retry gives Flash 110/120 versus Qwen 72/120 deterministic passes, including context 30/30 versus 29/30; the retry has no new semantic/human review. This favors the current Flash-Next served stack on these particular synthetic tasks, especially scripted tools and six-turn state. It is not measured production accuracy. |
-| Speed | Original Qwen3.6 median client time was about half Flash-Next's on short and six-turn tasks. Multi-tool failure shortcuts invalidate the all-case median as successful-work speed. The first October 1 eager smoke has only one cold failed short request. The subsequent governed run reports new phase metrics and slower decode than the original unconstrained Qwen run; its CPU quota, pauses, and cache policy must remain visible, and its rows cannot be pooled with the original run. The unpaused Flash audit measures only 15 noncontext cases before thermal slowdown; no unpaused long-context phase ranking is available. |
+| Speed | Original Qwen3.6 median client time was about half Flash-Next's on short and six-turn tasks. Multi-tool failure shortcuts invalidate the all-case median as successful-work speed. The first October 1 eager smoke has only one cold failed short request. The subsequent governed run reports new phase metrics and slower decode than the original unconstrained Qwen run; its CPU quota, pauses, and cache policy must remain visible, and its rows cannot be pooled with the original run. The first unpaused audit stopped at 15 cases; the later relaxed full Flash run completed 120. Its measured phase values and Qwen pause-excluded estimates are compared at the top, with CPU/cache/control differences explicit. |
 | Stability | Flash-Next completed 120 original cases; the Qwen3.6 arm ended at 92 during an unexplained host reset. The initial retry stopped after a short request; the subsequent governed Qwen configuration completed 120 cases, including all 30 contexts, without runtime errors or a reset. That establishes feasibility under its controls, not intrinsic model reliability or the cause of the old reset. |
+
+Qwen pause-excluded derived context timing must be used when discussing
+active computation; raw timings include deliberate waits. These reconstructions
+retain the CPU quota and do not establish unconstrained performance.
+
+The latest full Flash run independently reproduces 110/120 deterministic
+passes and completes 30/30 contexts without explicit thermal waits. Compared
+with Qwen 72/120, this strengthens the fixture-specific task-completion evidence.
 
 Keeping Flash-Next as the operational default is a reasonable provisional
 choice given its higher fixture task-completion counts and the unresolved

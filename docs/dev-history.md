@@ -3,6 +3,29 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.26.1 — 2026-10-01 (patch: complete relaxed Flash evaluation and separate Qwen pause time)
+
+- At user request, Flash inference now completes each in-flight request without
+  process pauses or a temperature-based abort. Before a new case, temperatures
+  of 88°C or above trigger a short wait until 84°C. Temperature-limit margin
+  and hardware throttling are logged, while GPU/kernel errors and severe
+  memory pressure still stop the diagnostic. State checks run every 2 seconds,
+  kernel checks every 15 seconds; this policy has a distinct output directory.
+- Extended the resumed Flash run to all 120 synthetic cases, preserving earlier
+  interrupted and more conservative measurements. Completed **120 cases**,
+  **110 passes** (context 30/30), and **338/338 native request timings**. Maximum
+  sampled temperature 87°C; zero process pauses and zero between-case cooldowns.
+  GPU/kernel errors and reset were absent; thermal throttling was recorded.
+  Flash/main/English/watchdog restoration was verified; the pre-existing
+  ClawGram readiness mismatch remains. Final tables are in the report.
+- Derived Qwen case active times by subtracting logged stage pauses. Reconstructed
+  phase-specific pause overlap for context TTFT/prefill/decode; retain raw
+  timings, estimates, and endpoint sensitivity assumptions separately. Old
+  logs lack absolute request timestamps, so corrected phase values are marked
+  approximate and do not claim unconstrained CPU/GPU throughput.
+- This change updates evaluation records and documentation only; no production
+  launcher, new agent, cron, bot, or Observatory room is introduced.
+
 ## v1.26.0 — 2026-10-01 (minor: measure serving phases and diagnose long-context execution)
 
 - Added runner 2.3 per-request performance records: client TTFT and explicitly
