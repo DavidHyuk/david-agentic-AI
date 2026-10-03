@@ -262,3 +262,30 @@ The completed relaxed Flash retry measured all 120 cases / 338 requests, with
 process pauses or between-case cooldowns. See the report's opening tables for
 both full runs, both-pass task latency, long-context phase throughput, raw
 observations, and Qwen pause-excluded reconstruction limitations.
+
+## Bounded CPU diagnostics after the October 3 reset
+
+Use `guarded_diagnostic.py` for CPU-only metadata inspection. It creates a
+separate systemd cgroup with a hard RAM limit, no swap, a runtime limit and
+fsynced telemetry. It refuses launch below 12 GiB available-memory headroom.
+The parent stops only its own diagnostic; it never signals the production model.
+This is not containment for GPU/model workloads or protection from kernel and
+firmware failures. Do not repeat unbounded GGUFReader inspection while serving.
+
+`gguf_metadata.py` reads selected metadata and optional tensor descriptors with
+standard-library streaming I/O. It skips tokenizer contents, never maps tensor
+payloads, and rejects oversized/truncated headers. Run with a fresh output path:
+
+```bash
+python3 local-model/eval/guarded_diagnostic.py \
+  --output-dir runtime/model-benchmarks/header-check-NEW \
+  --memory-mib 128 --seconds 60 -- \
+  /usr/bin/python3 local-model/eval/gguf_metadata.py \
+  --tensor-summary /absolute/path/model.gguf
+```
+
+Multiple shard paths are accepted. The JSON includes selected PLE tensor shapes
+and numeric GGML types, without reading their values. See the
+[October 3 incident and diagnosis](../../docs/benchmarks/flash-prefill-diagnostic-incident-2026-10-03.md)
+for the bounded reproduction, corrected distinction between speculative n-gram
+and model-internal PLE hashing, and remaining performance-attribution limits.

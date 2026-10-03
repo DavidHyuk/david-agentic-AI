@@ -172,7 +172,7 @@ function englishDesk(d) {
 function podcastDesk(d) {
   const history = d.watch_history || {};
   const videos = history.videos || [];
-  const connection = history.connected ? "계정 연결 확인됨" : history.session_saved ? "세션 전달됨 · 연결 확인 대기" : "맥북의 YouTube 로그인 세션을 SSH로 연결해 주세요.";
+  const connection = history.connected ? "계정 연결 확인됨" : history.authenticated ? "로그인 확인됨 · 기록 수집 대기" : history.session_saved ? "세션 전달됨 · 연결 확인 대기" : "맥북의 YouTube 로그인 세션을 SSH로 연결해 주세요.";
   const state = d.podcast_review?.status === "ready" ? "주중 팟캐스트 복습" : history.is_today ? "가장 최근에 본 팟캐스트" : history.date ? "이전 수집 결과 · 갱신 대기" : "계정 연결 후 첫 수집 대기";
   const review = d.podcast_review;
   const reviewCard = review ? `<article class="desk-card"><h2>주말 복습 · ${esc(review.week_start)} ~ ${esc(review.week_end)}</h2>${review.status === "ready" ? (review.episodes || []).map(item => `<div class="reading-row"><div><strong>${esc(item.title)}</strong><small>${(item.source_dates || []).map(esc).join(" · ")}</small></div><div>${safeLink(item.url, "주중 영상 다시 듣기")}</div></div>`).join("") + '<p class="muted">주중 대본 문장과 약점 표현을 Telegram에서 복습합니다.</p>' : `<p>${esc(review.reason || "이번 주 복습 자료가 없습니다.")}</p>`}</article>` : "";

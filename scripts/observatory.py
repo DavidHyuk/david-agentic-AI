@@ -328,8 +328,12 @@ class Observatory:
                 })
             history = read_json(self.home / 'data/youtube-history/snapshot.json', {})
             connection = read_json(self.home / 'data/youtube-history/connection.json', {})
+            authentication = read_json(self.home / 'data/youtube-history/authentication.json', {})
             data['watch_history'] = {
                 'connected': connection.get('version') == 1 and bool(connection.get('verified_at')),
+                'authenticated': (authentication.get('version') == 1 and bool(authentication.get('verified_at')))
+                                 or (connection.get('version') == 1 and bool(connection.get('verified_at'))),
+                'authentication_verified_at': authentication.get('verified_at'),
                 'connection_verified_at': connection.get('verified_at'),
                 'session_saved': (self.home / 'data/youtube-history/session.json').is_file(),
                 'date': history.get('date'),

@@ -3,6 +3,28 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.30.0 — 2026-10-03 (minor: bound CPU diagnostics and replace heavy GGUF inspection)
+
+- Respond to the diagnostic-time host reset by separating CPU inspection into
+  a transient systemd cgroup: RAM/high limits, no swap, runtime/CPU/I/O limits,
+  durable telemetry and manifests, reserved headroom and pressure/kernel checks.
+  Validate pressure-triggered child stopping and actual runtime timeout; do not
+  claim GPU-driver containment or guaranteed reset prevention.
+- Replace full GGUFReader metadata reconstruction with bounded streaming header
+  and tensor-descriptor inspection. All three shards complete at about 4.54 MiB
+  cgroup peak; the old first-shard reader reached the 768 MiB high boundary and
+  was stopped. Preserve interrupted artifacts and original benchmark results.
+- Correct the prior inference that disabled speculative decoding excludes all
+  n-gram processing: this checkpoint has CPU PLE hashing. A bounded synthetic
+  predecessor/hash probe takes roughly 8.6 ms for 52,564 tokens, excluding the
+  embedding gather, transfers and model kernels; causal GPU attribution remains
+  incomplete. Production Flash and all current gateways/watchdog stay active.
+- Add focused tests for pressure refusal, interruption/timeout boundaries,
+  retained accounting and malformed/oversized GGUF headers. This is an internal
+  diagnostic with no user-facing schedule or workflow, so no Observatory room,
+  Hermes profile, bot or permanent background service is introduced.
+- Final `pytest -q`: **459 passed**; the 18 diagnostic/metadata tests also pass.
+
 ## v1.29.0 — 2026-10-03 (minor: weekday watched-podcast practice and weekend review)
 
 - Run watched-podcast recommendations Monday–Friday at 18:00. From that selected

@@ -208,6 +208,15 @@ host-level outage before the full benchmark finished; do not treat it as a
 validated production replacement. On this Spark, restore the NVIDIA driver
 and verify `nvidia-smi` before launching either GPU backend.
 
+### Bounded local-model inspection
+
+After the October 3 host reset, CPU-only model inspection uses a separate
+systemd memory/runtime boundary and pressure monitor. The streaming GGUF helper
+reads headers and tensor descriptors without mapping weights or retaining the
+vocabulary. See [usage](local-model/eval/README.md#bounded-cpu-diagnostics-after-the-october-3-reset)
+and the [incident report](docs/benchmarks/flash-prefill-diagnostic-incident-2026-10-03.md).
+These limits do not guarantee protection against GPU-driver or host failures.
+
 ### Agent-task model benchmark
 
 The version-controlled [120-case synthetic benchmark](local-model/eval/README.md)

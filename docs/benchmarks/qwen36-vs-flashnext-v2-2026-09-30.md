@@ -572,3 +572,16 @@ judge against that review. Report production-frequency weighting alongside
 per-workflow results, repeated-run variation, successful-work latency, and
 service stability independently. These steps are needed before a claim about
 which model is generally better for this agent.
+
+## October 3 diagnostic follow-up
+
+An unbounded metadata inspection coincided with another host reset. Subsequent
+CPU-only experiments now use hard cgroup RAM/runtime limits and a streaming
+header reader. The metadata and matching llama.cpp implementation confirm
+**model-internal PLE n-gram hashing on the CPU**, despite speculative decoding
+being disabled; those are distinct mechanisms. Synthetic CPU predecessor/hash
+work took about 8.6 ms at 52,564 tokens, excluding embedding gathers and GPU
+work. No further GPU benchmark was launched after the reset. See the
+[incident and corrected diagnosis](flash-prefill-diagnostic-incident-2026-10-03.md).
+Existing score and timing tables are preserved; kernel/placement/thermal
+contributions to TTFT remain incompletely attributed.

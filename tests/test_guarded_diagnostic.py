@@ -85,3 +85,18 @@ def test_user_interrupt_stops_only_own_unit(tmp_path, monkeypatch):
     stops = [x for x in calls if x[:3] == ['systemctl', '--user', 'stop']]
     assert len(stops) == 1 and stops[0][-1].startswith('hermes-cpu-diagnostic-')
     assert json.loads((args.output_dir / 'manifest.json').read_text())['reason'] == 'user interrupted supervisor'
+
+
+def test_finished_command_retains_peak_and_is_cleaned_up(tmp_path, monkeypatch):
+    monkeypatch.setattr(guard, 'read_resources', sample)
+    monkeypatch.setattr(guard, 'command_output', lambda *_: '')
+    properties = {'MemoryMax': str(1024**3), 'MemorySwapMax': '0', 'ActiveState': 'active',
+                  'SubState': 'exited', 'Result': 'success', 'ExecMainStatus': '0', 'MemoryPeak': '123456'}
+    monkeypatch.setattr(guard, 'unit_properties', lambda *_: properties)
+    calls = []
+    monkeypatch.setattr(guard.subprocess, 'run', lambda argv, **_: (calls.append(argv) or argparse.Namespace(stdout='', stderr='')))
+    args = argparse.Namespace(command=['python3', '-c', 'pass'], output_dir=tmp_path / 'run',
+                              reserve_gib=12, memory_mib=1024, seconds=90)
+    assert guard.run(args) == 0
+    assert json.loads((args.output_dir / 'manifest.json').read_text())['final']['MemoryPeak'] == '123456'
+    assert any(x[:3] == ['systemctl', '--user', 'stop'] for x in calls)

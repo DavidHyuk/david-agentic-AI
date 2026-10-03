@@ -50,6 +50,7 @@ def launch_arguments(unit: str, command: list[str], memory_mib: int, seconds: in
         '--property', 'Nice=10',
         '--property', 'OOMPolicy=stop',
         '--property', 'KillMode=control-group',
+        '--property', 'RemainAfterExit=yes',
         '--property', 'TimeoutStopSec=5',
         '--property', f'RuntimeMaxSec={seconds}',
         '--property', f'WorkingDirectory={Path.cwd()}',
@@ -69,7 +70,7 @@ def command_output(args: list[str]) -> str:
 
 def unit_properties(unit: str) -> dict:
     body = command_output(['systemctl', '--user', 'show', unit,
-                           '-p', 'ActiveState', '-p', 'Result', '-p', 'ExecMainStatus',
+                           '-p', 'ActiveState', '-p', 'SubState', '-p', 'Result', '-p', 'ExecMainStatus',
                            '-p', 'MemoryCurrent', '-p', 'MemoryPeak', '-p', 'MemoryMax',
                            '-p', 'MemoryHigh', '-p', 'MemorySwapMax', '-p', 'ControlGroup'])
     return dict(line.split('=', 1) for line in body.splitlines() if '=' in line)
@@ -145,7 +146,7 @@ def run(args: argparse.Namespace) -> int:
                     reason = 'new GPU/kernel failure'
             if reason:
                 raise RuntimeError(reason)
-            if final['ActiveState'] in ('inactive', 'failed'):
+            if final['ActiveState'] in ('inactive', 'failed') or final.get('SubState') == 'exited':
                 break
             if time.monotonic() > deadline:
                 raise RuntimeError('supervisor deadline exceeded')

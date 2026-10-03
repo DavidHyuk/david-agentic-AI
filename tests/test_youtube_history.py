@@ -75,7 +75,7 @@ def test_cli_passes_default_or_explicit_channels_to_refresh(tmp_path, monkeypatc
     monkeypatch.setattr(yh, 'is_connected', lambda *args: True)
     def refreshed(data_dir, browser_dir, executable, channels, **kwargs):
         assert channels == expected
-        return {'date': '2026-10-03', 'videos': []}
+        return {'date': '2026-10-03', 'synced_at': '2026-10-03T18:00:00-07:00', 'videos': []}
     monkeypatch.setattr(yh, 'refresh', refreshed)
     assert yh.main(['--data-dir', str(tmp_path), *options, 'sync']) == 0
     assert capsys.readouterr().err == ''
@@ -317,3 +317,82 @@ def test_saved_native_chromium_expiry_is_normalized(tmp_path):
         'name': 'SID', 'value': 'private-session',
     }]})
     assert yh.load_saved_cookies(tmp_path / 'session.json')[0]['expires'] == 2000000000
+
+
+@pytest.mark.parametrize('markup', [
+    '<ytd-video-renderer><a id="video-title" href="https://www.youtube.com/watch?v=abcdefghijk">A real watched episode</a><ytd-channel-name><a>Daily English Podcast</a></ytd-channel-name></ytd-video-renderer>',
+    '<yt-lockup-view-model><a class="yt-lockup-metadata-view-model__title" href="https://www.youtube.com/watch?v=abcdefghijk">A real watched episode</a><div class="yt-lockup-metadata-view-model__metadata"><a>Daily English Podcast</a></div></yt-lockup-view-model>',
+    '<yt-lockup-view-model><h3><a class="ytLockupMetadataViewModelTitle" href="https://www.youtube.com/watch?v=abcdefghijk">A real watched episode</a></h3><div class="ytLockupMetadataViewModelMetadata"><span class="ytContentMetadataViewModelMetadataText">Daily English Podcast</span></div></yt-lockup-view-model>',
+])
+def test_real_browser_extracts_title_and_channel_from_supported_history_markup(markup):
+    api = pytest.importorskip('playwright.sync_api')
+    executables = list(yh.DEFAULT_BROWSER_CACHE.glob('**/chrome-headless-shell'))
+    if not executables:
+        pytest.skip('Install the history browser runtime for local markup integration checks.')
+    with api.sync_playwright() as playwright:
+        browser = playwright.chromium.launch(executable_path=str(executables[-1]), headless=True)
+        try:
+            page = browser.new_page()
+            page.set_content('<ytd-item-section-renderer><div id="header">Today</div>' + markup + '</ytd-item-section-renderer>')
+            sections = page.evaluate(yh.HISTORY_SCRIPT)
+            result = yh.normalize_sections(sections, yh.DEFAULT_CHANNELS)
+            assert result[0]['title'] == 'A real watched episode'
+            assert result[0]['channel'] == 'Daily English Podcast'
+            assert result[0]['url'] == 'https://www.youtube.com/watch?v=abcdefghijk'
+        finally:
+            browser.close()
+
+
+def test_authenticated_only_session_recovers_collection_without_cookie_reimport(tmp_path, monkeypatch, capsys):
+    browser_dir = tmp_path / 'browser'
+    (browser_dir / 'Default').mkdir(parents=True)
+    now = datetime.now(yh.TZ)
+    yh.save_json(tmp_path / 'authentication.json', {'version': 1, 'verified_at': now.isoformat(),
+                                                 'browser_dir': str(browser_dir.resolve())})
+    assert yh.is_authenticated(tmp_path, browser_dir)
+    assert not yh.is_connected(tmp_path, browser_dir)
+    monkeypatch.setattr(yh, 'refresh', lambda *a, **kw: {
+        'date': now.date().isoformat(), 'synced_at': now.isoformat(), 'videos': [video()],
+    })
+    assert yh.main(['--data-dir', str(tmp_path), '--browser-dir', str(browser_dir), 'notify']) == 0
+    assert 'https://www.youtube.com/watch?v=abcdefghijk' in capsys.readouterr().out
+    assert yh.is_connected(tmp_path, browser_dir)
+
+
+@pytest.mark.parametrize('logged_in', [True, False])
+def test_login_state_survives_render_failure_and_is_cleared_when_signed_out(tmp_path, monkeypatch, logged_in):
+    from types import SimpleNamespace
+    import sys
+    browser_dir = tmp_path / 'browser'
+    (browser_dir / 'Default').mkdir(parents=True)
+    record = {'version': 1, 'verified_at': 'old', 'browser_dir': str(browser_dir.resolve())}
+    yh.save_json(tmp_path / 'authentication.json', record)
+    yh.save_json(tmp_path / 'connection.json', record)
+    class Page:
+        def goto(self, *a, **kw):
+            return SimpleNamespace(status=200)
+        def wait_for_function(self, *a, **kw):
+            pass
+        def evaluate(self, *a, **kw):
+            return logged_in
+        def wait_for_selector(self, *a, **kw):
+            raise RuntimeError('private-session-value')
+    cookies = yh.parse_cookies(cookies_text('.youtube.com\tTRUE\t/\tTRUE\t0\tSID\tprivate-session-value'))
+    context = SimpleNamespace(pages=[Page()], close=lambda: None, clear_cookies=lambda: None,
+                              add_cookies=lambda value: None, cookies=lambda *a: cookies)
+    class Playwright:
+        chromium = SimpleNamespace(launch_persistent_context=lambda *a, **kw: context)
+        def __enter__(self):
+            return self
+        def __exit__(self, *a):
+            pass
+    monkeypatch.setitem(sys.modules, 'playwright.sync_api', SimpleNamespace(sync_playwright=Playwright, Error=RuntimeError))
+    with pytest.raises(yh.HistoryError) as error:
+        yh.collect_history(browser_dir, '', cookies=cookies, session_path=tmp_path / 'session.json')
+    assert 'private-session-value' not in str(error.value)
+    assert yh.is_authenticated(tmp_path, browser_dir) is logged_in
+    if logged_in:
+        assert (tmp_path / 'session.json').exists()
+        assert (tmp_path / 'authentication.json').stat().st_mode & 0o777 == 0o600
+    else:
+        assert not yh.is_connected(tmp_path, browser_dir)

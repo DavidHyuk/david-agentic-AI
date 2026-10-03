@@ -36,8 +36,8 @@ HISTORY_SCRIPT = r"""() => {
   return sections.map(section => ({
     heading: (section.querySelector('#header')?.innerText || '').trim(),
     videos: [...section.querySelectorAll('ytd-video-renderer, yt-lockup-view-model')].map(row => {
-      const title = row.querySelector('a#video-title, a.yt-lockup-metadata-view-model__title');
-      const channel = row.querySelector('ytd-channel-name a, .yt-lockup-metadata-view-model__metadata a');
+      const title = row.querySelector('a#video-title, a.ytLockupMetadataViewModelTitle, a.yt-lockup-metadata-view-model__title');
+      const channel = row.querySelector('ytd-channel-name a, .ytLockupMetadataViewModelMetadata .ytContentMetadataViewModelMetadataText, .yt-lockup-metadata-view-model__metadata a');
       return {title: (title?.textContent || '').trim(), url: title?.href || '',
               channel: (channel?.textContent || '').trim()};
     })
@@ -163,14 +163,23 @@ def parse_cookies(text: str, *, now: float | None = None) -> list[dict]:
     return cookies
 
 
-def is_connected(data_dir: Path, browser_dir: Path) -> bool:
-    path = data_dir / 'connection.json'
+def verified_browser_record(data_dir: Path, browser_dir: Path, filename: str) -> bool:
+    """Distinguish verified login from a fully collected history connection."""
+    path = data_dir / filename
     if not path.exists():
         return False
     connection = json.loads(path.read_text())
     return (connection.get('version') == 1 and bool(connection.get('verified_at'))
             and connection.get('browser_dir') == str(browser_dir.resolve())
             and (browser_dir / 'Default').is_dir())
+
+
+def is_connected(data_dir: Path, browser_dir: Path) -> bool:
+    return verified_browser_record(data_dir, browser_dir, 'connection.json')
+
+
+def is_authenticated(data_dir: Path, browser_dir: Path) -> bool:
+    return verified_browser_record(data_dir, browser_dir, 'authentication.json') or is_connected(data_dir, browser_dir)
 
 
 def load_saved_cookies(path: Path) -> list[dict]:
@@ -256,7 +265,16 @@ def collect_history(browser_dir: Path, executable: str, *, cookies: list[dict] |
                 page.wait_for_function('() => window.ytInitialData && window.ytcfg', timeout=30_000)
                 logged_in = page.evaluate("() => window.ytcfg.get('LOGGED_IN') === true")
                 if not logged_in:
+                    if session_path is not None:
+                        (session_path.parent / 'authentication.json').unlink(missing_ok=True)
+                        (session_path.parent / 'connection.json').unlink(missing_ok=True)
                     raise HistoryError('YouTube 로그인이 필요합니다. 맥북에서 쿠키를 다시 내보내고 SSH로 connect --cookies-stdin을 실행해 주세요.')
+                if session_path is not None:
+                    save_json(session_path, {'version': 1, 'cookies': context.cookies('https://www.youtube.com')})
+                    save_json(session_path.parent / 'authentication.json', {
+                        'version': 1, 'verified_at': datetime.now(TZ).isoformat(),
+                        'browser_dir': str(browser_dir.resolve()),
+                    })
                 stage = 'render'
                 page.wait_for_selector('ytd-item-section-renderer, ytd-message-renderer', timeout=20_000)
                 stage = 'collect'
@@ -273,6 +291,10 @@ def collect_history(browser_dir: Path, executable: str, *, cookies: list[dict] |
                         if any('this list has no videos' in text.lower() or 'watch history is empty' in text.lower() for text in message):
                             return finish([{'heading': 'Today', 'videos': []}])
                     # YouTube orders history newest first; older days remain eligible.
+                    rows = [video for section in sections for video in section['videos']]
+                    readable = sum(bool(str(video.get('title', '')).strip()) for video in rows)
+                    if rows and readable <= len(rows) * 0.1:
+                        raise HistoryError('YouTube 로그인은 확인됐지만 영상 제목을 읽지 못했습니다. 저장된 세션은 유지되며 쿠키 재전송은 필요하지 않습니다.')
                     if sections and normalize_sections(sections, channel):
                         return finish(sections)
                     count = sum(len(s['videos']) for s in sections)
@@ -281,7 +303,7 @@ def collect_history(browser_dir: Path, executable: str, *, cookies: list[dict] |
                     previous = count
                     page.evaluate('window.scrollTo(0, document.documentElement.scrollHeight)')
                     page.wait_for_timeout(1200)
-                raise HistoryError('최근 팟캐스트를 찾기 전에 기록 수집 한도에 도달했습니다. 다음 실행에서 재시도합니다.')
+                raise HistoryError('YouTube 로그인은 완료됐습니다. 시청 기록을 20회 검색했지만 조건에 맞는 팟캐스트를 찾지 못했습니다. 저장된 쿠키를 다시 보내지 않아도 됩니다.')
             finally:
                 context.close()
     except HistoryError:
@@ -346,15 +368,16 @@ def main(argv=None) -> int:
             path = args.data_dir / 'snapshot.json'
             snapshot = json.loads(path.read_text()) if path.exists() else {}
             print(json.dumps({'connected': is_connected(args.data_dir, args.browser_dir),
+                              'authenticated': is_authenticated(args.data_dir, args.browser_dir),
                               'session_saved': (args.data_dir / 'session.json').is_file(),
                               'browser_initialized': (args.browser_dir / 'Default' / 'Preferences').is_file(),
                               'date': snapshot.get('date'), 'synced_at': snapshot.get('synced_at'),
                               'video_count': len(snapshot.get('videos', []))}, ensure_ascii=False))
             return 0
-        if args.command == 'notify' and not is_connected(args.data_dir, args.browser_dir):
+        if args.command == 'notify' and not is_authenticated(args.data_dir, args.browser_dir):
             print('[SILENT]')
             return 0
-        if args.command == 'sync' and not is_connected(args.data_dir, args.browser_dir):
+        if args.command == 'sync' and not is_authenticated(args.data_dir, args.browser_dir):
             raise HistoryError('맥북에서 내보낸 쿠키로 connect --cookies-stdin을 먼저 실행해 주세요.')
         cookies = None
         if args.command == 'connect':
@@ -373,14 +396,14 @@ def main(argv=None) -> int:
                 raise HistoryError('YouTube 계정 연결 또는 기록 수집이 이미 진행 중입니다. 완료 후 재시도해 주세요.') from exc
             if args.command == 'connect':
                 (args.data_dir / 'connection.json').unlink(missing_ok=True)
+                (args.data_dir / 'authentication.json').unlink(missing_ok=True)
                 save_json(args.data_dir / 'session.json', {'version': 1, 'cookies': cookies})
             snapshot = refresh(args.data_dir, args.browser_dir, args.browser_executable,
                                channels, cookies=cookies)
-            if args.command == 'connect':
-                save_json(args.data_dir / 'connection.json', {
-                    'version': 1, 'verified_at': snapshot['synced_at'],
-                    'browser_dir': str(args.browser_dir.resolve()),
-                })
+            save_json(args.data_dir / 'connection.json', {
+                'version': 1, 'verified_at': snapshot['synced_at'],
+                'browser_dir': str(args.browser_dir.resolve()),
+            })
         if args.command == 'notify':
             print(render_digest(snapshot))
         else:
@@ -391,7 +414,7 @@ def main(argv=None) -> int:
         return 1
     except (OSError, ValueError, EOFError):
         # Raw Playwright/OS exceptions may contain page/account data or paths.
-        print('YouTube 시청 기록을 가져오지 못했습니다. 맥북에서 YouTube 쿠키를 다시 내보내고 connect --cookies-stdin으로 연결해 주세요.', file=sys.stderr)
+        print('YouTube 기록 처리 중 오류가 발생했습니다. 저장된 세션은 유지됩니다. 서버에서 connect --saved-cookies로 확인해 주세요.', file=sys.stderr)
         return 1
 
 
