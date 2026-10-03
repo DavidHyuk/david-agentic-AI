@@ -371,7 +371,7 @@ server TTFT·prefill/decode TPS, llama.cpp native timings와 실제 처리/캐�
 prompt 토큰 수도 기록합니다. `--server-metrics-url`은 단일 요청만 완료된
 차이를 귀속하고, 측정 실패와 채점 실패를 구분하며 exporter 조회 시간을 과제
 지연에서 제외합니다. prefix 캐시가 있으면 실제 새 KV 토큰 수를 우선 사용합니다.
-현재 관련 변경 후 `pytest -q`는 392개가 통과했습니다.
+현재 관련 변경 후 `pytest -q`는 398개가 통과했습니다.
 추가 KV 진단에서는 기존 19.92GiB 예산과 마지막 2.8% 사용률을 확인했고,
 KV 8GiB·prefix-off 설정에서도 40K를 통과했습니다. 온도 여유가 먼저 감소해
 작은 prefill 배치·CPU quota·열 제어를 적용한 별도 실행에서 55K와 요청별
@@ -591,12 +591,19 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   공식 API는 시청 기록을 제공하지 않으므로 계정 만료나 UI 변경 시 재연결이
   필요합니다. 최초 연결 전 `notify`는 브라우저를 열지 않고 `[SILENT]`입니다.
 - `install_youtube_history.sh`가 `~/.hermes/venvs/youtube-history/`에
-  Playwright를 설치하며 English installer가 호출합니다. SSH 연결과 18:00
+  Playwright와 맞는 headless shell을 설치하며 English installer가 호출합니다.
+  브라우저는 같은 venv의 `browsers/`에 설치해 Hermes HOME 변경 영향을 받지
+  않습니다. Snap Chromium에서는 YouTube `ERR_ACCESS_DENIED`가 재현되어
+  이 workflow의 기본 실행 파일을 교체했습니다. 공용 Hermes CDP는 그대로입니다. SSH 연결과 18:00
   cron은 그 환경의 절대 Python 경로를 사용해 Conda/시스템 Python 차이를
   피합니다. `ssh -o ClearAllForwardings=yes dgx`로 불필요한 기본 port
   forwarding 충돌 없이 쿠키를 전달합니다.
-- 인증 브라우저 디렉터리는 `~/snap/chromium/common/hermes-youtube-history/`,
-  private snapshot은 `~/.hermes/data/youtube-history/`입니다. 단발 브라우저
+- 인증 브라우저는 `~/.hermes/data/youtube-history/browser/`, private snapshot과
+  필터링된 `session.json`은 `~/.hermes/data/youtube-history/`입니다.
+  쿠키는 owner-only로 network 접속 전에 저장하고 성공 시 갱신합니다. 실패
+  후 `connect --saved-cookies`로 서버에서 재시도할 수 있으며, 연결 성공
+  marker는 실제 인증·기록 읽기가 확인된 뒤에만 씁니다. 오류는 고정된
+  실패 단계와 whitelist network code만 표시하며 쿠키나 페이지를 출력하지 않습니다. 단발 브라우저
   프로세스를 사용하므로 새 profile, gateway, bot, 상시 service가 없습니다.
 - 동일 영상은 중복 제거하고 다른 채널과 Shorts는 제외합니다. 시청 완료나
   시청 시간을 추정하지 않습니다. 오늘 기록이 없으면 `[SILENT]`; 오류가
@@ -604,7 +611,8 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
 - 아침 09:15 추천과 08:25 자동 대본 timer를 중단했습니다. 기존
   `english_podcast.py prepare`와 다운로드 대본은 요청 시 학습에 사용합니다.
 - Observatory의 기존 `Morning Echo`는 `english` 소유를 유지하며 일정,
-  현재·과거 세션, 실제 시청 링크와 날짜를 같은 podcast 방에서 확인합니다.
+  현재·과거 세션, 안전한 연결 상태, 실제 시청 링크와 날짜를 같은 podcast
+  방에서 확인합니다. 저장된 쿠키 내용은 Observatory에 제공하지 않습니다.
 
 ### 인터뷰 학습 코치 (interview_progress.py)
 - 기존 `interview-prep` 스킬 안에서 동작하며, `stage.py`가 standalone helper와

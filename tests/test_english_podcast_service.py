@@ -31,6 +31,8 @@ def test_watch_history_installer_and_cron_use_explicit_playwright_environment():
     assert '.hermes/venvs/youtube-history' in installer
     assert 'playwright>=1.55,<2' in installer
     assert 'from playwright.sync_api import sync_playwright' in installer
+    assert 'playwright install chromium --only-shell --no-remove' in installer
+    assert 'PLAYWRIGHT_BROWSERS_PATH' in installer
     assert 'install_youtube_history.sh' in english_installer
     assert '/home/david/.hermes/venvs/youtube-history/bin/python' in job['prompt']
     assert 'Run python3' not in job['prompt']

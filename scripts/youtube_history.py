@@ -24,7 +24,8 @@ from zoneinfo import ZoneInfo
 
 TZ = ZoneInfo('America/Los_Angeles')
 DEFAULT_DATA_DIR = Path('/home/david/.hermes/data/youtube-history')
-DEFAULT_BROWSER_DIR = Path('/home/david/snap/chromium/common/hermes-youtube-history')
+DEFAULT_BROWSER_DIR = DEFAULT_DATA_DIR / 'browser'
+DEFAULT_BROWSER_CACHE = Path('/home/david/.hermes/venvs/youtube-history/browsers')
 DEFAULT_CHANNEL = 'English Goal Podcast'
 HISTORY_URL = 'https://www.youtube.com/feed/history?hl=en&gl=US'
 
@@ -153,45 +154,110 @@ def is_connected(data_dir: Path, browser_dir: Path) -> bool:
             and (browser_dir / 'Default').is_dir())
 
 
-def collect_history(browser_dir: Path, executable: str, *, cookies: list[dict] | None = None) -> list[dict]:
+def load_saved_cookies(path: Path) -> list[dict]:
+    """Validate a private saved session without echoing any credential values."""
+    try:
+        document = json.loads(path.read_text())
+        if document.get('version') != 1 or not isinstance(document.get('cookies'), list):
+            raise ValueError('invalid session')
+        rows = ['# Netscape HTTP Cookie File']
+        for cookie in document['cookies']:
+            domain = cookie['domain']
+            prefix = '#HttpOnly_' if cookie.get('httpOnly') else ''
+            expires = cookie.get('expires', -1)
+            rows.append('\t'.join((prefix + domain,
+                                    'TRUE' if domain.startswith('.') else 'FALSE',
+                                    cookie['path'], 'TRUE' if cookie['secure'] else 'FALSE',
+                                    str(int(expires)) if expires > 0 else '0',
+                                    cookie['name'], cookie['value'])))
+        return parse_cookies('\n'.join(rows) + '\n')
+    except (OSError, ValueError, TypeError, KeyError, AttributeError) as exc:
+        raise HistoryError('저장된 YouTube 세션이 없거나 유효하지 않습니다. 맥북의 쿠키를 SSH로 다시 전달해 주세요.') from exc
+
+
+def describe_browser_error(stage: str, error: Exception) -> str:
+    """Expose only fixed stages and whitelisted network codes, never raw errors."""
+    stages = {'launch': '브라우저 실행', 'cookies': '쿠키 적용',
+              'navigate': 'YouTube 페이지 접속', 'bootstrap': 'YouTube 페이지 초기화',
+              'render': '시청 기록 표시', 'collect': '시청 기록 수집'}
+    label = stages.get(stage, '브라우저 처리')
+    allowed_codes = {'ERR_ACCESS_DENIED', 'ERR_NETWORK_ACCESS_DENIED',
+                     'ERR_CONNECTION_RESET', 'ERR_CONNECTION_REFUSED',
+                     'ERR_CONNECTION_CLOSED', 'ERR_TIMED_OUT',
+                     'ERR_NAME_NOT_RESOLVED', 'ERR_INTERNET_DISCONNECTED',
+                     'ERR_PROXY_CONNECTION_FAILED', 'ERR_TUNNEL_CONNECTION_FAILED',
+                     'ERR_CERT_AUTHORITY_INVALID', 'ERR_CERT_DATE_INVALID',
+                     'ERR_CERT_COMMON_NAME_INVALID', 'ERR_ABORTED',
+                     'ERR_HTTP2_PROTOCOL_ERROR'}
+    match = re.search(r'net::(ERR_[A-Z_]+)\b', str(error))
+    if match and match.group(1) in allowed_codes:
+        detail = match.group(1)
+    elif type(error).__name__ == 'TimeoutError':
+        detail = '시간 초과'
+    else:
+        detail = '브라우저 오류'
+    return f'{label} 실패 ({detail}). 이전 기록은 보존됩니다.'
+
+
+def collect_history(browser_dir: Path, executable: str, *, cookies: list[dict] | None = None,
+                    session_path: Path | None = None) -> list[dict]:
     try:
         from playwright.sync_api import sync_playwright, Error as PlaywrightError
     except ImportError as exc:
         raise HistoryError('Playwright가 없는 Python으로 실행됐습니다. /home/david/.hermes/venvs/youtube-history/bin/python으로 실행해 주세요.') from exc
     browser_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     browser_dir.chmod(0o700)
+    os.environ.setdefault('PLAYWRIGHT_BROWSERS_PATH', str(DEFAULT_BROWSER_CACHE))
+    stage = 'launch'
     try:
         with sync_playwright() as playwright:
             context = playwright.chromium.launch_persistent_context(
-                str(browser_dir), executable_path=executable, headless=True,
+                str(browser_dir), executable_path=executable or None, headless=True,
                 locale='en-US', timezone_id='America/Los_Angeles',
                 args=['--no-first-run', '--no-default-browser-check'],
                 ignore_default_args=['--enable-automation'],
             )
             try:
+                stage = 'cookies'
+                if cookies is None and session_path is not None and session_path.exists():
+                    existing = context.cookies('https://www.youtube.com')
+                    auth_names = {'SID', 'SAPISID', '__Secure-1PSID', '__Secure-3PSID'}
+                    if not any(c['name'] in auth_names for c in existing):
+                        cookies = load_saved_cookies(session_path)
                 if cookies is not None:
                     context.clear_cookies()
                     context.add_cookies(cookies)
                 page = context.pages[0] if context.pages else context.new_page()
-                page.goto(HISTORY_URL, wait_until='domcontentloaded', timeout=45_000)
+                stage = 'navigate'
+                response = page.goto(HISTORY_URL, wait_until='domcontentloaded', timeout=45_000)
+                if response is not None and response.status >= 400:
+                    raise HistoryError(f'YouTube 페이지 접속 실패 (HTTP {response.status}). 이전 기록은 보존됩니다.')
+                stage = 'bootstrap'
                 page.wait_for_function('() => window.ytInitialData && window.ytcfg', timeout=30_000)
                 logged_in = page.evaluate("() => window.ytcfg.get('LOGGED_IN') === true")
                 if not logged_in:
                     raise HistoryError('YouTube 로그인이 필요합니다. 맥북에서 쿠키를 다시 내보내고 SSH로 connect --cookies-stdin을 실행해 주세요.')
+                stage = 'render'
                 page.wait_for_selector('ytd-item-section-renderer, ytd-message-renderer', timeout=20_000)
+                stage = 'collect'
+                def finish(sections):
+                    if session_path is not None:
+                        refreshed = context.cookies('https://www.youtube.com')
+                        save_json(session_path, {'version': 1, 'cookies': refreshed})
+                    return sections
                 previous = None
                 for _ in range(20):
                     sections = page.evaluate(HISTORY_SCRIPT)
                     if not sections:
                         message = page.locator('ytd-message-renderer').all_text_contents()
                         if any('this list has no videos' in text.lower() or 'watch history is empty' in text.lower() for text in message):
-                            return [{'heading': 'Today', 'videos': []}]
+                            return finish([{'heading': 'Today', 'videos': []}])
                     today_count = sum(len(s['videos']) for s in sections if s['heading'].strip().lower() in ('today', '오늘'))
                     # Stop once the visible history reaches a prior day.
                     if any(s['heading'] and s['heading'].strip().lower() not in ('today', '오늘') for s in sections):
-                        return sections
+                        return finish(sections)
                     if previous == today_count:
-                        return sections
+                        return finish(sections)
                     previous = today_count
                     page.evaluate('window.scrollTo(0, document.documentElement.scrollHeight)')
                     page.wait_for_timeout(1200)
@@ -201,7 +267,7 @@ def collect_history(browser_dir: Path, executable: str, *, cookies: list[dict] |
     except HistoryError:
         raise
     except PlaywrightError as exc:
-        raise HistoryError('YouTube 기록을 읽지 못했습니다. 브라우저 연결/로그인을 확인해 주세요. 이전 기록은 보존됩니다.') from exc
+        raise HistoryError(describe_browser_error(stage, exc)) from exc
 
 
 def refresh(data_dir: Path, browser_dir: Path, executable: str, channel: str,
@@ -209,7 +275,7 @@ def refresh(data_dir: Path, browser_dir: Path, executable: str, channel: str,
     supplied_now = now is not None
     now = now or datetime.now(TZ)
     before = now.astimezone(TZ).date().isoformat()
-    sections = collector(browser_dir, executable, cookies=cookies)
+    sections = collector(browser_dir, executable, cookies=cookies, session_path=data_dir / 'session.json')
     after = datetime.now(TZ).date().isoformat() if not supplied_now else before
     if after != before:
         raise HistoryError('수집 도중 날짜가 바뀌었습니다. 다음 실행에서 재시도합니다.')
@@ -245,22 +311,25 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--data-dir', type=Path, default=Path(os.environ.get('YOUTUBE_HISTORY_DATA_DIR', str(DEFAULT_DATA_DIR))))
     parser.add_argument('--browser-dir', type=Path, default=Path(os.environ.get('YOUTUBE_HISTORY_BROWSER_DIR', str(DEFAULT_BROWSER_DIR))))
-    parser.add_argument('--browser-executable', default=os.environ.get('HERMES_CHROMIUM_EXECUTABLE', '/snap/bin/chromium'))
+    parser.add_argument('--browser-executable', default=os.environ.get('YOUTUBE_HISTORY_BROWSER_EXECUTABLE', ''),
+                        help='optional external browser; default is the installed Playwright headless shell')
     parser.add_argument('--channel', default=DEFAULT_CHANNEL)
     parser.add_argument('command', choices=['connect', 'sync', 'notify', 'status'])
     source = parser.add_mutually_exclusive_group()
     source.add_argument('--cookies-file', type=Path, help='private Netscape cookie export; no cookie values in arguments')
+    source.add_argument('--saved-cookies', action='store_true', help='retry connecting with the owner-only saved session')
     source.add_argument('--cookies-stdin', action='store_true', help='read a YouTube cookie export through an SSH stdin pipe')
     args = parser.parse_args(argv)
     try:
         if not channel_key(args.channel):
             raise HistoryError('대상 채널 이름이 필요합니다.')
-        if args.command != 'connect' and (args.cookies_file or args.cookies_stdin):
+        if args.command != 'connect' and (args.cookies_file or args.cookies_stdin or args.saved_cookies):
             raise HistoryError('쿠키 입력 옵션은 connect 명령에만 사용할 수 있습니다.')
         if args.command == 'status':
             path = args.data_dir / 'snapshot.json'
             snapshot = json.loads(path.read_text()) if path.exists() else {}
             print(json.dumps({'connected': is_connected(args.data_dir, args.browser_dir),
+                              'session_saved': (args.data_dir / 'session.json').is_file(),
                               'browser_initialized': (args.browser_dir / 'Default' / 'Preferences').is_file(),
                               'date': snapshot.get('date'), 'synced_at': snapshot.get('synced_at'),
                               'video_count': len(snapshot.get('videos', []))}, ensure_ascii=False))
@@ -272,10 +341,13 @@ def main(argv=None) -> int:
             raise HistoryError('맥북에서 내보낸 쿠키로 connect --cookies-stdin을 먼저 실행해 주세요.')
         cookies = None
         if args.command == 'connect':
-            if not (args.cookies_file or args.cookies_stdin):
+            if not (args.cookies_file or args.cookies_stdin or args.saved_cookies):
                 raise HistoryError('서버 GUI는 필요 없습니다. connect --cookies-stdin 또는 --cookies-file로 맥북의 YouTube 쿠키를 전달해 주세요.')
-            text = args.cookies_file.read_text() if args.cookies_file else sys.stdin.read(5_000_001)
-            cookies = parse_cookies(text)
+            if args.saved_cookies:
+                cookies = load_saved_cookies(args.data_dir / 'session.json')
+            else:
+                text = args.cookies_file.read_text() if args.cookies_file else sys.stdin.read(5_000_001)
+                cookies = parse_cookies(text)
         args.data_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
         with (args.data_dir / '.lock').open('w') as lock:
             try:
@@ -284,6 +356,7 @@ def main(argv=None) -> int:
                 raise HistoryError('YouTube 계정 연결 또는 기록 수집이 이미 진행 중입니다. 완료 후 재시도해 주세요.') from exc
             if args.command == 'connect':
                 (args.data_dir / 'connection.json').unlink(missing_ok=True)
+                save_json(args.data_dir / 'session.json', {'version': 1, 'cookies': cookies})
             snapshot = refresh(args.data_dir, args.browser_dir, args.browser_executable,
                                args.channel, cookies=cookies)
             if args.command == 'connect':

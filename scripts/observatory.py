@@ -329,6 +329,7 @@ class Observatory:
             data['watch_history'] = {
                 'connected': connection.get('version') == 1 and bool(connection.get('verified_at')),
                 'connection_verified_at': connection.get('verified_at'),
+                'session_saved': (self.home / 'data/youtube-history/session.json').is_file(),
                 'date': history.get('date'),
                 'synced_at': history.get('synced_at'),
                 'channel_filter': history.get('channel_filter'),

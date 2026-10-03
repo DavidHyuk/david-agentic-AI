@@ -3,6 +3,30 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.27.3 — 2026-10-03 (patch: repair YouTube navigation and retain private retry sessions)
+
+- Reproduced the failed import’s browser-stage problem: Snap Chromium returned
+  `net::ERR_ACCESS_DENIED` for YouTube while another HTTPS site loaded. The
+  corresponding Playwright headless shell loaded YouTube history with HTTP 200
+  and reached its login check. Use that supported browser for this workflow;
+  do not change the shared CDP service or host security policy.
+- Extend the dedicated installer to install the matching headless shell at a
+  fixed venv cache path, independent of Hermes profile HOME changes. Move the
+  podcast-only browser data into `data/youtube-history/browser/`.
+- Save filtered imported cookies owner-only before browser/network access,
+  retain them through failure, restore session-only cookies when necessary,
+  and refresh the saved jar after successful reads. Add `connect --saved-cookies`
+  for server-side retries; mark connection verified only after real authenticated
+  history collection. Earlier attempts left zero retained cookies, so a fresh
+  SSH transfer is still required for the initial verified connection.
+- Replace the blanket browser error with fixed failure stages and whitelisted
+  network codes. Raw exceptions, account/page dumps and cookie values stay out
+  of output. The existing podcast Observatory room shows only safe connection
+  and session-presence metadata; no new room, profile, bot or service is needed.
+- Updated usage, skill, installer, workbench and overview. `pytest -q`: 398 passed.
+  Live public-page navigation and login-check reachability were verified with
+  the actual collector; authenticated history remains pending the user’s session.
+
 ## v1.27.2 — 2026-10-03 (patch: use one Playwright Python for SSH and scheduled history)
 
 - Diagnosed the failed MacBook import: cookie export succeeded, but noninteractive

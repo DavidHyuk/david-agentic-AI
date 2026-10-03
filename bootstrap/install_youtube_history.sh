@@ -25,5 +25,7 @@ else
   "$YOUTUBE_HISTORY_RUNTIME_PYTHON" -m pip install 'playwright>=1.55,<2'
 fi
 
-# Chromium is already provided by /snap/bin/chromium; no browser download needed.
-"$YOUTUBE_HISTORY_RUNTIME_PYTHON" -c 'from playwright.sync_api import sync_playwright; print("YouTube history Python runtime ready.")'
+# Install a matching headless browser in a stable path, even when Hermes changes HOME.
+PLAYWRIGHT_BROWSERS_PATH="$YOUTUBE_HISTORY_RUNTIME_DIR/browsers" \
+  "$YOUTUBE_HISTORY_RUNTIME_PYTHON" -m playwright install chromium --only-shell --no-remove
+"$YOUTUBE_HISTORY_RUNTIME_PYTHON" -c 'from playwright.sync_api import sync_playwright; print("YouTube history Python and browser runtime ready.")'

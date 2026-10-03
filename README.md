@@ -873,8 +873,11 @@ The English installer provisions Playwright in the explicit server environment
 `~/.hermes/venvs/youtube-history/`. For a manual or existing deployment, run
 `bash bootstrap/install_youtube_history.sh` on the DGX once. SSH imports and the
 18:00 cron both use this environment's absolute Python path; interactive Conda
-and SSH/system `python3` can have different installed packages. Existing Snap
-Chromium is reused, with no additional browser download. The SSH command below
+and SSH/system `python3` can have different installed packages. The installer also
+downloads the [matching Playwright headless shell](https://playwright.dev/python/docs/browsers#chromium-headless-shell)
+into the environment’s `browsers/` directory. This fixed cache works even when
+Hermes changes HOME. Snap Chromium on this host returned `ERR_ACCESS_DENIED` for
+YouTube; the shared Hermes CDP browser is retained for its separate workflows. The SSH command below
 uses `ClearAllForwardings=yes` to bypass unrelated default forwarding (such as
 an already occupied local port 8501) while importing cookies.
 
@@ -901,10 +904,22 @@ other sites' sessions or prints cookie values. Send the file via SSH stdin, neve
 through chat or Telegram. Export/import again if the login expires. Once import
 succeeds, the local export file can be deleted.
 
-The server verifies authenticated history access before marking the connection
-ready. Login stays in the owner-only browser directory
-`~/snap/chromium/common/hermes-youtube-history/`; each collection starts a
-short-lived headless browser process under a lock. Other channels and Shorts are
+The server saves the filtered session owner-only at
+`~/.hermes/data/youtube-history/session.json` before attempting network access.
+It verifies authenticated history access before marking the connection ready;
+file presence alone is not proof of login. If a network or rendering failure
+occurs, retry from the server using the saved session:
+
+```bash
+~/.hermes/venvs/youtube-history/bin/python ~/.hermes/profiles/english/scripts/youtube_history.py connect --saved-cookies
+```
+
+Login also stays in the owner-only browser directory
+`~/.hermes/data/youtube-history/browser/`; each collection starts a short-lived
+headless browser process under a lock. Saved session-only cookies restore login
+when Chromium does not retain them after exit; refreshed cookies are saved after
+a successful read. Errors report a fixed failure stage and safe network code,
+never a raw browser exception, cookie value, or page dump. Other channels and Shorts are
 excluded; a history entry does not prove a completed listen or viewing duration.
 
 ```bash
@@ -919,7 +934,8 @@ tutor SRS deck and transcript assignments. Before account connection, `notify`
 returns `[SILENT]` without launching Chromium or sending daily setup errors.
 No watched episode today also produces `[SILENT]`; a login, layout, or network error preserves the prior snapshot and
 reports the connection error without sending stale links. Observatory's existing
-podcast room displays source date, last successful collection, and watched links;
+podcast room displays safe session/connection status, source date, last
+successful collection, and watched links;
 previous-day records are visibly labeled. No live account verification is claimed
 until `connect`/`sync` succeeds.
 

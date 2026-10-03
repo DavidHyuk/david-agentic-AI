@@ -148,5 +148,49 @@ def test_failed_reconnection_clears_verified_marker_and_preserves_snapshot(tmp_p
     assert yh.main(['--data-dir', str(tmp_path), '--browser-dir', str(browser_dir),
                     'connect', '--cookies-stdin']) == 1
     assert not yh.is_connected(tmp_path, browser_dir)
+    assert (tmp_path / 'session.json').stat().st_mode & 0o777 == 0o600
+    assert yh.load_saved_cookies(tmp_path / 'session.json')[0]['name'] == 'SID'
     assert json.loads((tmp_path / 'snapshot.json').read_text())['date'] == '2026-10-02'
     assert 'private-session' not in str(capsys.readouterr())
+
+
+@pytest.mark.parametrize('stage, error, expected', [
+    ('navigate', RuntimeError('net::ERR_ACCESS_DENIED secret-session-value'), 'YouTube 페이지 접속 실패 (ERR_ACCESS_DENIED)'),
+    ('cookies', RuntimeError('Invalid cookie secret-session-value'), '쿠키 적용 실패 (브라우저 오류)'),
+    ('bootstrap', TimeoutError('secret-session-value'), 'YouTube 페이지 초기화 실패 (시간 초과)'),
+    ('secret-session-value', RuntimeError('net::ERR_SECRET_SESSION_VALUE'), '브라우저 처리 실패 (브라우저 오류)'),
+])
+def test_browser_diagnostics_show_only_safe_stage_and_known_codes(stage, error, expected):
+    message = yh.describe_browser_error(stage, error)
+    assert message.startswith(expected)
+    assert 'secret-session-value' not in message
+    assert 'ERR_SECRET_SESSION_VALUE' not in message
+
+
+def test_saved_cookie_retry_needs_no_stdin(tmp_path, monkeypatch, capsys):
+    browser_dir = tmp_path / 'browser'
+    (browser_dir / 'Default').mkdir(parents=True)
+    cookies = yh.parse_cookies(cookies_text('.youtube.com\tTRUE\t/\tTRUE\t0\tSID\tprivate-session'))
+    yh.save_json(tmp_path / 'session.json', {'version': 1, 'cookies': cookies})
+    def refreshed(*args, **kwargs):
+        assert kwargs['cookies'][0]['value'] == 'private-session'
+        return {'synced_at': '2026-10-03T18:00:00-07:00', 'videos': []}
+    class NoRead:
+        def read(self, *args):
+            pytest.fail('Saved-session retry must not read stdin.')
+    monkeypatch.setattr(yh.sys, 'stdin', NoRead())
+    monkeypatch.setattr(yh, 'refresh', refreshed)
+    assert yh.main(['--data-dir', str(tmp_path), '--browser-dir', str(browser_dir),
+                    'connect', '--saved-cookies']) == 0
+    assert yh.is_connected(tmp_path, browser_dir)
+    assert 'private-session' not in capsys.readouterr().out
+
+
+def test_expired_saved_session_reports_safe_reconnect_error(tmp_path):
+    yh.save_json(tmp_path / 'session.json', {'version': 1, 'cookies': [{
+        'domain': '.youtube.com', 'path': '/', 'secure': True, 'expires': 1,
+        'name': 'SID', 'value': 'expired-private-value',
+    }]})
+    with pytest.raises(yh.HistoryError) as error:
+        yh.load_saved_cookies(tmp_path / 'session.json')
+    assert 'expired-private-value' not in str(error.value)
