@@ -1,5 +1,5 @@
 # __author__ = 'David Choi (bestshoot21@gmail.com)'
-"""Check dated watch-history selection and failure-safe evening delivery."""
+"""Check latest watched-podcast selection and failure-safe evening delivery."""
 from datetime import datetime
 import json
 
@@ -12,7 +12,7 @@ def video(video_id='abcdefghijk', channel='English Goal Podcast', **changes):
             'url': 'https://www.youtube.com/watch?v=' + video_id, **changes}
 
 
-def test_only_today_exact_channel_canonical_deduplicated_links():
+def test_latest_exact_channel_canonical_link_wins_over_older_matches():
     rows = [{'heading': 'Today', 'videos': [video(), video(), video('bbbbbbbbbbb', 'Other Podcast'),
                                            video('ccccccccccc', url='https://evil.example/watch?v=ccccccccccc'),
                                            video('invalid')]},
@@ -22,9 +22,64 @@ def test_only_today_exact_channel_canonical_deduplicated_links():
     assert result[0]['url'] == 'https://www.youtube.com/watch?v=abcdefghijk'
 
 
-def test_yesterday_only_is_not_sent_as_today():
-    assert yh.normalize_sections([{'heading': 'Yesterday', 'videos': [video()]}], yh.DEFAULT_CHANNEL) == []
+def test_yesterday_match_is_eligible_and_not_claimed_as_watched_today():
+    videos = yh.normalize_sections([{'heading': 'Yesterday', 'videos': [video()]}], yh.DEFAULT_CHANNEL)
+    assert len(videos) == 1
+    assert videos[0]['history_heading'] == 'Yesterday'
+    digest = yh.render_digest({'date': '2026-10-03', 'videos': videos}, today='2026-10-03')
+    assert '가장 최근에 본' in digest
+    assert '오늘 본' not in digest
     assert yh.render_digest({'date': '2026-10-03', 'videos': []}, today='2026-10-03') == '[SILENT]'
+
+
+def test_skip_other_channels_and_invalid_links_to_find_latest_older_match():
+    rows = [{'heading': 'Today', 'videos': [video(channel='Other Podcast'),
+            video(url='https://www.youtube.com/shorts/abcdefghijk'), video(title='')]},
+            {'heading': 'September 30, 2026', 'videos': [video('bbbbbbbbbbb'), video('ccccccccccc')]}]
+    assert [item['video_id'] for item in yh.normalize_sections(rows, yh.DEFAULT_CHANNEL)] == ['bbbbbbbbbbb']
+
+
+def test_browser_search_continues_into_older_days_with_requested_channel(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    import sys
+
+    pages = [
+        [{'heading': 'Today', 'videos': [video()]}],
+        [{'heading': 'Today', 'videos': [video()]},
+         {'heading': 'Yesterday', 'videos': [video('bbbbbbbbbbb')]}],
+        [{'heading': 'Today', 'videos': [video()]},
+         {'heading': 'Yesterday', 'videos': [video('bbbbbbbbbbb')]},
+         {'heading': 'September 30, 2026', 'videos': [video('ccccccccccc', 'Requested Podcast')]}],
+    ]
+    class Page:
+        index = 0
+        def goto(self, *args, **kwargs):
+            return SimpleNamespace(status=200)
+        def wait_for_function(self, *args, **kwargs):
+            pass
+        def wait_for_selector(self, *args, **kwargs):
+            pass
+        def wait_for_timeout(self, *args):
+            pass
+        def evaluate(self, script):
+            if script == yh.HISTORY_SCRIPT:
+                return pages[self.index]
+            if 'LOGGED_IN' in script:
+                return True
+            self.index += 1
+    page = Page()
+    context = SimpleNamespace(pages=[page], close=lambda: None)
+    class Playwright:
+        chromium = SimpleNamespace(launch_persistent_context=lambda *a, **kw: context)
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            pass
+    monkeypatch.setitem(sys.modules, 'playwright.sync_api', SimpleNamespace(
+        sync_playwright=Playwright, Error=RuntimeError))
+    sections = yh.collect_history(tmp_path / 'browser', '', channel='Requested Podcast')
+    assert page.index == 2
+    assert yh.normalize_sections(sections, 'Requested Podcast')[0]['video_id'] == 'ccccccccccc'
 
 
 @pytest.mark.parametrize('sections', [[], [{'heading': 'Unexpected heading', 'videos': [video()]}]])
@@ -52,7 +107,8 @@ def test_refresh_dates_snapshot_and_writes_private_data(tmp_path):
     digest = yh.render_digest(snapshot, today='2026-10-03')
     assert 'https://www.youtube.com/watch?v=abcdefghijk' in digest
     assert 'A real watched episode' in digest
-    assert '끝까지 시청' in digest
+    assert snapshot['selection'] == 'latest'
+    assert '가장 최근에 본' in digest
 
 
 def test_stale_digest_rejected_and_long_message_bounded():
@@ -61,7 +117,7 @@ def test_stale_digest_rejected_and_long_message_bounded():
     digest = yh.render_digest({'date': '2026-10-03', 'videos': [
         {'title': 'a' * 160, 'url': 'https://www.youtube.com/watch?v=abcdefghijk'} for _ in range(100)]}, today='2026-10-03')
     assert len(digest) < 4000
-    assert '총 100편 중 최근' in digest
+    assert digest.count('https://www.youtube.com/watch?v=abcdefghijk') == 1
 
 
 def test_notify_failure_never_reads_previous_snapshot(tmp_path, monkeypatch, capsys):
@@ -194,3 +250,26 @@ def test_expired_saved_session_reports_safe_reconnect_error(tmp_path):
     with pytest.raises(yh.HistoryError) as error:
         yh.load_saved_cookies(tmp_path / 'session.json')
     assert 'expired-private-value' not in str(error.value)
+
+
+@pytest.mark.parametrize('unix_time', [1800000000, 2000000000])
+def test_chromium_expiry_is_converted_before_cookie_application(unix_time):
+    chromium_time = (unix_time + 11644473600) * 1000000 + 123456
+    text = cookies_text(f'.youtube.com\tTRUE\t/\tTRUE\t{chromium_time}\tSID\tprivate-session')
+    assert yh.parse_cookies(text, now=1700000000)[0]['expires'] == unix_time
+
+
+def test_expired_chromium_timestamp_is_not_treated_as_live():
+    chromium_time = (1000 + 11644473600) * 1000000
+    text = cookies_text(f'.youtube.com\tTRUE\t/\tTRUE\t{chromium_time}\tSID\tprivate-session')
+    with pytest.raises(yh.HistoryError):
+        yh.parse_cookies(text, now=1700000000)
+
+
+def test_saved_native_chromium_expiry_is_normalized(tmp_path):
+    yh.save_json(tmp_path / 'session.json', {'version': 1, 'cookies': [{
+        'domain': '.youtube.com', 'path': '/', 'secure': True,
+        'expires': (2000000000 + 11644473600) * 1000000,
+        'name': 'SID', 'value': 'private-session',
+    }]})
+    assert yh.load_saved_cookies(tmp_path / 'session.json')[0]['expires'] == 2000000000

@@ -38,7 +38,7 @@ ROOMS = [
     ('coding', 'LeetCode Gym', '코딩 훈련', '⌨', '#efc783'),
     ('design', 'Design Studio', '시스템 디자인', '🏗', '#9bcad8'),
     ('english', 'English Lab', '영어 코칭 · SRS', '💬', '#e7b3c7'),
-    ('podcast', 'Morning Echo', '오늘 본 팟캐스트 · 18시 기록', '🎧', '#f0b6a8'),
+    ('podcast', 'Morning Echo', '최근 본 팟캐스트 · 18시 링크', '🎧', '#f0b6a8'),
     ('hq', 'Hermes HQ', '대화 · 통합 리뷰', '✦', '#c4ccaa'),
 ]
 JOB_ROOMS = {'papers-digest': 'papers', 'interview-prep': 'interview',
@@ -333,6 +333,7 @@ class Observatory:
                 'date': history.get('date'),
                 'synced_at': history.get('synced_at'),
                 'channel_filter': history.get('channel_filter'),
+                'selection': history.get('selection'),
                 'videos': history.get('videos', []),
                 'is_today': history.get('date') == today,
             }
@@ -1026,7 +1027,7 @@ class Observatory:
                        'detail': design.get('item_id', '다음 과제 준비') if design else '다음 과제 준비'},
             'english': {'title': '영어 복습',
                         'detail': f'오늘 복습 {due}개' if due else '새 표현 한 문장'},
-            'podcast': {'title': '오늘 본 팟캐스트',
+            'podcast': {'title': '최근 본 팟캐스트',
                         'detail': f'시청 기록 {len(watched)}편' if history.get('date') == today else '18:00 시청 기록 확인'},
         }
 

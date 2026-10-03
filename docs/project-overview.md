@@ -203,7 +203,7 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 | `papers-digest` | research | 새 논문 카탈로그에서 LLM/LVM 후보를 뽑아 인터뷰 관련성과 항목별 원문 링크 제공 |
 | `interview-prep` | career | 월/수/금 Staff MLE 드릴 + 화/목/토 NeetCode/LeetCode 입문 코딩 + 일요일 적응형 General/ML/Agent 설계 인터뷰 |
 | `english-practice` | English profile / learning | 레슨 녹음/교정 파일 → SRS 카드 생성 + 전용 Telegram bot 매일 리뷰 |
-| `english-podcast-coach` | English profile / learning | 오늘 YouTube에서 본 English Goal Podcast 링크 → 같은 bot의 18:00 기록 |
+| `english-podcast-coach` | English profile / learning | YouTube 시청 기록의 가장 최근 English Goal Podcast 한 편 → 같은 bot의 18:00 기록 |
 | `calendar-assistant` | productivity | **비활성/보존** — 추후 Google Calendar 브리핑 |
 
 새 agent형 기능은 audience·credential·privacy·identity/memory·model/tool
@@ -248,7 +248,7 @@ Calendar 연동을 재개할 때까지 `morning-brief`는 등록하지 않습니
 | `coding-coach` | 12:10 화/목/토 | 전용 LeetCode 그룹: 같은 패턴 6문제 블록의 다음 35분 문제 |
 | `leetcode-history-sync` | 매일 06:35 | 전송 없음: 연결된 LeetCode 세션의 읽기 전용 풀이 이력 snapshot 갱신 |
 | `system-design-coach` | 12:15 일요일 | 전용 System Design 그룹: 주 1회 45분 General/ML/Agent 인터뷰 |
-| `english-podcast-daily` | 18:00 매일 | 기존 English bot의 `🎧 Morning Echo` 전용 그룹: 오늘 실제 본 English Goal Podcast 링크 |
+| `english-podcast-daily` | 18:00 매일 | 기존 English bot의 `🎧 Morning Echo` 전용 그룹: 가장 최근에 본 English Goal Podcast 한 편 |
 | `english-intake` | 월–토 20:05 | English bot: 새 피드백 분석 또는 취약 패턴 코칭 |
 | `english-drill` | 21:10 매일 | English bot: SRS 드릴 전달 |
 | `english-weekly-review` | 일요일 20:15 | English bot: tutor feedback + 취약 SRS 누적 복습 |
@@ -371,7 +371,7 @@ server TTFT·prefill/decode TPS, llama.cpp native timings와 실제 처리/캐�
 prompt 토큰 수도 기록합니다. `--server-metrics-url`은 단일 요청만 완료된
 차이를 귀속하고, 측정 실패와 채점 실패를 구분하며 exporter 조회 시간을 과제
 지연에서 제외합니다. prefix 캐시가 있으면 실제 새 KV 토큰 수를 우선 사용합니다.
-현재 관련 변경 후 `pytest -q`는 398개가 통과했습니다.
+현재 관련 변경 후 `pytest -q`는 405개가 통과했습니다.
 추가 KV 진단에서는 기존 19.92GiB 예산과 마지막 2.8% 사용률을 확인했고,
 KV 8GiB·prefix-off 설정에서도 40K를 통과했습니다. 온도 여유가 먼저 감소해
 작은 prefill 배치·CPU quota·열 제어를 적용한 별도 실행에서 55K와 요청별
@@ -588,6 +588,8 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   내보낸 뒤, SSH stdin으로 `youtube_history.py connect --cookies-stdin`에
   전달합니다. 서버는 headless Chromium에서 로그인과 기록 읽기를 검증합니다.
   쿠키 값은 명령 인자·채팅·로그에 남기지 않으며 unrelated domain은 제외합니다.
+  Chrome 내부 만료 시간을 Unix seconds로 바꿔 내보내며, 서버도 이전 export를
+  호환 처리합니다. 쿠키 적용과 실제 로그인 검증은 독립적으로 확인합니다.
   공식 API는 시청 기록을 제공하지 않으므로 계정 만료나 UI 변경 시 재연결이
   필요합니다. 최초 연결 전 `notify`는 브라우저를 열지 않고 `[SILENT]`입니다.
 - `install_youtube_history.sh`가 `~/.hermes/venvs/youtube-history/`에
@@ -605,9 +607,11 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   marker는 실제 인증·기록 읽기가 확인된 뒤에만 씁니다. 오류는 고정된
   실패 단계와 whitelist network code만 표시하며 쿠키나 페이지를 출력하지 않습니다. 단발 브라우저
   프로세스를 사용하므로 새 profile, gateway, bot, 상시 service가 없습니다.
-- 동일 영상은 중복 제거하고 다른 채널과 Shorts는 제외합니다. 시청 완료나
-  시청 시간을 추정하지 않습니다. 오늘 기록이 없으면 `[SILENT]`; 오류가
-  나면 이전 snapshot을 보존하고 과거 링크를 오늘 기록으로 전달하지 않습니다.
+- 시청 기록 최신순으로 과거 날짜까지 검색해 해당 채널의 한 편을 선택하며, 다른 채널과 Shorts는 제외합니다. 시청 완료나
+  시청 시간을 추정하지 않습니다. 수집 기록에 해당 영상이 없으면 `[SILENT]`; 최대
+  20회 스크롤 내에서 못 찾으면 오류를 보고합니다. 오류 시 이전 snapshot을
+  보존하며 전달하지 않습니다. 매일 가장 최근 링크를 보내므로 전날과 같을
+  수 있습니다. snapshot 날짜는 시청 날짜가 아니라 수집 날짜입니다.
 - 아침 09:15 추천과 08:25 자동 대본 timer를 중단했습니다. 기존
   `english_podcast.py prepare`와 다운로드 대본은 요청 시 학습에 사용합니다.
 - Observatory의 기존 `Morning Echo`는 `english` 소유를 유지하며 일정,

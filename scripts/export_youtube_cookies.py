@@ -9,6 +9,7 @@ cookie file; no values are logged. Chrome is the default; Firefox is supported.
 from __future__ import annotations
 
 import argparse
+from copy import copy
 from http.cookiejar import MozillaCookieJar
 import os
 from pathlib import Path
@@ -24,6 +25,17 @@ class QuietLogger:
     info = warning = error = debug
 
 
+
+def normalize_cookie_expiry(value: int) -> int:
+    """Convert Chromium's 1601-epoch microseconds to Unix seconds when present."""
+    value = int(value)
+    if value >= 11644473600000000:
+        value = value // 1000000 - 11644473600
+    if value > 253402300799 or value < -1:
+        raise ValueError('Unsupported cookie expiry format.')
+    return value
+
+
 def save_youtube_cookies(cookies, target: Path) -> int:
     """Atomically save live YouTube cookies, excluding every unrelated domain."""
     target = target.expanduser()
@@ -35,8 +47,13 @@ def save_youtube_cookies(cookies, target: Path) -> int:
         jar = MozillaCookieJar(str(temporary))
         for cookie in cookies:
             host = cookie.domain.lstrip('.').lower()
-            if (host == 'youtube.com' or host.endswith('.youtube.com')) and not cookie.is_expired():
-                jar.set_cookie(cookie)
+            if host != 'youtube.com' and not host.endswith('.youtube.com'):
+                continue
+            normalized = copy(cookie)
+            if normalized.expires is not None:
+                normalized.expires = normalize_cookie_expiry(normalized.expires)
+            if not normalized.is_expired():
+                jar.set_cookie(normalized)
         if not any(c.name in {'SID', 'SAPISID', '__Secure-1PSID', '__Secure-3PSID'} for c in jar):
             raise ValueError('No signed-in YouTube cookies found.')
         jar.save(ignore_discard=True, ignore_expires=False)

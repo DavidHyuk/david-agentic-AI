@@ -3,6 +3,45 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.27.5 — 2026-10-03 (patch: deliver the most recently watched podcast across days)
+
+- Follow David's clarified evening preference: search YouTube history in newest
+  first order for the exact English Goal Podcast channel and send one latest
+  title/link, including previous days. Scroll past unrelated recent videos
+  rather than stopping at yesterday; honor a configured channel while collecting.
+  Search remains bounded at 20 scrolls and reports an error if exhausted.
+- Refresh the source each evening at 18:00 America/Los_Angeles; the same latest
+  match can be sent on consecutive days. Label the message as the most recently
+  watched podcast rather than today's viewing. Keep the snapshot date as the
+  collection date and retain the source section heading for context.
+- Update the existing podcast Observatory room, workbench wording, cron prompt,
+  skill and usage docs. Reuse its English profile, Telegram bot, dedicated group
+  and history routing; no new workflow room or service is needed.
+- Regression checks cover yesterday/older matches, unrelated channels, Shorts,
+  invalid rows, newest-first selection, browser pagination across days with a
+  configured channel, and exactly one rendered link. `pytest -q`: 405 passed.
+  Account verification still requires a fresh MacBook export after local login.
+
+## v1.27.4 — 2026-10-03 (patch: normalize Chromium cookie expiry before browser application)
+
+- Diagnosed the saved MacBook payload without printing cookie values: its
+  expiration fields used Chromium microseconds since 1601, which Playwright
+  rejected. Convert that format to Unix seconds in both the standalone laptop
+  exporter and server parser; normalize before expiry filtering and reject
+  unsupported dates. Keep valid Unix timestamps and session cookies unchanged.
+- The importer also normalizes previously saved payloads, enabling autonomous
+  server retries without retransferring data just for format repair. Exporter
+  normalization copies cookie records rather than altering its input jar.
+- Verified all 23 saved cookies could be applied after conversion and an
+  authenticated-cookie header was sent to YouTube. The existing session still
+  received a signed-out response, so do not mark it connected or fabricate
+  history; a currently signed-in matching MacBook profile/session is required.
+- Added regression coverage for live/expired Chromium timestamps, saved older
+  payloads, exporter/importer round trips and preservation of the input jar.
+  `pytest -q`: 403 passed. Updated README, skill and current overview. The fix
+  remains inside the existing English profile/bot and podcast Observatory room;
+  no new user-visible agent or runtime service is introduced.
+
 ## v1.27.3 — 2026-10-03 (patch: repair YouTube navigation and retain private retry sessions)
 
 - Reproduced the failed import’s browser-stage problem: Snap Chromium returned

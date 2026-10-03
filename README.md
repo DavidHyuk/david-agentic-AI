@@ -70,7 +70,7 @@ Local DGX Spark (llama.cpp @ :8003, Qwen3.8 Flash-Next IQ4_XS, 2 × 64K slots)
 | `bootstrap/stage_english_profile.py` | Stage only the isolated English-coaching Hermes profile |
 | `bootstrap/install_english_bot.sh` | Create/stage the English profile, install its gateway, and sync cron jobs |
 | `scripts/english_podcast.py` | On-request channel transcript preparation |
-| `scripts/youtube_history.py` | Import cookies over SSH and send today’s watched podcast links headlessly |
+| `scripts/youtube_history.py` | Import cookies over SSH and send the latest watched podcast link headlessly |
 | `scripts/export_youtube_cookies.py` | Export YouTube-only cookies on the MacBook for server connection |
 | `scripts/papers_ingest.py` | Fetch and merge arXiv/Hugging Face paper metadata |
 | `scripts/papers_digest.py` | Read-only recommended/recent/trending paper digest |
@@ -612,7 +612,7 @@ coding, and system-design progress.
 | `interview-prep` | 12:05 Mon/Wed/Fri | Interview group: one focused Staff/Senior MLE drill |
 | `coding-coach` | 12:10 Tue/Thu/Sat | LeetCode group: 35-minute beginner problem with canonical links |
 | `system-design-coach` | 12:15 Sunday | System-design group: one adaptive 45-minute interview |
-| `english-podcast-daily` | 18:00 daily | `🎧 Morning Echo` group on the existing English bot: actual watched English Goal Podcast links |
+| `english-podcast-daily` | 18:00 daily | `🎧 Morning Echo` group on the existing English bot: latest watched English Goal Podcast link |
 | `english-intake` | 20:05 Mon–Sat | Dedicated English bot: feedback analysis or weakness coaching |
 | `english-drill` | 21:10 daily | Dedicated English bot: tonight's spaced-repetition drill |
 | `english-weekly-review` | 20:15 Sunday | Dedicated English bot: tutor feedback + weak SRS cumulative review |
@@ -855,8 +855,9 @@ changes.
 ### Evening YouTube watch-history links
 
 David selects videos himself in the YouTube app. At **18:00 America/Los_Angeles**,
-`english-podcast-daily` runs `youtube_history.py notify` and sends today's actual
-**English Goal Podcast** channel titles and links. It uses the existing English
+`english-podcast-daily` runs `youtube_history.py notify` and sends the **single most recently watched
+English Goal Podcast** channel video, including yesterday or older days. It
+refreshes history each evening and sends the latest match even if unchanged. It uses the existing English
 profile/bot and the dedicated `🎧 Morning Echo` group selected by the validated
 `ENGLISH_PODCAST_TELEGRAM_CHAT_ID`. No new Hermes profile, bot, or service is added.
 The previous 09:15 recommendation and automatic 08:25 transcript prefetch are
@@ -899,7 +900,8 @@ If macOS asks for Chrome Keychain access, approve it for this local export. Use
 `--browser firefox`, `edge`, or `brave` if that is where the matching account is
 signed in; `--profile` selects a non-default browser profile. Extraction depends
 on browser access and cookie decryption support. The helper exports **only live
-YouTube-domain cookies**, atomically with permissions `0600`; it never saves
+YouTube-domain cookies**, converting native Chromium expiration timestamps to
+Unix seconds before checking validity and saving atomically with permissions `0600`; it never saves
 other sites' sessions or prints cookie values. Send the file via SSH stdin, never
 through chat or Telegram. Export/import again if the login expires. Once import
 succeeds, the local export file can be deleted.
@@ -919,7 +921,12 @@ Login also stays in the owner-only browser directory
 headless browser process under a lock. Saved session-only cookies restore login
 when Chromium does not retain them after exit; refreshed cookies are saved after
 a successful read. Errors report a fixed failure stage and safe network code,
-never a raw browser exception, cookie value, or page dump. Other channels and Shorts are
+never a raw browser exception, cookie value, or page dump. The server also
+accepts earlier exports containing native Chromium expiration timestamps, so
+those files can be retried without a new export solely for format conversion.
+If browser application succeeds but YouTube reports signed out, confirm the
+MacBook’s matching Chrome profile is signed in and export a fresh session;
+cookie presence or a future expiration alone does not establish authentication. Other channels and Shorts are
 excluded; a history entry does not prove a completed listen or viewing duration.
 
 ```bash
@@ -932,11 +939,13 @@ hermes -p english cron list
 Private snapshots live in `~/.hermes/data/youtube-history/`, separately from the
 tutor SRS deck and transcript assignments. Before account connection, `notify`
 returns `[SILENT]` without launching Chromium or sending daily setup errors.
-No watched episode today also produces `[SILENT]`; a login, layout, or network error preserves the prior snapshot and
+No matching episode in the collected history also produces `[SILENT]`; a login, layout, or network error preserves the prior snapshot and
 reports the connection error without sending stale links. Observatory's existing
-podcast room displays safe session/connection status, source date, last
-successful collection, and watched links;
-previous-day records are visibly labeled. No live account verification is claimed
+podcast room displays safe session/connection status, collection date, last
+successful collection, and the latest watched link. The date records when history
+was refreshed, not when the video was watched; older snapshots are labeled as
+awaiting refresh. Search is limited to 20 scrolls per run and reports an error if
+that limit is reached before finding a match. No live account verification is claimed
 until `connect`/`sync` succeeds.
 
 ### Automatic cron recovery
@@ -1169,7 +1178,7 @@ hanging indefinitely; an active local-model turn may run for up to ten minutes.
   state and review schedule. Opening a room alone does not assign or complete work.
 - **English**: reveal due-card answers and mark each attempt correct or needing
   more practice. Results update the shared SRS deck used by Telegram drills.
-- **Morning Echo**: see actual watched English Goal Podcast links, source date,
+- **Morning Echo**: see latest watched English Goal Podcast link, source date,
   and last successful collection, then reopen a video. Its
   schedule and session history remain separate from tutor/SRS activity while it
   shares the English profile's learner memory.

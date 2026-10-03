@@ -31,3 +31,13 @@ def test_unsigned_export_preserves_existing_file_and_removes_temporary(tmp_path)
         exporter.save_youtube_cookies([cookie('.youtube.com', name='PREF')], target)
     assert target.read_text() == 'preserved'
     assert list(tmp_path.iterdir()) == [target]
+
+
+def test_export_normalizes_chromium_expiry_and_drops_expired_native_cookies(tmp_path):
+    live = cookie('.youtube.com', expires=(2000000000 + 11644473600) * 1000000)
+    expired = cookie('.youtube.com', name='OLD', expires=(1000 + 11644473600) * 1000000)
+    target = tmp_path / 'export.txt'
+    assert exporter.save_youtube_cookies([live, expired], target) == 1
+    imported = history.parse_cookies(target.read_text())
+    assert imported[0]['expires'] == 2000000000
+    assert live.expires == (2000000000 + 11644473600) * 1000000

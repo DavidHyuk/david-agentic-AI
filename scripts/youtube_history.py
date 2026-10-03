@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # __author__ = 'David Choi (bestshoot21@gmail.com)'
-"""Read today's YouTube watch history for the existing English podcast feed.
+"""Read the latest watched YouTube podcast for the existing English podcast feed.
 
 Import YouTube-only Netscape cookies with ``connect --cookies-stdin`` over SSH
 from the signed-in personal computer using the phone app’s account/channel.
@@ -68,7 +68,7 @@ def channel_key(value: str) -> str:
 
 
 def normalize_sections(sections: list[dict], channel: str) -> list[dict]:
-    """Select today's deduplicated canonical links from an explicit channel.
+    """Select the first matching video in YouTube's newest-first history order.
 
     Unknown page headings fail closed. History records indicate an appearance
     in watch history, not a completed listen or a measured viewing duration.
@@ -79,11 +79,8 @@ def normalize_sections(sections: list[dict], channel: str) -> list[dict]:
     if not any(h in ('today', 'yesterday', '오늘', '어제') or
                re.search(r'\b20\d{2}\b|\b(?:january|february|march|april|may|june|july|august|september|october|november|december)\b', h)
                for h in headings):
-        raise HistoryError('시청 날짜를 확인할 수 없습니다. 과거 영상을 오늘 기록으로 보내지 않습니다.')
-    videos, seen = [], set()
-    for section, heading in zip(sections, headings):
-        if heading not in ('today', '오늘'):
-            continue
+        raise HistoryError('시청 기록 페이지 구조를 확인할 수 없습니다. 연결을 확인해 주세요.')
+    for section in sections:
         for raw in section.get('videos', []):
             if channel_key(str(raw.get('channel', ''))) != channel_key(channel):
                 continue
@@ -91,16 +88,27 @@ def normalize_sections(sections: list[dict], channel: str) -> list[dict]:
             video_id = parse_qs(url.query).get('v', [''])[0]
             if url.scheme != 'https' or url.hostname not in ('www.youtube.com', 'youtube.com') or url.path != '/watch':
                 continue
-            if not re.fullmatch(r'[A-Za-z0-9_-]{11}', video_id) or video_id in seen:
+            if not re.fullmatch(r'[A-Za-z0-9_-]{11}', video_id):
                 continue
             title = ' '.join(str(raw.get('title', '')).split())
             if not title:
                 continue
-            seen.add(video_id)
-            videos.append({'video_id': video_id, 'title': title[:160],
-                           'channel': str(raw['channel']),
-                           'url': 'https://www.youtube.com/watch?v=' + video_id})
-    return videos
+            return [{'video_id': video_id, 'title': title[:160],
+                     'channel': str(raw['channel']),
+                     'history_heading': str(section.get('heading', '')).strip(),
+                     'url': 'https://www.youtube.com/watch?v=' + video_id}]
+    return []
+
+
+
+def normalize_cookie_expiry(value: int) -> int:
+    """Convert Chromium's 1601-epoch microseconds to Unix seconds when present."""
+    value = int(value)
+    if value >= 11644473600000000:
+        value = value // 1000000 - 11644473600
+    if value > 253402300799 or value < -1:
+        raise ValueError('Unsupported cookie expiry format.')
+    return value
 
 
 def parse_cookies(text: str, *, now: float | None = None) -> list[dict]:
@@ -128,7 +136,7 @@ def parse_cookies(text: str, *, now: float | None = None) -> list[dict]:
         if subdomains not in ('TRUE', 'FALSE') or secure not in ('TRUE', 'FALSE') or not path.startswith('/'):
             raise HistoryError('YouTube 쿠키 형식이 올바르지 않습니다.')
         try:
-            expires = int(expiry or 0)
+            expires = normalize_cookie_expiry(int(expiry or 0))
         except ValueError as exc:
             raise HistoryError('YouTube 쿠키 유효기간이 올바르지 않습니다.') from exc
         if expires and expires <= now:
@@ -200,7 +208,7 @@ def describe_browser_error(stage: str, error: Exception) -> str:
 
 
 def collect_history(browser_dir: Path, executable: str, *, cookies: list[dict] | None = None,
-                    session_path: Path | None = None) -> list[dict]:
+                    session_path: Path | None = None, channel: str = DEFAULT_CHANNEL) -> list[dict]:
     try:
         from playwright.sync_api import sync_playwright, Error as PlaywrightError
     except ImportError as exc:
@@ -252,16 +260,16 @@ def collect_history(browser_dir: Path, executable: str, *, cookies: list[dict] |
                         message = page.locator('ytd-message-renderer').all_text_contents()
                         if any('this list has no videos' in text.lower() or 'watch history is empty' in text.lower() for text in message):
                             return finish([{'heading': 'Today', 'videos': []}])
-                    today_count = sum(len(s['videos']) for s in sections if s['heading'].strip().lower() in ('today', '오늘'))
-                    # Stop once the visible history reaches a prior day.
-                    if any(s['heading'] and s['heading'].strip().lower() not in ('today', '오늘') for s in sections):
+                    # YouTube orders history newest first; older days remain eligible.
+                    if sections and normalize_sections(sections, channel):
                         return finish(sections)
-                    if previous == today_count:
+                    count = sum(len(s['videos']) for s in sections)
+                    if previous == count:
                         return finish(sections)
-                    previous = today_count
+                    previous = count
                     page.evaluate('window.scrollTo(0, document.documentElement.scrollHeight)')
                     page.wait_for_timeout(1200)
-                raise HistoryError('오늘 기록이 수집 한도를 넘었습니다. 일부 기록만 보내지 않고 다음 실행에서 재시도합니다.')
+                raise HistoryError('최근 팟캐스트를 찾기 전에 기록 수집 한도에 도달했습니다. 다음 실행에서 재시도합니다.')
             finally:
                 context.close()
     except HistoryError:
@@ -275,13 +283,14 @@ def refresh(data_dir: Path, browser_dir: Path, executable: str, channel: str,
     supplied_now = now is not None
     now = now or datetime.now(TZ)
     before = now.astimezone(TZ).date().isoformat()
-    sections = collector(browser_dir, executable, cookies=cookies, session_path=data_dir / 'session.json')
+    sections = collector(browser_dir, executable, cookies=cookies,
+                         session_path=data_dir / 'session.json', channel=channel)
     after = datetime.now(TZ).date().isoformat() if not supplied_now else before
     if after != before:
         raise HistoryError('수집 도중 날짜가 바뀌었습니다. 다음 실행에서 재시도합니다.')
     videos = normalize_sections(sections, channel)
     snapshot = {'version': 1, 'date': before, 'synced_at': now.isoformat(),
-                'channel_filter': channel, 'videos': videos}
+                'channel_filter': channel, 'selection': 'latest', 'videos': videos}
     save_json(data_dir / 'snapshot.json', snapshot)
     return snapshot
 
@@ -289,22 +298,14 @@ def refresh(data_dir: Path, browser_dir: Path, executable: str, channel: str,
 def render_digest(snapshot: dict, *, today: str | None = None) -> str:
     today = today or datetime.now(TZ).date().isoformat()
     if snapshot.get('date') != today:
-        raise HistoryError('오늘 날짜의 시청 기록이 아닙니다.')
+        raise HistoryError('오늘 새로 수집한 시청 기록이 아닙니다.')
     videos = snapshot.get('videos', [])
     if not videos:
         return '[SILENT]'
-    lines = ['🎧 오늘 본 영어 팟캐스트', today, '']
-    included = 0
-    for video in videos:
-        item = f"{included + 1}. {video['title']}\n{video['url']}\n"
-        if len('\n'.join(lines)) + len(item) > 3300:
-            break
-        lines.append(item)
-        included += 1
-    if included < len(videos):
-        lines.append(f'총 {len(videos)}편 중 최근 {included}편입니다.')
-    lines.append('YouTube 시청 기록 기준이며, 끝까지 시청했는지는 확인하지 않습니다.')
-    return '\n'.join(lines)
+    video = videos[0]
+    return '\n'.join(['🎧 가장 최근에 본 영어 팟캐스트', '',
+                      video['title'][:160], video['url'], '',
+                      'YouTube 시청 기록 기준입니다.'])
 
 
 def main(argv=None) -> int:
