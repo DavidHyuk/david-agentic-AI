@@ -325,7 +325,10 @@ class Observatory:
                     'transcript_available': bool(transcript and transcript.is_file()),
                 })
             history = read_json(self.home / 'data/youtube-history/snapshot.json', {})
+            connection = read_json(self.home / 'data/youtube-history/connection.json', {})
             data['watch_history'] = {
+                'connected': connection.get('version') == 1 and bool(connection.get('verified_at')),
+                'connection_verified_at': connection.get('verified_at'),
                 'date': history.get('date'),
                 'synced_at': history.get('synced_at'),
                 'channel_filter': history.get('channel_filter'),

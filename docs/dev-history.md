@@ -3,6 +3,26 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.27.1 — 2026-10-03 (patch: connect YouTube headlessly from the MacBook over SSH)
+
+- Corrected the GUI-login assumption for the SSH-only DGX Spark. Import a
+  Netscape YouTube cookie export through SSH stdin or a private file, inject it
+  into headless Chromium, and mark connection ready only after authenticated
+  history collection succeeds. No server GUI, password prompt, X11 or extra
+  persistent service is required.
+- Added a MacBook export helper using yt-dlp browser extraction; save only live
+  YouTube-domain cookies with owner-only permissions. Exclude unrelated domains
+  and never print credential values. Support session/HttpOnly cookies and fail
+  safely on malformed inputs or rejected authentication.
+- Keep the existing English profile, bot, podcast group, job identity, 18:00
+  schedule and Observatory room. Show safe connection metadata in that room;
+  unlinked scheduled runs remain silent rather than sending daily setup errors.
+  The export helper is an internal setup tool, not a separate user-visible agent,
+  so it shares the podcast room rather than adding an empty room.
+- Updated MacBook/SSH usage, skill instructions and current overview.
+  `pytest -q`: 391 passed. Actual account import and watch-history collection
+  remain pending until David exports the matching session from his MacBook.
+
 ## v1.27.0 — 2026-10-03 (minor: replace morning podcast picks with evening watched links)
 
 - David chooses podcast episodes in the YouTube app; replaced the existing

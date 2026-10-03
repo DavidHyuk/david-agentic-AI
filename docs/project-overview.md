@@ -84,7 +84,8 @@ David-Agent/
 │   ├── kakao_webhook.py       # Kakao 채널 피드백 수신·발신자 allowlist·로컬 큐
 │   ├── english_intake.py      # 새 레슨 탐지 + 이번 주 세션 조회 + 처리 상태 관리
 │   ├── english_srs.py         # Leitner SRS 덱 (추가/리뷰/통계/취약 카드)
-│   ├── youtube_history.py     # 계정 연결 + 오늘 본 팟캐스트 링크 수집
+│   ├── export_youtube_cookies.py # MacBook에서 YouTube 쿠키만 내보내기
+│   ├── youtube_history.py     # SSH 쿠키 연결 + headless 시청 기록 수집
 │   ├── english_podcast.py     # 요청 시 YouTube 자막/대본 저장
 │   ├── agenda.py              # 캘린더 이벤트 포맷팅 + 충돌 감지
 │   ├── cron_health.py         # cron tick lock / jobs.json 건강 검사 (+ 선택적 gateway restart)
@@ -155,6 +156,8 @@ David-Agent/
 │   ├── test_interview_trends.py  # 트렌드 수집 (normalization, ranking, cache, network stub)
 │   ├── test_english_intake.py
 │   ├── test_english_srs.py
+│   ├── test_youtube_history.py # 날짜/채널 선택·SSH 쿠키 연결·미연결 SILENT
+│   ├── test_export_youtube_cookies.py # YouTube-only export/import 검증
 │   ├── test_english_podcast.py # 자막 파싱·일일 배정·멱등 상태
 │   ├── test_english_podcast_service.py # 과거 대본 timer 유지/중단 검증
 │   ├── test_agenda.py
@@ -226,7 +229,8 @@ history/search·알림 제어의 이점이 있으면 같은 bot을 별도 Telegr
 | `english_intake.py` | 새 레슨 탐지, Telegram 파일 저장, 이번 주 세션 조회, 처리 상태 관리 |
 | `english_srs.py` | Leitner SRS 덱 (카드 추가/리뷰/통계/취약 카드 랭킹) |
 | `english_podcast.py` | 요청 시 영문 JSON3 자막 및 타임스탬프 대본 준비 |
-| `youtube_history.py` | 같은 계정의 브라우저 로그인 연결, 오늘 시청 기록 수집, 18시 링크 메시지 |
+| `youtube_history.py` | SSH stdin 쿠키 연결, GUI 없는 headless 시청 기록 수집, 18시 링크 메시지 |
+| `export_youtube_cookies.py` | MacBook 브라우저에서 live YouTube 쿠키만 private 파일로 내보내기 |
 | `agenda.py` | 캘린더 이벤트 포맷팅 + 충돌·여유 슬롯 감지 |
 | `cron_health.py` | cron tick lock·stale·마지막 실행 실패와 David Observatory API 응답 정지 감지, profile별 단발 재시도와 gateway 복구 |
 | `reward_system.py` | 코딩·설계·영어 SRS·논문 완료 증거를 멱등 Career Cash ledger와 일일/주간 미션으로 변환 |
@@ -366,7 +370,7 @@ server TTFT·prefill/decode TPS, llama.cpp native timings와 실제 처리/캐�
 prompt 토큰 수도 기록합니다. `--server-metrics-url`은 단일 요청만 완료된
 차이를 귀속하고, 측정 실패와 채점 실패를 구분하며 exporter 조회 시간을 과제
 지연에서 제외합니다. prefix 캐시가 있으면 실제 새 KV 토큰 수를 우선 사용합니다.
-현재 관련 변경 후 `pytest -q`는 382개가 통과했습니다.
+현재 관련 변경 후 `pytest -q`는 391개가 통과했습니다.
 추가 KV 진단에서는 기존 19.92GiB 예산과 마지막 2.8% 사용률을 확인했고,
 KV 8GiB·prefix-off 설정에서도 40K를 통과했습니다. 온도 여유가 먼저 감소해
 작은 prefill 배치·CPU quota·열 제어를 적용한 별도 실행에서 55K와 요청별
@@ -578,10 +582,13 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
 - David이 유튜브 앱에서 직접 고른 English Goal Podcast 영상의 오늘 시청
   기록을 18:00 America/Los_Angeles에 기존 English bot과 podcast 그룹으로
   보냅니다. 기존 job 이름을 유지해 중복 일정을 만들지 않습니다.
-- `youtube_history.py connect`를 데스크톱 터미널에서 실행하고 휴대폰과 같은
-  Google 계정 및 YouTube 채널로 직접 로그인해야 합니다. 공식 API가 시청
-  기록을 제공하지 않아 Chromium에서 오늘 기록을 읽습니다. 계정 만료나
-  페이지 구조 변경 시 연결 점검이 필요합니다.
+- DGX Spark는 SSH 접속 서버이며 GUI가 없습니다. MacBook에서 휴대폰과 같은
+  계정/채널로 로그인하고 `export_youtube_cookies.py`로 YouTube 쿠키만
+  내보낸 뒤, SSH stdin으로 `youtube_history.py connect --cookies-stdin`에
+  전달합니다. 서버는 headless Chromium에서 로그인과 기록 읽기를 검증합니다.
+  쿠키 값은 명령 인자·채팅·로그에 남기지 않으며 unrelated domain은 제외합니다.
+  공식 API는 시청 기록을 제공하지 않으므로 계정 만료나 UI 변경 시 재연결이
+  필요합니다. 최초 연결 전 `notify`는 브라우저를 열지 않고 `[SILENT]`입니다.
 - 인증 브라우저 디렉터리는 `~/snap/chromium/common/hermes-youtube-history/`,
   private snapshot은 `~/.hermes/data/youtube-history/`입니다. 단발 브라우저
   프로세스를 사용하므로 새 profile, gateway, bot, 상시 service가 없습니다.

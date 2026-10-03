@@ -70,7 +70,8 @@ Local DGX Spark (llama.cpp @ :8003, Qwen3.8 Flash-Next IQ4_XS, 2 × 64K slots)
 | `bootstrap/stage_english_profile.py` | Stage only the isolated English-coaching Hermes profile |
 | `bootstrap/install_english_bot.sh` | Create/stage the English profile, install its gateway, and sync cron jobs |
 | `scripts/english_podcast.py` | On-request channel transcript preparation |
-| `scripts/youtube_history.py` | Connect a private browser login and send today’s watched podcast links |
+| `scripts/youtube_history.py` | Import cookies over SSH and send today’s watched podcast links headlessly |
+| `scripts/export_youtube_cookies.py` | Export YouTube-only cookies on the MacBook for server connection |
 | `scripts/papers_ingest.py` | Fetch and merge arXiv/Hugging Face paper metadata |
 | `scripts/papers_digest.py` | Read-only recommended/recent/trending paper digest |
 | `scripts/interview_progress.py` | Concrete study messages, feedback, hints, adaptive reviews, weekly metrics |
@@ -862,22 +863,40 @@ The previous 09:15 recommendation and automatic 08:25 transcript prefetch are
 replaced. `english_podcast.py prepare` remains available for explicit transcript
 coaching; old downloaded transcripts remain available.
 
-YouTube's official API does not expose watch history. This helper reads the
-signed-in browser's history page; UI changes or expired login can require
-reconnection. First, in a **desktop terminal**, run:
+The **DGX Spark server is accessed over SSH and has no GUI**. YouTube's official
+API does not expose watch history, so the server reads the signed-in history page
+with headless Chromium. Import the MacBook's login session once; no headed
+browser, X11 forwarding, desktop service, or Google password on the server is
+required. UI changes or an expired session can require reconnection.
+
+On the **MacBook**, open YouTube in Chrome and sign in with the **same Google
+account and YouTube channel as the phone app**. Watch history must be enabled.
+Then run these commands in a **local Mac terminal**, replacing the SSH target
+with the same host/alias you normally use:
 
 ```bash
-python3 ~/.hermes/profiles/english/scripts/youtube_history.py connect
+DGX_SSH='david@YOUR_DGX_HOST'
+scp "${DGX_SSH}:/home/david/.hermes/scripts/export_youtube_cookies.py" ~/export_youtube_cookies.py
+python3 -m venv ~/.local/share/hermes-youtube-export
+~/.local/share/hermes-youtube-export/bin/python -m pip install yt-dlp
+~/.local/share/hermes-youtube-export/bin/python ~/export_youtube_cookies.py --browser chrome
+ssh "$DGX_SSH" 'python3 /home/david/.hermes/profiles/english/scripts/youtube_history.py connect --cookies-stdin' < ~/youtube-cookies.txt
 ```
 
-In the opened Chromium window, log in with the **same Google account and YouTube
-channel used by the phone app**, then press Enter in the terminal. Watch history
-must be enabled. The login is retained in the owner-only browser directory
-`~/snap/chromium/common/hermes-youtube-history/`; credentials are never entered
-in chat or committed. The helper starts a temporary browser process for each
-read and uses a lock to prevent concurrent reads/login. Use the same browser
-directory if running the helper manually. Other channels and Shorts are excluded;
-a history entry does not prove a completed listen or provide a viewing duration.
+If macOS asks for Chrome Keychain access, approve it for this local export. Use
+`--browser firefox`, `edge`, or `brave` if that is where the matching account is
+signed in; `--profile` selects a non-default browser profile. Extraction depends
+on browser access and cookie decryption support. The helper exports **only live
+YouTube-domain cookies**, atomically with permissions `0600`; it never saves
+other sites' sessions or prints cookie values. Send the file via SSH stdin, never
+through chat or Telegram. Export/import again if the login expires. Once import
+succeeds, the local export file can be deleted.
+
+The server verifies authenticated history access before marking the connection
+ready. Login stays in the owner-only browser directory
+`~/snap/chromium/common/hermes-youtube-history/`; each collection starts a
+short-lived headless browser process under a lock. Other channels and Shorts are
+excluded; a history entry does not prove a completed listen or viewing duration.
 
 ```bash
 python3 ~/.hermes/profiles/english/scripts/youtube_history.py status
@@ -887,8 +906,9 @@ hermes -p english cron list
 ```
 
 Private snapshots live in `~/.hermes/data/youtube-history/`, separately from the
-tutor SRS deck and transcript assignments. No watched episode today produces
-`[SILENT]`; a login, layout, or network error preserves the prior snapshot and
+tutor SRS deck and transcript assignments. Before account connection, `notify`
+returns `[SILENT]` without launching Chromium or sending daily setup errors.
+No watched episode today also produces `[SILENT]`; a login, layout, or network error preserves the prior snapshot and
 reports the connection error without sending stale links. Observatory's existing
 podcast room displays source date, last successful collection, and watched links;
 previous-day records are visibly labeled. No live account verification is claimed
