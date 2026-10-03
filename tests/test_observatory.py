@@ -89,6 +89,8 @@ def test_podcast_cron_uses_its_own_room_on_shared_english_profile():
     prompt = 'Use the english-podcast-coach skill for the English Goal Podcast lesson.'
     assert room_for('english', 'cron_pod_20260913', prompt, jobs) == 'podcast'
     assert room_for('english', 'cron_old_20260912', prompt, []) == 'podcast'
+    assert room_for('english', 'telegram_chat', 'Run youtube_browser_login.py for login.', jobs) == 'podcast'
+    assert room_for('english', 'cron_old_20260912', 'Run youtube_browser_login.py for login.', []) == 'podcast'
     assert room_for('english', 'telegram_chat', 'Review my correction.', jobs) == 'english'
 
 
@@ -956,3 +958,19 @@ def test_podcast_workbench_distinguishes_authenticated_login_from_pending_collec
     assert state['connected'] is False
     assert state['authentication_verified_at'] == '2026-10-03T18:00:00-07:00'
     assert 'never expose' not in json.dumps(state)
+
+
+@pytest.mark.parametrize('status', ['awaiting_login', 'verifying', 'connected', 'stopped', 'failed',
+                                  'private-cookie-value', None])
+def test_podcast_workbench_exposes_only_safe_interactive_login_state(store, status):
+    root = store.home / 'data/youtube-history'
+    root.mkdir(parents=True)
+    (root / 'login-status.json').write_text(json.dumps({
+        'status': status, 'cookie': 'never expose', 'browser_url': 'https://private.example',
+    }))
+    state = store.workbench('podcast')['watch_history']
+    expected = status if status in ('awaiting_login', 'verifying', 'connected', 'stopped', 'failed') else None
+    assert state['interactive_login_status'] == expected
+    assert 'never expose' not in json.dumps(state)
+    assert 'private-cookie-value' not in json.dumps(state)
+    assert 'private.example' not in json.dumps(state)

@@ -360,7 +360,8 @@ def test_authenticated_only_session_recovers_collection_without_cookie_reimport(
 
 
 @pytest.mark.parametrize('logged_in', [True, False])
-def test_login_state_survives_render_failure_and_is_cleared_when_signed_out(tmp_path, monkeypatch, logged_in):
+@pytest.mark.parametrize('explicit_import', [True, False])
+def test_login_state_survives_render_failure_and_is_cleared_when_signed_out(tmp_path, monkeypatch, logged_in, explicit_import):
     from types import SimpleNamespace
     import sys
     browser_dir = tmp_path / 'browser'
@@ -378,8 +379,15 @@ def test_login_state_survives_render_failure_and_is_cleared_when_signed_out(tmp_
         def wait_for_selector(self, *a, **kw):
             raise RuntimeError('private-session-value')
     cookies = yh.parse_cookies(cookies_text('.youtube.com\tTRUE\t/\tTRUE\t0\tSID\tprivate-session-value'))
-    context = SimpleNamespace(pages=[Page()], close=lambda: None, clear_cookies=lambda: None,
-                              add_cookies=lambda value: None, cookies=lambda *a: cookies)
+    yh.save_json(tmp_path / 'session.json', {'version': 1, 'cookies': cookies})
+    applied = []
+    operations = []
+    # An old credential name in the persistent profile must not prevent restore.
+    retained = [dict(cookies[0], value='old-private-session-value')]
+    context = SimpleNamespace(pages=[Page()], close=lambda: None,
+                              clear_cookies=lambda: operations.append('clear'),
+                              add_cookies=lambda value: (operations.append('add'), applied.extend(value)),
+                              cookies=lambda *a: cookies if applied else retained)
     class Playwright:
         chromium = SimpleNamespace(launch_persistent_context=lambda *a, **kw: context)
         def __enter__(self):
@@ -388,7 +396,10 @@ def test_login_state_survives_render_failure_and_is_cleared_when_signed_out(tmp_
             pass
     monkeypatch.setitem(sys.modules, 'playwright.sync_api', SimpleNamespace(sync_playwright=Playwright, Error=RuntimeError))
     with pytest.raises(yh.HistoryError) as error:
-        yh.collect_history(browser_dir, '', cookies=cookies, session_path=tmp_path / 'session.json')
+        yh.collect_history(browser_dir, '', cookies=cookies if explicit_import else None,
+                           session_path=tmp_path / 'session.json')
+    assert operations == ['clear', 'add']
+    assert applied == cookies
     assert 'private-session-value' not in str(error.value)
     assert yh.is_authenticated(tmp_path, browser_dir) is logged_in
     if logged_in:
@@ -396,3 +407,15 @@ def test_login_state_survives_render_failure_and_is_cleared_when_signed_out(tmp_
         assert (tmp_path / 'authentication.json').stat().st_mode & 0o777 == 0o600
     else:
         assert not yh.is_connected(tmp_path, browser_dir)
+        assert '개인 컴퓨터' in str(error.value)
+        assert yh.load_saved_cookies(tmp_path / 'session.json') == cookies
+
+
+def test_status_recognizes_headless_browser_directory_without_preferences(tmp_path, capsys):
+    browser_dir = tmp_path / 'browser'
+    (browser_dir / 'Default').mkdir(parents=True)
+    assert yh.main(['--data-dir', str(tmp_path), '--browser-dir', str(browser_dir), 'status']) == 0
+    status = json.loads(capsys.readouterr().out)
+    assert status['browser_initialized'] is True
+    assert status['authenticated'] is False
+    assert status['connected'] is False

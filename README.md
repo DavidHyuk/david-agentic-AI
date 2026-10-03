@@ -72,6 +72,7 @@ Local DGX Spark (llama.cpp @ :8003, Qwen3.8 Flash-Next IQ4_XS, 2 × 64K slots)
 | `bootstrap/install_english_bot.sh` | Create/stage the English profile, install its gateway, and sync cron jobs |
 | `scripts/english_podcast.py` | Channel transcripts and selected-video long-sentence practice |
 | `scripts/youtube_history.py` | Import cookies over SSH and send the latest watched podcast link headlessly |
+| `scripts/youtube_browser_login.py` | Open temporary DGX Chromium over an SSH tunnel for direct YouTube login |
 | `scripts/export_youtube_cookies.py` | Export YouTube-only cookies on the MacBook for server connection |
 | `scripts/papers_ingest.py` | Fetch and merge arXiv/Hugging Face paper metadata |
 | `scripts/papers_digest.py` | Read-only recommended/recent/trending paper digest |
@@ -908,11 +909,43 @@ inline answers and a next-week focus. Repeated weekday selections are merged by
 video. No usable records means `[SILENT]`. Both routines use Korean guidance and
 keep generated prompts distinct from caption quotations.
 
-The **DGX Spark server is accessed over SSH and has no GUI**. YouTube's official
+The **DGX Spark server is accessed over SSH and has no permanent GUI**. YouTube's official
 API does not expose watch history, so the server reads the signed-in history page
-with headless Chromium. Import the MacBook's login session once; no headed
-browser, X11 forwarding, desktop service, or Google password on the server is
-required. UI changes or an expired session can require reconnection.
+with headless Chromium. For account connection, use temporary headed Chromium on
+the DGX over an SSH tunnel, or import a personal computer's session. UI changes
+or an expired session can require reconnection.
+
+For **direct DGX login**, install the optional desktop runtime from this checkout
+once on the DGX (Ubuntu 24.04 arm64):
+
+```bash
+python3 bootstrap/install_youtube_history_desktop.py
+```
+
+This adds full Chromium, Xvfb, x11vnc, noVNC and websockify to the existing private
+YouTube runtime without sudo or a permanent desktop service. Start a temporary
+login window on the DGX:
+
+```bash
+systemd-run --user --unit=hermes-youtube-login --collect --property=RuntimeMaxSec=25min --property=MemoryMax=2G --property=CPUQuota=200% /home/david/.hermes/venvs/youtube-history/bin/python /home/david/.hermes/profiles/english/scripts/youtube_browser_login.py
+```
+
+In a **local Windows PowerShell** terminal, keep this SSH tunnel running:
+
+```powershell
+ssh -N -T -o ClearAllForwardings=yes -o ExitOnForwardFailure=yes -L 127.0.0.1:18780:127.0.0.1:18780 dgx
+```
+
+Open `http://127.0.0.1:18780/vnc.html?autoconnect=true&resize=scale` in local Chrome.
+Sign into the same YouTube account/channel as the phone app inside the displayed
+DGX Chromium. Credentials are entered directly in the browser. The helper
+detects verified YouTube login, saves only YouTube cookies on the server, closes
+the temporary display and requires both `connect --saved-cookies` and a separate
+`sync` to pass. No extension or local cookie export is needed. The window expires
+after 20 minutes and all components bind loopback. To stop it early, run
+`systemctl --user stop hermes-youtube-login.service` on the DGX. Safe progress is
+stored in `data/youtube-history/login-status.json` and the existing podcast
+Observatory room; cookie values and Google pages are excluded from that view.
 
 The English installer provisions Playwright in the explicit server environment
 `~/.hermes/venvs/youtube-history/`. For a manual or existing deployment, run
@@ -951,6 +984,31 @@ other sites' sessions or prints cookie values. Send the file via SSH stdin, neve
 through chat or Telegram. Export/import again if the login expires. Once import
 succeeds, the local export file can be deleted.
 
+On **Windows with Chrome**, export a separate session using
+[Get cookies.txt LOCALLY](https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc),
+listed in the [yt-dlp cookie documentation](https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp).
+Enable the extension's **Allow in Incognito** setting. In a new incognito window,
+sign into the same YouTube account/channel, then navigate in that same tab to
+`https://www.youtube.com/robots.txt`. Export only `youtube.com` cookies in
+**Netscape** format to `Downloads\youtube-cookies.txt`, then close that incognito
+window. The Python browser exporter above reads regular browser profiles; it
+does not read incognito sessions. YouTube can rotate credentials in open regular
+tabs, so a future cookie expiration does not guarantee the exported session will
+stay authenticated; see the
+[yt-dlp session export guidance](https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies).
+
+Run these commands in **local Windows PowerShell**, outside the DGX SSH shell:
+
+```powershell
+scp "$HOME\Downloads\youtube-cookies.txt" dgx:/home/david/.hermes/data/youtube-history/import-cookies.txt
+ssh -T -o ClearAllForwardings=yes dgx '/home/david/.hermes/venvs/youtube-history/bin/python /home/david/.hermes/profiles/english/scripts/youtube_history.py connect --cookies-file /home/david/.hermes/data/youtube-history/import-cookies.txt'
+```
+
+The upload destination is inside the existing private server directory. After
+successful import, remove that temporary server file and the local export. Test
+`sync` once more to verify login survives a fresh browser process; a successful
+first import alone does not establish continued authentication.
+
 The server saves the filtered session owner-only at
 `~/.hermes/data/youtube-history/session.json` before attempting network access.
 It records confirmed login separately in `authentication.json`, retaining refreshed
@@ -965,8 +1023,8 @@ occurs, retry from the server using the saved session:
 
 Login also stays in the owner-only browser directory
 `~/.hermes/data/youtube-history/browser/`; each collection starts a short-lived
-headless browser process under a lock. Saved session-only cookies restore login
-when Chromium does not retain them after exit; refreshed cookies are saved after
+headless browser process under a lock. Every fresh browser launch restores the
+saved session, including when stale cookie names remain in Chromium; refreshed cookies are saved after
 a successful read. Errors report a fixed failure stage and safe network code,
 never a raw browser exception, cookie value, or page dump. The server also
 accepts earlier exports containing native Chromium expiration timestamps, so
@@ -975,7 +1033,7 @@ The reader supports modern YouTube lockup title/channel classes as well as older
 video rows. A collection-limit/layout error does not request another cookie
 export; status and Observatory distinguish confirmed login from pending collection.
 If browser application succeeds but YouTube reports signed out, confirm the
-MacBook’s matching Chrome profile is signed in and export a fresh session;
+personal computer's matching browser profile is signed in and export a fresh session;
 cookie presence or a future expiration alone does not establish authentication. Videos outside both channel and title criteria, plus Shorts, are
 excluded; a history entry does not prove a completed listen or viewing duration.
 

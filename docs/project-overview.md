@@ -86,6 +86,7 @@ David-Agent/
 │   ├── english_srs.py         # Leitner SRS 덱 (추가/리뷰/통계/취약 카드)
 │   ├── export_youtube_cookies.py # MacBook에서 YouTube 쿠키만 내보내기
 │   ├── youtube_history.py     # SSH 쿠키 연결 + headless 시청 기록 수집
+│   ├── youtube_browser_login.py # SSH 터널로 DGX Chromium 직접 로그인
 │   ├── english_podcast.py     # 선택한 영상 대본·긴 문장 연습 / 요청 시 채널 대본
 │   ├── agenda.py              # 캘린더 이벤트 포맷팅 + 충돌 감지
 │   ├── cron_health.py         # cron tick lock / jobs.json 건강 검사 (+ 선택적 gateway restart)
@@ -113,6 +114,7 @@ David-Agent/
 │   ├── stage_english_profile.py # profile → ~/.hermes/profiles/english
 │   ├── stage_specialist_profiles.py # headless 전문 profile staging
 │   ├── install_youtube_history.sh # SSH/cron 공용 Playwright venv 설치
+│   ├── install_youtube_history_desktop.py # sudo 없는 임시 DGX 로그인 화면 설치
 │   ├── install_english_bot.sh # English Telegram bot gateway 설치
 │   ├── hermes-english-podcast-sync.{service,timer} # 과거 대본 timer (자동 실행 중단)
 │   ├── install_observatory.sh # 관제실 UI staging + Tailscale IP 전용 서비스
@@ -158,6 +160,8 @@ David-Agent/
 │   ├── test_english_intake.py
 │   ├── test_english_srs.py
 │   ├── test_youtube_history.py # 날짜/채널 선택·SSH 쿠키 연결·미연결 SILENT
+│   ├── test_youtube_browser_login.py # localhost 화면·로그인 감지·독립 sync·종료
+│   ├── test_youtube_history_desktop_install.py # Ubuntu 패키지 경로·SHA256 검증
 │   ├── test_export_youtube_cookies.py # YouTube-only export/import 검증
 │   ├── test_english_podcast.py # 자막·일일 배정·시청 영상 긴 문장 추출
 │   ├── test_english_podcast_service.py # 과거 대본 timer 유지/중단 검증
@@ -231,6 +235,7 @@ history/search·알림 제어의 이점이 있으면 같은 bot을 별도 Telegr
 | `english_srs.py` | Leitner SRS 덱 (카드 추가/리뷰/통계/취약 카드 랭킹) |
 | `english_podcast.py` | 시청 영상의 대본 긴 문장 추출과 요청 시 채널 대본 준비 |
 | `youtube_history.py` | SSH stdin 쿠키 연결, GUI 없는 headless 시청 기록 수집, 18시 링크 메시지 |
+| `youtube_browser_login.py` | DGX Chromium 직접 로그인, 임시 localhost noVNC, 연결과 재실행 검증 |
 | `export_youtube_cookies.py` | MacBook 브라우저에서 live YouTube 쿠키만 private 파일로 내보내기 |
 | `agenda.py` | 캘린더 이벤트 포맷팅 + 충돌·여유 슬롯 감지 |
 | `cron_health.py` | cron tick lock·stale·마지막 실행 실패와 David Observatory API 응답 정지 감지, profile별 단발 재시도와 gateway 복구 |
@@ -372,7 +377,7 @@ server TTFT·prefill/decode TPS, llama.cpp native timings와 실제 처리/캐�
 prompt 토큰 수도 기록합니다. `--server-metrics-url`은 단일 요청만 완료된
 차이를 귀속하고, 측정 실패와 채점 실패를 구분하며 exporter 조회 시간을 과제
 지연에서 제외합니다. prefix 캐시가 있으면 실제 새 KV 토큰 수를 우선 사용합니다.
-현재 관련 변경 후 `pytest -q`는 462개가 통과했습니다.
+현재 관련 변경 후 `pytest -q`는 488개가 통과했습니다.
 추가 KV 진단에서는 기존 19.92GiB 예산과 마지막 2.8% 사용률을 확인했고,
 KV 8GiB·prefix-off 설정에서도 40K를 통과했습니다. 온도 여유가 먼저 감소해
 작은 prefill 배치·CPU quota·열 제어를 적용한 별도 실행에서 55K와 요청별
@@ -583,13 +588,27 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
 ### YouTube 시청 기록 기반 Podcast English
 - David이 유튜브 앱에서 직접 고른 영상 중 가장 최근에 본 팟캐스트를 월~금 18:00 America/Los_Angeles에 기존 English bot과 podcast 그룹으로
   보냅니다. 기존 job 이름을 유지해 중복 일정을 만들지 않습니다.
-- DGX Spark는 SSH 접속 서버이며 GUI가 없습니다. MacBook에서 휴대폰과 같은
+- DGX Spark는 SSH 접속 서버이며 GUI가 없습니다. 개인 컴퓨터에서 휴대폰과 같은
   계정/채널로 로그인하고 `export_youtube_cookies.py`로 YouTube 쿠키만
   내보낸 뒤, SSH stdin으로 `youtube_history.py connect --cookies-stdin`에
   전달합니다. 서버는 headless Chromium에서 로그인과 기록 읽기를 검증합니다.
   쿠키 값은 명령 인자·채팅·로그에 남기지 않으며 unrelated domain은 제외합니다.
   Chrome 내부 만료 시간을 Unix seconds로 바꿔 내보내며, 서버도 이전 export를
   호환 처리합니다. 쿠키 적용과 실제 로그인 검증은 독립적으로 확인합니다.
+  선호 연결 방식은 `youtube_browser_login.py`의 임시 DGX Chromium 직접
+  로그인입니다. `install_youtube_history_desktop.py`가 Ubuntu 24.04 arm64에
+  사용자 권한으로 full Chromium, Xvfb, x11vnc, noVNC와 websockify를 준비합니다.
+  임시 systemd user 실행은 20분 뒤 끝나며, Windows 로컬 SSH 터널의
+  `127.0.0.1:18780`에서 화면을 조작합니다. 로그인 완료 시 YouTube 쿠키만
+  서버에 저장하고 임시 화면을 닫은 뒤 connect와 별도 sync를 모두 검증합니다.
+  Google 비밀번호는 브라우저에 직접 입력하고 쿠키 파일 내보내기는 필요 없습니다.
+  `login-status.json`의 안전한 상태만 기존 podcast Observatory room에 표시합니다.
+  Windows Chrome에서는 LOCALLY 확장의 시크릿 모드 허용 후 별도 시크릿
+  세션에서 로그인하고 같은 탭을 `youtube.com/robots.txt`로 이동해 Netscape
+  형식으로 내보낸 뒤 시크릿 창을 닫습니다. 로컬 PowerShell의 `scp`로 private
+  data 경로에 올리고 서버에서 `connect --cookies-file`로 가져옵니다. README에
+  전체 명령이 있습니다. 일반 브라우저 탭의 인증 갱신 때문에 export가 거부될
+  수 있으므로 첫 연결과 별도 `sync` 모두 검증하고 임시 파일을 삭제합니다.
   공식 API는 시청 기록을 제공하지 않으므로 계정 만료나 UI 변경 시 재연결이
   필요합니다. 로그인 미확인 상태의 `notify`는 브라우저를 열지 않고 `[SILENT]`입니다.
 - `install_youtube_history.sh`가 `~/.hermes/venvs/youtube-history/`에
@@ -607,6 +626,8 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   marker는 실제 인증·기록 읽기가 확인된 뒤에만 씁니다. `authentication.json`은
   로그인 확인을 별도로 저장하므로 읽기 실패 시에도 쿠키를 재전송하지 않고
   서버에서 재시도할 수 있습니다. Observatory도 로그인/수집 상태를 구분합니다.
+  새 브라우저 실행마다 저장된 세션을 복원하며, 실제 로그아웃 응답에는 확인
+  marker를 제거하고 이전 snapshot과 private session은 보존합니다.
   새 YouTube lockup의 제목·채널 class와 과거 renderer를 함께 지원합니다. 오류는 고정된
   실패 단계와 whitelist network code만 표시하며 쿠키나 페이지를 출력하지 않습니다. 단발 브라우저
   프로세스를 사용하므로 새 profile, gateway, bot, 상시 service가 없습니다.
@@ -752,4 +773,4 @@ Flash에는 CPU에서 해시를 계산하는 모델 내부 PLE n-gram이 실제�
 약 8.6ms는 실제 embedding 조회·복사·GPU 연산 시간을 포함하지 않습니다.
 세부 증거와 사용법은 [진단 사고 보고서](benchmarks/flash-prefill-diagnostic-incident-2026-10-03.md)에 있습니다.
 
-현재 전체 `pytest -q`는 462개, 진단·메타데이터 관련 검증은 18개가 통과했습니다.
+현재 전체 `pytest -q`는 488개, 진단·메타데이터 관련 검증은 18개가 통과했습니다.

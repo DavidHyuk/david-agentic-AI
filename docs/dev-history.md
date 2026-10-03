@@ -3,6 +3,41 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.31.0 — 2026-10-03 (minor: direct DGX Chromium login through SSH)
+
+- Add temporary headed DGX Chromium displayed in local Chrome through an SSH
+  loopback tunnel. A user-local Ubuntu desktop installer supplies Xvfb, x11vnc,
+  noVNC, websockify and full Chromium without sudo or a permanent desktop.
+  Bound the transient login session to 20 minutes; close all components after
+  login, cancellation or failure. Browser credentials are entered directly by
+  David; only YouTube cookies are retained, never Google page/account dumps.
+- Automatically verify imported server-side login with both history connection
+  and a separate headless sync. Expose a whitelisted login status in the existing
+  podcast room. This extends account setup for the same workflow, so no new room,
+  profile, bot, cron or permanent gateway is introduced.
+- Restore the saved credential payload on every browser launch even if stale
+  authentication cookie names remain in the profile. Cover explicit imports and
+  subsequent launches, including preservation of the session after a signed-out
+  response. Recognize an initialized headless profile without requiring a
+  Preferences file; directory presence still does not prove authentication.
+- Continued live verification found that all 23 saved cookies were sent, but
+  YouTube reported signed out and removed first-party credentials, including in
+  an independent temporary browser. The earlier successful connection and
+  caption extraction did not establish ongoing login. Preserve existing source
+  data; direct DGX login then passed initial collection and a separate headless
+  sync, selecting the same Daily English Podcast with two long sentences and
+  twelve shorter caption candidates. Remove the temporary Google browser profile
+  after transferring only the YouTube session. Dispatch Playwright navigation
+  events while waiting so an initial blank/Google page cannot hide completed login.
+- Add Windows Chrome incognito Netscape export and PowerShell SCP/file-import
+  instructions using the existing private state path, with upstream cookie
+  rotation guidance. Generalize connection errors from MacBook to personal
+  computer. No additional profile, bot, service, cron or Observatory room is
+  needed for this connection repair.
+- Validation: `pytest -q` passes 488 tests; a real noVNC browser connection loaded
+  without JavaScript errors. Existing weekday 18:00 source practice,
+  weekend archive review and disabled morning recommendation remain configured.
+
 ## v1.30.1 — 2026-10-03 (patch: repair authenticated YouTube history and caption collection)
 
 - Reproduced the recent import failure with the stored session, without exposing

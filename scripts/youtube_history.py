@@ -139,7 +139,7 @@ def parse_cookies(text: str, *, now: float | None = None) -> list[dict]:
             continue
         fields = line.split('\t')
         if len(fields) != 7:
-            raise HistoryError('쿠키 파일 형식이 올바르지 않습니다. 맥북에서 다시 내보내 주세요.')
+            raise HistoryError('쿠키 파일 형식이 올바르지 않습니다. 개인 컴퓨터에서 Netscape 형식으로 다시 내보내 주세요.')
         domain, subdomains, path, secure, expiry, name, value = fields
         host = domain.lstrip('.').lower()
         if host != 'youtube.com' and not host.endswith('.youtube.com'):
@@ -159,7 +159,7 @@ def parse_cookies(text: str, *, now: float | None = None) -> list[dict]:
                         'expires': expires if expires else -1})
     auth_names = {'SID', 'SAPISID', '__Secure-1PSID', '__Secure-3PSID'}
     if not any(cookie['name'] in auth_names for cookie in cookies):
-        raise HistoryError('유효한 YouTube 로그인 쿠키가 없습니다. 맥북에서 같은 계정으로 로그인한 후 다시 내보내 주세요.')
+        raise HistoryError('유효한 YouTube 로그인 쿠키가 없습니다. 개인 컴퓨터에서 같은 계정으로 로그인한 후 다시 내보내 주세요.')
     return cookies
 
 
@@ -200,7 +200,7 @@ def load_saved_cookies(path: Path) -> list[dict]:
                                     cookie['name'], cookie['value'])))
         return parse_cookies('\n'.join(rows) + '\n')
     except (OSError, ValueError, TypeError, KeyError, AttributeError) as exc:
-        raise HistoryError('저장된 YouTube 세션이 없거나 유효하지 않습니다. 맥북의 쿠키를 SSH로 다시 전달해 주세요.') from exc
+        raise HistoryError('저장된 YouTube 세션이 없거나 유효하지 않습니다. 개인 컴퓨터의 쿠키를 SSH로 다시 전달해 주세요.') from exc
 
 
 def describe_browser_error(stage: str, error: Exception) -> str:
@@ -267,7 +267,7 @@ def collect_history(browser_dir: Path, executable: str, *, cookies: list[dict] |
                     if session_path is not None:
                         (session_path.parent / 'authentication.json').unlink(missing_ok=True)
                         (session_path.parent / 'connection.json').unlink(missing_ok=True)
-                    raise HistoryError('YouTube 로그인이 필요합니다. 맥북에서 쿠키를 다시 내보내고 SSH로 connect --cookies-stdin을 실행해 주세요.')
+                    raise HistoryError('YouTube가 저장된 로그인 세션을 인정하지 않습니다. 이전 기록은 보존됩니다. 개인 컴퓨터에서 새 YouTube 세션을 내보내고 SSH로 connect --cookies-stdin 또는 --cookies-file을 실행해 주세요.')
                 if session_path is not None:
                     save_json(session_path, {'version': 1, 'cookies': context.cookies('https://www.youtube.com')})
                     save_json(session_path.parent / 'authentication.json', {
@@ -369,7 +369,7 @@ def main(argv=None) -> int:
             print(json.dumps({'connected': is_connected(args.data_dir, args.browser_dir),
                               'authenticated': is_authenticated(args.data_dir, args.browser_dir),
                               'session_saved': (args.data_dir / 'session.json').is_file(),
-                              'browser_initialized': (args.browser_dir / 'Default' / 'Preferences').is_file(),
+                              'browser_initialized': (args.browser_dir / 'Default').is_dir(),
                               'date': snapshot.get('date'), 'synced_at': snapshot.get('synced_at'),
                               'video_count': len(snapshot.get('videos', []))}, ensure_ascii=False))
             return 0
@@ -377,11 +377,11 @@ def main(argv=None) -> int:
             print('[SILENT]')
             return 0
         if args.command == 'sync' and not is_authenticated(args.data_dir, args.browser_dir):
-            raise HistoryError('맥북에서 내보낸 쿠키로 connect --cookies-stdin을 먼저 실행해 주세요.')
+            raise HistoryError('개인 컴퓨터에서 내보낸 쿠키로 connect --cookies-stdin 또는 --cookies-file을 먼저 실행해 주세요.')
         cookies = None
         if args.command == 'connect':
             if not (args.cookies_file or args.cookies_stdin or args.saved_cookies):
-                raise HistoryError('서버 GUI는 필요 없습니다. connect --cookies-stdin 또는 --cookies-file로 맥북의 YouTube 쿠키를 전달해 주세요.')
+                raise HistoryError('서버 GUI는 필요 없습니다. connect --cookies-stdin 또는 --cookies-file로 개인 컴퓨터의 YouTube 쿠키를 전달해 주세요.')
             if args.saved_cookies:
                 cookies = load_saved_cookies(args.data_dir / 'session.json')
             else:

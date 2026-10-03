@@ -149,7 +149,7 @@ def room_for(profile, session_id, prompt, jobs):
             prompt_text = task_prompt(prompt).lower()
             if any(needle in prompt_text for needle in (
                     'english-podcast-coach', 'english goal podcast',
-                    'podcast lesson', 'youtube_history.py', 'evening watch-history',
+                    'podcast lesson', 'youtube_history.py', 'youtube_browser_login.py', 'evening watch-history',
                     'english_podcast.py review', 'weekend podcast review')):
                 return 'podcast'
             return 'english'
@@ -329,6 +329,10 @@ class Observatory:
             history = read_json(self.home / 'data/youtube-history/snapshot.json', {})
             connection = read_json(self.home / 'data/youtube-history/connection.json', {})
             authentication = read_json(self.home / 'data/youtube-history/authentication.json', {})
+            login = read_json(self.home / 'data/youtube-history/login-status.json', {})
+            login_status = login.get('status')
+            if login_status not in ('awaiting_login', 'verifying', 'connected', 'stopped', 'failed'):
+                login_status = None
             data['watch_history'] = {
                 'connected': connection.get('version') == 1 and bool(connection.get('verified_at')),
                 'authenticated': (authentication.get('version') == 1 and bool(authentication.get('verified_at')))
@@ -336,6 +340,7 @@ class Observatory:
                 'authentication_verified_at': authentication.get('verified_at'),
                 'connection_verified_at': connection.get('verified_at'),
                 'session_saved': (self.home / 'data/youtube-history/session.json').is_file(),
+                'interactive_login_status': login_status,
                 'date': history.get('date'),
                 'synced_at': history.get('synced_at'),
                 'channel_filter': history.get('channel_filter'),

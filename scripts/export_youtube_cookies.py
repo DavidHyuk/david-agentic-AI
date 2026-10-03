@@ -2,7 +2,7 @@
 # __author__ = 'David Choi (bestshoot21@gmail.com)'
 """Export only YouTube cookies on the personal laptop for SSH server linking.
 
-Run on the MacBook, never on the DGX: python3 export_youtube_cookies.py.
+Run on the personal computer, never on the DGX: python3 export_youtube_cookies.py.
 Requires yt-dlp in this Python environment. The output is an owner-only Netscape
 cookie file; no values are logged. Chrome is the default; Firefox is supported.
 """
