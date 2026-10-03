@@ -10,7 +10,8 @@ bot, plus English feedback delivered to a dedicated English **Telegram** bot:
 2. **Staff/Senior MLE interview prep** — MLE drills, beginner coding, and a weekly adaptive system-design interview on a noon schedule.
 3. **English practice** — turns tutor recordings + corrections into spaced-repetition drills.
 4. **Daily podcast English** — sends the latest watched podcast
-   link at 18:00 after David chooses videos himself in the YouTube app, through
+   link plus long-sentence and weak-pattern practice at 18:00 Monday–Friday,
+   with weekday-material review on weekends, through
    the existing English Telegram bot.
 
 Google Calendar support is retained for a later phase, but its skill, MCP
@@ -43,7 +44,7 @@ Local DGX Spark (llama.cpp @ :8003, Qwen3.8 Flash-Next IQ4_XS, 2 × 64K slots)
    English Hermes profile ─────────────────────────────────────► English Telegram bot
         │ isolated SOUL / memory / sessions / Telegram token
         ├─ english-practice ─ Kakao webhook → intake + SRS review/drill
-        └─ english-podcast-coach ─ YouTube app watch history → 18:00 watched links
+        └─ english-podcast-coach ─ YouTube app watch history → 18:00 links + long-sentence practice
 
  arXiv + Hugging Face ── papers_ingest.py ── SQLite paper catalog
                               ▲
@@ -69,7 +70,7 @@ Local DGX Spark (llama.cpp @ :8003, Qwen3.8 Flash-Next IQ4_XS, 2 × 64K slots)
 | `bootstrap/install_cron_watchdog.sh` | Install automatic cron-stall detection and gateway recovery |
 | `bootstrap/stage_english_profile.py` | Stage only the isolated English-coaching Hermes profile |
 | `bootstrap/install_english_bot.sh` | Create/stage the English profile, install its gateway, and sync cron jobs |
-| `scripts/english_podcast.py` | On-request channel transcript preparation |
+| `scripts/english_podcast.py` | Channel transcripts and selected-video long-sentence practice |
 | `scripts/youtube_history.py` | Import cookies over SSH and send the latest watched podcast link headlessly |
 | `scripts/export_youtube_cookies.py` | Export YouTube-only cookies on the MacBook for server connection |
 | `scripts/papers_ingest.py` | Fetch and merge arXiv/Hugging Face paper metadata |
@@ -612,7 +613,8 @@ coding, and system-design progress.
 | `interview-prep` | 12:05 Mon/Wed/Fri | Interview group: one focused Staff/Senior MLE drill |
 | `coding-coach` | 12:10 Tue/Thu/Sat | LeetCode group: 35-minute beginner problem with canonical links |
 | `system-design-coach` | 12:15 Sunday | System-design group: one adaptive 45-minute interview |
-| `english-podcast-daily` | 18:00 daily | `🎧 Morning Echo` group on the existing English bot: latest watched podcast link (channels or Podcast title) |
+| `english-podcast-daily` | 18:00 Mon–Fri | `🎧 Morning Echo` group on the existing English bot: latest watched podcast link + transcript-backed long-sentence practice |
+| `english-podcast-weekend-review` | 18:00 Sat/Sun | Same podcast group: review this week’s weekday sources, no new video |
 | `english-intake` | 20:05 Mon–Sat | Dedicated English bot: feedback analysis or weakness coaching |
 | `english-drill` | 21:10 daily | Dedicated English bot: tonight's spaced-repetition drill |
 | `english-weekly-review` | 20:15 Sunday | Dedicated English bot: tutor feedback + weak SRS cumulative review |
@@ -854,7 +856,8 @@ changes.
 
 ### Evening YouTube watch-history links
 
-David selects videos himself in the YouTube app. At **18:00 America/Los_Angeles**,
+David selects videos himself in the YouTube app on weekdays. At **18:00
+Monday–Friday, America/Los_Angeles**,
 `english-podcast-daily` runs `youtube_history.py notify` and sends the **single most recently watched
 podcast** video, including yesterday or older days. A video qualifies if its
 channel is **English Goal Podcast** or **Daily English Podcast**, or its title
@@ -864,9 +867,36 @@ is not enough. It
 refreshes history each evening and sends the latest match even if unchanged. It uses the existing English
 profile/bot and the dedicated `🎧 Morning Echo` group selected by the validated
 `ENGLISH_PODCAST_TELEGRAM_CHAT_ID`. No new Hermes profile, bot, or service is added.
+The same evening message adds **two long-sentence speaking exercises** from that
+selected video's English captions. `english_podcast.py practice` validates the
+fresh watch-history snapshot, downloads/caches exactly that video, and extracts
+complete 20–45-word source sentences with timestamps. It favors clause connectors
+such as `even though`, `because`, `so that`, and `which`. The English agent adds
+Korean meanings, two or three clause chunks, reusable sentence frames and one
+personal speaking prompt per sentence. It also reads actual SRS weakness cards
+and chooses one or two additional short source sentences (8–25 words) from the
+same video for weak-pattern practice. If no known weakness fits the available
+sentences, it says so rather than inventing personal feedback. The 20:05 tutor
+coaching also uses these source records for additional practice; correction and
+SRS review remain grounded in actual feedback cards. Quotes stay verbatim; generated examples
+are labeled separately. Shadow each sentence three times, then say a personal
+version without looking. Automatic captions are identified. If captions are
+unavailable or no suitable complete sentences exist, the video link is still
+sent with a short explanation, without invented or substituted source sentences.
+
 The previous 09:15 recommendation and automatic 08:25 transcript prefetch are
-replaced. `english_podcast.py prepare` remains available for explicit transcript
-coaching; old downloaded transcripts remain available.
+replaced and remain disabled. The old `english_podcast.py prepare` new-video
+assignment is retained for a later explicit opt-in, but current practice and
+follow-ups use the selected weekday video or archived weekday material.
+
+At **18:00 Saturday/Sunday**, `english-podcast-weekend-review` runs
+`english_podcast.py review` in the same Python environment, profile, bot and
+podcast group. It reads only the current week's Monday–Friday source archives
+without refreshing history or downloading captions. Saturday emphasizes replay,
+shadowing and personal adaptations; Sunday emphasizes retrieval/rewrite with
+inline answers and a next-week focus. Repeated weekday selections are merged by
+video. No usable records means `[SILENT]`. Both routines use Korean guidance and
+keep generated prompts distinct from caption quotations.
 
 The **DGX Spark server is accessed over SSH and has no GUI**. YouTube's official
 API does not expose watch history, so the server reads the signed-in history page
@@ -880,7 +910,8 @@ The English installer provisions Playwright in the explicit server environment
 18:00 cron both use this environment's absolute Python path; interactive Conda
 and SSH/system `python3` can have different installed packages. The installer also
 downloads the [matching Playwright headless shell](https://playwright.dev/python/docs/browsers#chromium-headless-shell)
-into the environment’s `browsers/` directory. This fixed cache works even when
+into the environment’s `browsers/` directory and installs yt-dlp for the evening
+caption extraction. This fixed cache works even when
 Hermes changes HOME. Snap Chromium on this host returned `ERR_ACCESS_DENIED` for
 YouTube; the shared Hermes CDP browser is retained for its separate workflows. The SSH command below
 uses `ClearAllForwardings=yes` to bypass unrelated default forwarding (such as
@@ -937,6 +968,8 @@ excluded; a history entry does not prove a completed listen or viewing duration.
 ~/.hermes/venvs/youtube-history/bin/python ~/.hermes/profiles/english/scripts/youtube_history.py status
 ~/.hermes/venvs/youtube-history/bin/python ~/.hermes/profiles/english/scripts/youtube_history.py sync
 ~/.hermes/venvs/youtube-history/bin/python ~/.hermes/profiles/english/scripts/youtube_history.py notify
+/home/david/.hermes/venvs/youtube-history/bin/python /home/david/.hermes/profiles/english/scripts/english_podcast.py practice
+/home/david/.hermes/venvs/youtube-history/bin/python /home/david/.hermes/profiles/english/scripts/english_podcast.py review
 hermes -p english cron list
 ```
 
@@ -953,7 +986,11 @@ podcast room displays safe session/connection status, collection date, last
 successful collection, and the latest watched link. The date records when history
 was refreshed, not when the video was watched; older snapshots are labeled as
 awaiting refresh. Search is limited to 20 scrolls per run and reports an error if
-that limit is reached before finding a match. No live account verification is claimed
+that limit is reached before finding a match. Caption manifests, transcripts and
+practice source records live separately under `~/.hermes/data/english-podcast/watched/`;
+`practice.json` is current source state and `practice/YYYY-MM-DD.json` archives
+the extracted source sentences; `review.json` describes the current weekend
+review. It never changes legacy daily assignments or tutor SRS. No live account verification is claimed
 until `connect`/`sync` succeeds.
 
 ### Automatic cron recovery
@@ -1005,7 +1042,7 @@ hermes -p english cron run <ENGLISH_JOB_ID_FROM_LIST>
 ```
 
 `hermes cron list` shows the David bot jobs; `hermes -p english cron list` shows
-the isolated tutor-English jobs plus the 18:00 watched-link digest. Run each
+the isolated tutor-English jobs plus the weekday 18:00 watched-link practice and weekend review jobs. Run each
 profile's E2E message only after its Telegram bot has completed pairing.
 
 The gateway only starts after `/v1/models` contains
@@ -1187,7 +1224,8 @@ hanging indefinitely; an active local-model turn may run for up to ten minutes.
 - **English**: reveal due-card answers and mark each attempt correct or needing
   more practice. Results update the shared SRS deck used by Telegram drills.
 - **Morning Echo**: see latest watched podcast link (channels or Podcast title), source date,
-  and last successful collection, then reopen a video. Its
+  last successful collection and selected long-sentence quotes, then reopen a video
+  at each sentence’s timestamp. Its
   schedule and session history remain separate from tutor/SRS activity while it
   shares the English profile's learner memory.
 - **Papers**: browse recent catalog entries, save a reading list, and mark papers

@@ -25,7 +25,7 @@ DGX Spark (128GB 통합 메모리)
                 │
                 └── English Hermes gateway ── English Telegram bot
                       ├── tutor feedback / SRS
-                      └── Morning Echo group: 18:00 actual watched YouTube links
+                      └── Morning Echo group: weekday 18:00 watched practice / weekend 18:00 review
 
 arXiv / Hugging Face
         │
@@ -86,7 +86,7 @@ David-Agent/
 │   ├── english_srs.py         # Leitner SRS 덱 (추가/리뷰/통계/취약 카드)
 │   ├── export_youtube_cookies.py # MacBook에서 YouTube 쿠키만 내보내기
 │   ├── youtube_history.py     # SSH 쿠키 연결 + headless 시청 기록 수집
-│   ├── english_podcast.py     # 요청 시 YouTube 자막/대본 저장
+│   ├── english_podcast.py     # 선택한 영상 대본·긴 문장 연습 / 요청 시 채널 대본
 │   ├── agenda.py              # 캘린더 이벤트 포맷팅 + 충돌 감지
 │   ├── cron_health.py         # cron tick lock / jobs.json 건강 검사 (+ 선택적 gateway restart)
 │   ├── reward_system.py       # 실제 완료 증거 → Career Cash·연속 달성·가상 오퍼
@@ -159,7 +159,7 @@ David-Agent/
 │   ├── test_english_srs.py
 │   ├── test_youtube_history.py # 날짜/채널 선택·SSH 쿠키 연결·미연결 SILENT
 │   ├── test_export_youtube_cookies.py # YouTube-only export/import 검증
-│   ├── test_english_podcast.py # 자막 파싱·일일 배정·멱등 상태
+│   ├── test_english_podcast.py # 자막·일일 배정·시청 영상 긴 문장 추출
 │   ├── test_english_podcast_service.py # 과거 대본 timer 유지/중단 검증
 │   ├── test_agenda.py
 │   ├── test_skills.py         # 스킬 frontmatter 스키마 검증
@@ -203,7 +203,7 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 | `papers-digest` | research | 새 논문 카탈로그에서 LLM/LVM 후보를 뽑아 인터뷰 관련성과 항목별 원문 링크 제공 |
 | `interview-prep` | career | 월/수/금 Staff MLE 드릴 + 화/목/토 NeetCode/LeetCode 입문 코딩 + 일요일 적응형 General/ML/Agent 설계 인터뷰 |
 | `english-practice` | English profile / learning | 레슨 녹음/교정 파일 → SRS 카드 생성 + 전용 Telegram bot 매일 리뷰 |
-| `english-podcast-coach` | English profile / learning | YouTube 시청 기록의 가장 최근 팟캐스트 한 편 (두 채널 또는 제목 Podcast) → 같은 bot의 18:00 기록 |
+| `english-podcast-coach` | English profile / learning | YouTube 시청 기록의 가장 최근 팟캐스트 한 편 (두 채널 또는 제목 Podcast) → 평일 18:00 대본 긴 문장·약점 연습 / 주말 복습 |
 | `calendar-assistant` | productivity | **비활성/보존** — 추후 Google Calendar 브리핑 |
 
 새 agent형 기능은 audience·credential·privacy·identity/memory·model/tool
@@ -229,7 +229,7 @@ history/search·알림 제어의 이점이 있으면 같은 bot을 별도 Telegr
 | `interview_trends.py` | HN·GitHub·논문 DB에서 실시간 인터뷰 트렌드 수집·캐시 |
 | `english_intake.py` | 새 레슨 탐지, Telegram 파일 저장, 이번 주 세션 조회, 처리 상태 관리 |
 | `english_srs.py` | Leitner SRS 덱 (카드 추가/리뷰/통계/취약 카드 랭킹) |
-| `english_podcast.py` | 요청 시 영문 JSON3 자막 및 타임스탬프 대본 준비 |
+| `english_podcast.py` | 시청 영상의 대본 긴 문장 추출과 요청 시 채널 대본 준비 |
 | `youtube_history.py` | SSH stdin 쿠키 연결, GUI 없는 headless 시청 기록 수집, 18시 링크 메시지 |
 | `export_youtube_cookies.py` | MacBook 브라우저에서 live YouTube 쿠키만 private 파일로 내보내기 |
 | `agenda.py` | 캘린더 이벤트 포맷팅 + 충돌·여유 슬롯 감지 |
@@ -248,7 +248,8 @@ Calendar 연동을 재개할 때까지 `morning-brief`는 등록하지 않습니
 | `coding-coach` | 12:10 화/목/토 | 전용 LeetCode 그룹: 같은 패턴 6문제 블록의 다음 35분 문제 |
 | `leetcode-history-sync` | 매일 06:35 | 전송 없음: 연결된 LeetCode 세션의 읽기 전용 풀이 이력 snapshot 갱신 |
 | `system-design-coach` | 12:15 일요일 | 전용 System Design 그룹: 주 1회 45분 General/ML/Agent 인터뷰 |
-| `english-podcast-daily` | 18:00 매일 | 기존 English bot의 `🎧 Morning Echo` 전용 그룹: 가장 최근 팟캐스트 한 편 (두 채널 또는 제목 Podcast) |
+| `english-podcast-daily` | 18:00 월–금 | 기존 English bot의 `🎧 Morning Echo` 전용 그룹: 가장 최근 팟캐스트 한 편 + 대본 긴 문장 연습 |
+| `english-podcast-weekend-review` | 18:00 토·일 | 같은 podcast 그룹: 이번 주 평일 원문으로 복습, 새 영상 없음 |
 | `english-intake` | 월–토 20:05 | English bot: 새 피드백 분석 또는 취약 패턴 코칭 |
 | `english-drill` | 21:10 매일 | English bot: SRS 드릴 전달 |
 | `english-weekly-review` | 일요일 20:15 | English bot: tutor feedback + 취약 SRS 누적 복습 |
@@ -371,7 +372,7 @@ server TTFT·prefill/decode TPS, llama.cpp native timings와 실제 처리/캐�
 prompt 토큰 수도 기록합니다. `--server-metrics-url`은 단일 요청만 완료된
 차이를 귀속하고, 측정 실패와 채점 실패를 구분하며 exporter 조회 시간을 과제
 지연에서 제외합니다. prefix 캐시가 있으면 실제 새 KV 토큰 수를 우선 사용합니다.
-현재 관련 변경 후 `pytest -q`는 416개가 통과했습니다.
+현재 관련 변경 후 `pytest -q`는 435개가 통과했습니다.
 추가 KV 진단에서는 기존 19.92GiB 예산과 마지막 2.8% 사용률을 확인했고,
 KV 8GiB·prefix-off 설정에서도 40K를 통과했습니다. 온도 여유가 먼저 감소해
 작은 prefill 배치·CPU quota·열 제어를 적용한 별도 실행에서 55K와 요청별
@@ -580,7 +581,7 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
 - 영어 교정 데이터를 단순 저장이 아닌 **점진적 장기 학습**으로 전환
 
 ### YouTube 시청 기록 기반 Podcast English
-- David이 유튜브 앱에서 직접 고른 영상 중 가장 최근에 본 팟캐스트를 18:00 America/Los_Angeles에 기존 English bot과 podcast 그룹으로
+- David이 유튜브 앱에서 직접 고른 영상 중 가장 최근에 본 팟캐스트를 월~금 18:00 America/Los_Angeles에 기존 English bot과 podcast 그룹으로
   보냅니다. 기존 job 이름을 유지해 중복 일정을 만들지 않습니다.
 - DGX Spark는 SSH 접속 서버이며 GUI가 없습니다. MacBook에서 휴대폰과 같은
   계정/채널로 로그인하고 `export_youtube_cookies.py`로 YouTube 쿠키만
@@ -592,7 +593,7 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   공식 API는 시청 기록을 제공하지 않으므로 계정 만료나 UI 변경 시 재연결이
   필요합니다. 최초 연결 전 `notify`는 브라우저를 열지 않고 `[SILENT]`입니다.
 - `install_youtube_history.sh`가 `~/.hermes/venvs/youtube-history/`에
-  Playwright와 맞는 headless shell을 설치하며 English installer가 호출합니다.
+  Playwright와 맞는 headless shell, yt-dlp를 설치하며 English installer가 호출합니다.
   브라우저는 같은 venv의 `browsers/`에 설치해 Hermes HOME 변경 영향을 받지
   않습니다. Snap Chromium에서는 YouTube `ERR_ACCESS_DENIED`가 재현되어
   이 workflow의 기본 실행 파일을 교체했습니다. 공용 Hermes CDP는 그대로입니다. SSH 연결과 18:00
@@ -612,13 +613,31 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   선택하지 않습니다. Shorts는 제외합니다. 시청 완료나
   시청 시간을 추정하지 않습니다. 수집 기록에 해당 영상이 없으면 `[SILENT]`; 최대
   20회 스크롤 내에서 못 찾으면 오류를 보고합니다. 오류 시 이전 snapshot을
-  보존하며 전달하지 않습니다. 매일 가장 최근 링크를 보내므로 전날과 같을
+  보존하며 전달하지 않습니다. 평일마다 가장 최근 링크를 보내므로 전날과 같을
   수 있습니다. snapshot 날짜는 시청 날짜가 아니라 수집 날짜입니다.
-- 아침 09:15 추천과 08:25 자동 대본 timer를 중단했습니다. 기존
-  `english_podcast.py prepare`와 다운로드 대본은 요청 시 학습에 사용합니다.
+- 같은 평일 18시 메시지에 `english_podcast.py practice`로 선택한 영상의 영어
+  대본에서 20~45단어 완결 문장 두 개를 추출합니다. 접속사·관계절 표현을
+  우선하며 원문·타임스탬프에 한국어 뜻, 끊어 말하기, 재사용 구조, 개인
+  말하기 과제를 덧붙입니다. 실제 SRS 취약 카드와 대조해 같은 영상의
+  8~25단어 후보에서 약점 보완용 문장도 1~2개 골라줍니다. 20:05 추가
+  코칭도 이 원문을 사용하고 독립된 생성 문장을 새로 추천하지 않습니다. 자동 자막은 표시하고, 대본이나 적합한 문장을
+  못 구하면 링크와 사유만 전달합니다. 다른 영상이나 이전 연습 원문을
+  대체하지 않습니다. `english-podcast/watched/`의 caption·transcript·metadata와
+  현재 `practice.json`, 날짜별 `practice/` 기록은 기존 assignment/SRS와 분리합니다.
+- 토·일 18:00 `english-podcast-weekend-review`가 `english_podcast.py review`로
+  이번 주 월~금 원문 기록만 읽습니다. 반복 영상은 합치고 토요일은 듣기·
+  쉐도잉, 일요일은 회상·문장 재작성(바로 아래 정답)으로 복습합니다.
+  기록이 없으면 `[SILENT]`; 새 시청 기록·영상·대본은 가져오지 않습니다.
+  현재 `review.json`도 기존 podcast 방에서 같은 English 소유·세션 라우팅으로
+  표시하며 별도 profile/bot/service나 빈 방을 만들지 않습니다.
+- 아침 09:15 추천과 08:25 자동 대본 timer는 계속 비활성입니다. 기존
+  `english_podcast.py prepare`는 나중의 명시적인 재활성화를 위해 보존하되,
+  현재 후속 연습은 선택한 평일 영상이나 그 주의 대본 기록을 사용합니다.
 - Observatory의 기존 `Morning Echo`는 `english` 소유를 유지하며 일정,
   현재·과거 세션, 안전한 연결 상태, 실제 시청 링크와 날짜를 같은 podcast
-  방에서 확인합니다. 저장된 쿠키 내용은 Observatory에 제공하지 않습니다.
+  방에서 확인합니다. 현재 선택 영상과 날짜가 일치하는 긴 문장 원문·패턴·
+  듣기 링크도 표시하며 한국어 뜻·응용 과제는 Telegram에서 확인합니다.
+  저장된 쿠키 내용은 Observatory에 제공하지 않습니다.
 
 ### 인터뷰 학습 코치 (interview_progress.py)
 - 기존 `interview-prep` 스킬 안에서 동작하며, `stage.py`가 standalone helper와

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # __author__ = 'David Choi (bestshoot21@gmail.com)'
-"""Prepare one transcript-backed English Goal Podcast lesson per local day.
+"""Prepare transcript-backed podcast assignments and watched-video practice.
 
 The helper keeps network retrieval and daily assignment state deterministic for
 the ``english-podcast-coach`` skill. It downloads English YouTube captions with
@@ -11,16 +11,19 @@ does so.
 from __future__ import annotations
 
 import argparse
-from datetime import date, datetime
+from bisect import bisect_right
+from datetime import date, datetime, timedelta
 import fcntl
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
 from typing import Any, Callable, Sequence
+from zoneinfo import ZoneInfo
 
 
 DEFAULT_CHANNEL_URL = "https://www.youtube.com/@EnglishGoalPodcast/videos"
@@ -28,6 +31,22 @@ EXPECTED_CHANNEL_ID = "UC8oq85HHmW3BDhYWc1YcsIA"
 DEFAULT_DATA_DIR = Path.home() / ".hermes" / "data" / "english-podcast"
 DEFAULT_PLAYLIST_LIMIT = 500
 MIN_TRANSCRIPT_WORDS = 50
+HISTORY_PATH = Path('/home/david/.hermes/data/youtube-history/snapshot.json')
+WATCHED_DATA_DIR = Path('/home/david/.hermes/data/english-podcast/watched')
+TZ = ZoneInfo('America/Los_Angeles')
+SENTENCE_PATTERNS = (
+    ('even though', '양보: ~인데도'),
+    ('as long as', '조건: ~하기만 하면'),
+    ('not only', '확장: A뿐 아니라 B도'),
+    ('the more', '비례: ~할수록'),
+    ('because', '이유: ~하기 때문에'),
+    ('so that', '목적: ~할 수 있도록'),
+    ('although', '양보: ~이지만'),
+    ('instead of', '대안: ~하는 대신'),
+    ('which', '관계절: 앞 내용을 덧붙여 설명'),
+    ('when', '시간·상황: ~할 때'),
+    ('if', '조건: 만약 ~라면'),
+)
 
 Runner = Callable[..., subprocess.CompletedProcess[str]]
 
@@ -193,6 +212,7 @@ def download_transcript(
     data_dir: Path,
     *,
     runner: Runner = subprocess.run,
+    expected_channel_id: str | None = EXPECTED_CHANNEL_ID,
 ) -> dict[str, Any]:
     """Download captions and create a compact manifest plus readable transcript."""
     captions_dir = data_dir / "captions"
@@ -238,8 +258,10 @@ def download_transcript(
 
     info_path = captions_dir / f"{video_id}.info.json"
     info = json.loads(info_path.read_text(encoding="utf-8")) if info_path.exists() else {}
+    if info.get('id') and str(info['id']) != video_id:
+        raise RuntimeError('Downloaded captions do not match the selected video.')
     resolved_channel_id = str(info.get("channel_id") or "")
-    if resolved_channel_id and resolved_channel_id != EXPECTED_CHANNEL_ID:
+    if expected_channel_id and resolved_channel_id and resolved_channel_id != expected_channel_id:
         raise RuntimeError(
             f"Downloaded video {video_id} does not belong to the expected channel"
         )
@@ -252,7 +274,7 @@ def download_transcript(
     header = [
         f"Title: {title}",
         f"Source: {url}",
-        f"Channel: {info.get('channel') or 'English Goal Podcast'}",
+        f"Channel: {info.get('channel') or video.get('channel') or 'English Goal Podcast'}",
         f"Captions: YouTube {'automatic ' if caption_kind == 'automatic' else ''}captions ({language})",
         "",
     ]
@@ -266,7 +288,7 @@ def download_transcript(
         "video_id": video_id,
         "title": title,
         "url": url,
-        "channel": str(info.get("channel") or "English Goal Podcast"),
+        "channel": str(info.get("channel") or video.get('channel') or "English Goal Podcast"),
         "channel_id": resolved_channel_id,
         "upload_date": info.get("upload_date"),
         "duration_seconds": info.get("duration") or video.get("duration"),
@@ -280,6 +302,141 @@ def download_transcript(
     _atomic_write_json(metadata_dir / f"{video_id}.json", manifest)
     info_path.unlink(missing_ok=True)
     return manifest
+
+
+def select_caption_sentences(cues: list[dict[str, Any]], url: str, *,
+                             min_words: int = 20, max_words: int = 45,
+                             limit: int = 2) -> list[dict[str, Any]]:
+    """Rank complete, contiguous caption sentences; never invent punctuation."""
+    parts, starts, positions = [], [], []
+    length = 0
+    for cue in cues:
+        text = ' '.join(str(cue['text']).split())
+        if not text:
+            continue
+        starts.append(length)
+        positions.append(int(cue['start_ms']))
+        parts.append(text)
+        length += len(text) + 1
+    source = ' '.join(parts)
+    candidates, seen = [], set()
+    for match in re.finditer(r'[^.!?]+[.!?]+["”’]?(?=\s|$)', source):
+        quote = match.group().strip()
+        words = quote.split()
+        if not min_words <= len(words) <= max_words or quote.casefold() in seen:
+            continue
+        # Caption stage directions are not spoken practice sentences.
+        if '[' in quote or ']' in quote:
+            continue
+        patterns = [{'marker': marker, 'meaning': meaning}
+                    for marker, meaning in SENTENCE_PATTERNS
+                    if re.search(r'\b' + re.escape(marker) + r'\b', quote, re.IGNORECASE)]
+        offset = match.start() + len(match.group()) - len(match.group().lstrip())
+        start_ms = positions[max(0, bisect_right(starts, offset) - 1)]
+        seen.add(quote.casefold())
+        candidates.append({'source_quote': quote, 'word_count': len(words),
+                           'start_ms': start_ms, 'timestamp': timestamp(start_ms),
+                           'url': url + '&t=' + str(max(0, start_ms // 1000)),
+                           'patterns': patterns})
+    candidates.sort(key=lambda item: (-len(item['patterns']), -item['word_count'], item['start_ms']))
+    return candidates[:limit]
+
+
+def select_long_sentences(cues: list[dict[str, Any]], url: str) -> list[dict[str, Any]]:
+    """Select two long sentences while preserving source words and timestamps."""
+    return select_caption_sentences(cues, url)
+
+
+def prepare_watched_practice(
+    data_dir: Path, history_path: Path, *, lesson_date: str,
+    runner: Runner = subprocess.run,
+) -> dict[str, Any]:
+    """Extract practice only from the freshly selected watch-history video's captions."""
+    history = json.loads(history_path.read_text(encoding='utf-8'))
+    if history.get('date') != lesson_date or history.get('selection') != 'latest':
+        raise ValueError('A fresh latest-video history snapshot is required.')
+    videos = history.get('videos', [])
+    if len(videos) != 1:
+        raise ValueError('Exactly one watched video is required.')
+    selected = videos[0]
+    video_id = str(selected.get('video_id', ''))
+    url = 'https://www.youtube.com/watch?v=' + video_id
+    if not re.fullmatch(r'[A-Za-z0-9_-]{11}', video_id) or selected.get('url') != url:
+        raise ValueError('Invalid watched-video identity.')
+    data_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
+    result = {'lesson_date': lesson_date, 'video_id': video_id, 'url': url,
+              'title': str(selected.get('title', '')), 'sentences': [], 'weakness_candidates': []}
+    with (data_dir / '.practice.lock').open('a') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        try:
+            metadata_path = data_dir / 'metadata' / f'{video_id}.json'
+            manifest = json.loads(metadata_path.read_text()) if metadata_path.exists() else {}
+            caption_path = Path(str(manifest.get('caption_path', '')))
+            valid_cache = (manifest.get('video_id') == video_id
+                           and caption_path.is_file()
+                           and caption_path.name in (f'{video_id}.en.json3', f'{video_id}.en-orig.json3')
+                           and caption_path.resolve().parent == (data_dir / 'captions').resolve())
+            if not valid_cache:
+                manifest = download_transcript(
+                    {'id': video_id, 'url': url, 'title': result['title'],
+                     'channel': str(selected.get('channel', ''))},
+                    data_dir, runner=runner, expected_channel_id=None,
+                )
+                caption_path = Path(manifest['caption_path'])
+            cues = json3_cues(json.loads(caption_path.read_text(encoding='utf-8')))
+            result['caption_kind'] = manifest.get('caption_kind', 'unknown')
+            result['sentences'] = select_long_sentences(cues, url)
+            result['weakness_candidates'] = select_caption_sentences(cues, url, min_words=8, max_words=25, limit=12)
+            if result['sentences'] or result['weakness_candidates']:
+                result['status'] = 'ready'
+            else:
+                result.update(status='unavailable', reason='대본에서 연습에 적합한 완결된 문장을 찾지 못했습니다.')
+        except (RuntimeError, OSError, ValueError, TypeError, KeyError, subprocess.TimeoutExpired):
+            # External-tool errors may contain account data; never echo them.
+            result.update(status='unavailable', sentences=[], weakness_candidates=[],
+                          reason='선택한 영상의 영어 자막을 가져오지 못했습니다.')
+        _atomic_write_json(data_dir / 'practice.json', result)
+        _atomic_write_json(data_dir / 'practice' / f'{lesson_date}.json', result)
+    return result
+
+
+def prepare_weekend_review(data_dir: Path, *, lesson_date: str) -> dict[str, Any]:
+    """Read this week's weekday source records without contacting YouTube."""
+    today = date.fromisoformat(lesson_date)
+    monday = today - timedelta(days=today.weekday())
+    friday = min(today, monday + timedelta(days=4))
+    episodes = {}
+    for offset in range((friday - monday).days + 1):
+        source_date = (monday + timedelta(days=offset)).isoformat()
+        path = data_dir / 'practice' / f'{source_date}.json'
+        if not path.exists():
+            continue
+        try:
+            record = json.loads(path.read_text(encoding='utf-8'))
+            video_id = str(record.get('video_id', ''))
+            url = 'https://www.youtube.com/watch?v=' + video_id
+            if (record.get('lesson_date') != source_date or record.get('status') != 'ready'
+                    or not re.fullmatch(r'[A-Za-z0-9_-]{11}', video_id) or record.get('url') != url):
+                continue
+            if not record.get('sentences') and not record.get('weakness_candidates'):
+                continue
+            previous = episodes.get(video_id, {})
+            episodes[video_id] = {
+                'video_id': video_id, 'title': record.get('title'), 'url': url,
+                'source_dates': previous.get('source_dates', []) + [source_date],
+                'caption_kind': record.get('caption_kind'),
+                'sentences': record.get('sentences', [])[:2],
+                'weakness_candidates': record.get('weakness_candidates', [])[:12],
+            }
+        except (OSError, ValueError, TypeError, KeyError, AttributeError):
+            continue
+    result = {'lesson_date': lesson_date, 'week_start': monday.isoformat(),
+              'week_end': friday.isoformat(), 'episodes': list(episodes.values()),
+              'status': 'ready' if episodes else 'unavailable'}
+    if not episodes:
+        result['reason'] = '이번 주 평일 팟캐스트 대본 연습 기록이 없습니다.'
+    _atomic_write_json(data_dir / 'review.json', result)
+    return result
 
 
 def _existing_manifest(data_dir: Path, assignment: dict[str, Any]) -> dict[str, Any] | None:
@@ -384,7 +541,7 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default=Path(os.environ.get("ENGLISH_PODCAST_DATA_DIR", DEFAULT_DATA_DIR)),
     )
     parser.add_argument("--channel-url", default=DEFAULT_CHANNEL_URL)
-    parser.add_argument("--date", default=date.today().isoformat())
+    parser.add_argument("--date", default=datetime.now(TZ).date().isoformat())
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     prepare = subparsers.add_parser("prepare", help="download today's assigned transcript")
@@ -392,6 +549,11 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     delivered = subparsers.add_parser("mark", help="mark today's lesson delivered")
     delivered.add_argument("--video-id", required=True)
     subparsers.add_parser("status", help="show local assignment and transcript counts")
+    practice = subparsers.add_parser('practice', help='extract long sentences from the latest watched video')
+    practice.add_argument('--history-file', type=Path, default=HISTORY_PATH)
+    practice.add_argument('--practice-dir', type=Path, default=WATCHED_DATA_DIR)
+    review = subparsers.add_parser('review', help='review this week\'s weekday podcast sources without fetching a video')
+    review.add_argument('--practice-dir', type=Path, default=WATCHED_DATA_DIR)
     return parser.parse_args(argv)
 
 
@@ -407,6 +569,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
     elif args.command == "mark":
         result = mark_delivered(data_dir, args.video_id, args.date)
+    elif args.command == 'practice':
+        try:
+            result = prepare_watched_practice(args.practice_dir.expanduser(), args.history_file.expanduser(),
+                                             lesson_date=args.date)
+        except (OSError, ValueError, TypeError, KeyError):
+            print('현재 시청 기록의 영상과 대본을 확인하지 못했습니다. 이전 연습 자료는 전달하지 않습니다.', file=sys.stderr)
+            return 1
+    elif args.command == 'review':
+        try:
+            result = prepare_weekend_review(args.practice_dir.expanduser(), lesson_date=args.date)
+        except (OSError, ValueError):
+            print('이번 주 팟캐스트 복습 기록을 읽지 못했습니다.', file=sys.stderr)
+            return 1
     else:
         result = status(data_dir)
     print(json.dumps(result, indent=2, ensure_ascii=False))

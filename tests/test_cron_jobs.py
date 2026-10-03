@@ -10,7 +10,7 @@ REPO = Path(__file__).resolve().parent.parent
 JOBS = REPO / "cron" / "jobs.yaml"
 EXPECTED_JOBS = {
     "papers-digest", "interview-prep", "english-intake", "english-drill",
-    "english-weekly-review", "english-podcast-daily", "weekly-review",
+    "english-weekly-review", "english-podcast-daily", "english-podcast-weekend-review", "weekly-review",
     "leetcode-history-sync",
     "career-rewards-daily",
 }
@@ -148,22 +148,36 @@ def test_english_jobs_use_the_isolated_english_profile():
 def test_english_podcast_job_sends_actual_watch_history_at_1800_in_existing_profile():
     jobs = {job["name"]: job for job in rc.load_jobs(JOBS)}
     podcast = jobs["english-podcast-daily"]
-    assert podcast["schedule"] == "0 18 * * *"
+    assert podcast["schedule"] == "0 18 * * 1-5"
     assert podcast["profile"] == "english"
     assert podcast["deliver_chat_id_env"] == "ENGLISH_PODCAST_TELEGRAM_CHAT_ID"
     assert podcast["skills"] == ["english-podcast-coach"]
     assert "youtube_history.py" in podcast["prompt"]
-    assert "notify and return stdout exactly" in podcast["prompt"]
+    assert "notify to refresh the actual watch history" in podcast["prompt"]
     assert "including older days" in podcast["prompt"]
     assert "Daily English Podcast" in podcast["prompt"]
     assert "Podcast in the title (case insensitive)" in podcast["prompt"]
     assert "exactly one title and link" in podcast["prompt"]
+    assert "english_podcast.py practice" in podcast["prompt"]
+    assert "source_quote" in podcast["prompt"]
+    assert "weakness_candidates" in podcast["prompt"]
+    assert "never invent or substitute transcript quotations" in podcast["prompt"]
     assert "never read or send an old snapshot" in podcast["prompt"]
 
     command = rc.build_create_command(
         podcast, environment={"ENGLISH_PODCAST_TELEGRAM_CHAT_ID": "-1001234567894"}
     )
     assert command[command.index("--deliver") + 1] == "telegram:-1001234567894"
+
+
+def test_podcast_weekend_reviews_share_route_and_only_use_archived_weekday_sources():
+    jobs = {job['name']: job for job in rc.load_jobs(JOBS)}
+    review = jobs['english-podcast-weekend-review']
+    assert review['schedule'] == '0 18 * * 6,0'
+    assert review['profile'] == 'english'
+    assert review['deliver_chat_id_env'] == jobs['english-podcast-daily']['deliver_chat_id_env']
+    assert 'english_podcast.py review' in review['prompt']
+    assert 'never refresh YouTube history, download captions or recommend a new video' in review['prompt']
 
 
 def test_calendar_brief_is_not_scheduled_while_integration_is_deferred():

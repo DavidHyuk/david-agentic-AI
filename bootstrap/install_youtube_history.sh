@@ -20,9 +20,9 @@ if [[ ! -x "$YOUTUBE_HISTORY_RUNTIME_PYTHON" ]]; then
 fi
 
 if [[ -n "$YOUTUBE_HISTORY_UV" ]]; then
-  "$YOUTUBE_HISTORY_UV" pip install --python "$YOUTUBE_HISTORY_RUNTIME_PYTHON" 'playwright>=1.55,<2'
+  "$YOUTUBE_HISTORY_UV" pip install --python "$YOUTUBE_HISTORY_RUNTIME_PYTHON" 'playwright>=1.55,<2' 'yt-dlp>=2025.8.22'
 else
-  "$YOUTUBE_HISTORY_RUNTIME_PYTHON" -m pip install 'playwright>=1.55,<2'
+  "$YOUTUBE_HISTORY_RUNTIME_PYTHON" -m pip install 'playwright>=1.55,<2' 'yt-dlp>=2025.8.22'
 fi
 
 # Install a matching headless browser in a stable path, even when Hermes changes HOME.

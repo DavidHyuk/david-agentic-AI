@@ -107,7 +107,11 @@ def test_english_podcast_skill_requires_actual_evening_history_and_safe_followup
     body = path.read_text()
     assert "youtube_history.py notify" in body
     assert "18:00 America/Los_Angeles" in body
-    assert "Never read an older" in body
-    assert "snapshot as a substitute" in body
+    assert "do not use a cached snapshot" in body
+    assert "english_podcast.py practice" in body
+    assert "source_quote" in body
+    assert "20–45-word sentences" in body
+    assert "Do not substitute a different video's" in body
+    assert "previous practice result" in body
     assert "never invent tutor weaknesses" in body
     assert "english_podcast.py prepare" in body

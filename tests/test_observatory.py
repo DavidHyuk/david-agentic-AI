@@ -463,13 +463,16 @@ def test_podcast_room_reuses_english_profile_and_lists_its_schedule(store):
     (profile / 'cron').mkdir()
     (profile / 'cron/jobs.json').write_text(json.dumps({'jobs': [{
         'id': 'pod', 'name': 'english-podcast-daily', 'enabled': True,
-        'schedule_display': '0 9 * * *', 'deliver': 'telegram:-99',
+        'schedule_display': '0 18 * * 1-5', 'deliver': 'telegram:-99',
+    }, {
+        'id': 'pod-review', 'name': 'english-podcast-weekend-review', 'enabled': True,
+        'schedule_display': '0 18 * * 6,0', 'deliver': 'telegram:-99',
     }]}))
 
     room = next(room for room in store.overview()['rooms'] if room['id'] == 'podcast')
     assert room['title'] == 'Morning Echo'
     assert room['profile'] == 'english'
-    assert [job['name'] for job in room['jobs']] == ['english-podcast-daily']
+    assert {job['name'] for job in room['jobs']} == {'english-podcast-daily', 'english-podcast-weekend-review'}
 
 
 def test_http_blocks_untrusted_hosts_cross_site_and_arbitrary_files(store):
@@ -897,3 +900,46 @@ def test_podcast_workbench_exposes_dated_watch_history_without_browser_credentia
 def test_historical_evening_history_sessions_stay_in_shared_podcast_room():
     assert room_for('english', 'cron_removed_20261003',
                     'Run youtube_history.py notify for evening watch-history.', []) == 'podcast'
+    assert room_for('english', 'cron_removed_review',
+                    'Run english_podcast.py review for weekend podcast review.', []) == 'podcast'
+
+
+@pytest.mark.parametrize('practice_video,visible', [('abcdefghijk', True), ('bbbbbbbbbbb', False)])
+def test_podcast_practice_matches_current_selected_video_and_exposes_only_source_fields(store, practice_video, visible):
+    from datetime import datetime
+    today = datetime.now(observatory_module.TZ).date().isoformat()
+    history_root = store.home / 'data/youtube-history'
+    history_root.mkdir(parents=True)
+    (history_root / 'snapshot.json').write_text(json.dumps({'date': today, 'videos': [{
+        'video_id': 'abcdefghijk', 'title': 'Selected', 'url': 'https://www.youtube.com/watch?v=abcdefghijk',
+    }]}))
+    root = store.home / 'data/english-podcast/watched'
+    root.mkdir(parents=True)
+    (root / 'practice.json').write_text(json.dumps({
+        'lesson_date': today, 'video_id': practice_video, 'status': 'ready', 'caption_kind': 'automatic',
+        'caption_path': '/private/source', 'cookie': 'never expose',
+        'sentences': [{'source_quote': 'A source sentence.', 'timestamp': '01:00', 'patterns': [],
+                       'url': 'https://www.youtube.com/watch?v=abcdefghijk&t=60', 'secret': 'never expose'}],
+    }))
+    practice = store.workbench('podcast')['long_sentence_practice']
+    assert (practice is not None) is visible
+    if visible:
+        assert practice['sentences'][0]['source_quote'] == 'A source sentence.'
+        assert 'never expose' not in json.dumps(practice)
+        assert 'caption_path' not in practice
+
+
+def test_weekend_review_workbench_exposes_current_week_sources_without_private_fields(store):
+    from datetime import datetime
+    today = datetime.now(observatory_module.TZ).date().isoformat()
+    root = store.home / 'data/english-podcast/watched'
+    root.mkdir(parents=True)
+    (root / 'review.json').write_text(json.dumps({
+        'lesson_date': today, 'week_start': today, 'status': 'ready', 'private_path': '/private',
+        'episodes': [{'title': 'Weekday podcast', 'url': 'https://www.youtube.com/watch?v=abcdefghijk',
+                      'source_dates': [today], 'secret': 'never expose'}],
+    }))
+    review = store.workbench('podcast')['podcast_review']
+    assert review['episodes'][0]['title'] == 'Weekday podcast'
+    assert 'never expose' not in json.dumps(review)
+    assert 'private_path' not in review

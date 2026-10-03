@@ -13,8 +13,10 @@ retained in source but intentionally deferred and disabled. English
 tutor feedback enters through the KakaoTalk Channel chatbot and is processed
 locally before the review and SRS drill are delivered through Telegram.
 The existing English profile sends the latest watched YouTube podcast link at
-18:00 (English Goal Podcast / Daily English Podcast channels or Podcast in the title) to the dedicated podcast Telegram group. Transcript
-preparation remains available on request; automatic morning recommendations
+18:00 Monday-Friday (English Goal Podcast / Daily English Podcast channels or Podcast in the title) to the dedicated podcast Telegram group,
+with long-sentence and evidenced weak-pattern practice from that video’s captions.
+Weekend 18:00 messages review the current week’s weekday source material only.
+The former new-video assignment is retained for a later explicit opt-in; automatic morning recommendations
 and transcript prefetch are disabled.
 
 ## Layout

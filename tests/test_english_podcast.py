@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import subprocess
+import pytest
 
 import english_podcast as podcast
 
@@ -128,3 +129,178 @@ def test_prepare_downloads_transcript_and_is_idempotent_per_day(tmp_path: Path) 
     delivered = podcast.mark_delivered(tmp_path, "video123", "2026-09-13")
     assert delivered["delivered_at"]
     assert podcast.status(tmp_path)["delivered_count"] == 1
+
+
+LONG_SENTENCE = ('Even though I felt nervous about speaking in front of my colleagues, '
+                 'I decided to explain my idea clearly because I wanted to become more confident.')
+SECOND_SENTENCE = ('When you give yourself enough time to prepare for a difficult conversation, '
+                   'you can focus on what matters instead of worrying about every small mistake.')
+
+
+def test_long_sentences_join_caption_cues_without_rewriting_and_keep_start_times():
+    boundary = LONG_SENTENCE.index('I decided')
+    cues = [{'text': 'A short introduction.', 'start_ms': 0},
+            {'text': LONG_SENTENCE[:boundary], 'start_ms': 61000},
+            {'text': LONG_SENTENCE[boundary:], 'start_ms': 62000},
+            {'text': SECOND_SENTENCE, 'start_ms': 120000}]
+    url = 'https://www.youtube.com/watch?v=abcdefghijk'
+    result = podcast.select_long_sentences(cues, url)
+    assert {item['source_quote'] for item in result} == {LONG_SENTENCE, SECOND_SENTENCE}
+    first = next(item for item in result if item['source_quote'] == LONG_SENTENCE)
+    assert first['timestamp'] == '01:01'
+    assert first['url'] == url + '&t=61'
+    assert {item['marker'] for item in first['patterns']} == {'even though', 'because'}
+
+
+def test_no_punctuation_is_not_repaired_into_a_fabricated_complete_sentence():
+    assert podcast.select_long_sentences([{'start_ms': 0, 'text': LONG_SENTENCE.rstrip('.')}], 'url') == []
+
+
+def test_sentence_selection_deduplicates_and_limits_lengths_and_count():
+    cues = [{'text': text, 'start_ms': index * 1000} for index, text in enumerate([
+        LONG_SENTENCE, LONG_SENTENCE, SECOND_SENTENCE,
+        ' '.join(['word'] * 46) + '.', 'Too short.',
+        ' '.join(['word'] * 25) + '.',
+    ])]
+    result = podcast.select_long_sentences(cues, 'url')
+    assert len(result) == 2
+    assert {item['source_quote'] for item in result} == {LONG_SENTENCE, SECOND_SENTENCE}
+
+
+def watched_history(path, *, lesson_date='2026-10-03', video_id='abcdefghijk'):
+    path.write_text(json.dumps({'date': lesson_date, 'selection': 'latest', 'videos': [{
+        'video_id': video_id, 'url': 'https://www.youtube.com/watch?v=' + video_id,
+        'title': 'My watched episode', 'channel': 'Daily English Podcast',
+    }]}))
+
+
+def watched_caption_runner(command, **kwargs):
+    assert '--flat-playlist' not in command
+    assert command[-1] == 'https://www.youtube.com/watch?v=abcdefghijk'
+    directory = Path(command[command.index('--output') + 1]).parent
+    (directory / 'abcdefghijk.en.json3').write_text(json.dumps({'events': [
+        {'tStartMs': 61000, 'segs': [{'utf8': LONG_SENTENCE}]},
+        {'tStartMs': 120000, 'segs': [{'utf8': SECOND_SENTENCE}]},
+    ]}))
+    (directory / 'abcdefghijk.info.json').write_text(json.dumps({
+        'id': 'abcdefghijk', 'channel_id': 'another-channel', 'channel': 'Daily English Podcast',
+        'automatic_captions': {'en': [{}]},
+    }))
+    return subprocess.CompletedProcess(command, 0, '', '')
+
+
+def test_watched_practice_downloads_exact_video_from_other_channel_and_reuses_captions(tmp_path):
+    history_path = tmp_path / 'history.json'
+    watched_history(history_path)
+    root = tmp_path / 'watched'
+    result = podcast.prepare_watched_practice(root, history_path, lesson_date='2026-10-03',
+                                              runner=watched_caption_runner)
+    assert result['status'] == 'ready'
+    assert result['video_id'] == 'abcdefghijk'
+    assert result['caption_kind'] == 'automatic'
+    assert len(result['sentences']) == 2
+    assert not (root / 'state.json').exists()
+    assert json.loads((root / 'practice.json').read_text()) == result
+    assert (root / 'practice/2026-10-03.json').exists()
+    def no_download(*args, **kwargs):
+        pytest.fail('Verified captions should be reused for the same video.')
+    repeated = podcast.prepare_watched_practice(root, history_path, lesson_date='2026-10-03', runner=no_download)
+    assert repeated == result
+
+
+@pytest.mark.parametrize('failure', [RuntimeError('private-secret'), subprocess.TimeoutExpired('secret-command', 180)])
+def test_watched_caption_failure_is_safe_and_does_not_reuse_prior_practice(tmp_path, failure):
+    history_path = tmp_path / 'history.json'
+    watched_history(history_path)
+    root = tmp_path / 'watched'
+    root.mkdir()
+    (root / 'practice.json').write_text('{"sentences":[{"source_quote":"old unrelated text"}]}')
+    def unavailable(*args, **kwargs):
+        raise failure
+    result = podcast.prepare_watched_practice(root, history_path, lesson_date='2026-10-03', runner=unavailable)
+    assert result['status'] == 'unavailable'
+    assert result['sentences'] == []
+    assert 'secret' not in json.dumps(result)
+    assert 'old unrelated text' not in (root / 'practice.json').read_text()
+
+
+@pytest.mark.parametrize('change', ['old_date', 'invalid_url', 'multiple_videos'])
+def test_practice_rejects_stale_or_invalid_history_before_any_network_call(tmp_path, change):
+    history_path = tmp_path / 'history.json'
+    watched_history(history_path)
+    history = json.loads(history_path.read_text())
+    if change == 'old_date':
+        history['date'] = '2000-01-01'
+    elif change == 'invalid_url':
+        history['videos'][0]['url'] = 'https://evil.example/watch?v=abcdefghijk'
+    else:
+        history['videos'].append(history['videos'][0])
+    history_path.write_text(json.dumps(history))
+    with pytest.raises(ValueError):
+        podcast.prepare_watched_practice(tmp_path / 'practice', history_path, lesson_date='2026-10-03',
+                                        runner=lambda *a, **kw: pytest.fail('Must not fetch unverified video.'))
+
+
+def test_wrong_downloaded_video_never_becomes_a_source_quote(tmp_path):
+    history_path = tmp_path / 'history.json'
+    watched_history(history_path)
+    def wrong_video(command, **kwargs):
+        result = watched_caption_runner(command, **kwargs)
+        directory = Path(command[command.index('--output') + 1]).parent
+        (directory / 'abcdefghijk.info.json').write_text('{"id":"bbbbbbbbbbb"}')
+        return result
+    result = podcast.prepare_watched_practice(tmp_path / 'practice', history_path,
+                                              lesson_date='2026-10-03', runner=wrong_video)
+    assert result['status'] == 'unavailable'
+    assert result['sentences'] == []
+
+
+def test_practice_cli_uses_explicit_source_and_safe_failure_output(tmp_path, monkeypatch, capsys):
+    history_path = tmp_path / 'missing-history.json'
+    assert podcast.main(['--date', '2026-10-03', 'practice', '--history-file', str(history_path),
+                         '--practice-dir', str(tmp_path / 'practice')]) == 1
+    output = capsys.readouterr()
+    assert output.out == ''
+    assert 'missing-history.json' not in output.err
+    assert '이전 연습 자료는 전달하지 않습니다' in output.err
+
+
+def test_shorter_weakness_candidates_are_source_sentences_within_practice_length():
+    quote = 'I have been practicing English every morning because I want to feel more comfortable in meetings.'
+    candidates = podcast.select_caption_sentences([{'start_ms': 1000, 'text': quote}],
+                                                 'url', min_words=8, max_words=25, limit=12)
+    assert candidates[0]['source_quote'] == quote
+    assert 8 <= candidates[0]['word_count'] <= 25
+
+
+@pytest.mark.parametrize('lesson_date', ['2026-10-03', '2026-10-04'])
+def test_weekend_review_uses_weekdays_of_current_week_and_merges_repeat_videos(tmp_path, lesson_date):
+    directory = tmp_path / 'practice'
+    directory.mkdir()
+    for source_date in ('2026-09-25', '2026-09-28', '2026-09-29', '2026-10-02', '2026-10-03'):
+        video_id = 'bbbbbbbbbbb' if source_date in ('2026-09-25', '2026-10-03') else 'abcdefghijk'
+        (directory / f'{source_date}.json').write_text(json.dumps({
+            'lesson_date': source_date, 'video_id': video_id,
+            'url': 'https://www.youtube.com/watch?v=' + video_id,
+            'status': 'ready', 'sentences': [{'source_quote': LONG_SENTENCE}],
+        }))
+    result = podcast.prepare_weekend_review(tmp_path, lesson_date=lesson_date)
+    assert result['week_start'] == '2026-09-28'
+    assert result['week_end'] == '2026-10-02'
+    assert result['status'] == 'ready'
+    assert len(result['episodes']) == 1
+    assert result['episodes'][0]['source_dates'] == ['2026-09-28', '2026-09-29', '2026-10-02']
+    assert result['episodes'][0]['sentences'][0]['source_quote'] == LONG_SENTENCE
+
+
+def test_weekend_review_missing_or_failed_sources_does_not_fall_back_to_old_practice(tmp_path):
+    (tmp_path / 'practice').mkdir()
+    (tmp_path / 'practice/2026-09-28.json').write_text('malformed')
+    (tmp_path / 'practice/2026-09-29.json').write_text(json.dumps({
+        'lesson_date': '2026-09-29', 'video_id': 'abcdefghijk', 'status': 'unavailable',
+        'url': 'https://www.youtube.com/watch?v=abcdefghijk', 'sentences': [{'source_quote': 'old'}],
+    }))
+    (tmp_path / 'practice.json').write_text('{"sentences":[{"source_quote":"old"}]}')
+    result = podcast.prepare_weekend_review(tmp_path, lesson_date='2026-10-03')
+    assert result['status'] == 'unavailable'
+    assert result['episodes'] == []

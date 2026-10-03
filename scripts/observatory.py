@@ -38,14 +38,15 @@ ROOMS = [
     ('coding', 'LeetCode Gym', '코딩 훈련', '⌨', '#efc783'),
     ('design', 'Design Studio', '시스템 디자인', '🏗', '#9bcad8'),
     ('english', 'English Lab', '영어 코칭 · SRS', '💬', '#e7b3c7'),
-    ('podcast', 'Morning Echo', '최근 본 팟캐스트 · 18시 링크', '🎧', '#f0b6a8'),
+    ('podcast', 'Morning Echo', '평일 팟캐스트 연습 · 주말 복습', '🎧', '#f0b6a8'),
     ('hq', 'Hermes HQ', '대화 · 통합 리뷰', '✦', '#c4ccaa'),
 ]
 JOB_ROOMS = {'papers-digest': 'papers', 'interview-prep': 'interview',
              'coding-coach': 'coding', 'leetcode-history-sync': 'coding', 'system-design-coach': 'design',
              'weekly-review': 'hq', 'english-intake': 'english',
              'english-drill': 'english', 'english-weekly-review': 'english',
-             'english-podcast-daily': 'podcast', 'career-rewards-daily': 'hq'}
+             'english-podcast-daily': 'podcast', 'english-podcast-weekend-review': 'podcast',
+             'career-rewards-daily': 'hq'}
 BACKGROUND_MAINTENANCE_JOBS = frozenset({'leetcode-history-sync'})
 ROOM_PROFILES = {'hq': 'david', 'podcast': 'english'}
 SECRET_KEY = re.compile(r'(token|secret|password|api[_-]?key|authorization|cookie|credential)', re.I)
@@ -148,7 +149,8 @@ def room_for(profile, session_id, prompt, jobs):
             prompt_text = task_prompt(prompt).lower()
             if any(needle in prompt_text for needle in (
                     'english-podcast-coach', 'english goal podcast',
-                    'podcast lesson', 'youtube_history.py', 'evening watch-history')):
+                    'podcast lesson', 'youtube_history.py', 'evening watch-history',
+                    'english_podcast.py review', 'weekend podcast review')):
                 return 'podcast'
             return 'english'
         return profile
@@ -338,6 +340,23 @@ class Observatory:
                 'videos': history.get('videos', []),
                 'is_today': history.get('date') == today,
             }
+            practice = read_json(root / 'watched/practice.json', {})
+            selected = history.get('videos', [])
+            current_practice = (history.get('date') == today and len(selected) == 1
+                                and practice.get('lesson_date') == today
+                                and practice.get('video_id') == selected[0].get('video_id'))
+            data['long_sentence_practice'] = {
+                **{key: practice.get(key) for key in ('lesson_date', 'video_id', 'status', 'reason', 'caption_kind')},
+                'sentences': [{key: item.get(key) for key in ('source_quote', 'word_count', 'timestamp', 'url', 'patterns')}
+                              for item in practice.get('sentences', [])[:2]],
+                'weakness_candidate_count': len(practice.get('weakness_candidates', [])),
+            } if current_practice else None
+            review = read_json(root / 'watched/review.json', {})
+            data['podcast_review'] = {
+                **{key: review.get(key) for key in ('lesson_date', 'week_start', 'week_end', 'status', 'reason')},
+                'episodes': [{key: item.get(key) for key in ('title', 'url', 'source_dates')}
+                             for item in review.get('episodes', [])[:5]],
+            } if review.get('lesson_date') == today else None
             data.update(episodes=episodes[:30], episode_count=len(episodes),
                         transcript_count=sum(episode['transcript_available'] for episode in episodes),
                         latest_episode=episodes[0] if episodes else None)

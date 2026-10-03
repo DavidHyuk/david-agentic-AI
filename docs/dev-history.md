@@ -3,6 +3,38 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.29.0 — 2026-10-03 (minor: weekday watched-podcast practice and weekend review)
+
+- Run watched-podcast recommendations Monday–Friday at 18:00. From that selected
+  video's English captions, extract up to two complete 20–45-word sentences with
+  exact wording/timestamps; coach Korean meanings, clause chunks, reusable frames
+  and a personal speaking task. Rank connective structures and identify automatic
+  captions. Add one or two 8–25-word source sentences chosen against real SRS
+  weakness cards, without inventing personal weaknesses or independent examples.
+- Extend `english_podcast.py` with selected-video `practice` and archive-only
+  `review`. Validate the current selection and downloaded video identity; cache
+  captions and keep current/date-indexed sources under `english-podcast/watched/`,
+  separate from legacy assignments and tutor SRS. Source failures retain the
+  selected link with a concise note and never substitute another episode's quote.
+- Add `english-podcast-weekend-review` at 18:00 Saturday/Sunday: read only this
+  week's Monday–Friday source archives, merge repeated video selections and make
+  shadowing/recall exercises with inline rewrite answers. No history refresh,
+  caption fetch or new video recommendation occurs on weekends. Keep the former
+  new-video assignment and morning timer disabled for a later explicit opt-in.
+- Update existing tutor fallback/additional practice to use the same day's source
+  or current-week archives on weekends, while actual corrections and nightly SRS
+  remain evidenced review. Provision yt-dlp in the explicit history environment;
+  preserve standalone helpers and safe error messages.
+- Register both schedules, safe practice/review state and current/historical
+  session routing in the existing podcast Observatory room owned by English.
+  Reuse the English profile, bot and dedicated podcast group, since daily source
+  work and weekend review form one workflow; add no profile, service or empty room.
+  Update skills, memory seed, README and current overview.
+- `pytest -q`: 435 passed; JavaScript and installer shell syntax checks passed.
+  Eight existing caption files yielded two verbatim long-sentence candidates each,
+  checked against their joined source, without claiming these samples are David's
+  current watched selection. Live delivery still needs a verified YouTube session.
+
 ## v1.28.0 — 2026-10-03 (minor: broaden watched-podcast selection by channel or title)
 
 - Add Daily English Podcast alongside English Goal Podcast to reflect David's
