@@ -14,6 +14,8 @@ else
   python3 -m pip install --quiet --user 'yt-dlp>=2025.8.22'
 fi
 
+bash "$ENGLISH_INSTALL_SCRIPT_DIR/install_youtube_history.sh"
+
 if ! hermes profile show english >/dev/null 2>&1; then
   hermes profile create english --no-skills \
     --description "English tutor-feedback analysis and SRS coaching, delivered through its own Telegram bot."

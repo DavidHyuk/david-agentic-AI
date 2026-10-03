@@ -869,18 +869,27 @@ with headless Chromium. Import the MacBook's login session once; no headed
 browser, X11 forwarding, desktop service, or Google password on the server is
 required. UI changes or an expired session can require reconnection.
 
+The English installer provisions Playwright in the explicit server environment
+`~/.hermes/venvs/youtube-history/`. For a manual or existing deployment, run
+`bash bootstrap/install_youtube_history.sh` on the DGX once. SSH imports and the
+18:00 cron both use this environment's absolute Python path; interactive Conda
+and SSH/system `python3` can have different installed packages. Existing Snap
+Chromium is reused, with no additional browser download. The SSH command below
+uses `ClearAllForwardings=yes` to bypass unrelated default forwarding (such as
+an already occupied local port 8501) while importing cookies.
+
 On the **MacBook**, open YouTube in Chrome and sign in with the **same Google
 account and YouTube channel as the phone app**. Watch history must be enabled.
 Then run these commands in a **local Mac terminal**, replacing the SSH target
 with the same host/alias you normally use:
 
 ```bash
-DGX_SSH='david@YOUR_DGX_HOST'
+DGX_SSH='dgx'
 scp "${DGX_SSH}:/home/david/.hermes/scripts/export_youtube_cookies.py" ~/export_youtube_cookies.py
 python3 -m venv ~/.local/share/hermes-youtube-export
 ~/.local/share/hermes-youtube-export/bin/python -m pip install yt-dlp
 ~/.local/share/hermes-youtube-export/bin/python ~/export_youtube_cookies.py --browser chrome
-ssh "$DGX_SSH" 'python3 /home/david/.hermes/profiles/english/scripts/youtube_history.py connect --cookies-stdin' < ~/youtube-cookies.txt
+ssh -T -o ClearAllForwardings=yes "$DGX_SSH" '/home/david/.hermes/venvs/youtube-history/bin/python /home/david/.hermes/profiles/english/scripts/youtube_history.py connect --cookies-stdin' < ~/youtube-cookies.txt
 ```
 
 If macOS asks for Chrome Keychain access, approve it for this local export. Use
@@ -899,9 +908,9 @@ short-lived headless browser process under a lock. Other channels and Shorts are
 excluded; a history entry does not prove a completed listen or viewing duration.
 
 ```bash
-python3 ~/.hermes/profiles/english/scripts/youtube_history.py status
-python3 ~/.hermes/profiles/english/scripts/youtube_history.py sync
-python3 ~/.hermes/profiles/english/scripts/youtube_history.py notify
+~/.hermes/venvs/youtube-history/bin/python ~/.hermes/profiles/english/scripts/youtube_history.py status
+~/.hermes/venvs/youtube-history/bin/python ~/.hermes/profiles/english/scripts/youtube_history.py sync
+~/.hermes/venvs/youtube-history/bin/python ~/.hermes/profiles/english/scripts/youtube_history.py notify
 hermes -p english cron list
 ```
 

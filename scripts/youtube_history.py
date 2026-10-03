@@ -3,8 +3,8 @@
 """Read today's YouTube watch history for the existing English podcast feed.
 
 Import YouTube-only Netscape cookies with ``connect --cookies-stdin`` over SSH
-from the signed-in personal computer using the phone app’s account/channel. A private Chromium data directory preserves
-that login; no password or browser session is printed. ``notify`` refreshes the
+from the signed-in personal computer using the phone app’s account/channel.
+A private Chromium data directory preserves that login; no password or browser session is printed. ``notify`` refreshes the
 history and emits a deterministic Korean link digest for Hermes cron delivery.
 """
 from __future__ import annotations
@@ -157,7 +157,7 @@ def collect_history(browser_dir: Path, executable: str, *, cookies: list[dict] |
     try:
         from playwright.sync_api import sync_playwright, Error as PlaywrightError
     except ImportError as exc:
-        raise HistoryError('Playwright가 필요합니다: python3 -m pip install -r requirements.txt') from exc
+        raise HistoryError('Playwright가 없는 Python으로 실행됐습니다. /home/david/.hermes/venvs/youtube-history/bin/python으로 실행해 주세요.') from exc
     browser_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     browser_dir.chmod(0o700)
     try:

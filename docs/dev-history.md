@@ -3,6 +3,24 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.27.2 — 2026-10-03 (patch: use one Playwright Python for SSH and scheduled history)
+
+- Diagnosed the failed MacBook import: cookie export succeeded, but noninteractive
+  SSH selected system Python without Playwright while the interactive Conda
+  Python had it. Provision a dedicated `~/.hermes/venvs/youtube-history/`
+  environment and use its absolute interpreter for both cookie imports and cron.
+  The English installer now provisions this environment; existing Snap Chromium
+  is reused without another browser download or permanent service.
+- Updated the MacBook command to use the established `dgx` SSH alias and
+  `ClearAllForwardings=yes`, bypassing the alias's unrelated occupied local 8501
+  forwarding during the stdin import. Existing exported cookies can be reused.
+- Improved the missing-dependency message and synchronized README, skill, cron
+  and current overview. The same English bot, profile and podcast Observatory
+  room continue to own the workflow; this dependency fix needs no extra room.
+- `pytest -q`: 392 passed. Verified the dedicated interpreter and headless
+  Chromium locally; actual authenticated import still requires the MacBook to
+  resend its exported session through the corrected SSH command.
+
 ## v1.27.1 — 2026-10-03 (patch: connect YouTube headlessly from the MacBook over SSH)
 
 - Corrected the GUI-login assumption for the SSH-only DGX Spark. Import a

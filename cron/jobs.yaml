@@ -97,7 +97,8 @@ jobs:
     skills: [english-podcast-coach]
     prompt: >
       Use the english-podcast-coach skill's evening watch-history procedure.
-      Run python3 /home/david/.hermes/profiles/english/scripts/youtube_history.py
+      Run /home/david/.hermes/venvs/youtube-history/bin/python
+      /home/david/.hermes/profiles/english/scripts/youtube_history.py
       notify and return stdout exactly as the final response. This refreshes
       today's actual English Goal Podcast watch history in America/Los_Angeles.
       If stdout is [SILENT], reply only [SILENT]; account connection may still be

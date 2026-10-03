@@ -20,3 +20,17 @@ def test_legacy_transcript_timer_is_disabled_for_evening_history() -> None:
     assert "disable --now hermes-english-podcast-sync.timer" in installer
     assert "enable --now hermes-english-podcast-sync.timer" not in installer
     assert "stage_english_profile.py" in installer
+
+
+def test_watch_history_installer_and_cron_use_explicit_playwright_environment():
+    import yaml
+    installer = (REPO / 'bootstrap/install_youtube_history.sh').read_text()
+    english_installer = (REPO / 'bootstrap/install_english_bot.sh').read_text()
+    jobs = yaml.safe_load((REPO / 'cron/jobs.yaml').read_text())['jobs']
+    job = next(job for job in jobs if job['name'] == 'english-podcast-daily')
+    assert '.hermes/venvs/youtube-history' in installer
+    assert 'playwright>=1.55,<2' in installer
+    assert 'from playwright.sync_api import sync_playwright' in installer
+    assert 'install_youtube_history.sh' in english_installer
+    assert '/home/david/.hermes/venvs/youtube-history/bin/python' in job['prompt']
+    assert 'Run python3' not in job['prompt']

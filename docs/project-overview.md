@@ -112,6 +112,7 @@ David-Agent/
 │   ├── hermes-gateway-cron-recovery.conf # gateway 종료 45초 상한
 │   ├── stage_english_profile.py # profile → ~/.hermes/profiles/english
 │   ├── stage_specialist_profiles.py # headless 전문 profile staging
+│   ├── install_youtube_history.sh # SSH/cron 공용 Playwright venv 설치
 │   ├── install_english_bot.sh # English Telegram bot gateway 설치
 │   ├── hermes-english-podcast-sync.{service,timer} # 과거 대본 timer (자동 실행 중단)
 │   ├── install_observatory.sh # 관제실 UI staging + Tailscale IP 전용 서비스
@@ -370,7 +371,7 @@ server TTFT·prefill/decode TPS, llama.cpp native timings와 실제 처리/캐�
 prompt 토큰 수도 기록합니다. `--server-metrics-url`은 단일 요청만 완료된
 차이를 귀속하고, 측정 실패와 채점 실패를 구분하며 exporter 조회 시간을 과제
 지연에서 제외합니다. prefix 캐시가 있으면 실제 새 KV 토큰 수를 우선 사용합니다.
-현재 관련 변경 후 `pytest -q`는 391개가 통과했습니다.
+현재 관련 변경 후 `pytest -q`는 392개가 통과했습니다.
 추가 KV 진단에서는 기존 19.92GiB 예산과 마지막 2.8% 사용률을 확인했고,
 KV 8GiB·prefix-off 설정에서도 40K를 통과했습니다. 온도 여유가 먼저 감소해
 작은 prefill 배치·CPU quota·열 제어를 적용한 별도 실행에서 55K와 요청별
@@ -589,6 +590,11 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   쿠키 값은 명령 인자·채팅·로그에 남기지 않으며 unrelated domain은 제외합니다.
   공식 API는 시청 기록을 제공하지 않으므로 계정 만료나 UI 변경 시 재연결이
   필요합니다. 최초 연결 전 `notify`는 브라우저를 열지 않고 `[SILENT]`입니다.
+- `install_youtube_history.sh`가 `~/.hermes/venvs/youtube-history/`에
+  Playwright를 설치하며 English installer가 호출합니다. SSH 연결과 18:00
+  cron은 그 환경의 절대 Python 경로를 사용해 Conda/시스템 Python 차이를
+  피합니다. `ssh -o ClearAllForwardings=yes dgx`로 불필요한 기본 port
+  forwarding 충돌 없이 쿠키를 전달합니다.
 - 인증 브라우저 디렉터리는 `~/snap/chromium/common/hermes-youtube-history/`,
   private snapshot은 `~/.hermes/data/youtube-history/`입니다. 단발 브라우저
   프로세스를 사용하므로 새 profile, gateway, bot, 상시 service가 없습니다.
