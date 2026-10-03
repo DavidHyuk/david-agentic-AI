@@ -881,13 +881,15 @@ def test_podcast_workbench_exposes_dated_watch_history_without_browser_credentia
     root.mkdir(parents=True)
     (root / 'snapshot.json').write_text(json.dumps({
         'date': '2000-01-01', 'synced_at': '2000-01-01T18:00:00-08:00',
-        'channel_filter': 'English Goal Podcast', 'selection': 'latest',
+        'channel_filter': 'English Goal Podcast, Daily English Podcast', 'selection': 'latest',
+        'title_keyword': 'Podcast',
         'videos': [{'title': 'Watched', 'url': 'https://www.youtube.com/watch?v=abcdefghijk'}],
         'browser_path': '/private/browser', 'cookie': 'never expose',
     }))
     history = store.workbench('podcast')['watch_history']
     assert history['videos'][0]['title'] == 'Watched'
     assert history['selection'] == 'latest'
+    assert history['title_keyword'] == 'Podcast'
     assert history['is_today'] is False
     assert 'cookie' not in history and 'browser_path' not in history
 

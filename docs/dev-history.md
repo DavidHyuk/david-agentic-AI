@@ -3,6 +3,26 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.28.0 — 2026-10-03 (minor: broaden watched-podcast selection by channel or title)
+
+- Add Daily English Podcast alongside English Goal Podcast to reflect David's
+  listening preference. Also accept videos from any channel when the title
+  contains Podcast, case insensitive. Use OR matching and choose one newest
+  qualifying entry across all candidates; no channel takes priority. English
+  titles alone do not qualify, and invalid links and Shorts remain excluded.
+- Support repeatable `--channel` overrides without breaking single-channel use.
+  Keep the title criterion active with custom channels. Snapshots retain the
+  channel list and title keyword; the podcast Observatory workbench displays
+  both criteria without exposing account credentials.
+- Update the existing 18:00 cron prompt, English podcast skill, README and current
+  overview. Preserve its English profile/bot, dedicated Telegram group, podcast
+  room and current/historical session routing; this extends the same workflow
+  and needs no new room, profile or service.
+- Regression checks cover latest selection across both channels, title case
+  variants, unrelated English titles, invalid keyword-matched links/Shorts,
+  default and repeated CLI channel overrides, and safe Observatory criteria.
+  `pytest -q`: 416 passed; the workbench JavaScript syntax check also passed.
+
 ## v1.27.5 — 2026-10-03 (patch: deliver the most recently watched podcast across days)
 
 - Follow David's clarified evening preference: search YouTube history in newest

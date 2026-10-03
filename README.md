@@ -9,8 +9,8 @@ bot, plus English feedback delivered to a dedicated English **Telegram** bot:
 1. **LLM/LVM research** — daily arXiv + Hugging Face ingestion and a personalized twice-weekly digest.
 2. **Staff/Senior MLE interview prep** — MLE drills, beginner coding, and a weekly adaptive system-design interview on a noon schedule.
 3. **English practice** — turns tutor recordings + corrections into spaced-repetition drills.
-4. **Daily podcast English** — sends actual English Goal Podcast watch-history
-   links at 18:00 after David chooses videos himself in the YouTube app, through
+4. **Daily podcast English** — sends the latest watched podcast
+   link at 18:00 after David chooses videos himself in the YouTube app, through
    the existing English Telegram bot.
 
 Google Calendar support is retained for a later phase, but its skill, MCP
@@ -612,7 +612,7 @@ coding, and system-design progress.
 | `interview-prep` | 12:05 Mon/Wed/Fri | Interview group: one focused Staff/Senior MLE drill |
 | `coding-coach` | 12:10 Tue/Thu/Sat | LeetCode group: 35-minute beginner problem with canonical links |
 | `system-design-coach` | 12:15 Sunday | System-design group: one adaptive 45-minute interview |
-| `english-podcast-daily` | 18:00 daily | `🎧 Morning Echo` group on the existing English bot: latest watched English Goal Podcast link |
+| `english-podcast-daily` | 18:00 daily | `🎧 Morning Echo` group on the existing English bot: latest watched podcast link (channels or Podcast title) |
 | `english-intake` | 20:05 Mon–Sat | Dedicated English bot: feedback analysis or weakness coaching |
 | `english-drill` | 21:10 daily | Dedicated English bot: tonight's spaced-repetition drill |
 | `english-weekly-review` | 20:15 Sunday | Dedicated English bot: tutor feedback + weak SRS cumulative review |
@@ -856,7 +856,11 @@ changes.
 
 David selects videos himself in the YouTube app. At **18:00 America/Los_Angeles**,
 `english-podcast-daily` runs `youtube_history.py notify` and sends the **single most recently watched
-English Goal Podcast** channel video, including yesterday or older days. It
+podcast** video, including yesterday or older days. A video qualifies if its
+channel is **English Goal Podcast** or **Daily English Podcast**, or its title
+contains **Podcast** (case insensitive). These are OR conditions; the newest
+match wins across all candidates without channel priority. An English title alone
+is not enough. It
 refreshes history each evening and sends the latest match even if unchanged. It uses the existing English
 profile/bot and the dedicated `🎧 Morning Echo` group selected by the validated
 `ENGLISH_PODCAST_TELEGRAM_CHAT_ID`. No new Hermes profile, bot, or service is added.
@@ -926,7 +930,7 @@ accepts earlier exports containing native Chromium expiration timestamps, so
 those files can be retried without a new export solely for format conversion.
 If browser application succeeds but YouTube reports signed out, confirm the
 MacBook’s matching Chrome profile is signed in and export a fresh session;
-cookie presence or a future expiration alone does not establish authentication. Other channels and Shorts are
+cookie presence or a future expiration alone does not establish authentication. Videos outside both channel and title criteria, plus Shorts, are
 excluded; a history entry does not prove a completed listen or viewing duration.
 
 ```bash
@@ -935,6 +939,10 @@ excluded; a history entry does not prove a completed listen or viewing duration.
 ~/.hermes/venvs/youtube-history/bin/python ~/.hermes/profiles/english/scripts/youtube_history.py notify
 hermes -p english cron list
 ```
+
+To override the channel list, repeat `--channel`, for example
+`youtube_history.py --channel "Daily English Podcast" --channel "Another Channel" notify`.
+Titles containing `Podcast` still qualify alongside the selected channels.
 
 Private snapshots live in `~/.hermes/data/youtube-history/`, separately from the
 tutor SRS deck and transcript assignments. Before account connection, `notify`
@@ -1178,7 +1186,7 @@ hanging indefinitely; an active local-model turn may run for up to ten minutes.
   state and review schedule. Opening a room alone does not assign or complete work.
 - **English**: reveal due-card answers and mark each attempt correct or needing
   more practice. Results update the shared SRS deck used by Telegram drills.
-- **Morning Echo**: see latest watched English Goal Podcast link, source date,
+- **Morning Echo**: see latest watched podcast link (channels or Podcast title), source date,
   and last successful collection, then reopen a video. Its
   schedule and session history remain separate from tutor/SRS activity while it
   shares the English profile's learner memory.

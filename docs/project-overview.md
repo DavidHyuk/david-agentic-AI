@@ -203,7 +203,7 @@ David를 아는 장기 파트너로서 선제적이고(proactive), 고밀도 정
 | `papers-digest` | research | 새 논문 카탈로그에서 LLM/LVM 후보를 뽑아 인터뷰 관련성과 항목별 원문 링크 제공 |
 | `interview-prep` | career | 월/수/금 Staff MLE 드릴 + 화/목/토 NeetCode/LeetCode 입문 코딩 + 일요일 적응형 General/ML/Agent 설계 인터뷰 |
 | `english-practice` | English profile / learning | 레슨 녹음/교정 파일 → SRS 카드 생성 + 전용 Telegram bot 매일 리뷰 |
-| `english-podcast-coach` | English profile / learning | YouTube 시청 기록의 가장 최근 English Goal Podcast 한 편 → 같은 bot의 18:00 기록 |
+| `english-podcast-coach` | English profile / learning | YouTube 시청 기록의 가장 최근 팟캐스트 한 편 (두 채널 또는 제목 Podcast) → 같은 bot의 18:00 기록 |
 | `calendar-assistant` | productivity | **비활성/보존** — 추후 Google Calendar 브리핑 |
 
 새 agent형 기능은 audience·credential·privacy·identity/memory·model/tool
@@ -248,7 +248,7 @@ Calendar 연동을 재개할 때까지 `morning-brief`는 등록하지 않습니
 | `coding-coach` | 12:10 화/목/토 | 전용 LeetCode 그룹: 같은 패턴 6문제 블록의 다음 35분 문제 |
 | `leetcode-history-sync` | 매일 06:35 | 전송 없음: 연결된 LeetCode 세션의 읽기 전용 풀이 이력 snapshot 갱신 |
 | `system-design-coach` | 12:15 일요일 | 전용 System Design 그룹: 주 1회 45분 General/ML/Agent 인터뷰 |
-| `english-podcast-daily` | 18:00 매일 | 기존 English bot의 `🎧 Morning Echo` 전용 그룹: 가장 최근에 본 English Goal Podcast 한 편 |
+| `english-podcast-daily` | 18:00 매일 | 기존 English bot의 `🎧 Morning Echo` 전용 그룹: 가장 최근 팟캐스트 한 편 (두 채널 또는 제목 Podcast) |
 | `english-intake` | 월–토 20:05 | English bot: 새 피드백 분석 또는 취약 패턴 코칭 |
 | `english-drill` | 21:10 매일 | English bot: SRS 드릴 전달 |
 | `english-weekly-review` | 일요일 20:15 | English bot: tutor feedback + 취약 SRS 누적 복습 |
@@ -371,7 +371,7 @@ server TTFT·prefill/decode TPS, llama.cpp native timings와 실제 처리/캐�
 prompt 토큰 수도 기록합니다. `--server-metrics-url`은 단일 요청만 완료된
 차이를 귀속하고, 측정 실패와 채점 실패를 구분하며 exporter 조회 시간을 과제
 지연에서 제외합니다. prefix 캐시가 있으면 실제 새 KV 토큰 수를 우선 사용합니다.
-현재 관련 변경 후 `pytest -q`는 405개가 통과했습니다.
+현재 관련 변경 후 `pytest -q`는 416개가 통과했습니다.
 추가 KV 진단에서는 기존 19.92GiB 예산과 마지막 2.8% 사용률을 확인했고,
 KV 8GiB·prefix-off 설정에서도 40K를 통과했습니다. 온도 여유가 먼저 감소해
 작은 prefill 배치·CPU quota·열 제어를 적용한 별도 실행에서 55K와 요청별
@@ -580,8 +580,7 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
 - 영어 교정 데이터를 단순 저장이 아닌 **점진적 장기 학습**으로 전환
 
 ### YouTube 시청 기록 기반 Podcast English
-- David이 유튜브 앱에서 직접 고른 English Goal Podcast 영상의 오늘 시청
-  기록을 18:00 America/Los_Angeles에 기존 English bot과 podcast 그룹으로
+- David이 유튜브 앱에서 직접 고른 영상 중 가장 최근에 본 팟캐스트를 18:00 America/Los_Angeles에 기존 English bot과 podcast 그룹으로
   보냅니다. 기존 job 이름을 유지해 중복 일정을 만들지 않습니다.
 - DGX Spark는 SSH 접속 서버이며 GUI가 없습니다. MacBook에서 휴대폰과 같은
   계정/채널로 로그인하고 `export_youtube_cookies.py`로 YouTube 쿠키만
@@ -607,7 +606,10 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   marker는 실제 인증·기록 읽기가 확인된 뒤에만 씁니다. 오류는 고정된
   실패 단계와 whitelist network code만 표시하며 쿠키나 페이지를 출력하지 않습니다. 단발 브라우저
   프로세스를 사용하므로 새 profile, gateway, bot, 상시 service가 없습니다.
-- 시청 기록 최신순으로 과거 날짜까지 검색해 해당 채널의 한 편을 선택하며, 다른 채널과 Shorts는 제외합니다. 시청 완료나
+- 시청 기록 최신순으로 과거 날짜까지 검색합니다. `English Goal Podcast`나
+  `Daily English Podcast` 채널 또는 제목에 `Podcast`가 포함된 영상(대소문자
+  무관) 중 한 편을 고릅니다. 채널 우선순위는 없고 영어 제목만으로는
+  선택하지 않습니다. Shorts는 제외합니다. 시청 완료나
   시청 시간을 추정하지 않습니다. 수집 기록에 해당 영상이 없으면 `[SILENT]`; 최대
   20회 스크롤 내에서 못 찾으면 오류를 보고합니다. 오류 시 이전 snapshot을
   보존하며 전달하지 않습니다. 매일 가장 최근 링크를 보내므로 전날과 같을

@@ -12,8 +12,8 @@ bot**. Calendar support is
 retained in source but intentionally deferred and disabled. English
 tutor feedback enters through the KakaoTalk Channel chatbot and is processed
 locally before the review and SRS drill are delivered through Telegram.
-The existing English profile sends actual English Goal Podcast YouTube watch
-history links at 18:00 to the dedicated podcast Telegram group. Transcript
+The existing English profile sends the latest watched YouTube podcast link at
+18:00 (English Goal Podcast / Daily English Podcast channels or Podcast in the title) to the dedicated podcast Telegram group. Transcript
 preparation remains available on request; automatic morning recommendations
 and transcript prefetch are disabled.
 

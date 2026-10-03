@@ -39,6 +39,48 @@ def test_skip_other_channels_and_invalid_links_to_find_latest_older_match():
     assert [item['video_id'] for item in yh.normalize_sections(rows, yh.DEFAULT_CHANNEL)] == ['bbbbbbbbbbb']
 
 
+@pytest.mark.parametrize('newest_channel', yh.DEFAULT_CHANNELS)
+def test_latest_video_across_both_channels_wins_without_channel_priority(newest_channel):
+    other_channel = next(name for name in yh.DEFAULT_CHANNELS if name != newest_channel)
+    rows = [{'heading': 'Today', 'videos': [video('bbbbbbbbbbb', newest_channel),
+                                           video('ccccccccccc', other_channel)]}]
+    assert yh.normalize_sections(rows, yh.DEFAULT_CHANNELS)[0]['video_id'] == 'bbbbbbbbbbb'
+
+
+def test_english_title_on_unrelated_channel_is_not_a_podcast_match():
+    rows = [{'heading': 'Today', 'videos': [video(channel='Technology News', title='Daily English Lesson')]}]
+    assert yh.normalize_sections(rows, yh.DEFAULT_CHANNELS) == []
+
+
+@pytest.mark.parametrize('title', ['English Podcast Episode', 'A PODCAST about science', 'My podcast'])
+def test_podcast_title_matches_any_channel_before_an_older_known_channel(title):
+    rows = [{'heading': 'Today', 'videos': [video('bbbbbbbbbbb', 'Another Channel', title=title)]},
+            {'heading': 'Yesterday', 'videos': [video()]}]
+    assert yh.normalize_sections(rows, yh.DEFAULT_CHANNELS)[0]['video_id'] == 'bbbbbbbbbbb'
+
+
+@pytest.mark.parametrize('url', ['https://evil.example/watch?v=abcdefghijk',
+                                'https://www.youtube.com/shorts/abcdefghijk'])
+def test_podcast_title_does_not_allow_invalid_links_or_shorts(url):
+    rows = [{'heading': 'Today', 'videos': [video(channel='Other', title='Podcast', url=url)]}]
+    assert yh.normalize_sections(rows, yh.DEFAULT_CHANNELS) == []
+
+
+@pytest.mark.parametrize('options,expected', [
+    ([], list(yh.DEFAULT_CHANNELS)),
+    (['--channel', 'Custom Podcast'], ['Custom Podcast']),
+    (['--channel', 'First Podcast', '--channel', 'Second Podcast'], ['First Podcast', 'Second Podcast']),
+])
+def test_cli_passes_default_or_explicit_channels_to_refresh(tmp_path, monkeypatch, capsys, options, expected):
+    monkeypatch.setattr(yh, 'is_connected', lambda *args: True)
+    def refreshed(data_dir, browser_dir, executable, channels, **kwargs):
+        assert channels == expected
+        return {'date': '2026-10-03', 'videos': []}
+    monkeypatch.setattr(yh, 'refresh', refreshed)
+    assert yh.main(['--data-dir', str(tmp_path), *options, 'sync']) == 0
+    assert capsys.readouterr().err == ''
+
+
 def test_browser_search_continues_into_older_days_with_requested_channel(tmp_path, monkeypatch):
     from types import SimpleNamespace
     import sys
@@ -108,6 +150,8 @@ def test_refresh_dates_snapshot_and_writes_private_data(tmp_path):
     assert 'https://www.youtube.com/watch?v=abcdefghijk' in digest
     assert 'A real watched episode' in digest
     assert snapshot['selection'] == 'latest'
+    assert snapshot['channels'] == [yh.DEFAULT_CHANNEL]
+    assert snapshot['title_keyword'] == 'Podcast'
     assert '가장 최근에 본' in digest
 
 

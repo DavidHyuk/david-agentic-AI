@@ -27,6 +27,7 @@ DEFAULT_DATA_DIR = Path('/home/david/.hermes/data/youtube-history')
 DEFAULT_BROWSER_DIR = DEFAULT_DATA_DIR / 'browser'
 DEFAULT_BROWSER_CACHE = Path('/home/david/.hermes/venvs/youtube-history/browsers')
 DEFAULT_CHANNEL = 'English Goal Podcast'
+DEFAULT_CHANNELS = (DEFAULT_CHANNEL, 'Daily English Podcast')
 HISTORY_URL = 'https://www.youtube.com/feed/history?hl=en&gl=US'
 
 # Extract only visible history rows, never the whole page or account data.
@@ -67,8 +68,16 @@ def channel_key(value: str) -> str:
     return re.sub(r'[^a-z0-9]', '', value.lower())
 
 
-def normalize_sections(sections: list[dict], channel: str) -> list[dict]:
-    """Select the first matching video in YouTube's newest-first history order.
+def channel_names(channel: str | list[str] | tuple[str, ...]) -> list[str]:
+    """Validate explicit channel names, keeping their display labels and order."""
+    names = [channel] if isinstance(channel, str) else list(channel)
+    if not names or any(not channel_key(name) for name in names):
+        raise HistoryError('대상 채널 이름이 필요합니다.')
+    return list(dict.fromkeys(name.strip() for name in names))
+
+
+def normalize_sections(sections: list[dict], channel: str | list[str] | tuple[str, ...]) -> list[dict]:
+    """Select the latest video matching a channel or the Podcast title keyword.
 
     Unknown page headings fail closed. History records indicate an appearance
     in watch history, not a completed listen or a measured viewing duration.
@@ -80,9 +89,14 @@ def normalize_sections(sections: list[dict], channel: str) -> list[dict]:
                re.search(r'\b20\d{2}\b|\b(?:january|february|march|april|may|june|july|august|september|october|november|december)\b', h)
                for h in headings):
         raise HistoryError('시청 기록 페이지 구조를 확인할 수 없습니다. 연결을 확인해 주세요.')
+    allowed = {channel_key(name) for name in channel_names(channel)}
     for section in sections:
         for raw in section.get('videos', []):
-            if channel_key(str(raw.get('channel', ''))) != channel_key(channel):
+            title = ' '.join(str(raw.get('title', '')).split())
+            if not title:
+                continue
+            if (channel_key(str(raw.get('channel', ''))) not in allowed
+                    and 'podcast' not in title.casefold()):
                 continue
             url = urlsplit(str(raw.get('url', '')))
             video_id = parse_qs(url.query).get('v', [''])[0]
@@ -90,11 +104,8 @@ def normalize_sections(sections: list[dict], channel: str) -> list[dict]:
                 continue
             if not re.fullmatch(r'[A-Za-z0-9_-]{11}', video_id):
                 continue
-            title = ' '.join(str(raw.get('title', '')).split())
-            if not title:
-                continue
             return [{'video_id': video_id, 'title': title[:160],
-                     'channel': str(raw['channel']),
+                     'channel': str(raw.get('channel', '')),
                      'history_heading': str(section.get('heading', '')).strip(),
                      'url': 'https://www.youtube.com/watch?v=' + video_id}]
     return []
@@ -208,7 +219,8 @@ def describe_browser_error(stage: str, error: Exception) -> str:
 
 
 def collect_history(browser_dir: Path, executable: str, *, cookies: list[dict] | None = None,
-                    session_path: Path | None = None, channel: str = DEFAULT_CHANNEL) -> list[dict]:
+                    session_path: Path | None = None,
+                    channel: str | list[str] | tuple[str, ...] = DEFAULT_CHANNELS) -> list[dict]:
     try:
         from playwright.sync_api import sync_playwright, Error as PlaywrightError
     except ImportError as exc:
@@ -278,7 +290,8 @@ def collect_history(browser_dir: Path, executable: str, *, cookies: list[dict] |
         raise HistoryError(describe_browser_error(stage, exc)) from exc
 
 
-def refresh(data_dir: Path, browser_dir: Path, executable: str, channel: str,
+def refresh(data_dir: Path, browser_dir: Path, executable: str,
+            channel: str | list[str] | tuple[str, ...],
             *, collector=collect_history, cookies=None, now=None) -> dict:
     supplied_now = now is not None
     now = now or datetime.now(TZ)
@@ -289,8 +302,11 @@ def refresh(data_dir: Path, browser_dir: Path, executable: str, channel: str,
     if after != before:
         raise HistoryError('수집 도중 날짜가 바뀌었습니다. 다음 실행에서 재시도합니다.')
     videos = normalize_sections(sections, channel)
+    names = channel_names(channel)
     snapshot = {'version': 1, 'date': before, 'synced_at': now.isoformat(),
-                'channel_filter': channel, 'selection': 'latest', 'videos': videos}
+                'channel_filter': ', '.join(names), 'channels': names,
+                'title_keyword': 'Podcast',
+                'selection': 'latest', 'videos': videos}
     save_json(data_dir / 'snapshot.json', snapshot)
     return snapshot
 
@@ -314,7 +330,8 @@ def main(argv=None) -> int:
     parser.add_argument('--browser-dir', type=Path, default=Path(os.environ.get('YOUTUBE_HISTORY_BROWSER_DIR', str(DEFAULT_BROWSER_DIR))))
     parser.add_argument('--browser-executable', default=os.environ.get('YOUTUBE_HISTORY_BROWSER_EXECUTABLE', ''),
                         help='optional external browser; default is the installed Playwright headless shell')
-    parser.add_argument('--channel', default=DEFAULT_CHANNEL)
+    parser.add_argument('--channel', action='append',
+                        help='watched channel name; repeat to override defaults; Podcast titles also match')
     parser.add_argument('command', choices=['connect', 'sync', 'notify', 'status'])
     source = parser.add_mutually_exclusive_group()
     source.add_argument('--cookies-file', type=Path, help='private Netscape cookie export; no cookie values in arguments')
@@ -322,8 +339,7 @@ def main(argv=None) -> int:
     source.add_argument('--cookies-stdin', action='store_true', help='read a YouTube cookie export through an SSH stdin pipe')
     args = parser.parse_args(argv)
     try:
-        if not channel_key(args.channel):
-            raise HistoryError('대상 채널 이름이 필요합니다.')
+        channels = channel_names(args.channel if args.channel is not None else DEFAULT_CHANNELS)
         if args.command != 'connect' and (args.cookies_file or args.cookies_stdin or args.saved_cookies):
             raise HistoryError('쿠키 입력 옵션은 connect 명령에만 사용할 수 있습니다.')
         if args.command == 'status':
@@ -359,7 +375,7 @@ def main(argv=None) -> int:
                 (args.data_dir / 'connection.json').unlink(missing_ok=True)
                 save_json(args.data_dir / 'session.json', {'version': 1, 'cookies': cookies})
             snapshot = refresh(args.data_dir, args.browser_dir, args.browser_executable,
-                               args.channel, cookies=cookies)
+                               channels, cookies=cookies)
             if args.command == 'connect':
                 save_json(args.data_dir / 'connection.json', {
                     'version': 1, 'verified_at': snapshot['synced_at'],

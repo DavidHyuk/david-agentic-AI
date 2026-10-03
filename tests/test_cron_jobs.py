@@ -155,6 +155,8 @@ def test_english_podcast_job_sends_actual_watch_history_at_1800_in_existing_prof
     assert "youtube_history.py" in podcast["prompt"]
     assert "notify and return stdout exactly" in podcast["prompt"]
     assert "including older days" in podcast["prompt"]
+    assert "Daily English Podcast" in podcast["prompt"]
+    assert "Podcast in the title (case insensitive)" in podcast["prompt"]
     assert "exactly one title and link" in podcast["prompt"]
     assert "never read or send an old snapshot" in podcast["prompt"]
 

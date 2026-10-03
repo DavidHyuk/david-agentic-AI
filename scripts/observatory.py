@@ -333,6 +333,7 @@ class Observatory:
                 'date': history.get('date'),
                 'synced_at': history.get('synced_at'),
                 'channel_filter': history.get('channel_filter'),
+                'title_keyword': history.get('title_keyword'),
                 'selection': history.get('selection'),
                 'videos': history.get('videos', []),
                 'is_today': history.get('date') == today,
