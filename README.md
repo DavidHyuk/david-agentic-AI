@@ -879,7 +879,8 @@ profile/bot and the dedicated `🎧 Morning Echo` group selected by the validate
 The same evening message adds **two long-sentence speaking exercises** from that
 selected video's English captions. `english_podcast.py practice` validates the
 fresh watch-history snapshot, downloads/caches exactly that video, and extracts
-complete 20–45-word source sentences with timestamps. It favors clause connectors
+complete 20–45-word source sentences with timestamps. Caption retrieval prefers `en-orig`, requesting `en` only if no original English
+track is available, avoiding a redundant subtitle request. It favors clause connectors
 such as `even though`, `because`, `so that`, and `which`. The English agent adds
 Korean meanings, two or three clause chunks, reusable sentence frames and one
 personal speaking prompt per sentence. It also reads actual SRS weakness cards
@@ -952,8 +953,10 @@ succeeds, the local export file can be deleted.
 
 The server saves the filtered session owner-only at
 `~/.hermes/data/youtube-history/session.json` before attempting network access.
-It verifies authenticated history access before marking the connection ready;
-file presence alone is not proof of login. If a network or rendering failure
+It records confirmed login separately in `authentication.json`, retaining refreshed
+cookies even if history rendering fails. `connection.json` marks a completed
+history collection; file presence alone is not proof of login. Authenticated
+sessions retry collection automatically without another laptop export. If a network or rendering failure
 occurs, retry from the server using the saved session:
 
 ```bash
@@ -968,6 +971,9 @@ a successful read. Errors report a fixed failure stage and safe network code,
 never a raw browser exception, cookie value, or page dump. The server also
 accepts earlier exports containing native Chromium expiration timestamps, so
 those files can be retried without a new export solely for format conversion.
+The reader supports modern YouTube lockup title/channel classes as well as older
+video rows. A collection-limit/layout error does not request another cookie
+export; status and Observatory distinguish confirmed login from pending collection.
 If browser application succeeds but YouTube reports signed out, confirm the
 MacBook’s matching Chrome profile is signed in and export a fresh session;
 cookie presence or a future expiration alone does not establish authentication. Videos outside both channel and title criteria, plus Shorts, are
@@ -987,7 +993,7 @@ To override the channel list, repeat `--channel`, for example
 Titles containing `Podcast` still qualify alongside the selected channels.
 
 Private snapshots live in `~/.hermes/data/youtube-history/`, separately from the
-tutor SRS deck and transcript assignments. Before account connection, `notify`
+tutor SRS deck and transcript assignments. Before verified login, `notify`
 returns `[SILENT]` without launching Chromium or sending daily setup errors.
 No matching episode in the collected history also produces `[SILENT]`; a login, layout, or network error preserves the prior snapshot and
 reports the connection error without sending stale links. Observatory's existing

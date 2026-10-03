@@ -943,3 +943,16 @@ def test_weekend_review_workbench_exposes_current_week_sources_without_private_f
     assert review['episodes'][0]['title'] == 'Weekday podcast'
     assert 'never expose' not in json.dumps(review)
     assert 'private_path' not in review
+
+
+def test_podcast_workbench_distinguishes_authenticated_login_from_pending_collection(store):
+    root = store.home / 'data/youtube-history'
+    root.mkdir(parents=True)
+    (root / 'authentication.json').write_text(json.dumps({
+        'version': 1, 'verified_at': '2026-10-03T18:00:00-07:00', 'cookie': 'never expose',
+    }))
+    state = store.workbench('podcast')['watch_history']
+    assert state['authenticated'] is True
+    assert state['connected'] is False
+    assert state['authentication_verified_at'] == '2026-10-03T18:00:00-07:00'
+    assert 'never expose' not in json.dumps(state)

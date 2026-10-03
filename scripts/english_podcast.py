@@ -223,28 +223,23 @@ def download_transcript(
 
     video_id = str(video["id"])
     output_template = str(captions_dir / "%(id)s.%(ext)s")
-    _run_yt_dlp(
-        [
-            "--no-playlist",
-            "--skip-download",
-            "--write-subs",
-            "--write-auto-subs",
-            "--sub-langs",
-            "en-orig,en",
-            "--sub-format",
-            "json3",
-            "--write-info-json",
-            "--no-warnings",
-            "--output",
-            output_template,
-            str(video["url"]),
-        ],
-        timeout=180,
-        runner=runner,
-    )
-    caption_paths = sorted(
-        captions_dir.glob(f"{video_id}.en*.json3"), key=_caption_preference
-    )
+    caption_paths = []
+    # Avoid requesting the same English track twice: a redundant fetch can hit 429.
+    for language in ('en-orig', 'en'):
+        _run_yt_dlp(
+            [
+                "--no-playlist", "--skip-download", "--write-subs", "--write-auto-subs",
+                "--sub-langs", language, "--sub-format", "json3", "--write-info-json",
+                "--no-warnings", "--output", output_template, str(video["url"]),
+            ],
+            timeout=180,
+            runner=runner,
+        )
+        caption_paths = sorted(
+            captions_dir.glob(f"{video_id}.en*.json3"), key=_caption_preference
+        )
+        if caption_paths:
+            break
     if not caption_paths:
         raise RuntimeError(f"No downloadable English captions for {video_id}")
     caption_path = caption_paths[0]
@@ -322,11 +317,13 @@ def select_caption_sentences(cues: list[dict[str, Any]], url: str, *,
     candidates, seen = [], set()
     for match in re.finditer(r'[^.!?]+[.!?]+["”’]?(?=\s|$)', source):
         quote = match.group().strip()
+        # A leading speaker label is not speech; internal labels join different turns.
+        quote = re.sub(r'^(?:>>\s*)+', '', quote)
         words = quote.split()
         if not min_words <= len(words) <= max_words or quote.casefold() in seen:
             continue
         # Caption stage directions are not spoken practice sentences.
-        if '[' in quote or ']' in quote:
+        if '[' in quote or ']' in quote or '>>' in quote:
             continue
         patterns = [{'marker': marker, 'meaning': meaning}
                     for marker, meaning in SENTENCE_PATTERNS

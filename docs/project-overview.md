@@ -372,7 +372,7 @@ server TTFT·prefill/decode TPS, llama.cpp native timings와 실제 처리/캐�
 prompt 토큰 수도 기록합니다. `--server-metrics-url`은 단일 요청만 완료된
 차이를 귀속하고, 측정 실패와 채점 실패를 구분하며 exporter 조회 시간을 과제
 지연에서 제외합니다. prefix 캐시가 있으면 실제 새 KV 토큰 수를 우선 사용합니다.
-현재 관련 변경 후 `pytest -q`는 435개가 통과했습니다.
+현재 관련 변경 후 `pytest -q`는 462개가 통과했습니다.
 추가 KV 진단에서는 기존 19.92GiB 예산과 마지막 2.8% 사용률을 확인했고,
 KV 8GiB·prefix-off 설정에서도 40K를 통과했습니다. 온도 여유가 먼저 감소해
 작은 prefill 배치·CPU quota·열 제어를 적용한 별도 실행에서 55K와 요청별
@@ -591,7 +591,7 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   Chrome 내부 만료 시간을 Unix seconds로 바꿔 내보내며, 서버도 이전 export를
   호환 처리합니다. 쿠키 적용과 실제 로그인 검증은 독립적으로 확인합니다.
   공식 API는 시청 기록을 제공하지 않으므로 계정 만료나 UI 변경 시 재연결이
-  필요합니다. 최초 연결 전 `notify`는 브라우저를 열지 않고 `[SILENT]`입니다.
+  필요합니다. 로그인 미확인 상태의 `notify`는 브라우저를 열지 않고 `[SILENT]`입니다.
 - `install_youtube_history.sh`가 `~/.hermes/venvs/youtube-history/`에
   Playwright와 맞는 headless shell, yt-dlp를 설치하며 English installer가 호출합니다.
   브라우저는 같은 venv의 `browsers/`에 설치해 Hermes HOME 변경 영향을 받지
@@ -604,7 +604,10 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   필터링된 `session.json`은 `~/.hermes/data/youtube-history/`입니다.
   쿠키는 owner-only로 network 접속 전에 저장하고 성공 시 갱신합니다. 실패
   후 `connect --saved-cookies`로 서버에서 재시도할 수 있으며, 연결 성공
-  marker는 실제 인증·기록 읽기가 확인된 뒤에만 씁니다. 오류는 고정된
+  marker는 실제 인증·기록 읽기가 확인된 뒤에만 씁니다. `authentication.json`은
+  로그인 확인을 별도로 저장하므로 읽기 실패 시에도 쿠키를 재전송하지 않고
+  서버에서 재시도할 수 있습니다. Observatory도 로그인/수집 상태를 구분합니다.
+  새 YouTube lockup의 제목·채널 class와 과거 renderer를 함께 지원합니다. 오류는 고정된
   실패 단계와 whitelist network code만 표시하며 쿠키나 페이지를 출력하지 않습니다. 단발 브라우저
   프로세스를 사용하므로 새 profile, gateway, bot, 상시 service가 없습니다.
 - 시청 기록 최신순으로 과거 날짜까지 검색합니다. `English Goal Podcast`나
@@ -616,8 +619,8 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   보존하며 전달하지 않습니다. 평일마다 가장 최근 링크를 보내므로 전날과 같을
   수 있습니다. snapshot 날짜는 시청 날짜가 아니라 수집 날짜입니다.
 - 같은 평일 18시 메시지에 `english_podcast.py practice`로 선택한 영상의 영어
-  대본에서 20~45단어 완결 문장 두 개를 추출합니다. 접속사·관계절 표현을
-  우선하며 원문·타임스탬프에 한국어 뜻, 끊어 말하기, 재사용 구조, 개인
+  대본에서 20~45단어 완결 문장 두 개를 추출합니다. en-orig 원본을 우선하고 없을 때만 en 자막을 요청해 중복 요청을 피합니다.
+  접속사·관계절 표현을 우선하며 원문·타임스탬프에 한국어 뜻, 끊어 말하기, 재사용 구조, 개인
   말하기 과제를 덧붙입니다. 실제 SRS 취약 카드와 대조해 같은 영상의
   8~25단어 후보에서 약점 보완용 문장도 1~2개 골라줍니다. 20:05 추가
   코칭도 이 원문을 사용하고 독립된 생성 문장을 새로 추천하지 않습니다. 자동 자막은 표시하고, 대본이나 적합한 문장을
@@ -749,4 +752,4 @@ Flash에는 CPU에서 해시를 계산하는 모델 내부 PLE n-gram이 실제�
 약 8.6ms는 실제 embedding 조회·복사·GPU 연산 시간을 포함하지 않습니다.
 세부 증거와 사용법은 [진단 사고 보고서](benchmarks/flash-prefill-diagnostic-incident-2026-10-03.md)에 있습니다.
 
-이번 진단 변경 후 전체 `pytest -q`는 459개, 진단·메타데이터 관련 검증은 18개가 통과했습니다.
+현재 전체 `pytest -q`는 462개, 진단·메타데이터 관련 검증은 18개가 통과했습니다.

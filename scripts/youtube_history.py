@@ -249,10 +249,9 @@ def collect_history(browser_dir: Path, executable: str, *, cookies: list[dict] |
             try:
                 stage = 'cookies'
                 if cookies is None and session_path is not None and session_path.exists():
-                    existing = context.cookies('https://www.youtube.com')
-                    auth_names = {'SID', 'SAPISID', '__Secure-1PSID', '__Secure-3PSID'}
-                    if not any(c['name'] in auth_names for c in existing):
-                        cookies = load_saved_cookies(session_path)
+                    # Names can survive even when session-only credential values do not.
+                    # Restore the last verified payload on every fresh browser launch.
+                    cookies = load_saved_cookies(session_path)
                 if cookies is not None:
                     context.clear_cookies()
                     context.add_cookies(cookies)

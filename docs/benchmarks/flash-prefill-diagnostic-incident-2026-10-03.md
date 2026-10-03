@@ -88,6 +88,42 @@ page faults, CPU/GPU copies or GPU kernels.
 
 ## Remaining attribution limits
 
+### Unified-memory and CUDA gather follow-up
+
+Read-only inspection of the same local source found a concrete obstacle to
+moving this PLE gather onto CUDA. In `ggml/src/ggml-cuda/ggml-cuda.cu`,
+`ggml_backend_cuda_device_supports_op` accepts IQ4_NL `GET_ROWS` only when
+the table row width is divisible by `QK_K` (256). This checkpoint's row width
+is **160**, so that predicate rejects its gather. `getrows.cu` uses a
+256-value super-block loop for this path. Changing only the predicate is not
+a valid fix: the kernel must correctly handle five 32-value blocks per row.
+
+The general host-operation offload heuristic also gives `GET_ROWS` a batch
+size of zero, below the default offload threshold of 32. Tensor buffer
+overrides exist, but neither an override nor unified physical RAM supplies a
+missing supported kernel. These are source-level constraints, not a measured
+percentage of prefill time. The previously measured millisecond hash work
+remains separate from table gathering and dequantization.
+
+DGX Spark shares physical memory, but allocation/access semantics and backend
+execution still matter; see NVIDIA's [CUDA porting guidance](https://docs.nvidia.com/dgx/dgx-spark-porting-guide/porting/cuda.html).
+A future experiment should first validate an IQ4_NL width-160 CUDA gather
+against CPU output on a tiny synthetic table, then measure it before considering
+the approximately 26.82 GiB production table. Whole-table F16 conversion would
+require about 95.37 GiB for this tensor alone and is not an appropriate shortcut.
+No tensor override, model reload or GPU experiment was performed in this follow-up.
+
+The follow-up also found a newer boot, `cf326b1b-e8b0-47fe-ac5a-4ab81436240c`:
+the preceding boot journal ends at 02:06:50 PDT and the current boot journal
+starts at 02:13:31 PDT on October 3. The readable preceding journal contains no
+host reboot/shutdown entry in the checked matches; its end shows production
+inference. The current boot recorded another NVIDIA `NV_ERR_NO_MEMORY` at
+02:15:00. These observations do not establish what triggered that reboot.
+At follow-up inspection Flash and the main/English/ClawGram gateways were active
+and memory PSI avg10 was zero. The later allocation error and unexplained boot
+change are reasons to defer large GPU allocations, not evidence of a resolved
+reset mechanism.
+
 | Candidate | Verified evidence | What is not established |
 | --- | --- | --- |
 | CPU n-gram | PLE host hashing exists; speculative decoding is disabled. Synthetic hash/predecessor work is milliseconds. | Actual PLE gather and transfer share of TTFT. |

@@ -3,6 +3,32 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.30.1 — 2026-10-03 (patch: repair authenticated YouTube history and caption collection)
+
+- Reproduced the recent import failure with the stored session, without exposing
+  cookie values: login was valid, but current lockup title/channel classes were
+  missed, leaving most rows empty and causing unnecessary pagination. Support
+  modern camel-case lockup classes and older renderers; fail promptly if at least
+  90% of row titles cannot be read.
+- Record authenticated login separately from completed history collection and
+  save refreshed cookies before rendering. Recover collection with the saved
+  session, clear verification when YouTube actually reports signed out, and
+  reserve laptop re-export guidance for authentication failures. Show distinct
+  login/collection states in status and the existing podcast Observatory room.
+- Avoid duplicate English subtitle requests: fetch en-orig first, fall back to en
+  only if no original track is present. The live selected episode had valid
+  original captions, but a redundant request hit HTTP 429 and blocked processing.
+  Omit leading nonspoken speaker labels and reject sentences spanning speaker
+  turns, while preserving the quoted spoken words and timestamps.
+- Verified successful saved-session connection and latest Daily English Podcast
+  selection, then obtained its automatic English captions, two long sentences
+  and twelve shorter source candidates. No laptop re-upload or new video was
+  needed. Weekday/weekend schedules and routing remain unchanged.
+- `pytest -q`: 462 passed, including real-browser markup fixtures for three
+  renderer variants, login-only recovery, safe verification states and subtitle
+  fallback. Workbench JavaScript syntax also passed. Update README, skill and
+  current overview; reuse the existing English profile, bot and podcast room.
+
 ## v1.30.0 — 2026-10-03 (minor: bound CPU diagnostics and replace heavy GGUF inspection)
 
 - Respond to the diagnostic-time host reset by separating CPU inspection into

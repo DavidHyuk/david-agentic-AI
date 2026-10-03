@@ -118,6 +118,7 @@ def test_prepare_downloads_transcript_and_is_idempotent_per_day(tmp_path: Path) 
     assert "[00:00] useful phrase number 0" in transcript.read_text()
     assert manifest["word_count"] == 80
     assert len(fake.calls) == 2
+    assert fake.calls[1][fake.calls[1].index('--sub-langs') + 1] == 'en-orig'
 
     repeated = podcast.prepare_daily(
         tmp_path,
@@ -165,6 +166,16 @@ def test_sentence_selection_deduplicates_and_limits_lengths_and_count():
     result = podcast.select_long_sentences(cues, 'url')
     assert len(result) == 2
     assert {item['source_quote'] for item in result} == {LONG_SENTENCE, SECOND_SENTENCE}
+
+
+def test_practice_omits_nonspoken_speaker_label_and_rejects_cross_speaker_sentence():
+    cues = [{'text': '>> ' + LONG_SENTENCE, 'start_ms': 3000},
+            {'text': SECOND_SENTENCE.replace('you can', '>> you can'), 'start_ms': 4000}]
+    result = podcast.select_long_sentences(cues, 'https://www.youtube.com/watch?v=abcdefghijk')
+    assert len(result) == 1
+    assert result[0]['source_quote'] == LONG_SENTENCE
+    assert result[0]['word_count'] == len(LONG_SENTENCE.split())
+    assert result[0]['timestamp'] == '00:03'
 
 
 def watched_history(path, *, lesson_date='2026-10-03', video_id='abcdefghijk'):
@@ -304,3 +315,17 @@ def test_weekend_review_missing_or_failed_sources_does_not_fall_back_to_old_prac
     result = podcast.prepare_weekend_review(tmp_path, lesson_date='2026-10-03')
     assert result['status'] == 'unavailable'
     assert result['episodes'] == []
+
+
+def test_caption_download_requests_en_only_when_original_track_is_absent(tmp_path):
+    languages = []
+    def runner(command, **kwargs):
+        language = command[command.index('--sub-langs') + 1]
+        languages.append(language)
+        if language == 'en-orig':
+            return subprocess.CompletedProcess(command, 0, '', '')
+        return watched_caption_runner(command, **kwargs)
+    manifest = podcast.download_transcript({'id': 'abcdefghijk', 'url': 'https://www.youtube.com/watch?v=abcdefghijk'},
+                                           tmp_path, runner=runner, expected_channel_id=None)
+    assert languages == ['en-orig', 'en']
+    assert manifest['caption_language'] == 'en'
