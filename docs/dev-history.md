@@ -3,6 +3,26 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.27.0 — 2026-10-03 (minor: replace morning podcast picks with evening watched links)
+
+- David chooses podcast episodes in the YouTube app; replaced the existing
+  `english-podcast-daily` recommendation with actual watched English Goal Podcast
+  links at 18:00 America/Los_Angeles. Disable the automatic morning transcript
+  timer while preserving on-request transcript tools and existing data.
+- Added a standalone private-browser watch-history helper with manual desktop
+  account linking, explicit today/channel selection, canonical deduplicated
+  links, bounded Telegram output, and failure-safe snapshot preservation. The
+  official API cannot supply history; this depends on the authenticated YouTube
+  UI, and requires the phone app's same account/channel and enabled history.
+- Reuse the English profile, credentials, bot and validated podcast group; keep
+  watch-history state separate from tutor/SRS and transcript assignments. No new
+  Hermes profile, gateway, bot, or persistent service is introduced.
+- Updated the existing podcast Observatory room's source state and workbench,
+  owning-profile and current/historical session routing. Existing job identity
+  stays stable, so there is no duplicate daily feed or empty extra room.
+- Updated usage and project overview; `pytest -q`: 382 passed. Account linking
+  and real-history delivery remain pending until David completes desktop login.
+
 ## v1.26.1 — 2026-10-01 (patch: complete relaxed Flash evaluation and separate Qwen pause time)
 
 - At user request, Flash inference now completes each in-flight request without

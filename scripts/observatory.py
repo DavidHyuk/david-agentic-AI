@@ -38,7 +38,7 @@ ROOMS = [
     ('coding', 'LeetCode Gym', '코딩 훈련', '⌨', '#efc783'),
     ('design', 'Design Studio', '시스템 디자인', '🏗', '#9bcad8'),
     ('english', 'English Lab', '영어 코칭 · SRS', '💬', '#e7b3c7'),
-    ('podcast', 'Morning Echo', '매일 듣기 · 표현 · 셰도잉', '🎧', '#f0b6a8'),
+    ('podcast', 'Morning Echo', '오늘 본 팟캐스트 · 18시 기록', '🎧', '#f0b6a8'),
     ('hq', 'Hermes HQ', '대화 · 통합 리뷰', '✦', '#c4ccaa'),
 ]
 JOB_ROOMS = {'papers-digest': 'papers', 'interview-prep': 'interview',
@@ -148,7 +148,7 @@ def room_for(profile, session_id, prompt, jobs):
             prompt_text = task_prompt(prompt).lower()
             if any(needle in prompt_text for needle in (
                     'english-podcast-coach', 'english goal podcast',
-                    'podcast lesson')):
+                    'podcast lesson', 'youtube_history.py', 'evening watch-history')):
                 return 'podcast'
             return 'english'
         return profile
@@ -324,6 +324,14 @@ class Observatory:
                     'caption_kind': metadata.get('caption_kind', ''),
                     'transcript_available': bool(transcript and transcript.is_file()),
                 })
+            history = read_json(self.home / 'data/youtube-history/snapshot.json', {})
+            data['watch_history'] = {
+                'date': history.get('date'),
+                'synced_at': history.get('synced_at'),
+                'channel_filter': history.get('channel_filter'),
+                'videos': history.get('videos', []),
+                'is_today': history.get('date') == today,
+            }
             data.update(episodes=episodes[:30], episode_count=len(episodes),
                         transcript_count=sum(episode['transcript_available'] for episode in episodes),
                         latest_episode=episodes[0] if episodes else None)
@@ -1000,9 +1008,8 @@ class Observatory:
         due = sum(card.get('due', '') <= today for card in cards)
         coding = next((item for item in pending if item.get('track') == 'coding'), None)
         design = next((item for item in pending if item.get('track') == 'system_design'), None)
-        podcast = read_json(self.home / 'data/english-podcast/state.json', {'assignments': {}})
-        assignments = podcast.get('assignments', {})
-        latest = assignments.get(max(assignments), {}) if assignments else {}
+        history = read_json(self.home / 'data/youtube-history/snapshot.json', {})
+        watched = history.get('videos', []) if history.get('date') == today else []
         return {
             'hq': {'title': '오늘의 우선순위',
                    'detail': f'미완료 학습 {len(pending)}개' if pending else '팀의 다음 흐름 확인'},
@@ -1015,8 +1022,8 @@ class Observatory:
                        'detail': design.get('item_id', '다음 과제 준비') if design else '다음 과제 준비'},
             'english': {'title': '영어 복습',
                         'detail': f'오늘 복습 {due}개' if due else '새 표현 한 문장'},
-            'podcast': {'title': '오늘의 듣기',
-                        'detail': latest.get('title', '') or '에피소드 준비 상태 확인'},
+            'podcast': {'title': '오늘 본 팟캐스트',
+                        'detail': f'시청 기록 {len(watched)}편' if history.get('date') == today else '18:00 시청 기록 확인'},
         }
 
     def overview(self):

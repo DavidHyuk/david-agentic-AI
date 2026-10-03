@@ -6,7 +6,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 
 
-def test_transcript_sync_runs_before_daily_coaching() -> None:
+def test_legacy_transcript_timer_is_disabled_for_evening_history() -> None:
     service = (REPO / "bootstrap/hermes-english-podcast-sync.service").read_text()
     timer = (REPO / "bootstrap/hermes-english-podcast-sync.timer").read_text()
     installer = (REPO / "bootstrap/install_english_bot.sh").read_text()
@@ -17,5 +17,6 @@ def test_transcript_sync_runs_before_daily_coaching() -> None:
     assert "ReadWritePaths=%h/.hermes/data/english-podcast" in service
     assert "OnCalendar=*-*-* 08:25:00" in timer
     assert "Persistent=true" in timer
-    assert "enable --now hermes-english-podcast-sync.timer" in installer
+    assert "disable --now hermes-english-podcast-sync.timer" in installer
+    assert "enable --now hermes-english-podcast-sync.timer" not in installer
     assert "stage_english_profile.py" in installer

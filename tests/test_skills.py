@@ -94,7 +94,7 @@ def test_english_skill_uses_the_staged_profile_script_path():
     assert "/home/david/.hermes/profiles/english/scripts/english_srs.py" in body
 
 
-def test_english_podcast_skill_requires_downloaded_transcript_and_tutor_evidence():
+def test_english_podcast_skill_requires_actual_evening_history_and_safe_followup():
     path = (
         REPO
         / "profiles"
@@ -105,8 +105,9 @@ def test_english_podcast_skill_requires_downloaded_transcript_and_tutor_evidence
         / "SKILL.md"
     )
     body = path.read_text()
+    assert "youtube_history.py notify" in body
+    assert "18:00 America/Los_Angeles" in body
+    assert "Never read an older" in body
+    assert "snapshot as a substitute" in body
+    assert "never invent tutor weaknesses" in body
     assert "english_podcast.py prepare" in body
-    assert "/home/david/.hermes/profiles/english/scripts/english_podcast.py" in body
-    assert "srs_deck.json weaknesses --limit 8" in body
-    assert "exactly three short transcript moments" in body
-    assert "Never summarize or recommend an episode whose transcript was not downloaded" in body

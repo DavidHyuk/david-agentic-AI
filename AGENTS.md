@@ -12,9 +12,10 @@ bot**. Calendar support is
 retained in source but intentionally deferred and disabled. English
 tutor feedback enters through the KakaoTalk Channel chatbot and is processed
 locally before the review and SRS drill are delivered through Telegram.
-The existing English profile also pre-downloads one English Goal Podcast
-transcript each morning and delivers a personalized 09:00 lesson in the same
-English Telegram chat.
+The existing English profile sends actual English Goal Podcast YouTube watch
+history links at 18:00 to the dedicated podcast Telegram group. Transcript
+preparation remains available on request; automatic morning recommendations
+and transcript prefetch are disabled.
 
 ## Layout
 - `config/soul/SOUL.md` — agent personality (staged to `$HERMES_HOME/SOUL.md`).

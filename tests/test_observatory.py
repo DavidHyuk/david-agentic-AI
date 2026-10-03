@@ -874,3 +874,23 @@ def test_hq_mission_actions_validate_and_use_fixed_cli_arguments(store, monkeypa
     with pytest.raises(ValueError, match='캠퍼스'):
         store.study_action({'action': 'mission_assign', 'task': 't_1234abcd',
                             'assignee': 'rogue'})
+
+
+def test_podcast_workbench_exposes_dated_watch_history_without_browser_credentials(store):
+    root = store.home / 'data/youtube-history'
+    root.mkdir(parents=True)
+    (root / 'snapshot.json').write_text(json.dumps({
+        'date': '2000-01-01', 'synced_at': '2000-01-01T18:00:00-08:00',
+        'channel_filter': 'English Goal Podcast',
+        'videos': [{'title': 'Watched', 'url': 'https://www.youtube.com/watch?v=abcdefghijk'}],
+        'browser_path': '/private/browser', 'cookie': 'never expose',
+    }))
+    history = store.workbench('podcast')['watch_history']
+    assert history['videos'][0]['title'] == 'Watched'
+    assert history['is_today'] is False
+    assert 'cookie' not in history and 'browser_path' not in history
+
+
+def test_historical_evening_history_sessions_stay_in_shared_podcast_room():
+    assert room_for('english', 'cron_removed_20261003',
+                    'Run youtube_history.py notify for evening watch-history.', []) == 'podcast'

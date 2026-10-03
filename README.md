@@ -9,9 +9,9 @@ bot, plus English feedback delivered to a dedicated English **Telegram** bot:
 1. **LLM/LVM research** — daily arXiv + Hugging Face ingestion and a personalized twice-weekly digest.
 2. **Staff/Senior MLE interview prep** — MLE drills, beginner coding, and a weekly adaptive system-design interview on a noon schedule.
 3. **English practice** — turns tutor recordings + corrections into spaced-repetition drills.
-4. **Daily podcast English** — pre-downloads one English Goal Podcast transcript
-   and turns it into a personalized 09:15 listening/expression lesson in the
-   existing English Telegram bot.
+4. **Daily podcast English** — sends actual English Goal Podcast watch-history
+   links at 18:00 after David chooses videos himself in the YouTube app, through
+   the existing English Telegram bot.
 
 Google Calendar support is retained for a later phase, but its skill, MCP
 connection, and scheduled brief are currently disabled.
@@ -43,7 +43,7 @@ Local DGX Spark (llama.cpp @ :8003, Qwen3.8 Flash-Next IQ4_XS, 2 × 64K slots)
    English Hermes profile ─────────────────────────────────────► English Telegram bot
         │ isolated SOUL / memory / sessions / Telegram token
         ├─ english-practice ─ Kakao webhook → intake + SRS review/drill
-        └─ english-podcast-coach ─ 08:25 transcript → 09:15 personalized lesson
+        └─ english-podcast-coach ─ YouTube app watch history → 18:00 watched links
 
  arXiv + Hugging Face ── papers_ingest.py ── SQLite paper catalog
                               ▲
@@ -69,7 +69,8 @@ Local DGX Spark (llama.cpp @ :8003, Qwen3.8 Flash-Next IQ4_XS, 2 × 64K slots)
 | `bootstrap/install_cron_watchdog.sh` | Install automatic cron-stall detection and gateway recovery |
 | `bootstrap/stage_english_profile.py` | Stage only the isolated English-coaching Hermes profile |
 | `bootstrap/install_english_bot.sh` | Create/stage the English profile, install its gateway, and sync cron jobs |
-| `scripts/english_podcast.py` | Assign one unseen channel video and save JSON3 + timestamped transcript |
+| `scripts/english_podcast.py` | On-request channel transcript preparation |
+| `scripts/youtube_history.py` | Connect a private browser login and send today’s watched podcast links |
 | `scripts/papers_ingest.py` | Fetch and merge arXiv/Hugging Face paper metadata |
 | `scripts/papers_digest.py` | Read-only recommended/recent/trending paper digest |
 | `scripts/interview_progress.py` | Concrete study messages, feedback, hints, adaptive reviews, weekly metrics |
@@ -142,8 +143,8 @@ Then complete the **interactive, one-time** steps `install.sh` prints:
   ```
 
   The English token is stored only in `~/.hermes/profiles/english/.env`. The same
-  installer enables the 08:25 podcast transcript timer and registers the 09:15
-  lesson in this existing bot; no second token is needed.
+  installer disables the old morning transcript timer and registers the 18:00
+  watch-history digest in this existing bot; no second token is needed.
 - `bash bootstrap/install_cron_watchdog.sh` → recover automatically from a
   permanently stuck cron worker.
 - Create Telegram groups for papers, MLE interviews, system design, and LeetCode
@@ -610,7 +611,7 @@ coding, and system-design progress.
 | `interview-prep` | 12:05 Mon/Wed/Fri | Interview group: one focused Staff/Senior MLE drill |
 | `coding-coach` | 12:10 Tue/Thu/Sat | LeetCode group: 35-minute beginner problem with canonical links |
 | `system-design-coach` | 12:15 Sunday | System-design group: one adaptive 45-minute interview |
-| `english-podcast-daily` | 09:15 daily | `🎧 Morning Echo` group on the existing English bot: one downloaded transcript + personalized three-point lesson |
+| `english-podcast-daily` | 18:00 daily | `🎧 Morning Echo` group on the existing English bot: actual watched English Goal Podcast links |
 | `english-intake` | 20:05 Mon–Sat | Dedicated English bot: feedback analysis or weakness coaching |
 | `english-drill` | 21:10 daily | Dedicated English bot: tonight's spaced-repetition drill |
 | `english-weekly-review` | 20:15 Sunday | Dedicated English bot: tutor feedback + weak SRS cumulative review |
@@ -850,33 +851,48 @@ runtime-created skills, while background skill creation and curator maintenance 
 disabled for this profile. Edit `profiles/english/` and stage again for durable
 changes.
 
-### Transcript-backed podcast coaching in the English bot
+### Evening YouTube watch-history links
 
-Podcast coaching is a separate skill and data workflow inside the existing
-English profile. It deliberately reuses the same identity, accumulated learner
-memory and Telegram bot, so no second BotFather token or gateway is needed. The
-daily feed is delivered to a dedicated `🎧 Morning Echo` Telegram group through
-`ENGLISH_PODCAST_TELEGRAM_CHAT_ID`; the registrar rejects a missing or invalid
-ID rather than sending it to the tutor/SRS chat. The Observatory room is also
-separate regardless of Telegram routing. `bootstrap/install_english_bot.sh` installs
-`yt-dlp` and enables
-`hermes-english-podcast-sync.timer`. At 08:25 local time the timer selects the
-newest channel video not previously assigned, preserves its English caption
-JSON3, and writes a timestamped text transcript under
-`~/.hermes/data/english-podcast/`. The 09:15 cron verifies that local transcript,
-reads weakness cards from `~/.hermes/data/english/srs_deck.json` plus the same
-English profile memory, and sends exactly one episode with three short learning
-moments to the existing English chat. It never edits the tutor deck and does not
-create a lesson if captions cannot be downloaded.
+David selects videos himself in the YouTube app. At **18:00 America/Los_Angeles**,
+`english-podcast-daily` runs `youtube_history.py notify` and sends today's actual
+**English Goal Podcast** channel titles and links. It uses the existing English
+profile/bot and the dedicated `🎧 Morning Echo` group selected by the validated
+`ENGLISH_PODCAST_TELEGRAM_CHAT_ID`. No new Hermes profile, bot, or service is added.
+The previous 09:15 recommendation and automatic 08:25 transcript prefetch are
+replaced. `english_podcast.py prepare` remains available for explicit transcript
+coaching; old downloaded transcripts remain available.
 
-Inspect or retry the deterministic preparation layer directly:
+YouTube's official API does not expose watch history. This helper reads the
+signed-in browser's history page; UI changes or expired login can require
+reconnection. First, in a **desktop terminal**, run:
 
 ```bash
-systemctl --user status hermes-english-podcast-sync.timer
-python3 ~/.hermes/profiles/english/scripts/english_podcast.py status
-python3 ~/.hermes/profiles/english/scripts/english_podcast.py prepare
+python3 ~/.hermes/profiles/english/scripts/youtube_history.py connect
+```
+
+In the opened Chromium window, log in with the **same Google account and YouTube
+channel used by the phone app**, then press Enter in the terminal. Watch history
+must be enabled. The login is retained in the owner-only browser directory
+`~/snap/chromium/common/hermes-youtube-history/`; credentials are never entered
+in chat or committed. The helper starts a temporary browser process for each
+read and uses a lock to prevent concurrent reads/login. Use the same browser
+directory if running the helper manually. Other channels and Shorts are excluded;
+a history entry does not prove a completed listen or provide a viewing duration.
+
+```bash
+python3 ~/.hermes/profiles/english/scripts/youtube_history.py status
+python3 ~/.hermes/profiles/english/scripts/youtube_history.py sync
+python3 ~/.hermes/profiles/english/scripts/youtube_history.py notify
 hermes -p english cron list
 ```
+
+Private snapshots live in `~/.hermes/data/youtube-history/`, separately from the
+tutor SRS deck and transcript assignments. No watched episode today produces
+`[SILENT]`; a login, layout, or network error preserves the prior snapshot and
+reports the connection error without sending stale links. Observatory's existing
+podcast room displays source date, last successful collection, and watched links;
+previous-day records are visibly labeled. No live account verification is claimed
+until `connect`/`sync` succeeds.
 
 ### Automatic cron recovery
 
@@ -927,7 +943,7 @@ hermes -p english cron run <ENGLISH_JOB_ID_FROM_LIST>
 ```
 
 `hermes cron list` shows the David bot jobs; `hermes -p english cron list` shows
-the isolated tutor-English jobs plus the 09:15 transcript-backed lesson. Run each
+the isolated tutor-English jobs plus the 18:00 watched-link digest. Run each
 profile's E2E message only after its Telegram bot has completed pairing.
 
 The gateway only starts after `/v1/models` contains
@@ -1108,8 +1124,8 @@ hanging indefinitely; an active local-model turn may run for up to ten minutes.
   state and review schedule. Opening a room alone does not assign or complete work.
 - **English**: reveal due-card answers and mark each attempt correct or needing
   more practice. Results update the shared SRS deck used by Telegram drills.
-- **Morning Echo**: see the latest assigned English Goal Podcast episode,
-  transcript readiness and delivery state, then open the source video. Its
+- **Morning Echo**: see actual watched English Goal Podcast links, source date,
+  and last successful collection, then reopen a video. Its
   schedule and session history remain separate from tutor/SRS activity while it
   shares the English profile's learner memory.
 - **Papers**: browse recent catalog entries, save a reading list, and mark papers

@@ -145,15 +145,16 @@ def test_english_jobs_use_the_isolated_english_profile():
     assert "english-practice" not in jobs["weekly-review"]["skills"]
 
 
-def test_english_podcast_job_is_daily_after_prefetch_in_existing_english_profile():
+def test_english_podcast_job_sends_actual_watch_history_at_1800_in_existing_profile():
     jobs = {job["name"]: job for job in rc.load_jobs(JOBS)}
     podcast = jobs["english-podcast-daily"]
-    assert podcast["schedule"] == "15 9 * * *"
+    assert podcast["schedule"] == "0 18 * * *"
     assert podcast["profile"] == "english"
     assert podcast["deliver_chat_id_env"] == "ENGLISH_PODCAST_TELEGRAM_CHAT_ID"
     assert podcast["skills"] == ["english-podcast-coach"]
-    assert "transcript_path" in podcast["prompt"]
-    assert "exactly three short" in podcast["prompt"]
+    assert "youtube_history.py" in podcast["prompt"]
+    assert "notify and return stdout exactly" in podcast["prompt"]
+    assert "never read or send an old snapshot" in podcast["prompt"]
 
     command = rc.build_create_command(
         podcast, environment={"ENGLISH_PODCAST_TELEGRAM_CHAT_ID": "-1001234567894"}

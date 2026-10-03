@@ -31,11 +31,9 @@ install -m 0644 \
   "$ENGLISH_INSTALL_SCRIPT_DIR/hermes-english-podcast-sync.timer" \
   "$ENGLISH_USER_UNIT_DIR/hermes-english-podcast-sync.timer"
 systemctl --user daemon-reload
-systemctl --user enable --now hermes-english-podcast-sync.timer
-if ! systemctl --user start hermes-english-podcast-sync.service; then
-  echo "Initial podcast transcript download failed; the 09:00 job will retry."
-  echo "Inspect with: journalctl --user -u hermes-english-podcast-sync.service -n 50"
-fi
+# Morning recommendations are replaced by the 18:00 watched-link digest.
+# Keep source units available for explicit transcript preparation only.
+systemctl --user disable --now hermes-english-podcast-sync.timer
 
 if [[ -f "$ENGLISH_PROFILE_ENV" ]] && grep -Eq '^TELEGRAM_BOT_TOKEN=.+$' "$ENGLISH_PROFILE_ENV"; then
   # Hermes currently asks two fixed Linux questions: start now and enable at login.
