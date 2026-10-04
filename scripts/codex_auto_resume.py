@@ -28,6 +28,7 @@ from pathlib import Path
 
 WAIT_SECONDS = 5 * 60 * 60
 GRACE_SECONDS = 90
+ROLLOUT_PARSER_VERSION = '2'
 PROMPT = ('사용량 제한으로 중단된 기존 작업을 계속 진행해줘. 기존 대화의 목표와 '
           '승인 범위를 유지하고, 현재 파일과 실행 상태를 확인하여 이미 완료한 '
           '작업이나 외부 전송을 중복하지 말고 남은 작업을 완료하고 검증해줘.')
@@ -49,6 +50,30 @@ def is_usage_limit(error):
     return 'hit your usage limit' in error.get('message', '').lower()
 
 
+def reset_from_error(error, failed_at):
+    """Interpret Codex's local retry clock relative to the failure, not today."""
+    if not is_usage_limit(error):
+        return 0
+    explicit = error.get('resets_at')
+    if isinstance(explicit, (int, float)) and explicit >= failed_at:
+        return explicit
+    match = re.search(r'\btry again at (\d{1,2}):(\d{2})(?:\s*([AP]M))?\b',
+                      error.get('message', ''), re.IGNORECASE)
+    if not match:
+        return 0
+    hour, minute = map(int, match.group(1, 2))
+    period = match.group(3)
+    if minute > 59 or (period and not 1 <= hour <= 12) or (not period and hour > 23):
+        return 0
+    if period:
+        hour = hour % 12 + (12 if period.upper() == 'PM' else 0)
+    local = datetime.fromtimestamp(failed_at).astimezone()
+    target = local.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    if target.timestamp() + GRACE_SECONDS <= failed_at:
+        target += timedelta(days=1)
+    return target.timestamp()
+
+
 def apply_record(snapshot, record):
     payload = record.get('payload', {})
     kind = record.get('type')
@@ -67,10 +92,13 @@ def apply_record(snapshot, record):
         event = payload.get('type')
         if event == 'task_started':
             snapshot['start'] = {'turn': payload['turn_id'], 'at': timestamp(record['timestamp'])}
+            snapshot['reset_at'] = 0  # Never reuse an earlier turn's quota window.
         elif event == 'task_complete':
+            failed_at = timestamp(record['timestamp'])
             snapshot['end'] = {'turn': payload['turn_id'], 'at': timestamp(record['timestamp']),
                                'usage_limit': is_usage_limit(payload.get('error')),
-                               'failed': bool(payload.get('error'))}
+                               'failed': bool(payload.get('error')),
+                               'reset_at': reset_from_error(payload.get('error'), failed_at)}
         elif event == 'turn_aborted':
             snapshot['end'] = {'turn': payload.get('turn_id'),
                                'at': timestamp(record['timestamp']),
@@ -108,7 +136,8 @@ def unresolved_limit(snapshot):
 
 
 def due_for_limit(snapshot, wait=WAIT_SECONDS, grace=GRACE_SECONDS):
-    return max(snapshot['end']['at'] + wait, snapshot.get('reset_at', 0)) + grace
+    reset = max(snapshot['end'].get('reset_at', 0), snapshot.get('reset_at', 0))
+    return (reset or snapshot['end']['at'] + wait) + grace
 
 
 def resume_command(codex, snapshot, prompt):
@@ -312,13 +341,23 @@ class Store:
                 unit TEXT, log TEXT, started INTEGER DEFAULT 0, result TEXT,
                 UNIQUE(thread, cause));
             CREATE TABLE IF NOT EXISTS exclusions (thread TEXT PRIMARY KEY);
+            CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
         ''')
-        self.db.commit()
+        with self.db:
+            version = self.db.execute("select value from metadata where key='rollout_parser_version'").fetchone()
+            if not version or version['value'] != ROLLOUT_PARSER_VERSION:
+                # Reparse immutable history after a parser upgrade; retain jobs and exclusions.
+                self.db.execute('delete from cursors')
+                self.db.execute("insert or replace into metadata values ('rollout_parser_version',?)",
+                                (ROLLOUT_PARSER_VERSION,))
 
     def enqueue(self, snapshot, cause, due, prompt=PROMPT):
-        existing = self.db.execute('select id from jobs where thread=? and cause=?',
+        existing = self.db.execute('select id,status,due from jobs where thread=? and cause=?',
                                    (snapshot['id'], cause)).fetchone()
         if existing:
+            if existing['status'] == 'pending' and existing['due'] != due:
+                self.update(existing['id'], due=due, snapshot=json.dumps(snapshot))
+                log('rescheduled', thread=snapshot['id'], job=existing['id'], due=due)
             return existing['id']
         job_id = str(uuid.uuid4())
         with self.db:

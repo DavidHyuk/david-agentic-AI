@@ -60,6 +60,53 @@ def test_five_hours_plus_grace_and_server_reset(environment):
     snapshot = snapshots[THREAD]
     snapshot['reset_at'] = environment.now + 7 * 3600
     assert resume.due_for_limit(snapshot) == environment.now + 7 * 3600 + 90
+    snapshot['reset_at'] = environment.now + 3600
+    assert resume.due_for_limit(snapshot) == environment.now + 3600 + 90
+
+
+@pytest.mark.parametrize('clock,hour,minute,next_day', [
+    ('1:56 PM', 13, 56, False), ('12:00 PM', 12, 0, False),
+    ('12:10 AM', 0, 10, True), ('03:09 AM', 3, 9, True),
+    ('13:56', 13, 56, False), ('10:27 AM', 10, 27, False)])
+def test_usage_retry_clock_is_relative_to_failure(clock, hour, minute, next_day):
+    failed = datetime(2026, 10, 4, 10, 27, 35).astimezone()
+    error = {'codex_error_info': 'usage_limit_exceeded', 'message': 'Try again at ' + clock + '.'}
+    expected = failed.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    if next_day:
+        from datetime import timedelta
+        expected += timedelta(days=1)
+    assert resume.reset_from_error(error, failed.timestamp()) == expected.timestamp()
+
+
+def test_error_clock_ignored_for_other_errors_and_stale_window_cleared():
+    failed = time.time()
+    assert resume.reset_from_error({'message': 'Network failed; try again at 1:56 PM.'}, failed) == 0
+    assert resume.reset_from_error({'codex_error_info': 'usage_limit_exceeded',
+                                    'message': 'Try again at 25:99 PM.'}, failed) == 0
+    assert resume.reset_from_error({'codex_error_info': 'usage_limit_exceeded',
+                                    'resets_at': failed + 10}, failed) == failed + 10
+    snapshot = {'reset_at': failed + 86400}
+    resume.apply_record(snapshot, record('event_msg', {'type': 'task_started', 'turn_id': 'new'}, failed))
+    assert snapshot['reset_at'] == 0
+
+
+def test_parser_upgrade_corrects_pending_due_without_duplicate_or_lost_exclusion(environment):
+    resume.scan(environment.store, environment.home)
+    before = environment.store.jobs()[0]
+    with environment.store.db:
+        environment.store.db.execute("update metadata set value='1' where key='rollout_parser_version'")
+        environment.store.db.execute('insert into exclusions values (?)', ('unrelated-thread',))
+    error = {'codex_error_info': 'usage_limit_exceeded', 'resets_at': environment.now + 60}
+    append(environment.path, 'event_msg', {'type': 'task_complete', 'turn_id': TURN, 'error': error},
+           environment.now - 60)
+    upgraded = resume.Store(environment.store.directory)
+    assert not upgraded.db.execute('select * from cursors').fetchall()
+    assert upgraded.db.execute('select * from exclusions').fetchall()
+    resume.scan(upgraded, environment.home)
+    after, = upgraded.jobs()
+    assert after['id'] == before['id']
+    assert after['due'] == pytest.approx(environment.now + 150)
+    assert json.loads(after['snapshot'])['end']['reset_at'] == environment.now + 60
 
 
 def test_restarts_and_multiple_polls_never_duplicate(environment):

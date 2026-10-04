@@ -3,6 +3,27 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.37.1 — 2026-10-04 (patch: retry Codex at its actual quota reset)
+
+- Correct a delayed retry: the 10:27 usage-limit failure announced a 13:56 reset,
+  but failure plus five hours reserved 15:29:05. Read the usage error's local
+  AM/PM clock relative to the failure date, including midnight rollover, and
+  retry at reset plus 90 seconds. Structured quota windows also take precedence;
+  use the five-hour delay only when no reset time is known.
+- Clear stale quota windows when a new turn starts. Version incremental rollout
+  parsing, re-read history on upgrade and correct pending reservations in place
+  while preserving job deduplication, exclusions and terminal outcomes. Keep
+  current-usage-limit checks before every submission and the shared-server TUI path.
+- This remains an internal Codex lifecycle helper with no new Hermes room, bot,
+  profile or scheduled content workflow. Validation: 46 targeted recovery tests
+  and the full `pytest -q` suite pass (638 tests), including early resets, AM/PM,
+  next-day clocks, non-quota exclusion and persisted reservation migration.
+- Live deployment corrects the existing pending job to 13:57:30 and starts it at
+  14:39:21 through the loaded shared daemon, preserving the original session ID.
+  The turn completes at 14:40:14 with a tool call and final reply. The original
+  TUI receives activity while its copy-selection viewport remains paused; its
+  `copy & follow` action returns to new output without reopening the session.
+
 ## v1.37.0 — 2026-10-04 (minor: scoped ChatGPT project agentic vector retrieval)
 
 - Restrict new body collection and vector retrieval to the owner's selected

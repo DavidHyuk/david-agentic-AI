@@ -13,9 +13,12 @@ profile을 `~/.hermes/profiles/english`로 동기화합니다.
 `scripts/codex_auto_resume.py`와 `bootstrap/install_codex_auto_resume.sh`는
 Hermes staging과 별도로 설치하는 host 내부 수명주기 도구입니다.
 `codex-auto-resume.service`가 Codex root session의 structured usage-limit
-종료를 10초마다 감지하고, 발생 시점 + 5시간 + 90초(서버 reset이 더 늦으면
-그 시점 + 90초)에 `codex exec resume --json`으로 같은 session의 작업을
-재개합니다. 최초 설치 시 최근 24시간의 미해결 제한만 복구하며, 이후 감시는
+종료를 10초마다 감지하고, 서버 reset + 90초에 `codex exec resume --json`으로
+같은 session의 작업을 재개합니다. structured quota window와 오류 메시지의
+`try again at …` 현지 시각을 읽고, 해제 시각이 없을 때만 실패 + 5시간 + 90초를
+사용합니다. 오류 발생 날짜를 기준으로 자정 넘김을 처리하며, parser 업그레이드는
+기존 대기 예약의 시간을 같은 job ID로 정정합니다.
+최초 설치 시 최근 24시간의 미해결 제한만 복구하며, 이후 감시는
 서비스 downtime 중 추가된 실패도 처리합니다. 폴더·모델·reasoning effort·
 마지막 실제 turn의 파일 접근 권한을 유지하고 unattended approval은 never로
 설정합니다. 기존 `<SESSION_ID> HH:MM` 명령은 tmux sleep 대신 영속 예약을
@@ -904,7 +907,8 @@ Flash에는 CPU에서 해시를 계산하는 모델 내부 PLE n-gram이 실제�
 현재 전체 `pytest -q` 검증에는 ChatGPT 선택 branch·Unicode 검색·원자적 교체·
 ZIP 경로 격리·credential 오류 출력 방지 및 HQ source 상태 검증도 포함됩니다.
 2026-10-04 Codex quota 복구·writer 충돌·최종 상태 재확인 검증 후 전체
-630개 테스트가 통과했습니다. David·English 자동 tracing의 도구 인자 제외,
+638개 테스트가 통과했습니다. 서버 해제 시각·자정 넘김·기존 예약 migration과
+David·English 자동 tracing의 도구 인자 제외,
 session 묶음과 visible TTFT 처리 검증을 포함합니다.
 
 2026-10-04 대화 streaming·Langfuse private 설정·numeric score 검증 후 전체

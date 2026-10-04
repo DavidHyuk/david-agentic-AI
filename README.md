@@ -40,8 +40,12 @@ journalctl --user -u codex-auto-resume.service -f
 
 The enabled user service polls the local Codex thread index/rollouts every ten
 seconds. A root session ending with `usage_limit_exceeded` gets one persistent
-retry **five hours after the failure, plus 90 seconds**, or after a later server
-reset timestamp when supplied. Existing unresolved failures from the last 24
+retry **90 seconds after the server's reset time**, using structured quota windows
+or the usage error's local `try again at …` clock. Only when no reset time is
+available does it wait **five hours after the failure, plus 90 seconds**.
+The clock is resolved against the failure's date, including midnight rollover;
+parser upgrades correct existing pending reservations without duplicating jobs.
+Existing unresolved failures from the last 24
 hours are recovered on installation. Later failures also survive watcher downtime.
 A new manually submitted turn supersedes its pending retry. Context-window,
 network and ordinary tool errors do not trigger quota recovery.
@@ -62,7 +66,7 @@ systemd workers run concurrently; SSH/tmux disconnects and watcher restarts do
 not stop them. Persistent private state and JSONL worker output live in
 `~/.local/state/codex-auto-resume/`. A turn is marked complete only after verified
 `turn.started` / `turn.completed` events and a successful exit. Another quota
-failure schedules another five-hour retry; ambiguous worker crashes are recorded
+failure schedules another retry using its reset time; ambiguous worker crashes are recorded
 as `needs_review` rather than blindly replaying external actions.
 
 The former command remains available and now saves a persistent schedule:
@@ -80,7 +84,7 @@ worker unit and private output path. Reconnect to the resumed work with
 `codex resume <SESSION_ID>`; the TUI's previous limit error is historical, not a
 new request. The host's enabled user linger keeps the service running after logout
 and at boot. Tests use isolated `--codex-home` / `--state-dir` directories and
-shortened watcher delays; production uses the five-hour default.
+shortened watcher delays; production uses server reset times or the five-hour fallback.
 Live validation used a synthetic quota failure in an isolated rollout, a two-second
 delay and real authenticated Codex turns that wrote verified files. Both normal
 execution and the shared-daemon writer-conflict path kept one original session.
