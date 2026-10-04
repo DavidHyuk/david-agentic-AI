@@ -32,6 +32,7 @@ DEFAULT_RUNTIME = Path.home() / '.hermes/venvs/youtube-history'
 WEB_PORT, VNC_PORT, CDP_PORT = 18781, 15902, 19324
 MAX_EXPORT_BYTES = 512 * 1024 * 1024
 CONVERSATION_PATH = re.compile(r'^/(?:c/|g/[^/]+/c/)([0-9a-fA-F-]{36})/?$')
+PROJECT_ID = re.compile(r'^g-p-[0-9a-f]{32}$')
 
 
 class ArchiveError(ValueError):
@@ -325,7 +326,131 @@ def sync_sidebar(data_dir: Path, max_scrolls: int) -> dict:
                 'captured_at': snapshot['captured_at'], 'complete': False}
 
 
-def read_browser_conversation(data_dir: Path, identifier: str) -> dict:
+def project_conversations(rows: list[dict], project_id: str) -> list[dict]:
+    """Keep only observed links that belong to the exact selected project."""
+    if not PROJECT_ID.fullmatch(project_id):
+        raise ArchiveError('Invalid project identifier.')
+    prefix = f'/g/{project_id}/c/'
+    return [row for row in sidebar_conversations(rows) if urlsplit(row['url']).path.startswith(prefix)]
+
+
+def sync_project(data_dir: Path, project_name: str, max_scrolls: int) -> dict:
+    """Index the selected project's main chat list, excluding global sidebar links."""
+    from playwright.sync_api import sync_playwright
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.connect_over_cdp(f'http://127.0.0.1:{CDP_PORT}')
+        context = browser.contexts[0]
+        candidates = [p for p in context.pages if urlsplit(p.url).hostname == 'chatgpt.com']
+        if not candidates:
+            raise ArchiveError('Open the signed-in ChatGPT login browser first.')
+        page = candidates[-1]
+        projects = page.locator('[data-app-action-sidebar-project-row]')
+        entries = projects.evaluate_all('''nodes => nodes.map(e => ({
+            name:e.getAttribute('data-app-action-sidebar-project-label'),
+            id:e.getAttribute('data-app-action-sidebar-project-id')}))''')
+        matching = [row for row in entries if row['name'] == project_name]
+        if len(matching) != 1 or not PROJECT_ID.fullmatch(matching[0]['id'] or ''):
+            raise ArchiveError('The exact project name was not found in the signed-in sidebar.')
+        project_id = matching[0]['id']
+        url = f'https://chatgpt.com/g/{project_id}/project'
+        tab = context.new_page()
+        try:
+            tab.goto(url, wait_until='domcontentloaded', timeout=45_000)
+            tab.locator('main').get_by_role('button', name=project_name, exact=True).wait_for(timeout=30_000)
+            links = tab.locator('main a[href*="/c/"]')
+            links.first.wait_for(timeout=30_000)
+            collected, stalled = {}, 0
+            for unused in range(max_scrolls + 1):
+                if tab.url.rstrip('/') != url or not is_authenticated(tab):
+                    raise ArchiveError('The selected project page is no longer available; previous index retained.')
+                rows = project_conversations(links.evaluate_all('''nodes => nodes.map(e => ({
+                    url:e.href,title:e.innerText.trim().split('\\n')[0]}))'''), project_id)
+                before = len(collected)
+                collected.update({row['id']: row for row in rows})
+                stalled = stalled + 1 if len(collected) == before else 0
+                moved = links.first.evaluate('''e => {
+                    for(let p=e.parentElement;p && p!==document.body;p=p.parentElement){
+                        if(p.scrollHeight>p.clientHeight && /auto|scroll/.test(getComputedStyle(p).overflowY)){
+                            const before=p.scrollTop;
+                            p.scrollTop+=p.clientHeight*0.8;
+                            return p.scrollTop!==before;
+                        }
+                    }
+                    return false;
+                }''')
+                if not moved and stalled >= 3:
+                    break
+                tab.wait_for_timeout(750)
+            if not collected:
+                raise ArchiveError('No conversations were observed in the selected project.')
+            previous = load_json(data_dir / 'browser-project.json')
+            merged = {}
+            if previous.get('id') == project_id:
+                merged.update({row['id']: row for row in project_conversations(previous.get('conversations', []), project_id)})
+            merged.update(collected)
+            project = {'version': 1, 'id': project_id, 'name': project_name, 'url': url,
+                       'captured_at': now(), 'source': 'visible_project', 'complete': False,
+                       'conversations': list(merged.values())}
+            save_json(data_dir / 'browser-project.json', project)
+            index = load_json(data_dir / 'browser-index.json')
+            all_rows = {row['id']: row for row in sidebar_conversations(index.get('conversations', []))}
+            all_rows.update(merged)
+            save_json(data_dir / 'browser-index.json', {**index, 'version': 1, 'complete': False,
+                'source': 'visible_sidebar', 'conversations': list(all_rows.values())})
+            return {'project_id': project_id, 'project_name': project_name,
+                    'project_conversation_count': len(merged), 'complete': False}
+        finally:
+            tab.close()
+
+
+def collect_browser_messages(page, max_scrolls: int) -> tuple[list[dict], bool]:
+    """Observe rendered messages across a bounded scroll; retain stable message order."""
+    modern = ('main [data-user-message-bubble="true"]:visible,'
+              'main [data-markdown-text-style="assistant-message"]:visible')
+    legacy = ('main [data-message-author-role="user"]:visible,'
+              'main [data-message-author-role="assistant"]:visible')
+    scroll = page.locator('main .thread-scroll-container').first
+    if max_scrolls and scroll.count():
+        scroll.evaluate('e=>{e.scrollTop=getComputedStyle(e).flexDirection==="column-reverse"?-e.scrollHeight:0}')
+        page.wait_for_timeout(750)
+    observed, boundary = {}, False
+    for step in range(max_scrolls + 1):
+        messages = page.locator(modern)
+        if not messages.count():
+            messages = page.locator(legacy)
+        rows = messages.evaluate_all('''nodes => nodes.map((e,i) => {
+            const role=e.hasAttribute('data-user-message-bubble')?'user':
+                e.getAttribute('data-message-author-role')||'assistant';
+            const turn=e.closest('[data-content-search-turn-key]')?.getAttribute('data-content-search-turn-key');
+            const ordinal=turn?.match(/fallback-turn-(\\d+)/);
+            const holder=e.closest('[data-chatgpt-selection-message-id],[data-chatgpt-search-message-ids],[data-message-id]');
+            const key=holder?.getAttribute('data-chatgpt-selection-message-id')||
+                holder?.getAttribute('data-chatgpt-search-message-ids')||holder?.getAttribute('data-message-id');
+            return {role,text:e.innerText.trim(),key:role+':'+(key||turn||i),
+                    ordinal:ordinal?Number(ordinal[1]):null};
+        }).filter(e=>e.text)''')
+        for row in rows:
+            previous = observed.get(row['key'])
+            if previous is None or len(row['text']) >= len(previous['text']):
+                observed[row['key']] = row
+        if step == max_scrolls or not scroll.count():
+            break
+        moved = scroll.evaluate('''e=>{
+            const before=e.scrollTop;
+            e.scrollTop+=e.clientHeight*0.8;
+            return Math.abs(e.scrollTop-before)>1;
+        }''')
+        page.wait_for_timeout(400)
+        if not moved:
+            boundary = True
+            break
+    rows = list(observed.values())
+    if rows and all(row['ordinal'] is not None for row in rows):
+        rows.sort(key=lambda row: (row['ordinal'], row['role'] != 'user'))
+    return [{'role': row['role'], 'text': row['text']} for row in rows], boundary
+
+
+def read_browser_conversation(data_dir: Path, identifier: str, max_scrolls: int = 0) -> dict:
     """Read one explicitly selected indexed chat through the visible web UI."""
     from playwright.sync_api import sync_playwright
     sidebar = load_json(data_dir / 'browser-index.json')
@@ -344,23 +469,19 @@ def read_browser_conversation(data_dir: Path, identifier: str) -> dict:
             legacy_selector = ('main [data-message-author-role="user"]:visible,'
                                'main [data-message-author-role="assistant"]:visible')
             page.locator(modern_selector + ',' + legacy_selector).first.wait_for(timeout=30_000)
-            messages = page.locator(modern_selector)
-            if not messages.count():
-                messages = page.locator(legacy_selector)
             # Avoid claiming all historical turns have rendered on a long chat.
             page.wait_for_timeout(1500)
             current = sidebar_conversations([{'url': page.url, 'title': row['title']}])
             if not current or current[0]['id'] != row['id']:
                 raise ArchiveError('The selected conversation was not opened; no chat content was saved.')
-            texts = messages.evaluate_all('''nodes => nodes.map(e => ({
-                role:e.hasAttribute('data-user-message-bubble') ? 'user' :
-                     e.getAttribute('data-message-author-role') || 'assistant',
-                text:e.innerText.trim()
-            })).filter(e => e.text)''')
+            texts, boundary = collect_browser_messages(page, max_scrolls)
+            current = project_conversations([row], urlsplit(row['url']).path.split('/')[2]) if '/g/' in row['url'] else [row]
+            if not current or page.url.rstrip('/') != row['url'].rstrip('/'):
+                raise ArchiveError('Conversation changed while reading; previous cache retained.')
             if not texts:
                 raise ArchiveError('No visible conversation text was found.')
             result = {**row, 'source': 'visible_browser', 'captured_at': now(),
-                      'complete': False, 'messages': texts}
+                      'complete': False, 'scroll_boundary_reached': boundary, 'messages': texts}
             safe_filename = row['id'] + '.json'
             save_json(data_dir / 'browser-chats' / safe_filename, result)
             return result
@@ -590,6 +711,10 @@ def main(argv=None) -> int:
     sidebar.add_argument('--max-scrolls', type=int, default=40)
     reader = commands.add_parser('read-browser', help='Read one indexed chat from the signed-in browser.')
     reader.add_argument('id')
+    reader.add_argument('--max-scrolls', type=int, default=0)
+    project = commands.add_parser('sync-project', help='Index only the selected project chat list.')
+    project.add_argument('name')
+    project.add_argument('--max-scrolls', type=int, default=40)
     args = parser.parse_args(argv)
     os.umask(0o077)
     def interrupted(*unused):
@@ -623,8 +748,15 @@ def main(argv=None) -> int:
             with locked(args.data_dir, '.browser-read.lock'):
                 result = sync_sidebar(args.data_dir, args.max_scrolls)
         elif args.command == 'read-browser':
+            if not 0 <= args.max_scrolls <= 400:
+                parser.error('--max-scrolls must be between 0 and 400')
             with locked(args.data_dir, '.browser-read.lock'):
-                result = read_browser_conversation(args.data_dir, args.id)
+                result = read_browser_conversation(args.data_dir, args.id, args.max_scrolls)
+        elif args.command == 'sync-project':
+            if not 0 <= args.max_scrolls <= 100:
+                parser.error('--max-scrolls must be between 0 and 100')
+            with locked(args.data_dir, '.browser-read.lock'):
+                result = sync_project(args.data_dir, args.name, args.max_scrolls)
         else:
             result = archive_status(args.data_dir)
         print(json.dumps(result, ensure_ascii=False, indent=2))
