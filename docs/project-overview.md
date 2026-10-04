@@ -788,6 +788,18 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   저장된 쿠키 내용은 Observatory에 제공하지 않습니다.
 
 ### 인터뷰 학습 코치 (interview_progress.py)
+- `import-coding-history --file PRIVATE_JSON`은 선택 프로젝트에 속한 ChatGPT
+  cache의 질문·힌트와 LeetCode의 실제 Accepted 시각을 검증해 `external_coding`에
+  배운 점·원문·출처를 저장합니다. 알려진 커리큘럼 문제는 완료 처리하고 다음 신규
+  문제 선택과 선행 조건에 반영합니다. 명시적 복습 과제와 기존 평가 이력은 보존하며,
+  시간·자신감·독립 풀이·수치 힌트 단계가 없으면 평가 통계를 만들지 않습니다.
+  동일 import는 중복되지 않고, 충돌·잘못된 근거는 batch 전체를 저장하지 않습니다.
+  기존 LeetCode 작업실에서 새 과제를 먼저 보여주고 원문 링크와 힌트·배운 점을
+  표시합니다. Jun 인사 아래의 중복 대화 버튼 대신 마지막 확인된 완료 이후 경과일을
+  Los Angeles 날짜로 표시하며, 일정상 연체일로 해석하지 않습니다. 새 profile·bot·room은
+  만들지 않고 기존 coding 작업실과 소유 profile을 재사용합니다.
+  문제를 언급한 작업실 채팅에도 해당 배움을 전달하므로 제출 코드가 없어도
+  실제 질문·힌트 기준으로 설명할 수 있습니다.
 - 기존 `interview-prep` 스킬 안에서 동작하며, `stage.py`가 standalone helper와
   `references/coach_catalog.json`을 그대로 배포합니다. 모델/엔진 구성은 현재
   Qwen3.8 Flash-Next 4비트 llama.cpp 64K 설정을 공유합니다.
@@ -907,7 +919,9 @@ Flash에는 CPU에서 해시를 계산하는 모델 내부 PLE n-gram이 실제�
 현재 전체 `pytest -q` 검증에는 ChatGPT 선택 branch·Unicode 검색·원자적 교체·
 ZIP 경로 격리·credential 오류 출력 방지 및 HQ source 상태 검증도 포함됩니다.
 2026-10-04 Codex quota 복구·writer 충돌·최종 상태 재확인 검증 후 전체
-638개 테스트가 통과했습니다. 서버 해제 시각·자정 넘김·기존 예약 migration과
+638개 테스트가 통과했습니다. 이후 코딩 대화 학습 import·원자적 거부·중복 방지·
+커리큘럼 진행·작업실 경과일·학습 근거 전달 검증까지 전체 659개가 통과했습니다.
+서버 해제 시각·자정 넘김·기존 예약 migration과
 David·English 자동 tracing의 도구 인자 제외,
 session 묶음과 visible TTFT 처리 검증을 포함합니다.
 

@@ -115,9 +115,11 @@ assigning a recently accepted catalog problem and surface an obvious pattern
 gap. When David asks how he previously solved a LeetCode problem, first read
 the matching `accepted_solutions` entry in that owner-only snapshot and explain
 the actual submitted source (language, approach, and key lines). Never invent
-or substitute a canonical answer when no matching source is saved. Never infer
-a completion from the snapshot; the structured coach state remains the source
-of truth for curriculum completion and reviews.
+or substitute a canonical answer when no matching source is saved. A snapshot
+read alone never creates coach completion. When David requests an import,
+`import-coding-history` verifies actual Accepted evidence and selected cached
+ChatGPT messages before recording external completion and learning in structured
+coach state. This advances known curriculum problems without guessing scores.
 
 LeetCode linking is opt-in. Run `python3 ~/.hermes/scripts/leetcode_sync.py
 status` before claiming it is connected. A linked session is refreshed with
@@ -234,6 +236,19 @@ assisted work as non-independent. Seeing an external editorial counts as viewing
 a solution too; report it honestly even though Hermes did not supply it.
 
 `coach_state.json` lives under `~/.hermes/data/interview/` (or `$HERMES_HOME`).
+For requested ChatGPT learning imports, prepare a private JSON with `chat_id`
+and `entries` containing `slug`, the saved `accepted_at`, zero-based
+`message_indices`, and source-grounded `lesson` / `hint_notes`. Run
+`python3 ~/.hermes/scripts/interview_progress.py import-coding-history --file PATH`.
+Use the owner's actual questions and received hints, retaining their distinction;
+an assistant suggestion alone is not evidence of mastery. The helper validates
+the selected project/cache and Accepted snapshot, saves original messages under
+`external_coding`, and closes outstanding new assignments for those problems.
+Identical retries do nothing. Extra practice outside the catalog remains visible
+without changing the curriculum. Read this imported learning when discussing
+prior attempts; the LeetCode workbench displays it with original conversation
+links. Missing duration, confidence, independence, solution exposure or numeric
+hint level stay unknown and do not enter graded feedback/review statistics.
 The legacy MLE `progress.md` and trend cache remain in use. Do not store structured
 coach results only in prose memory. Repeating the same completed assignment and
 feedback is a no-op; different feedback for that ID is rejected for reconciliation.

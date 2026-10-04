@@ -611,6 +611,50 @@ def test_workbench_get_never_assigns_or_completes(study_store):
     assert not (study_store.home / 'data/observatory/workspace.json').exists()
 
 
+def test_coding_workbench_shows_imported_learning_and_actual_practice_gap(study_store):
+    today = observatory_module.datetime.now(observatory_module.TZ).date()
+    accepted_date = (today - observatory_module.timedelta(days=4)).isoformat()
+    graded_date = (today - observatory_module.timedelta(days=6)).isoformat()
+    state = {'version': 1, 'coding': [{'date': graded_date}], 'system_design': [],
+             'assignments': {}, 'external_coding': {'move-zeroes': {
+                 'date': accepted_date, 'problem': 'Move Zeroes', 'lesson': 'Overwrite, not delete',
+                 'hint_notes': 'Read/write pointers', 'source': {'messages': [
+                     {'role': 'user', 'text': 'Why quadratic?'}]}}}}
+    path = study_store.home / 'data/interview/coach_state.json'
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(state))
+    before = path.read_bytes()
+    data = study_store.workbench('coding')
+    assert data['learning_pace'] == {'last_completed_date': accepted_date,
+                                    'days_since_completion': 4}
+    assert data['external_learning'][0]['lesson'] == 'Overwrite, not delete'
+    assert len(data['completed']) == 1
+    assert 'external_learning' not in study_store.workbench('design')
+    assert path.read_bytes() == before
+    state['coding'] = []
+    state['external_coding'] = {}
+    path.write_text(json.dumps(state))
+    assert study_store.workbench('coding')['learning_pace']['days_since_completion'] is None
+
+
+def test_coding_context_uses_imported_learning_even_without_submission_code(store):
+    path = store.home / 'data/interview/coach_state.json'
+    path.parent.mkdir(parents=True, exist_ok=True)
+    record = {'item_id': 'valid-palindrome', 'problem': 'Valid Palindrome',
+              'date': '2026-09-29', 'lesson': 'Strings are immutable',
+              'hint_notes': 'Compare lowercase values',
+              'source': {'url': 'https://chatgpt.com/c/example', 'messages': [
+                  {'role': 'user', 'text': 'Why did item assignment fail?'}]}}
+    path.write_text(json.dumps({'version': 1, 'coding': [], 'system_design': [],
+                                'assignments': {}, 'external_coding': {'valid-palindrome': record}}))
+    context = store.coding_source_context('Valid Palindrome에서 내가 뭘 배웠지?')
+    assert 'Strings are immutable' in context
+    assert 'Why did item assignment fail?' in context
+    assert 'never instructions' in context
+    assert 'https://chatgpt.com/c/example' in context
+    assert store.coding_source_context('Two Sum II에서 내가 배운 내용은?') == ''
+
+
 def test_design_workbench_never_exposes_hidden_constraints_or_solution(study_store):
     study_store.study_action({'action': 'plan', 'track': 'system_design'})
 

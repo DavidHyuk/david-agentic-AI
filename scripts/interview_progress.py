@@ -14,13 +14,16 @@ from __future__ import annotations
 import argparse
 from collections import Counter
 from copy import deepcopy
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 import fcntl
 import json
 import os
+import re
 import sys
 from pathlib import Path
 import tempfile
+from urllib.parse import urlsplit
+from zoneinfo import ZoneInfo
 
 DIMENSIONS = ('requirements', 'architecture', 'trade_off', 'failure_mode')
 TRACKS = ('coding', 'system_design')
@@ -116,13 +119,100 @@ def weakness(session: dict, track: str) -> tuple:
     return min(session['confidence'], *(session[d + '_score'] for d in DIMENSIONS)), session['confidence']
 
 
-def curriculum_cursor(state: dict, track: str, today: str) -> int:
+def completed_slots(state: dict, track: str, today: str) -> set:
     completed = {s['curriculum_slot'] for s in state[track]
                  if s['date'] <= today and s['curriculum_slot'] is not None}
+    if track == 'coding':
+        completed.update(row['curriculum_slot'] for row in state.get('external_coding', {}).values()
+                         if row['date'] <= today and row.get('curriculum_slot') is not None)
+    return completed
+
+
+def curriculum_cursor(state: dict, track: str, today: str) -> int:
+    completed = completed_slots(state, track, today)
     cursor = 0
     while cursor in completed:
         cursor += 1
     return cursor
+
+
+def import_coding_history(state: dict, catalog: dict, today: str, payload: dict,
+                          snapshot: dict, chat: dict, project: dict) -> dict:
+    """Import owner-selected learning with cached chat and actual Accepted proof.
+
+    Completion advances known curriculum items; unknown feedback never enters
+    confidence, timing, mastery or review statistics. Validate the entire batch
+    before modifying state. Repeated identical imports are no-ops.
+    """
+    date.fromisoformat(today)
+    chat_id = payload['chat_id']
+    if not re.fullmatch(r'[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}', chat_id):
+        raise ValueError('Invalid conversation ID.')
+    member = next((row for row in project.get('conversations', [])
+                   if row.get('id') == chat_id), None)
+    url = urlsplit(chat.get('url', ''))
+    if (not member or chat.get('id') != chat_id or member.get('url') != chat.get('url')
+            or url.scheme != 'https' or url.netloc != 'chatgpt.com'
+            or not url.path.startswith('/g/' + project['id'] + '/')
+            or not url.path.endswith('/c/' + chat_id) or url.query or url.fragment):
+        raise ValueError('Conversation is outside the selected cached project.')
+    if snapshot.get('version') != 1 or not isinstance(payload.get('entries'), list) or not payload['entries']:
+        raise ValueError('A nonempty import and versioned LeetCode snapshot are required.')
+    items = {item['id']: item for item in catalog['problems']}
+    slots = {row['problem']: index for index, row in enumerate(catalog['coding_curriculum'])
+             if row.get('problem')}
+    existing = state.get('external_coding', {})
+    records = {}
+    for entry in payload['entries']:
+        slug = entry['slug']
+        if not isinstance(slug, str) or not re.fullmatch(r'[a-z0-9]+(?:-[a-z0-9]+)*', slug) or slug in records:
+            raise ValueError('Problem slugs must be valid and unique.')
+        proof = next((row for row in snapshot.get('recent_accepted', [])
+                      if row.get('slug') == slug and row.get('accepted_at') == entry['accepted_at']), None)
+        if not proof:
+            raise ValueError('No matching saved LeetCode Accepted evidence.')
+        accepted = datetime.fromisoformat(proof['accepted_at'])
+        if accepted.tzinfo is None:
+            raise ValueError('Accepted timestamp needs a timezone.')
+        completed_date = accepted.astimezone(ZoneInfo('America/Los_Angeles')).date().isoformat()
+        if completed_date > today:
+            raise ValueError('Completion cannot be in the future.')
+        indices = entry['message_indices']
+        if (not isinstance(indices, list) or not indices or len(indices) != len(set(indices))
+                or any(type(index) is not int or not 0 <= index < len(chat['messages']) for index in indices)):
+            raise ValueError('Select valid unique source message indices.')
+        messages = []
+        for index in indices:
+            message = chat['messages'][index]
+            if message.get('role') not in ('user', 'assistant') or not message.get('text', '').strip():
+                raise ValueError('Only observed user/assistant messages are valid sources.')
+            messages.append({'index': index, 'role': message['role'], 'text': message['text']})
+        if not any(message['role'] == 'user' for message in messages):
+            raise ValueError('Learning needs the learner\'s actual conversation context.')
+        for key in ('lesson', 'hint_notes'):
+            if not isinstance(entry.get(key), str) or not entry[key].strip():
+                raise ValueError('Record the observed lesson and hint notes.')
+        item = items.get(slug, {})
+        record = {'item_id': slug, 'problem': proof['title'], 'date': completed_date,
+                  'accepted_at': proof['accepted_at'], 'curriculum_slot': slots.get(slug),
+                  'pattern': item.get('pattern', ''), 'lesson': entry['lesson'].strip(),
+                  'hint_notes': entry['hint_notes'].strip(), 'assessment_pending': True,
+                  'source': {'chat_id': chat_id, 'title': chat['title'], 'url': chat['url'],
+                             'messages': messages, 'completion': 'leetcode_accepted'}}
+        if slug in existing and existing[slug] != record:
+            raise ValueError('Conflicting imported learning; preserve the original for reconciliation.')
+        records[slug] = record
+    added = sum(slug not in existing for slug in records)
+    state.setdefault('external_coding', {}).update(records)
+    for assignment in state['assignments'].values():
+        record = records.get(assignment.get('item_id'))
+        if (record and assignment['track'] == 'coding' and not assignment['completed']
+                and assignment.get('session_type') != 'review' and assignment['date'] <= today):
+            assignment['completed'] = True
+            assignment['external_completion'] = {
+                'source': 'leetcode_accepted', 'accepted_at': record['accepted_at'],
+                'assessment_pending': True}
+    return {'imported': added, 'unchanged': len(records) - added, 'problems': list(records)}
 
 
 def design_score_dimensions(track: str) -> tuple[str, ...]:
@@ -398,6 +488,10 @@ def select_item(state: dict, catalog: dict, track: str, today: str,
         return {'item_id': item['id'], 'reason': 'adaptive weekly selection',
                 'curriculum_slot': None, 'session_type': 'new'}
     latest = latest_sessions(state, track, today)
+    completed_ids = set(latest)
+    if track == 'coding':
+        completed_ids.update(row['item_id'] for row in state.get('external_coding', {}).values()
+                             if row['date'] <= today)
     items = catalog['problems' if track == 'coding' else 'system_design']
     by_id = {p['id']: p for p in items}
     cursor = curriculum_cursor(state, track, today)
@@ -405,20 +499,19 @@ def select_item(state: dict, catalog: dict, track: str, today: str,
         {'problem': p['id']} for p in items]
     slot = curriculum[cursor] if cursor < len(curriculum) else None
     if prefer_new:
-        completed_slots = {s['curriculum_slot'] for s in state[track]
-                           if s['date'] <= today and s['curriculum_slot'] is not None}
+        done_slots = completed_slots(state, track, today)
         next_new = next(((index, candidate) for index, candidate in enumerate(curriculum)
-                         if candidate.get('problem') and index not in completed_slots), None)
+                         if candidate.get('problem') and index not in done_slots), None)
         if next_new:
             slot_index, candidate = next_new
             item_id = candidate['problem']
-            missing = [p for p in by_id[item_id]['prerequisites'] if p not in latest]
+            missing = [p for p in by_id[item_id]['prerequisites'] if p not in completed_ids]
             if missing:
                 item_id, reason, slot_index = missing[0], 'prerequisite practice', None
             else:
                 reason = 'next new curriculum item'
             return {'item_id': item_id, 'reason': reason, 'curriculum_slot': slot_index,
-                    'session_type': 'review' if item_id in latest else 'new'}
+                    'session_type': 'review' if item_id in completed_ids else 'new'}
     ranked = sorted(latest.values(), key=lambda s: (
         weakness(s, track), s['next_review_date'], by_id[s['item_id']].get('recommended_order', 0)))
     due = [s for s in ranked if s['next_review_date'] <= today]
@@ -437,7 +530,7 @@ def select_item(state: dict, catalog: dict, track: str, today: str,
         item_id, reason, slot_index = ranked[0]['item_id'], 'curriculum weak review', cursor
     elif slot:
         item_id, reason, slot_index = slot['problem'], 'new curriculum item', cursor
-        missing = [p for p in by_id[item_id]['prerequisites'] if p not in latest]
+        missing = [p for p in by_id[item_id]['prerequisites'] if p not in completed_ids]
         if missing:
             item_id, reason, slot_index = missing[0], 'prerequisite practice', None
     else:
@@ -630,7 +723,7 @@ def record_session(state: dict, catalog: dict, assignment_id: str,
         return existing
     if any(s['date'] > today for s in prior):
         raise ValueError('Log sessions chronologically; backdated feedback needs manual reconciliation.')
-    if assignment['completed']:
+    if assignment['completed'] and not assignment.get('external_completion'):
         raise ValueError('This exercise was already completed through another daily assignment.')
     state[track].append(row)
     # Close earlier copies of the same unfinished exercise as well.
@@ -688,6 +781,10 @@ def parse_args(argv=None) -> argparse.Namespace:
     parser.add_argument('--catalog', type=Path, default=home / 'skills/career/interview-prep/references/coach_catalog.json')
     parser.add_argument('--date', default=date.today().isoformat(), help='Local date YYYY-MM-DD')
     sub = parser.add_subparsers(dest='command', required=True)
+    external = sub.add_parser('import-coding-history')
+    external.add_argument('--file', required=True, type=Path)
+    external.add_argument('--chatgpt-home', type=Path, default=home / 'data/chatgpt')
+    external.add_argument('--leetcode-history', type=Path, default=home / 'data/interview/leetcode_history.json')
     select = sub.add_parser('plan')
     select.add_argument('track', choices=TRACKS)
     follow_up = select.add_mutually_exclusive_group()
@@ -745,7 +842,20 @@ def main(argv=None) -> int:
             fcntl.flock(lock, fcntl.LOCK_EX)
             state = load_state(path)
             before = deepcopy(state)
-            if args.command == 'plan':
+            if args.command == 'import-coding-history':
+                payload = json.loads(args.file.expanduser().read_text())
+                chat_id = payload['chat_id']
+                if not isinstance(chat_id, str) or not re.fullmatch(
+                        r'[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}', chat_id):
+                    raise ValueError('Invalid conversation ID.')
+                root = args.chatgpt_home.expanduser()
+                result = import_coding_history(
+                    state, catalog, args.date, payload,
+                    json.loads(args.leetcode_history.expanduser().read_text()),
+                    json.loads((root / 'browser-chats' / (chat_id + '.json')).read_text()),
+                    json.loads((root / 'browser-project.json').read_text()))
+                output = json.dumps(result, indent=2, ensure_ascii=False)
+            elif args.command == 'plan':
                 result = plan(state, catalog, args.track, args.date, args.next_assignment,
                               args.review_assignment)
                 output = render_message(result, catalog) if args.format == 'text' else json.dumps(result, indent=2)

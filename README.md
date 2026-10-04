@@ -881,14 +881,37 @@ chronological. Identical completion retries are ignored; conflicting feedback
 for the same assignment fails explicitly. Locked atomic writes preserve concurrent
 updates, and corrupt state is retained for recovery instead of silently reset.
 
+To import actual hints and learning from a cached ChatGPT project conversation,
+prepare a **private** JSON file with `chat_id` and an `entries` array. Each entry
+contains `slug`, the exact `accepted_at` from your saved LeetCode snapshot,
+zero-based `message_indices`, and source-grounded `lesson` / `hint_notes`:
+
+```bash
+python3 ~/.hermes/scripts/interview_progress.py import-coding-history --file /private/path/learning.json
+python3 ~/.hermes/scripts/interview_progress.py plan coding --next
+```
+
+The importer verifies project membership, cached messages and actual Accepted
+evidence before writing `external_coding` in the locked coach state. Identical
+retries do nothing; conflicting imports fail without partial changes. Known
+curriculum problems advance and close outstanding new assignments, while
+explicit reviews remain open. Extra practice stays visible without adding slots.
+Missing time, confidence, numeric hint level or independence remain unknown and
+do not affect graded review statistics. The existing LeetCode workbench shows
+the next assignment first, imported hints/lessons with source messages and links,
+and days since the last verified completion below Jun's greeting. This practice
+gap uses Los Angeles dates and is not a scheduled deadline. The redundant
+“대화 이어가기” companion button is removed; the existing conversation remains.
+
 ### LeetCode account history (optional, read-only)
 
 The Coding Coach can use your solved totals, recent accepted submissions, and
 the latest actual Accepted source for each recent problem as supplementary
 context. This lets it answer questions such as “How did I solve Anagram?” from
 your submitted code rather than a generic solution. It never treats that
-history as a completed coach assignment, submits code, edits your LeetCode
-profile, or stores a password.
+history as graded coach feedback. An explicit learning import can record a
+verified external completion as described above. It never submits code, edits
+your LeetCode profile, or stores a password.
 In the LeetCode workbench chat, the referenced problem (including a follow-up
 that refers to the immediately preceding problem) automatically provides only
 that matching local submission to the coach; the reply and its Telegram mirror

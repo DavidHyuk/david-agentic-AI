@@ -3,6 +3,28 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.38.0 — 2026-10-04 (minor: import verified coding learning into the workbench)
+
+- Import owner-selected ChatGPT questions, hints and lessons with original
+  messages/links, verifying the selected project cache and exact LeetCode
+  Accepted evidence. Store external completions separately from graded feedback;
+  unknown duration, confidence, independence and numeric hint levels stay absent.
+- Advance catalog slots and prerequisites from verified completion, close old
+  new-problem assignments, and preserve explicit reviews. Retry identical batches
+  without duplicates and reject conflicting or invalid batches before writing.
+  A later actual self-assessment can enrich an externally closed assignment.
+- Show the next problem before account/history cards. Display imported learning
+  in the existing coding workbench and replace the companion's redundant chat
+  button with days since the latest verified completion in Los Angeles dates.
+  This is a practice gap, not an invented deadline. Reuse the existing coding
+  room/profile/bot; no new workflow, cron, profile or Telegram delivery is added.
+- Live records: Valid Palindrome (September 29) and Move Zeroes (September 30)
+  retain actual learner questions and received explanations; Two Sum II remains
+  the next new assignment. Private conversation data stays outside git.
+- Feed referenced imported learning into existing coding chat context even when
+  submitted source code is unavailable, distinguishing questions from advice.
+  Validation: `pytest -q` passes 659 tests; JavaScript syntax checks pass.
+
 ## v1.37.1 — 2026-10-04 (patch: retry Codex at its actual quota reset)
 
 - Correct a delayed retry: the 10:27 usage-limit failure announced a 13:56 reset,

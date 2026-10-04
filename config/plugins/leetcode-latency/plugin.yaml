@@ -1,0 +1,7 @@
+name: leetcode-latency
+version: "1.0.0"
+author: David Choi
+description: Focus tool schemas on selected local LeetCode conversations.
+kind: standalone
+provides_hooks:
+  - pre_llm_call

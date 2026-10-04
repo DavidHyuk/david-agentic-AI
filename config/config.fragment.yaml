@@ -25,6 +25,13 @@ model:
 agent:
   restart_drain_timeout: 15
 
+# Jun's web dialogue uses study/code-reading tools instead of the full browser,
+# image, scheduler and delegation catalog. Other sessions retain their tools.
+leetcode_latency:
+  enabled: true
+  sessions:
+    - office_coding
+
 # --- Built-in browser --------------------------------------------------------
 # Hermes keeps its own browser tool. agent-browser connects to a localhost-only
 # Chromium CDP service because auto-launching Ubuntu's Snap Chromium hangs on

@@ -35,6 +35,114 @@ def design_feedback(**overrides):
                 next_improvement='Quantify peak traffic') | overrides
 
 
+def external_sources():
+    chat_id = '6aa8637a-349c-83e8-90c9-7fab3acedc50'
+    project_id = 'g-p-example'
+    url = f'https://chatgpt.com/g/{project_id}/c/{chat_id}'
+    project = {'id': project_id, 'conversations': [{'id': chat_id, 'url': url}]}
+    chat = {'id': chat_id, 'url': url, 'title': 'LeetCode hints', 'messages': [
+        {'role': 'user', 'text': 'Why does assigning a string character fail?'},
+        {'role': 'assistant', 'text': 'Strings are immutable; compare lowercase characters.'},
+        {'role': 'user', 'text': 'Why does repeated pop become quadratic?'},
+        {'role': 'assistant', 'text': 'Middle deletion shifts the remaining elements.'}]}
+    proofs = [{'slug': 'valid-palindrome', 'title': 'Valid Palindrome',
+               'accepted_at': '2026-09-29T16:36:57+00:00'},
+              {'slug': 'move-zeroes', 'title': 'Move Zeroes',
+               'accepted_at': '2026-09-30T15:54:01+00:00'}]
+    payload = {'chat_id': chat_id, 'entries': [
+        {'slug': proof['slug'], 'accepted_at': proof['accepted_at'],
+         'message_indices': [index * 2, index * 2 + 1],
+         'lesson': 'Observed lesson', 'hint_notes': 'Received explanation'}
+        for index, proof in enumerate(proofs)]}
+    return payload, {'version': 1, 'recent_accepted': proofs}, chat, project
+
+
+def test_external_learning_advances_catalog_without_fabricated_grades(catalog):
+    state = ip.empty_state()
+    for day in range(1, 7):
+        assignment = ip.plan(state, catalog, 'coding', f'2026-09-{day:02}', next_assignment=True)
+        ip.record_session(state, catalog, assignment['id'], assignment['date'], feedback())
+    pending = ip.plan(state, catalog, 'coding', '2026-09-28', next_assignment=True)
+    review = dict(pending, id='explicit-review', session_type='review')
+    state['assignments'][review['id']] = review
+    assert pending['item_id'] == 'valid-palindrome'
+    graded = deepcopy(state['coding'])
+    sources = external_sources()
+    result = ip.import_coding_history(state, catalog, '2026-10-04', *sources)
+    assert result['imported'] == 2
+    assert state['coding'] == graded
+    assert pending['completed'] and not review['completed']
+    assert ip.curriculum_cursor(state, 'coding', '2026-10-04') == 7
+    assert ip.curriculum_cursor(state, 'coding', '2026-09-28') == 6
+    next_problem = ip.plan(state, catalog, 'coding', '2026-10-04', next_assignment=True)
+    assert next_problem['item_id'] == 'two-sum-ii-input-array-is-sorted'
+    before = deepcopy(state)
+    assert ip.import_coding_history(state, catalog, '2026-10-04', *sources)['unchanged'] == 2
+    assert ip.plan(state, catalog, 'coding', '2026-10-04', next_assignment=True) == next_problem
+    assert state == before
+    extra = state['external_coding']['move-zeroes']
+    assert catalog['coding_curriculum'][extra['curriculum_slot']]['problem'] == 'move-zeroes'
+    assert extra['source']['messages'][0]['role'] == 'user'
+    assert not any(key in extra for key in ('duration', 'confidence', 'hint_level', 'independent'))
+    assert ip.weekly_report(state, catalog, '2026-10-04')['coding_sessions_completed'] == 0
+    # Actual later self-assessment can still enrich an externally closed assignment.
+    row = ip.record_session(state, catalog, pending['id'], '2026-10-04', feedback())
+    assert row['duration'] == 30
+
+
+def test_external_extra_practice_does_not_change_catalog_cursor(catalog):
+    state = ip.empty_state()
+    payload, snapshot, chat, project = external_sources()
+    payload['entries'] = [payload['entries'][0] | {'slug': 'extra-practice'}]
+    snapshot['recent_accepted'][0]['slug'] = 'extra-practice'
+    ip.import_coding_history(state, catalog, '2026-10-04', payload, snapshot, chat, project)
+    assert state['external_coding']['extra-practice']['curriculum_slot'] is None
+    assert ip.curriculum_cursor(state, 'coding', '2026-10-04') == 0
+
+
+@pytest.mark.parametrize('failure', ['outside_project', 'no_accepted', 'bad_index',
+                                      'conflict', 'future', 'no_user'])
+def test_external_import_rejects_invalid_batch_without_partial_writes(catalog, failure):
+    state = ip.empty_state()
+    payload, snapshot, chat, project = external_sources()
+    if failure == 'outside_project':
+        project['conversations'] = []
+    elif failure == 'no_accepted':
+        snapshot['recent_accepted'].pop()
+    elif failure == 'bad_index':
+        payload['entries'][1]['message_indices'] = [999]
+    elif failure == 'conflict':
+        ip.import_coding_history(state, catalog, '2026-10-04', payload, snapshot, chat, project)
+        payload['entries'][1]['lesson'] = 'Different lesson'
+    elif failure == 'future':
+        payload['entries'][1]['accepted_at'] = '2026-10-10T00:00:00+00:00'
+        snapshot['recent_accepted'][1]['accepted_at'] = payload['entries'][1]['accepted_at']
+    else:
+        payload['entries'][1]['message_indices'] = [3]
+    before = deepcopy(state)
+    with pytest.raises(ValueError):
+        ip.import_coding_history(state, catalog, '2026-10-04', payload, snapshot, chat, project)
+    assert state == before
+
+
+def test_external_import_cli_uses_cached_private_sources(tmp_path, catalog):
+    payload, snapshot, chat, project = external_sources()
+    root = tmp_path / 'chatgpt'
+    (root / 'browser-chats').mkdir(parents=True)
+    files = {'payload.json': payload, 'leetcode.json': snapshot, 'catalog.json': catalog,
+             'chatgpt/browser-project.json': project,
+             f'chatgpt/browser-chats/{chat["id"]}.json': chat}
+    for name, value in files.items():
+        (tmp_path / name).write_text(json.dumps(value))
+    argv = ['--state', str(tmp_path / 'state.json'), '--catalog', str(tmp_path / 'catalog.json'),
+            '--date', '2026-10-04', 'import-coding-history', '--file', str(tmp_path / 'payload.json'),
+            '--chatgpt-home', str(root), '--leetcode-history', str(tmp_path / 'leetcode.json')]
+    assert ip.main(argv) == 0
+    original = (tmp_path / 'state.json').read_bytes()
+    assert ip.main(argv) == 0
+    assert (tmp_path / 'state.json').read_bytes() == original
+
+
 def complete(state, catalog, day, track='coding', **overrides):
     assignment = ip.plan(state, catalog, track, day)
     result = feedback(**overrides) if track == 'coding' else design_feedback(**overrides)

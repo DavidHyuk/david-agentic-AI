@@ -627,7 +627,7 @@ window.sharedOffice = (() => {
     historyRequest++;
     $("office-conversation").hidden = true;
     actors.get(last)?.node.classList.remove("is-selected");
-    if (state.view === "workbench") $("bench-talk")?.focus({preventScroll: true});
+    if (state.view === "workbench") $("office-message")?.focus({preventScroll: true});
     else actors.get(last)?.node.focus({preventScroll: true});
   }
   function select(room, insideWorkbench = false) {
@@ -749,15 +749,22 @@ window.sharedOffice = (() => {
     }
     if (!officeCast[room]) { target.replaceChildren(); return; }
     const cast = officeCast[room];
-    target.innerHTML = `<div class="bench-companion">${sprite(room)}<div><small>${esc(cast.role)}</small><h2>${esc(cast.name)}와 함께하는 작업실</h2><p>자료를 함께 살펴보고, 이곳에서 이야기를 이어가세요.</p><button class="primary" id="bench-talk">대화 이어가기</button></div></div>`;
-    $("bench-talk").onclick = () => {
-      $("office-conversation").hidden = false;
-      $("office-message").focus({preventScroll: true});
-    };
+    target.innerHTML = `<div class="bench-companion">${sprite(room)}<div><small>${esc(cast.role)}</small><h2>${esc(cast.name)}와 함께하는 작업실</h2><p>자료를 함께 살펴보고, 이곳에서 이야기를 이어가세요.</p>${room === "coding" ? '<p class="bench-pace" id="bench-pace" aria-live="polite">다음 한 걸음을 준비하고 있어요.</p>' : ""}</div></div>`;
     select(room, true);
     $("conversation-workbench").hidden = true;
   }
+  function learningPace(pace) {
+    const target = $("bench-pace");
+    if (!target) return;
+    const days = pace?.days_since_completion;
+    target.textContent = days == null
+      ? "첫 번째 기록을 기다리고 있어요. 오늘, 한 문제부터."
+      : days === 0
+        ? "오늘도 한 걸음 쌓았어요. 다음 문제도 함께 가요."
+        : `마지막 풀이 이후 ${days}일. 다음 한 걸음은 오늘부터.`;
+    target.title = pace?.last_completed_date ? `마지막 확인된 완료: ${pace.last_completed_date}` : "";
+  }
   document.addEventListener("visibilitychange", visibility);
   reduced.addEventListener("change", visibility);
-  return {render, visibility, select, workbench, setZoom: setOfficeZoom};
+  return {render, visibility, select, workbench, learningPace, setZoom: setOfficeZoom};
 })();

@@ -293,6 +293,7 @@
 .bench-companion > div:last-child { align-self: center; padding: 8px 0; }
 .bench-companion h2 { font: 23px Georgia, serif; margin: 5px 0; }
 .bench-companion p { font-size: 12px; color: #738069; }
+.bench-companion .bench-pace { color: #465837; font-weight: 600; padding-top: 4px; }
 .bench-companion small { font-size: 10px; color: #748465; }
 @keyframes office-walk { from { transform: translateY(-2px) rotate(-2deg); } to { transform: translateY(1px) rotate(2deg); } }
 @keyframes office-idle { 50% { transform: translateY(-2px); } }
