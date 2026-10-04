@@ -54,7 +54,8 @@ semantic versioning (major.minor.patch).
   agent, bot or cron is needed for this internal observer.
 - Document Graph/Sessions/Experiments navigation and the separate existing
   ClawGram Studio snapshot route for LangGraph checkpoint/state debugging.
-- Validation: 611 tests pass. Real default-gateway SSE and isolated English
+- Validation: 630 tests pass, including omission of assistant tool-call arguments
+  from subsequent request history. Real default-gateway SSE and isolated English
   runtime probes produce expected answers and read back their root/generation,
   session grouping, usage and observed TTFT from Cloud. Source/runtime hashes
   match, gateway/API health is restored and tracing hooks log no failures.

@@ -904,7 +904,8 @@ Flash에는 CPU에서 해시를 계산하는 모델 내부 PLE n-gram이 실제�
 현재 전체 `pytest -q` 검증에는 ChatGPT 선택 branch·Unicode 검색·원자적 교체·
 ZIP 경로 격리·credential 오류 출력 방지 및 HQ source 상태 검증도 포함됩니다.
 2026-10-04 Codex quota 복구·writer 충돌·최종 상태 재확인 검증 후 전체
-629개 테스트가 통과했습니다.
+630개 테스트가 통과했습니다. David·English 자동 tracing의 도구 인자 제외,
+session 묶음과 visible TTFT 처리 검증을 포함합니다.
 
 2026-10-04 대화 streaming·Langfuse private 설정·numeric score 검증 후 전체
 `pytest -q`는 549 passed입니다. 웹 helper와 office client의 배포 및 health를

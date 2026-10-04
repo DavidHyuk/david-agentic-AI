@@ -103,7 +103,8 @@ ssh -F /dev/null -N -L 2024:127.0.0.1:2024 david@100.94.7.102
 이미 2024 SSH forwarding이 있다면 중복 터널을 만들지 않습니다.
 snapshot을 새로 만들려면 Spark에서 `systemctl --user stop clawgram-studio.service`
 후 위 script를 실행합니다.
-Studio 웹 UI 로그인이 필요할 수 있으나 그래프를 Cloud에 배포할 필요는 없습니다.
+Studio 웹 UI는 별도의 LangSmith 계정 로그인이 필요합니다. Langfuse 계정과는
+별개이며 이 연결을 위해 그래프를 Cloud에 배포할 필요는 없습니다.
 설치된 Studio 서버가 실행 중이어야 연결됩니다. ClawGram의 private SSH 안내와
 별도 Studio 환경은 해당 저장소 README를 따릅니다.
 운영 draft 승인과 KakaoTalk delivery는 계속 ClawGram review의 별도 권한 경계에 있습니다.
