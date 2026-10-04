@@ -961,7 +961,7 @@ systemd-run --user --unit=hermes-youtube-login --collect --property=RuntimeMaxSe
 In a **local Windows PowerShell** terminal, keep this SSH tunnel running:
 
 ```powershell
-ssh -N -T -o ClearAllForwardings=yes -o ExitOnForwardFailure=yes -L 127.0.0.1:18780:127.0.0.1:18780 dgx
+ssh -F /dev/null -N -T -o ExitOnForwardFailure=yes -L 127.0.0.1:18780:127.0.0.1:18780 david@10.0.0.50
 ```
 
 Open `http://127.0.0.1:18780/vnc.html?autoconnect=true&resize=scale` in local Chrome.
@@ -1203,13 +1203,20 @@ On the **DGX**, start a bounded browser session (30 minutes by default):
 ```
 
 On the **MacBook**, open a **new local terminal outside the DGX SSH session**.
-Replace `dgx` with the SSH target you normally use and leave this command running:
+Use the DGX's direct address and leave this command running:
 
 ```bash
-ssh -N -o ClearAllForwardings=yes -o ExitOnForwardFailure=yes -L 18781:127.0.0.1:18781 dgx
+ssh -F /dev/null -N -o ExitOnForwardFailure=yes -L 127.0.0.1:18781:127.0.0.1:18781 david@10.0.0.50
 ```
 
-Open `http://localhost:18781/vnc.html?autoconnect=true&resize=scale` in the MacBook
+`-F /dev/null` bypasses alias forwarding defaults, including port 8501 which may
+already belong to an existing `ssh dgx` session. Replace the direct address if
+connecting through a different network; add `-i /path/to/key` if the alias normally
+selects a nondefault identity. Do not combine explicit `-L` with
+`ClearAllForwardings=yes`: OpenSSH removes command-line forwards too, leaving an
+apparently connected SSH session without the browser tunnel.
+
+Open `http://127.0.0.1:18781/vnc.html?autoconnect=true&resize=scale` in the MacBook
 browser and sign in directly, completing any additional authentication. The
 helper attempts Settings → Data controls → Export → Confirm export once and
 requires a success notice before reporting a confirmed request. If account UI

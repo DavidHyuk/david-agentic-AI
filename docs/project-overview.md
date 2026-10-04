@@ -65,6 +65,11 @@ ChatGPT Chromium profile을 열고 SSH 터널 `18781`로 직접 로그인을 받
 분리합니다. 새 agent/skill/room/profile/bot/cron 없이 David/HQ의 참고 자료
 연결 도구로 유지합니다.
 
+로그인 터널은 `-F /dev/null`과 실제 DGX 주소(`david@10.0.0.50`)를 사용하여
+기존 `ssh dgx`의 기본 `8501` forwarding 충돌을 피합니다.
+`ClearAllForwardings=yes`는 명령줄 `-L`도 제거하므로 로그인 터널에 사용하지
+않습니다. 이 옵션은 별도 터널 없이 쿠키를 전달하는 SSH 명령에만 유지합니다.
+
 ---
 
 ## 디렉터리 구조

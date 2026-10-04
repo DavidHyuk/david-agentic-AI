@@ -3,6 +3,20 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.33.1 — 2026-10-04 (patch: repair direct browser SSH tunnel commands)
+
+- Remove `ClearAllForwardings=yes` from interactive browser tunnel instructions:
+  it clears explicit command-line `-L` forwards as well as alias defaults,
+  causing SSH to remain connected while localhost refuses browser connections.
+- Use `-F /dev/null` and the actual DGX address for ChatGPT and YouTube tunnels.
+  This avoids the existing `ssh dgx` session's occupied default port 8501 while
+  keeping `ExitOnForwardFailure=yes` for the requested browser listener. Explain
+  how to supply a nondefault identity without reloading alias port forwards.
+- Validation: `ssh -G` reproduces the missing forward with the old option and
+  confirms the corrected explicit loopback listener. DGX noVNC returns HTTP 200;
+  the MacBook-side tunnel still requires the user's local SSH connection.
+  Documentation-only repair; no runtime code, profile, room or cron changes.
+
 ## v1.32.1 — 2026-10-04 (patch: progressive web replies and compact-input experiment)
 
 - Forward assistant text from the existing authenticated Hermes session stream
