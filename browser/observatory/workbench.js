@@ -213,10 +213,12 @@ function missionCard(task) {
 function hqDesk(d) {
   const o = d.orchestration;
   const archive = d.chatgpt_archive || {};
+  const rag = d.chatgpt_project_rag || {};
   const archiveStates = {not_started: "연결 전", starting: "브라우저 준비 중", awaiting_login: "직접 로그인 대기", authenticated: "브라우저 로그인 확인", closed: "브라우저 닫힘"};
   const exportStates = {not_requested: "", requesting: "내보내기 요청 중", requested: "내보내기 요청 확인 · 이메일/SMS 대기", needs_browser_review: "브라우저에서 내보내기 상태 확인 필요", awaiting_verification: "ChatGPT 앱 또는 이메일 본인 인증 대기", verification_loop: "내보내기 인증 반복 · 요청 중단"};
   const sidebarSummary = archive.sidebar_conversation_count ? `<p>화면에서 읽은 제목·링크 ${Number(archive.sidebar_conversation_count)}개 · 전체 계정 백업은 아닙니다.</p><small>목록 확인: ${when(archive.sidebar_captured_at)}</small>` : "";
-  const archiveCard = `<article class="desk-card"><span class="tag">CHATGPT</span><h2>이전 대화 참고 자료</h2><p>내보내기 파일: ${Number(archive.conversation_count || 0)}개 대화 · ${Number(archive.message_count || 0)}개 메시지</p>${sidebarSummary}<p class="muted">${esc(archiveStates[archive.browser_status] || "상태 확인 필요")}${exportStates[archive.export_status] ? " · " + esc(exportStates[archive.export_status]) : ""}</p>${archive.imported_at ? `<small>가져온 시각: ${when(archive.imported_at)}</small>` : '<small>HQ에서 이전 대화를 요청하면 저장한 목록을 검색하고 필요한 대화 본문을 가져와 참고합니다.</small>'}${archive.error ? '<p class="muted">참고 자료 상태를 확인하지 못했습니다.</p>' : ""}</article>`;
+  const ragSummary = rag.project_name ? `<p><b>${esc(rag.project_name)}</b></p><p>${rag.ready ? "로컬 의미 검색 준비됨" : rag.stale ? "프로젝트 자료 변경 · 색인 갱신 필요" : "프로젝트 색인 준비 필요"} · ${Number(rag.conversation_count || 0)}개 대화 · ${Number(rag.message_count || 0)}개 메시지 · ${Number(rag.chunk_count || 0)}개 검색 구간</p><small>화면에서 읽은 본문 기준 · 전체 계정 백업은 아닙니다.${rag.indexed_at ? ` 색인: ${when(rag.indexed_at)}` : ""}</small>` : "";
+  const archiveCard = `<article class="desk-card"><span class="tag">CHATGPT</span><h2>이전 대화 참고 자료</h2>${ragSummary}<p>내보내기 파일: ${Number(archive.conversation_count || 0)}개 대화 · ${Number(archive.message_count || 0)}개 메시지</p>${sidebarSummary}<p class="muted">${esc(archiveStates[archive.browser_status] || "상태 확인 필요")}${exportStates[archive.export_status] ? " · " + esc(exportStates[archive.export_status]) : ""}</p>${archive.imported_at ? `<small>가져온 시각: ${when(archive.imported_at)}</small>` : '<small>HQ에서 프로젝트의 이전 대화를 요청하면 관련 원문을 검색하고 확인해 답합니다.</small>'}${archive.error || rag.error ? '<p class="muted">참고 자료 상태를 확인하지 못했습니다.</p>' : ""}</article>`;
   const rewards = d.rewards || {};
   const weekly = rewards.weekly || { counts: {}, goals: {} };
   const rewardCard = rewards.available === false

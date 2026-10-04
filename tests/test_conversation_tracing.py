@@ -110,6 +110,14 @@ def test_turn_tool_loop_and_cache_accounting(tracing):
     assert not tracing._TURNS and not tracing._SESSIONS
 
 
+def test_assistant_tool_arguments_in_next_request_history_are_omitted(tracing):
+    value = {"role": "assistant", "content": None, "tool_calls": [
+        {"id": "fixture", "function": {"name": "terminal", "arguments": '{"command":"PRIVATE COMMAND"}'}}]}
+    result = tracing.safe(value)
+    assert "PRIVATE COMMAND" not in json.dumps(result)
+    assert result["tool_calls"][0]["function"]["name"] == "terminal"
+
+
 def test_parallel_same_name_tool_hooks_without_pre_id(tracing):
     pre(tracing)
     post(tracing, tools=2)

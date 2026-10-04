@@ -3,6 +3,64 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.37.0 — 2026-10-04 (minor: scoped ChatGPT project agentic vector retrieval)
+
+- Restrict new body collection and vector retrieval to the owner's selected
+  Silicon Valley Career 2027 project. Observe nine project chat links and cache
+  116 user/assistant messages with bounded scrolling, stable-message merging and
+  same-conversation verification across ChatGPT's canonical project-name redirects.
+  `read-project` skips prior observations, sanitizes failures and preserves caches.
+- Build 254 tokenizer-bounded source chunks using pinned multilingual E5-small
+  CPU mean pooling and normalized 384-dimensional vectors. Store source offsets,
+  roles and links in an atomic private SQLite snapshot. Fuse cosine and literal
+  ranks; exclude stopwords/English substring accidents. No embedding API, new
+  vector server, model service or GPU backend change is introduced.
+- Fail closed when project membership, cached URLs/roles, model revision or source
+  fingerprint changes. Preserve the old index on failed builds and reuse identical
+  sources without embedding again. Indexed retrieval works with the browser closed.
+- Give existing David/HQ agent search/source-neighbor tools and up to three
+  query-refinement rounds, including source-language equivalents. Require grounded
+  conversation citations and distinguish user facts from old assistant advice.
+  This reference-source extension stays in the existing HQ room, profile and bot;
+  it creates no new agent, room, recurring job or delivery route. HQ displays only
+  configured project readiness and counts, never message bodies or credentials.
+- Validation: `pytest -q` passes 629 tests, including scope isolation, token
+  coverage, source preservation, vector-only retrieval, citations/neighbors,
+  stale-index rejection and safe HQ state/policy. Four of five targeted live
+  questions find the expected conversation first; a broad English coding question
+  needs query refinement, which finds the expected conversation. Browser captures
+  remain partial observations, and the full-account export remains unconfirmed.
+  Runtime verification closes the browser, then retrieves a cited source and its
+  neighbors locally; the HQ API reports the matching ready counts with HTTP 200.
+  Reload only the idle David gateway to clear cached old identity instructions;
+  English/ClawGram and the model service are not restarted.
+  After reload, David gateway is running with Telegram/API adapters connected
+  and its health endpoint returns HTTP 200.
+
+## v1.36.0 — 2026-10-04 (minor: automatic conversation traces and agent graphs)
+
+- Add an optional profile-local Hermes observer plugin for agent, LLM and tool
+  spans in Langfuse production. Group all spans by owning profile/session and
+  export bounded conversation text, cache/usage, timing and tool status; omit
+  system prompts, media, tool arguments/results and known credential values.
+- Keep SDK export in background batches with fail-open hooks. Observe the
+  existing text-delivery method for visible-stream TTFT, defer instrumentation
+  safely through circular imports, and leave unobserved TTFT/native prefill/TPS
+  empty. Hidden reasoning makes total-output/visible-decode-rate estimates invalid.
+- Provide a standalone staging helper that preserves other config/plugins,
+  keeps private backups and changes only the selected David-owned profile.
+  Activate the default and English adapters during idle gateway windows without
+  changing the model, two 128K slots or ClawGram gateway. No new content room,
+  agent, bot or cron is needed for this internal observer.
+- Document Graph/Sessions/Experiments navigation and the separate existing
+  ClawGram Studio snapshot route for LangGraph checkpoint/state debugging.
+- Validation: 611 tests pass. Real default-gateway SSE and isolated English
+  runtime probes produce expected answers and read back their root/generation,
+  session grouping, usage and observed TTFT from Cloud. Source/runtime hashes
+  match, gateway/API health is restored and tracing hooks log no failures.
+  Probes are deployment checks, not matched performance/quality benchmarks;
+  no Telegram messages are sent and prior experiments are not republished.
+
 ## v1.35.0 — 2026-10-04 (minor: persistent Codex usage-limit recovery)
 
 - Replace the host's sleeping interactive resume script with a backed-up,

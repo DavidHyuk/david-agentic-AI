@@ -55,6 +55,11 @@ def test_token_chunks_preserve_original_unicode_and_overlap():
     assert set().union(*(set(range(left, right)) for left, right, part in chunks)) == set(range(len(text)))
 
 
+def test_lexical_retrieval_ignores_stopwords_and_matches_english_word_boundaries():
+    assert rag.lexical_score('chair formal should coding', 'How should I prepare for AI?') == 0
+    assert rag.lexical_score('AI 기반 리트코드 면접 준비', 'AI 리트코드 면접') == 3
+
+
 @pytest.mark.parametrize('change', ['wrong_project', 'traversal', 'wrong_cached_url', 'hidden_role'])
 def test_project_source_validation_fails_closed(sources, change):
     manifest = rag.load_json(sources / 'browser-project.json')
@@ -113,6 +118,8 @@ def test_changed_sources_require_rebuild_and_failed_embeddings_keep_previous_db(
     cached = rag.load_json(path)
     cached['messages'][0]['text'] += ' changed'
     write_json(path, cached)
+    assert rag.index_status(sources)['ready'] is False
+    assert rag.index_status(sources)['stale'] is True
     with pytest.raises(rag.RetrievalError, match='rebuild'):
         rag.search_index(sources, 'promotion', encoder=Encoder())
     bad = SimpleNamespace(tokenizer=Tokenizer(), encode=lambda texts, kind: np.full((len(texts), 2), np.nan))

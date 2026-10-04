@@ -26,6 +26,8 @@ MODEL = 'intfloat/multilingual-e5-small'
 REVISION = '614241f622f53c4eeff9890bdc4f31cfecc418b3'
 PROJECT_ID = re.compile(r'g-p-[0-9a-f]{32}')
 CHAT_ID = re.compile(r'[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}')
+STOP_WORDS = set('a an and are as at be by do for from how i in is it me my of on or '
+                 'should that the this to was we what when where which with you your'.split())
 
 
 class RetrievalError(ValueError):
@@ -78,7 +80,7 @@ def token_chunks(text: str, tokenizer, budget: int, overlap: int = 48) -> list[t
     """Split by actual token offsets, retaining original text and bounded overlap."""
     if budget <= overlap or overlap < 0:
         raise RetrievalError('Invalid chunk token budget.')
-    offsets = tokenizer(text, add_special_tokens=False, return_offsets_mapping=True)['offset_mapping']
+    offsets = tokenizer(text, add_special_tokens=False, return_offsets_mapping=True, verbose=False)['offset_mapping']
     result = []
     for start in range(0, len(offsets), budget - overlap):
         end = min(start + budget, len(offsets))
@@ -232,6 +234,15 @@ def source_result(row, score=None) -> dict:
     return result
 
 
+def lexical_score(text: str, query: str) -> int:
+    """Match meaningful terms without English stopwords or substring accidents."""
+    text = text.casefold()
+    terms = {term for term in re.findall(r'\w+', query.casefold())
+             if len(term) >= 2 and term not in STOP_WORDS}
+    return sum(bool(re.search(r'(?<!\w)' + re.escape(term) + r'(?!\w)', text))
+               if term.isascii() else term in text for term in terms)
+
+
 def search_index(data_dir: Path, query: str, limit: int = 6, conversation_id: str | None = None,
                  encoder=None, minimum_similarity: float = 0.65) -> dict:
     """Fuse multilingual cosine candidates and literal matches within this project."""
@@ -255,16 +266,15 @@ def search_index(data_dir: Path, query: str, limit: int = 6, conversation_id: st
     vector /= np.linalg.norm(vector)
     matrix = np.stack([np.frombuffer(row['vector'], dtype='<f4') for row in rows])
     cosine = matrix @ vector
-    terms = set(re.findall(r'\w+', query.casefold()))
-    lexical = [sum(term in (row['title'] + '\n' + row['text']).casefold() for term in terms) for row in rows]
+    lexical = [lexical_score(row['title'] + '\n' + row['text'], query) for row in rows]
     dense_order = sorted(range(len(rows)), key=lambda i: float(cosine[i]), reverse=True)[:60]
     literal_order = sorted((i for i in range(len(rows)) if lexical[i]),
                            key=lambda i: lexical[i], reverse=True)[:60]
     fused = {}
-    for ordering in (dense_order, literal_order):
+    for ordering, weight in ((dense_order, 2), (literal_order, 1)):
         for rank, i in enumerate(ordering, 1):
             if cosine[i] >= minimum_similarity or lexical[i]:
-                fused[i] = fused.get(i, 0) + 1 / (60 + rank)
+                fused[i] = fused.get(i, 0) + weight / (60 + rank)
     order = sorted(fused, key=lambda i: (fused[i], float(cosine[i])), reverse=True)
     # Limit overlapping chunks from one answer, allowing evidence from other chats.
     selected, per_message, characters = [], {}, 0

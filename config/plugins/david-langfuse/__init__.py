@@ -26,6 +26,7 @@ _TURNS = {}
 _SESSIONS = {}
 _MEDIA_KEYS = {"image_url", "image", "images", "base64_content", "data", "audio", "video", "file_data"}
 _SECRET_KEYS = {"authorization", "api_key", "apikey", "secret", "password", "token", "access_token", "refresh_token"}
+_TOOL_KEYS = {"arguments", "args"}
 _TOKEN = re.compile(r"(?:sk-[A-Za-z0-9_-]{12,}|pk-lf-[A-Za-z0-9_-]{12,}|\d{6,}:[A-Za-z0-9_-]{20,}|Bearer\s+\S+)")
 
 
@@ -38,7 +39,7 @@ def safe(value, depth=0):
             return {"role": value["role"], "content": "[omitted]"}
         if str(value.get("type", "")).lower() in {"image_url", "input_image", "image", "input_audio", "audio", "file"}:
             return {"type": value["type"], "omitted": True}
-        return {str(k): "[omitted]" if str(k).lower() in _MEDIA_KEYS | _SECRET_KEYS or
+        return {str(k): "[omitted]" if str(k).lower() in _MEDIA_KEYS | _SECRET_KEYS | _TOOL_KEYS or
                 any(part in str(k).lower() for part in ("secret", "password", "api_key"))
                 else safe(v, depth + 1) for k, v in list(value.items())[:50]}
     if isinstance(value, (tuple, list)):

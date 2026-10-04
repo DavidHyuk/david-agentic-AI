@@ -79,6 +79,12 @@ ClawGram에는 `langgraph.json`, `clawgram/studio_app.py`,
 personalization DB의 **격리된 snapshot**을 보고 LangSmith tracing은 꺼 둡니다.
 현재 live worker의 자동 상태 mirror가 아니라 마지막으로 만든 복사본입니다.
 
+2026-10-04에는 기존 script를 transient `clawgram-studio.service`로 실행하고
+health, 그래프 구조와 checkpoint thread 5개의 state 조회를 확인했습니다.
+`human_review` 대기 3개와 `assess_window` 다음 단계 2개를 snapshot에서
+조회했습니다. 이는 운영 작업의 실행/재시작이나 승인이 아닙니다.
+서비스는 loopback에만 bind하며 boot 자동 실행을 등록하지 않았습니다.
+
 Spark의 ClawGram 저장소에서 실행합니다.
 
 ```bash
@@ -88,6 +94,15 @@ bash scripts/run_langgraph_studio.sh
 
 다른 컴퓨터에서는 SSH로 Spark의 loopback `2024`를 자신의 `2024`로 연결한 뒤
 [Studio 열기](https://smith.langchain.com/studio/?baseUrl=http://localhost:2024)를 사용합니다.
+
+```bash
+ssh -F /dev/null -N -L 2024:127.0.0.1:2024 david@100.94.7.102
+```
+
+위 명령은 Spark와 같은 tailnet에 접속한 컴퓨터에서 실행하고 터미널을 열어 둡니다.
+이미 2024 SSH forwarding이 있다면 중복 터널을 만들지 않습니다.
+snapshot을 새로 만들려면 Spark에서 `systemctl --user stop clawgram-studio.service`
+후 위 script를 실행합니다.
 Studio 웹 UI 로그인이 필요할 수 있으나 그래프를 Cloud에 배포할 필요는 없습니다.
 설치된 Studio 서버가 실행 중이어야 연결됩니다. ClawGram의 private SSH 안내와
 별도 Studio 환경은 해당 저장소 README를 따릅니다.

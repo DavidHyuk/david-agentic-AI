@@ -504,6 +504,29 @@ def desktop_commands(runtime: Path, data_dir: Path, executable: Path) -> list[li
     ]
 
 
+def read_project(data_dir: Path, max_scrolls: int, refresh: bool = False) -> dict:
+    """Cache only selected project chats, skipping already completed observations."""
+    project = load_json(data_dir / 'browser-project.json')
+    rows = project_conversations(project.get('conversations', []), project.get('id', ''))
+    if not rows or len(rows) != len(project.get('conversations', [])):
+        raise ArchiveError('The selected project manifest has invalid conversation links.')
+    fetched, skipped, failures = 0, 0, []
+    for row in rows:
+        cached = load_json(data_dir / 'browser-chats' / (row['id'] + '.json'))
+        if (not refresh and cached.get('id') == row['id'] and cached.get('url') == row['url']
+                and cached.get('source') == 'visible_browser' and cached.get('messages')
+                and cached.get('scroll_boundary_reached') is True):
+            skipped += 1
+            continue
+        try:
+            read_browser_conversation(data_dir, row['id'], max_scrolls)
+            fetched += 1
+        except Exception as exc:
+            failures.append({'id': row['id'], 'error': str(exc) if isinstance(exc, ArchiveError) else type(exc).__name__})
+    return {'project_name': project.get('name'), 'fetched': fetched, 'skipped': skipped,
+            'failures': failures, 'complete': False}
+
+
 def stop_process(process) -> None:
     if process.poll() is None:
         process.terminate()
@@ -715,6 +738,9 @@ def main(argv=None) -> int:
     project = commands.add_parser('sync-project', help='Index only the selected project chat list.')
     project.add_argument('name')
     project.add_argument('--max-scrolls', type=int, default=40)
+    project_reader = commands.add_parser('read-project', help='Cache selected project chats; skip prior observations.')
+    project_reader.add_argument('--max-scrolls', type=int, default=400)
+    project_reader.add_argument('--refresh', action='store_true')
     args = parser.parse_args(argv)
     os.umask(0o077)
     def interrupted(*unused):
@@ -757,10 +783,15 @@ def main(argv=None) -> int:
                 parser.error('--max-scrolls must be between 0 and 100')
             with locked(args.data_dir, '.browser-read.lock'):
                 result = sync_project(args.data_dir, args.name, args.max_scrolls)
+        elif args.command == 'read-project':
+            if not 0 <= args.max_scrolls <= 400:
+                parser.error('--max-scrolls must be between 0 and 400')
+            with locked(args.data_dir, '.browser-read.lock'):
+                result = read_project(args.data_dir, args.max_scrolls, args.refresh)
         else:
             result = archive_status(args.data_dir)
         print(json.dumps(result, ensure_ascii=False, indent=2))
-        return 0
+        return 1 if args.command == 'read-project' and result['failures'] else 0
     except KeyboardInterrupt:
         print('ChatGPT browser stopped; private session retained.')
         return 130

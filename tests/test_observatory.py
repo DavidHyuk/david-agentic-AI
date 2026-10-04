@@ -105,6 +105,31 @@ def test_hq_chatgpt_status_reports_corruption_without_exposing_records(store):
     assert 'private' not in json.dumps(result)
 
 
+def test_project_rag_status_exposes_only_readiness_name_and_counts(store, monkeypatch):
+    calls = []
+    def helper(name, args, **kwargs):
+        calls.append((name, args))
+        return {'ready': True, 'project_name': 'Career 2027', 'conversation_count': 9,
+                'message_count': 116, 'chunk_count': 254, 'dimensions': 384,
+                'indexed_at': '2026-10-04T12:00:00+00:00', 'source_complete': True,
+                'messages': 'PRIVATE CONTENT', 'source_fingerprint': 'PRIVATE HASH',
+                'cookies': 'PRIVATE TOKEN'}
+    monkeypatch.setattr(store, 'helper', helper)
+    result = store.chatgpt_project_rag_status()
+    assert result['ready'] is True and result['conversation_count'] == 9
+    assert result['source_complete'] is False
+    assert 'PRIVATE' not in json.dumps(result)
+    assert calls == [('chatgpt_rag.py', ['--data-dir', str(store.home / 'data/chatgpt'), 'status'])]
+
+
+def test_project_rag_failure_never_exposes_library_exception(store, monkeypatch):
+    def helper(*args, **kwargs):
+        raise OSError('PRIVATE CONTENT account@example.com')
+    monkeypatch.setattr(store, 'helper', helper)
+    result = store.chatgpt_project_rag_status()
+    assert result['ready'] is False and 'PRIVATE' not in json.dumps(result)
+
+
 def test_hq_browser_index_is_distinct_from_an_imported_export(store):
     import chatgpt_archive
     root = store.home / 'data/chatgpt'
@@ -399,6 +424,12 @@ def test_office_chat_persists_separate_session_without_delivery(store, monkeypat
     if room == 'english':
         assert 'You are Ellie, a friendly female English conversation tutor' in calls[2][2]['instructions']
         assert calls[1][2]['title'] == 'Ellie · Office conversation'
+    if room == 'hq':
+        policy = calls[2][2]['instructions']
+        assert 'chatgpt_rag.py' in policy
+        assert 'Silicon Valley Career 2027' in policy
+        assert 'read <chunk-id>' in policy and 'three rounds' in policy
+        assert 'without an explicit scope expansion' in policy
     assert room_for('david', 'office_' + room, '', []) == room
     assert not store.office_locks[room].locked()
 

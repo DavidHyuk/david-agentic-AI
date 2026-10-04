@@ -1,0 +1,8 @@
+# Author: David Choi
+# Purpose: optional local ChatGPT project embedding runtime, used on CPU.
+numpy>=1.26,<3
+torch>=2.2,<3
+transformers>=4.57,<5
+huggingface-hub>=0.34,<1
+sentencepiece>=0.2,<1
+safetensors>=0.4,<1

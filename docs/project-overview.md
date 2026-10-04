@@ -118,8 +118,28 @@ ChatGPT Chromium profile을 열고 SSH 터널 `18781`로 직접 로그인을 받
 이메일 인증 후에도 인증 화면이 반복되면 `verification_loop` 상태로 멈추며,
 이미 로그인한 일반 대화 화면은 추가 인증 없이 읽을 수 있습니다. 최신 메시지
 DOM과 이전 DOM을 지원하고 저장 전 선택한 대화 ID를 재검증합니다.
-실제 계정에서 제목·링크 290개와 대화 하나의 메시지 10개 수집을 확인했습니다.
-전체 대화 수 또는 모든 turn의 수집 완료를 의미하지 않습니다.
+기존 전체 사이드바 제목·링크 290개 관찰 후, 현재 본문 수집 범위는 사용자가
+지정한 **Silicon Valley Career 2027** 프로젝트로 좁혔습니다. `sync-project`는
+프로젝트 main 목록의 같은 project-ID 링크만 기록하며 `read-project`는 해당
+9개 대화의 본문만 수집하고, 기존 scroll 관찰 완료 cache를 재수집하지 않습니다.
+현재 메시지 116개를 로컬에 저장했고, 전체 계정 또는 모든 turn의 완료를 뜻하지 않습니다.
+
+`scripts/chatgpt_rag.py`는 이 프로젝트 manifest와 각 cache의 URL·ID·role을
+검증한 뒤 실제 tokenizer offset 기준으로 254개 검색 구간을 만들었습니다.
+pinned `intfloat/multilingual-e5-small`을 CPU에서 실행하여 한국어·영어
+384차원 벡터를 생성하고 owner-only `project-rag.db`를 원자적으로 교체합니다.
+cosine 검색과 의미 있는 literal term의 reciprocal ranks를 결합합니다.
+본문은 embedding API로 보내지 않으며 별도 vector 서버나 model service를
+추가하지 않습니다. optional 환경은 `~/.hermes/venvs/chatgpt-rag`, 의존성 선언은
+`bootstrap/requirements-chatgpt-rag.txt`입니다. 색인 후에는 브라우저 없이 조회됩니다.
+source fingerprint가 달라지거나 프로젝트가 바뀌면 검색·원문 조회를 막아
+재색인하도록 하고, 실패한 build는 이전 snapshot을 보존합니다.
+
+기존 David/HQ agent가 `search` → `read --neighbors` → 근거 평가 및 최대 3회
+질문 재작성/세분화/원문 언어 검색 → 출처 링크 답변을 수행하도록 연결했습니다.
+과거 user 사실과 assistant 조언을 구분하며 근거가 없으면 확인되지 않은 내용을
+만들지 않습니다. 기존 HQ에는 프로젝트명과 준비 상태·대화/메시지/구간 수만
+표시합니다. 새 room/profile/bot/cron 없이 기존 참고 자료 기능을 확장합니다.
 
 로그인 터널은 `-F /dev/null`과 실제 DGX 주소(`david@10.0.0.50`)를 사용하여
 기존 `ssh dgx`의 기본 `8501` forwarding 충돌을 피합니다.
@@ -175,6 +195,7 @@ David-Agent/
 │   ├── youtube_history.py     # SSH 쿠키 연결 + headless 시청 기록 수집
 │   ├── youtube_browser_login.py # SSH 터널로 DGX Chromium 직접 로그인
 │   ├── chatgpt_archive.py     # ChatGPT 직접 로그인·내보내기·로컬 대화 검색
+│   ├── chatgpt_rag.py         # 선택 프로젝트 CPU 임베딩·벡터 검색·인용 원문
 │   ├── english_podcast.py     # 선택한 영상 대본·긴 문장 연습 / 요청 시 채널 대본
 │   ├── agenda.py              # 캘린더 이벤트 포맷팅 + 충돌 감지
 │   ├── cron_health.py         # cron tick lock / jobs.json 건강 검사 (+ 선택적 gateway restart)
@@ -324,6 +345,8 @@ history/search·알림 제어의 이점이 있으면 같은 bot을 별도 Telegr
 | `english_podcast.py` | 시청 영상의 대본 긴 문장 추출과 요청 시 채널 대본 준비 |
 | `youtube_history.py` | SSH stdin 쿠키 연결, GUI 없는 headless 시청 기록 수집, 18시 링크 메시지 |
 | `youtube_browser_login.py` | DGX Chromium 직접 로그인, 임시 localhost noVNC, 연결과 재실행 검증 |
+| `chatgpt_archive.py` | ChatGPT 로그인·선택 프로젝트 목록/본문 관찰·공식 export import |
+| `chatgpt_rag.py` | 프로젝트 범위 검증·token chunk·CPU E5 embedding·로컬 hybrid retrieval·출처 조회 |
 | `export_youtube_cookies.py` | MacBook 브라우저에서 live YouTube 쿠키만 private 파일로 내보내기 |
 | `agenda.py` | 캘린더 이벤트 포맷팅 + 충돌·여유 슬롯 감지 |
 | `cron_health.py` | cron tick lock·stale·마지막 실행 실패와 David Observatory API 응답 정지 감지, profile별 단발 재시도와 gateway 복구 |
@@ -539,6 +562,15 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
 ---
 
 ## 발전을 이끄는 핵심 기술
+
+### 프로젝트 범위의 Agentic Vector RAG
+- Hermes가 검색어 재작성·근거 확인을 제어하고, 별도 standalone Python helper가
+  tokenizer offsets / CPU PyTorch / Transformers E5 mean pooling / NumPy cosine /
+  SQLite BLOB vectors로 해당 프로젝트만 검색합니다. 실제 공개 모델 revision을
+  고정하며 원문·역할·대화 링크·문자 위치를 함께 유지합니다.
+- SQL snapshot과 scope/fingerprint 검증으로 다른 프로젝트 및 stale 자료를
+  차단합니다. 렌더링 관찰의 범위를 넘는 전체 수집을 주장하지 않고, 브라우저
+  로그인·공식 export와 독립적으로 이미 색인된 원문을 조회합니다.
 
 ### Hermes HQ 관제실
 - `scripts/observatory.py` + `browser/observatory/`의 HTML/CSS/JavaScript
@@ -872,7 +904,7 @@ Flash에는 CPU에서 해시를 계산하는 모델 내부 PLE n-gram이 실제�
 현재 전체 `pytest -q` 검증에는 ChatGPT 선택 branch·Unicode 검색·원자적 교체·
 ZIP 경로 격리·credential 오류 출력 방지 및 HQ source 상태 검증도 포함됩니다.
 2026-10-04 Codex quota 복구·writer 충돌·최종 상태 재확인 검증 후 전체
-609개 테스트가 통과했습니다.
+629개 테스트가 통과했습니다.
 
 2026-10-04 대화 streaming·Langfuse private 설정·numeric score 검증 후 전체
 `pytest -q`는 549 passed입니다. 웹 helper와 office client의 배포 및 health를

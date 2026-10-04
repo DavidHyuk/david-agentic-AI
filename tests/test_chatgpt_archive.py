@@ -262,6 +262,36 @@ def test_project_index_excludes_global_and_other_project_chats():
         archive.project_conversations(rows, '../../private')
 
 
+def test_project_batch_skips_prior_reads_and_sanitizes_failures(tmp_path, monkeypatch):
+    project = 'g-p-' + 'a' * 32
+    other = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    rows = [{'id': identifier, 'title': 'selected', 'url': f'https://chatgpt.com/g/{project}/c/{identifier}'}
+            for identifier in (CHAT_ID, other)]
+    archive.save_json(tmp_path / 'browser-project.json', {'id': project, 'name': 'Career', 'conversations': rows})
+    cache = {**rows[0], 'source': 'visible_browser', 'scroll_boundary_reached': True,
+             'messages': [{'role': 'user', 'text': 'previous text'}]}
+    archive.save_json(tmp_path / 'browser-chats' / (CHAT_ID + '.json'), cache)
+    calls = []
+    def fail(root, identifier, scrolls):
+        calls.append(identifier)
+        raise RuntimeError('private signed URL account@example.com')
+    monkeypatch.setattr(archive, 'read_browser_conversation', fail)
+    result = archive.read_project(tmp_path, 400)
+    assert result['skipped'] == 1 and result['fetched'] == 0
+    assert calls == [other] and result['failures'][0]['error'] == 'RuntimeError'
+    assert archive.load_json(tmp_path / 'browser-chats' / (CHAT_ID + '.json')) == cache
+    assert 'private' not in json.dumps(result)
+
+
+def test_project_batch_rejects_manifest_containing_other_project(tmp_path, monkeypatch):
+    project = 'g-p-' + 'a' * 32
+    archive.save_json(tmp_path / 'browser-project.json', {'id': project, 'conversations': [
+        {'title': 'wrong', 'url': f'/g/g-p-{"b" * 32}/c/{CHAT_ID}'}]})
+    monkeypatch.setattr(archive, 'read_browser_conversation', lambda *args: pytest.fail('Must not read another project'))
+    with pytest.raises(archive.ArchiveError):
+        archive.read_project(tmp_path, 400)
+
+
 def test_browser_scroll_merges_stable_messages_and_preserves_turn_order():
     observed = iter([
         [{'key': 'a', 'ordinal': 1, 'role': 'assistant', 'text': 'part'},
