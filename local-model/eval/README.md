@@ -1,5 +1,102 @@
 # Local synthetic agent benchmark v2
 
+## Interactive coaching latency and experiment tracking
+
+`interactive_latency.py` measures four synthetic coaching cases: a short coding
+hint, English correction, coding explanation and English drill. It uses the
+existing llama.cpp HTTP API, verifies **128K per request and two slots**, and
+requires production MTP OFF. It never invokes Hermes tools, updates an agent,
+restarts a provider or delivers Telegram messages.
+
+```bash
+python local-model/eval/interactive_latency.py --repetitions 3 --concurrent \
+  --output runtime/model-benchmarks/interactive-coaching.json
+python local-model/eval/experiment_tracker.py import-mtp \
+  --source /home/david/.local/share/clawgram/diagnostics/mtp-comparison \
+  --output runtime/model-benchmarks/mtp-matched.json
+python local-model/eval/experiment_tracker.py audit-production \
+  --since '2026-10-03 23:15:00 UTC' --until '2026-10-04 04:26:00 UTC' \
+  --output runtime/model-benchmarks/production-latency.json
+python local-model/eval/experiment_tracker.py report \
+  --input runtime/model-benchmarks/interactive-coaching.json \
+    runtime/model-benchmarks/mtp-matched.json runtime/model-benchmarks/production-latency.json \
+  --output runtime/model-benchmarks/latency-dashboard.html
+```
+
+Choose a log interval ending before the synthetic experiment so production
+statistics do not include benchmark calls. The journal importer only accepts
+the current MTP-OFF provider PID and complete, untruncated timing records.
+It reconstructs full context from slot release and separates cached tokens
+from newly processed tokens. Server logs do not establish client TTFT,
+delivery latency, request concurrency or which coach issued a call.
+
+The coaching fixture sizes 20K coding and 16K English contexts with the actual
+server tokenizer. These are test scenarios anchored by approximately 20K cron
+usage and the earlier 16K benchmark, not measured interactive percentiles or
+an assertion that English uses less context. Context is fictional archive filler, not private learner history
+or real tools. Each case gets three independently seeded repeats, a prompt-cache
+cold call and one followup reusing the preceding generated answer. Cold means
+an uncached prompt on an already loaded model, not process startup. Cache reuse
+is checked from server timing counters. The overlap test sends coding and
+English requests into separate slots simultaneously. It does not measure two
+warm conversations competing for cache or production queue percentiles.
+
+Output limits are 256, 512 and 384 tokens. Inspect `output_limit_reached` before
+calling a run a completed answer: capped explanations can be unfinished.
+Quality checks establish nonempty text and Korean presence, not instructional
+correctness. Only token counts, hashes, timing and aggregate host telemetry are
+saved. No prompts, generated answers, photos or learner identifiers are exported.
+
+Before each sample, the harness waits for idle scheduler metrics, at least 24GiB
+MemAvailable, 8GiB MemFree and 8°C GPU thermal margin. The waits are excluded
+from request latency. These entry checks cannot prevent later thermal
+throttling or unrelated traffic. Memory, GPU temperature/margin, thermal flags
+and scheduler state are sampled about once per second. GB10 uses unified
+memory: reported GPU allocation overlaps physical host memory, so do not add
+them. A single run with three repeats does not establish p95 or thermal
+equivalence across configurations. Full 128K endurance is untested.
+
+The [2026-10-03 report](../../docs/benchmarks/interactive-coaching-latency-2026-10-03.md)
+contains the measured cold/warm and overlap results, MTP comparison, frontend
+streaming audit, and tracker recommendation. This is an internal evaluation
+helper with no new Observatory room, profile, schedule or messaging workflow.
+
+### Optional tracker export
+
+**Langfuse is recommended for these cross-framework model/agent experiments.**
+Its [OpenTelemetry experiment ingestion](https://langfuse.com/integrations/native/opentelemetry/experiments)
+accepts stable local dataset identifiers and per-item traces. This standard-library
+exporter prepares direct OTLP/HTTP JSON without adding an SDK dependency:
+
+```bash
+python local-model/eval/experiment_tracker.py publish-langfuse \
+  --input runtime/model-benchmarks/interactive-coaching.json \
+    runtime/model-benchmarks/mtp-matched.json runtime/model-benchmarks/production-latency.json \
+  --dry-run runtime/model-benchmarks/langfuse-otlp.json
+```
+
+To upload, configure `LANGFUSE_BASE_URL`, `LANGFUSE_PUBLIC_KEY` and
+`LANGFUSE_SECRET_KEY` privately, then omit `--dry-run`. The exporter targets
+`/api/public/otel/v1/traces` with the v4 ingestion header and rejects reported
+partial ingestion failures. Live ingestion is untested until a project is
+configured. Local dry runs require no credentials and perform no network calls.
+New measurements use actual request timestamps and first-token times.
+Historical records without request starts become zero-duration import spans;
+their measured timings remain metadata rather than invented trace durations.
+
+[LangSmith](https://docs.langchain.com/langsmith/log-llm-trace) also supports
+TTFT and token accounting and fits existing ClawGram LangGraph evaluations.
+Its optional fallback exports tagged traces, not dataset-backed experiment runs:
+
+```bash
+python local-model/eval/experiment_tracker.py publish-langsmith \
+  --input runtime/model-benchmarks/interactive-coaching.json --project coaching-latency
+```
+
+This needs the `langsmith` SDK and privately configured `LANGSMITH_API_KEY`.
+Neither tracker is a prerequisite for the offline dashboard. The existing
+ClawGram aggregate exporter and agent independence remain intact.
+
 `agent_suite_v2.py` deterministically builds `agent_cases_v2.json`, a
 version-controlled suite of 120 synthetic cases: 30 each in `short_task`,
 `multi_tool`, `long_horizon`, and `context_heavy`. The scenarios borrow themes

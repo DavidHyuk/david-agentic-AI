@@ -76,6 +76,35 @@ def test_invalid_profile_never_traverses_filesystem(store):
         store.library('../../.env')
 
 
+def test_hq_chatgpt_readiness_excludes_titles_links_and_account_data(store):
+    import chatgpt_archive
+    root = store.home / 'data/chatgpt'
+    chatgpt_archive.save_json(root / 'browser-status.json', {
+        'browser_status': 'awaiting_login', 'export_status': 'requested',
+        'email': 'private@example.com', 'export_link': 'signed-private-link'})
+    path = root / 'input.json'
+    path.write_text(json.dumps([{'id': 'private-id', 'title': 'private-title', 'current_node': 'one',
+                               'mapping': {'one': {'parent': None, 'message': {
+                                   'author': {'role': 'user'}, 'content': {
+                                       'content_type': 'text', 'parts': ['private-message']}}}}}]))
+    chatgpt_archive.import_export(path, root)
+    result = store.chatgpt_archive_status()
+    assert result['conversation_count'] == 1
+    assert result['message_count'] == 1
+    assert result['export_status'] == 'requested'
+    assert 'private' not in json.dumps(result)
+    assert room_for('david', 'office_hq', 'ChatGPT archive', []) == 'hq'
+
+
+def test_hq_chatgpt_status_reports_corruption_without_exposing_records(store):
+    root = store.home / 'data/chatgpt'
+    root.mkdir(parents=True)
+    (root / 'archive.db').write_text('private broken database')
+    result = store.chatgpt_archive_status()
+    assert result['error'] == 'Source status unavailable'
+    assert 'private' not in json.dumps(result)
+
+
 def test_recreated_cron_uses_task_not_injected_skill():
     prompt = 'Skill: weekly review, system design coach, English\n\nand nothing more.]\n\nDeliver today\'s Coding Coach using interview-prep.'
     assert room_for('david', 'cron_old_20260911', prompt, []) == 'coding'
@@ -1047,3 +1076,76 @@ def test_background_source_refresh_runs_once_and_releases_lock(store, monkeypatc
     store.refresh_leetcode_sources()
     assert calls == [('leetcode_sync.py', ['sync', '--missing-only'], {'timeout': 180})]
     assert not store.leetcode_source_lock.locked()
+
+
+def test_office_stream_forwards_text_without_tool_arguments(store, monkeypatch):
+    import io
+    class Response(io.BytesIO):
+        headers = {'Content-Type': 'text/event-stream'}
+    frames = [('tool.started', {'args': {'secret': 'PRIVATE TOOL'}}),
+              ('assistant.delta', {'delta': '먼저 '}),
+              ('assistant.delta', {'delta': '힌트입니다.'}),
+              ('assistant.completed', {'content': '먼저 힌트입니다.', 'partial': False}),
+              ('done', {})]
+    raw = ''.join('event: '+name+'\ndata: '+json.dumps(data)+'\n\n' for name, data in frames)
+    store.agent_api_key = 'unit-test-key'
+    monkeypatch.setattr(observatory_module, 'urlopen', lambda *a, **k: Response(raw.encode()))
+    monkeypatch.setattr(store, 'agent_api', lambda *a, **k: {})
+    monkeypatch.setattr(store, 'telegram_send', lambda *a: pytest.fail('Unexpected delivery'))
+    emitted = []
+    result = store.office_chat({'room': 'english', 'message': '교정해 줘'}, emit=emitted.append)
+    assert result['response'] == '먼저 힌트입니다.'
+    assert [e['event'] for e in emitted] == ['started', 'delta', 'delta']
+    assert 'PRIVATE TOOL' not in json.dumps(emitted)
+    assert not store.office_locks['english'].locked()
+
+
+@pytest.mark.parametrize('frame', ['event: done\ndata: {}\n\n',
+    'event: error\ndata: {"message":"PRIVATE ERROR"}\n\n',
+    'event: assistant.completed\ndata: {"content":"partial","partial":true}\n\n'])
+def test_office_stream_incomplete_turn_fails_without_retry(store, monkeypatch, frame):
+    import io
+    class Response(io.BytesIO):
+        headers = {'Content-Type': 'text/event-stream'}
+    calls=[]
+    def opened(*args, **kwargs):
+        calls.append(True)
+        return Response(frame.encode())
+    store.agent_api_key = 'unit-test-key'
+    monkeypatch.setattr(observatory_module, 'urlopen', opened)
+    monkeypatch.setattr(store, 'agent_api', lambda *a, **k: {})
+    with pytest.raises(OSError) as error:
+        store.office_chat({'room': 'hq', 'message': 'hello'}, emit=lambda _: None)
+    assert 'PRIVATE ERROR' not in str(error.value)
+    assert len(calls) == 1
+    assert not store.office_locks['hq'].locked()
+
+
+def test_http_stream_delivers_delta_before_model_completion(store, monkeypatch):
+    release = threading.Event()
+    def chat(body, emit=None):
+        emit({'event': 'started'})
+        emit({'event': 'delta', 'text': '첫 출력'})
+        assert release.wait(3)
+        return {'saved': True, 'response': '첫 출력 완료'}
+    monkeypatch.setattr(store, 'office_chat', chat)
+    assets = Path(__file__).resolve().parents[1] / 'browser/observatory'
+    server = ThreadingHTTPServer(('127.0.0.1', 0), make_handler(store, assets, {'127.0.0.1'}))
+    worker = threading.Thread(target=server.serve_forever, daemon=True); worker.start()
+    conn = HTTPConnection(*server.server_address, timeout=3)
+    host = '127.0.0.1:' + str(server.server_port)
+    try:
+        body = json.dumps({'room': 'coding', 'message': 'hint'})
+        conn.request('POST', '/api/office-chat/stream', body, {'Origin': 'http://'+host,
+            'Content-Type': 'application/json', 'X-Hermes-Action': '1'})
+        response = conn.getresponse()
+        assert response.status == 200
+        assert 'text/event-stream' in response.getheader('Content-Type')
+        assert json.loads(response.readline().decode()[6:])['event'] == 'started'
+        assert response.readline() == b'\n'
+        assert json.loads(response.readline().decode()[6:])['text'] == '첫 출력'
+        assert not release.is_set()
+        release.set()
+        assert 'complete' in response.read().decode()
+    finally:
+        release.set(); conn.close(); server.shutdown(); server.server_close(); worker.join(2)

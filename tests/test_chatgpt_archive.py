@@ -1,0 +1,191 @@
+# __author__ = 'David Choi (bestshoot21@gmail.com)'
+"""Verify private ChatGPT imports, branch selection, login isolation and errors."""
+import json
+from pathlib import Path
+import zipfile
+
+import pytest
+import chatgpt_archive as archive
+
+
+def message(role, text, **extra):
+    return {'author': {'role': role}, 'content': {'content_type': 'text', 'parts': [text]}, **extra}
+
+
+def conversation(identifier='chat-1'):
+    return {'id': identifier, 'title': '영어 ML interview', 'current_node': 'selected', 'mapping': {
+        'root': {'parent': None, 'message': message('system', 'private system')},
+        'user': {'parent': 'root', 'message': message('user', '영어 연습 Straße')},
+        'other': {'parent': 'user', 'message': message('assistant', 'superseded branch')},
+        'tool': {'parent': 'user', 'message': message('tool', 'private tool')},
+        'hidden': {'parent': 'tool', 'message': message('assistant', 'hidden reasoning', metadata={
+            'is_visually_hidden_from_conversation': True})},
+        'selected': {'parent': 'hidden', 'message': message('assistant', 'Practice leadership')},
+    }}
+
+
+def export_file(tmp_path, records):
+    path = tmp_path / 'export.json'
+    path.write_text(json.dumps(records))
+    return path
+
+
+def test_active_branch_excludes_system_tools_hidden_content_and_alternatives():
+    assert archive.conversation_messages(conversation()) == [
+        {'role': 'user', 'text': '영어 연습 Straße', 'timestamp': None},
+        {'role': 'assistant', 'text': 'Practice leadership', 'timestamp': None}]
+
+
+def test_multimodal_messages_retain_text_without_asset_references():
+    record = conversation()
+    record['mapping']['selected']['message']['content'] = {
+        'content_type': 'multimodal_text', 'parts': ['Discuss this', {'asset_pointer': 'private-image'}]}
+    assert archive.conversation_messages(record)[-1]['text'] == 'Discuss this'
+
+
+def test_assistant_analysis_channel_is_not_imported_as_visible_history():
+    record = conversation()
+    record['mapping']['selected']['message']['channel'] = 'analysis'
+    assert [item['role'] for item in archive.conversation_messages(record)] == ['user']
+
+
+@pytest.mark.parametrize('failure', ['cycle', 'missing', 'ambiguous'])
+def test_invalid_branches_fail_without_guessing(failure):
+    record = conversation()
+    if failure == 'cycle':
+        record['mapping']['root']['parent'] = 'selected'
+    elif failure == 'missing':
+        record['current_node'] = 'missing'
+    else:
+        record.pop('current_node')
+    with pytest.raises(ValueError):
+        archive.conversation_messages(record)
+
+
+def test_unbranched_legacy_export_can_omit_current_node():
+    record = conversation()
+    record.pop('current_node')
+    record['mapping'].pop('other')
+    assert len(archive.conversation_messages(record)) == 2
+
+
+def test_import_search_and_read_are_unicode_literal_and_owner_only(tmp_path):
+    root = tmp_path / 'private'
+    report = archive.import_export(export_file(tmp_path, [conversation()]), root)
+    assert report['conversation_count'] == 1 and report['message_count'] == 2
+    assert root.stat().st_mode & 0o777 == 0o700
+    assert (root / 'archive.db').stat().st_mode & 0o777 == 0o600
+    assert archive.search_archive(root, '영어 STRASSE', 20) == [{'id': 'chat-1', 'title': '영어 ML interview'}]
+    assert archive.search_archive(root, "%' OR 1=1 --", 20) == []
+    assert archive.show_conversation(root, 'chat-1')['messages'][0]['role'] == 'user'
+    assert archive.archive_status(root)['imported_at'] == report['imported_at']
+
+
+def test_reimport_replaces_snapshot_including_removed_chats(tmp_path):
+    root = tmp_path / 'private'
+    archive.import_export(export_file(tmp_path, [conversation('one'), conversation('two')]), root)
+    archive.import_export(export_file(tmp_path, [conversation('two')]), root)
+    assert archive.search_archive(root, '', 20) == [{'id': 'two', 'title': '영어 ML interview'}]
+    with pytest.raises(ValueError, match='not found'):
+        archive.show_conversation(root, 'one')
+
+
+@pytest.mark.parametrize('bad', [[conversation(), conversation()], [{'id': 'broken', 'mapping': {}}], {}])
+def test_malformed_import_preserves_previous_archive(tmp_path, bad):
+    root = tmp_path / 'private'
+    archive.import_export(export_file(tmp_path, [conversation()]), root)
+    before = (root / 'archive.db').read_bytes()
+    with pytest.raises(ValueError):
+        archive.import_export(export_file(tmp_path, bad), root)
+    assert (root / 'archive.db').read_bytes() == before
+
+
+def test_zip_reads_only_conversation_json_without_extracting_other_files(tmp_path):
+    path = tmp_path / 'export.zip'
+    with zipfile.ZipFile(path, 'w') as bundle:
+        bundle.writestr('conversations.json', json.dumps([conversation()]))
+        bundle.writestr('../outside.txt', 'private account data')
+        bundle.writestr('account.json', 'private account data')
+    assert archive.import_export(path, tmp_path / 'private')['conversation_count'] == 1
+    assert not (tmp_path / 'outside.txt').exists()
+    assert not (tmp_path / 'private/account.json').exists()
+
+
+def test_zip_uncompressed_size_is_bounded(tmp_path, monkeypatch):
+    path = tmp_path / 'export.zip'
+    with zipfile.ZipFile(path, 'w', compression=zipfile.ZIP_DEFLATED) as bundle:
+        bundle.writestr('conversations.json', ' ' * 4096)
+    monkeypatch.setattr(archive, 'MAX_EXPORT_BYTES', 200)
+    with pytest.raises(ValueError):
+        archive.read_export(path)
+
+
+def test_completed_browser_download_is_imported_once(tmp_path):
+    folder = tmp_path / 'downloads'
+    folder.mkdir()
+    path = folder / 'export.zip'
+    with zipfile.ZipFile(path, 'w') as bundle:
+        bundle.writestr('conversations.json', json.dumps([conversation()]))
+    seen = set()
+    partial = Path(str(path) + '.crdownload')
+    partial.touch()
+    assert archive.import_downloads(tmp_path, seen) is None
+    partial.unlink()
+    assert archive.import_downloads(tmp_path, seen)['conversation_count'] == 1
+    assert archive.import_downloads(tmp_path, seen) is None
+
+
+def test_desktop_uses_own_profile_and_loopback_ports():
+    commands = archive.desktop_commands(Path('/runtime'), Path('/private'), Path('/chrome'))
+    assert '-nolisten' in commands[0]
+    assert commands[1][commands[1].index('-listen') + 1] == '127.0.0.1'
+    assert '127.0.0.1:18781' in commands[2]
+    assert '--user-data-dir=/private/browser' in commands[3]
+    assert '--remote-debugging-address=127.0.0.1' in commands[3]
+    assert commands[3][-1] == 'https://chatgpt.com/'
+    assert 'youtube.com' not in str(commands)
+
+
+def test_status_never_returns_account_fields_or_session_credentials(tmp_path):
+    archive.save_json(tmp_path / 'browser-status.json', {
+        'browser_status': 'authenticated', 'email': 'private@example.com',
+        'cookies': [{'value': 'private-token'}], 'export_link': 'https://private.example'})
+    result = archive.archive_status(tmp_path)
+    assert result['browser_status'] == 'authenticated'
+    assert 'private' not in json.dumps(result)
+
+
+def test_login_failure_cleans_up_status_and_hides_browser_exception(tmp_path, monkeypatch, capsys):
+    def fail(*args):
+        raise RuntimeError('https://chatgpt.com/private?token=secret account@example.com')
+    monkeypatch.setattr(archive, 'run_browser', fail)
+    monkeypatch.setattr(archive.signal, 'signal', lambda *args: None)
+    assert archive.main(['--data-dir', str(tmp_path), 'login']) == 1
+    assert archive.load_json(tmp_path / 'browser-status.json')['browser_status'] == 'closed'
+    output = capsys.readouterr().err
+    assert 'RuntimeError' in output and 'secret' not in output and '@' not in output
+
+
+def test_failed_read_does_not_create_empty_database(tmp_path):
+    with pytest.raises(ValueError):
+        archive.search_archive(tmp_path, '', 20)
+    assert not (tmp_path / 'archive.db').exists()
+
+
+@pytest.mark.parametrize('url', ['http://chatgpt.com/export', 'https://chatgpt.com.evil.test/export',
+                              'https://chatgpt.com@evil.test/export', 'https://user:password@chatgpt.com/export',
+                              'https://127.0.0.1/export', 'https://chatgpt.com:8443/export'])
+def test_download_rejects_unrelated_origins_credentials_and_ports(url):
+    with pytest.raises(ValueError):
+        archive.validate_download_url(url)
+
+
+def test_signed_official_download_url_is_accepted_without_rewriting():
+    assert archive.validate_download_url('https://chatgpt.com/backend-api/content?token=private') is None
+
+
+def test_invalid_url_library_error_is_not_printed(tmp_path, monkeypatch, capsys):
+    import io
+    monkeypatch.setattr(archive.sys, 'stdin', io.StringIO('https://chatgpt.com:private-secret/export'))
+    assert archive.main(['--data-dir', str(tmp_path), 'download']) == 1
+    assert 'private-secret' not in capsys.readouterr().err

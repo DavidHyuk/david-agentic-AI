@@ -11,11 +11,8 @@ import argparse
 import concurrent.futures
 import hashlib
 import json
-import math
-import os
 from pathlib import Path
 import re
-import statistics
 import subprocess
 import threading
 import time
@@ -230,6 +227,8 @@ def request(base, prompt, case, repeat, phase, slot, concurrency=1):
         raise RuntimeError("server truncated input; context contract violated")
     if phase == "cold" and timings.get("cache_n", 0):
         raise RuntimeError("cold request unexpectedly reused prompt cache")
+    if phase == "warm_followup" and not timings.get("cache_n", 0):
+        raise RuntimeError("followup lost prompt cache; cannot label it warm")
     return {"id": f"{case['id']}-{repeat}-{phase}-{slot}", "case": case["id"],
         "workflow": case["workflow"], "phase": phase, "repeat": repeat,
         "concurrency": concurrency, "output_limit": case["limit"],
@@ -237,7 +236,7 @@ def request(base, prompt, case, repeat, phase, slot, concurrency=1):
         "output_sha256": hashlib.sha256(text.encode()).hexdigest(),
         "metrics": metrics_from_timings(timings, first, wall),
         "quality": {"nonempty": bool(text.strip()), "hangul_present": bool(re.search("[가-힣]", text)),
-            "output_limit_reached": bool(final.get("stopped_limit")),
+            "output_limit_reached": timings["predicted_n"] >= case["limit"] or bool(final.get("stopped_limit")),
             "scope": "format checks only; teaching correctness requires review"}}, text
 
 
@@ -246,13 +245,15 @@ def run(args):
     if props["total_slots"] != 2 or props["default_generation_settings"]["n_ctx"] != 131072:
         raise RuntimeError("retain two 128K slots before benchmarking")
     model = api(args.base_url, "/v1/models")["data"][0]["id"]
-    cases = [c for c in CASES if not args.case or c["id"] in args.case]
+    cases = [{**c, "target_input": args.input_tokens or c["target_input"]}
+             for c in CASES if not args.case or c["id"] in args.case]
     if not cases:
         raise ValueError("no cases selected")
     report = {"schema_version": 1, "run_id": str(uuid4()), "label": args.label,
         "source": "synthetic_coaching_api", "started_at": utcnow(), "model": model,
         "build": props.get("build_info"), "dataset_digest": digest(CASES),
         "context_per_request": 131072, "slots": 2, "mtp": "off",
+        "input_budget_tokens": args.input_tokens,
         "scope": "model API; no live Hermes tool loop or Telegram/web delivery",
         "sampling": {"temperature": 0.1, "top_k": 20, "top_p": 0.95, "min_p": 0.0,
                      "presence_penalty": 1.5, "seed_base": 1234, "thinking": False},
@@ -281,9 +282,11 @@ def run(args):
                     messages += [{"role": "assistant", "content": text}, {"role": "user", "content": case["followup"]}]
         if args.concurrent:
             for repeat in range(args.repetitions):
-                pair = [CASES[0], CASES[1]]
+                pair = [{**c, "target_input": args.input_tokens or c["target_input"]} for c in CASES[:2]]
                 prompts = [render(args.base_url, build_messages(args.base_url, c, repeat + 100)) for c in pair]
                 require_ready(args.base_url)
+                if Path(f"/proc/{pid}/cmdline").read_bytes().decode().split("\0") != argv:
+                    raise RuntimeError("provider changed during run")
                 begin = time.monotonic()
                 with Telemetry(args.base_url) as telemetry, concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
                     futures = [pool.submit(request, args.base_url, prompt, case, repeat, "cold", slot, 2)
@@ -315,6 +318,8 @@ def main():
     parser.add_argument("--repetitions", type=int, default=3)
     parser.add_argument("--case", action="append", choices=[c["id"] for c in CASES])
     parser.add_argument("--concurrent", action="store_true")
+    parser.add_argument("--input-tokens", type=int, choices=(2048, 4096, 8192, 16384, 20000),
+                        help="change synthetic payload size, retaining the two 128K slots")
     args = parser.parse_args()
     if not 1 <= args.repetitions <= 10:
         parser.error("repetitions must be 1..10")

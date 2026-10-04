@@ -3,6 +3,51 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.33.0 — 2026-10-03 (minor: private ChatGPT account connection and archive)
+
+- Reuse the existing temporary Chromium/noVNC runtime for direct ChatGPT login
+  over a MacBook-local SSH tunnel, with a separate owner-only browser profile and
+  loopback ports. Credentials stay in the browser; Codex/ChatGPT OAuth sign-in is
+  not treated as permission to read old conversations.
+- Attempt the visible data-export workflow once after confirmed browser login.
+  Require a success notice; ambiguous submission remains pending browser review
+  without automatic retries. Email/SMS access is not connected. Download an
+  official link through the signed-in browser and import completed ZIPs locally.
+- Add atomic SQLite snapshot imports and literal Unicode search/show over the
+  selected conversation branch. Exclude system/tool messages, hidden reasoning,
+  alternative branches and nontext assets; bound JSON size and avoid extracting
+  ZIP members. Preserve the previous archive if validation fails.
+- Register safe connection/export state and counts in the existing David-owned
+  Hermes HQ room, and provide read-only archive retrieval instructions for HQ
+  chats. This is a reference-source/account-setup helper for general HQ dialogue,
+  not a new agent or scheduled feed; current/historical sessions remain in HQ.
+  No new skill, room, profile, Telegram destination, gateway or cron is needed.
+- Validation: live browser loads ChatGPT's sign-in page and noVNC returns HTTP
+  200. Actual account login, export submission and download require David's
+  authentication and the export email/SMS and are not claimed complete.
+  `pytest -q` passes 546 tests; JavaScript syntax and Python compilation checks
+  pass. Stage the helper, HQ source status and retrieval instructions into the
+  existing runtime without changing model configuration or learned memories.
+
+## v1.32.0 — 2026-10-03 (minor: interactive coaching latency notebook)
+
+- Measure synthetic coding and English coaching on the existing MTP-OFF
+  provider, preserving two 128K slots. Separate uncached prompts, cached
+  followups, output caps, and two overlapping requests; record client TTFT,
+  native prefill/decode timing, complete-request latency and host telemetry.
+- Import matched historical MTP experiments and scalar production timing logs
+  into an offline HTML dashboard. Keep build and feature comparisons distinct;
+  do not invent client TTFT or absolute timestamps for historical server data.
+- Recommend Langfuse for cross-framework latency experiments and prepare
+  metrics-only OTLP exports. Optional LangSmith export remains available.
+  Neither remote project is configured; remote ingestion is untested.
+- This is an internal evaluation helper with no user-facing agent schedule,
+  history or action, so no Observatory room, Hermes profile, bot or cron is added.
+  Existing streaming and deployment settings are unchanged.
+- Validation: cache accounting, stream failure handling, privacy allowlists,
+  journal reconstruction, historical timestamps and offline exports are tested.
+  See the dated coaching report for measurements and validation totals.
+
 ## v1.31.2 — 2026-10-03 (patch: incremental actual Accepted source ingestion)
 
 - Download actual Accepted code for recent solves whether or not David reported

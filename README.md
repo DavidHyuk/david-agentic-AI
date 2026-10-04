@@ -220,6 +220,13 @@ These limits do not guarantee protection against GPU-driver or host failures.
 
 ### Agent-task model benchmark
 
+The [interactive coaching latency notebook](local-model/eval/README.md#interactive-coaching-latency-and-experiment-tracking)
+measures short coding/English replies, longer explanations, cached followups,
+and two overlapping requests on the existing two-slot 128K provider. It imports
+the earlier matched MTP results, builds an offline comparison dashboard, and
+prepares metrics-only Langfuse exports (or optional LangSmith traces). It is an
+internal evaluation helper with no new room, schedule, gateway or messaging.
+
 The version-controlled [120-case synthetic benchmark](local-model/eval/README.md)
 uses four balanced buckets: short tasks, scripted multi-tool calls, multi-turn
 long-horizon state, and context-heavy retrieval. Validate the fixture, then run
@@ -1166,6 +1173,74 @@ Playwright only to attach to that same local CDP browser for an interactive,
 headless password login; it neither launches a cloud browser nor saves a
 password. The explicit CDP service avoids a Snap Chromium auto-launch hang
 observed on the DGX Spark's ARM64 environment.
+
+### ChatGPT conversation archive (optional)
+
+Hermes can search exported ChatGPT conversations as reference material in the
+existing **Hermes HQ** room. Signing in to Codex or using Sign in with ChatGPT
+does not grant access to earlier ChatGPT chats. This helper operates the visible
+ChatGPT website, then imports an actual export; it has no private history API,
+new bot/profile, automatic polling, or recurring delivery.
+
+The existing temporary desktop runtime is reused, with a separate owner-only
+ChatGPT browser profile. If not already installed on the DGX:
+
+```bash
+bash bootstrap/install_youtube_history.sh
+python3 bootstrap/install_youtube_history_desktop.py
+python3 bootstrap/stage.py
+```
+
+On the **DGX**, start a bounded browser session (30 minutes by default):
+
+```bash
+~/.hermes/venvs/youtube-history/bin/python ~/.hermes/scripts/chatgpt_archive.py login --request-export
+```
+
+On the **MacBook**, open a **new local terminal outside the DGX SSH session**.
+Replace `dgx` with the SSH target you normally use and leave this command running:
+
+```bash
+ssh -N -o ClearAllForwardings=yes -o ExitOnForwardFailure=yes -L 18781:127.0.0.1:18781 dgx
+```
+
+Open `http://localhost:18781/vnc.html?autoconnect=true&resize=scale` in the MacBook
+browser and sign in directly, completing any additional authentication. The
+helper attempts Settings → Data controls → Export → Confirm export once and
+requires a success notice before reporting a confirmed request. If account UI
+controls change, use the visible browser to finish; an ambiguous result is never
+automatically retried. Some account types or automated-browser restrictions may
+prevent exporting. See [OpenAI's export instructions](https://help.openai.com/en/articles/7260999-exporting-your-chatgpt-history-and-data).
+
+The export email/SMS may take up to seven days; its download link expires after
+24 hours. Email access is not connected by this helper. When the link arrives,
+reopen the same login browser and navigate to it there. Completed ZIP downloads
+are automatically imported during that session. Alternatively, run the following
+DGX command while the browser is open and paste the link into terminal stdin
+(not the shell command or chat); press Return:
+
+```bash
+~/.hermes/venvs/youtube-history/bin/python ~/.hermes/scripts/chatgpt_archive.py download
+```
+
+For an existing export file, and subsequent read-only queries:
+
+```bash
+python3 ~/.hermes/scripts/chatgpt_archive.py import --file /path/to/chatgpt-export.zip
+python3 ~/.hermes/scripts/chatgpt_archive.py status
+python3 ~/.hermes/scripts/chatgpt_archive.py search "interview"
+python3 ~/.hermes/scripts/chatgpt_archive.py show <conversation-id>
+```
+
+State stays under `~/.hermes/data/chatgpt/`: the private browser profile,
+downloads, and `archive.db`. ZIP members are not extracted; only a bounded
+`conversations.json` is read. Each successful import atomically replaces the
+local snapshot, preserving the previous archive on failure. Search/show include
+visible user/assistant text from the selected branch, excluding other branches,
+system/tool records, hidden reasoning, and nontext assets. Imported text is
+historical evidence and must not be treated as instructions or copied wholesale
+into memory. HQ shows connection/export state and counts, not chat titles,
+contents, account identity, session credentials or signed links.
 
 ### Switching to MiniMax-M2.7 (DGX Spark)
 ```bash

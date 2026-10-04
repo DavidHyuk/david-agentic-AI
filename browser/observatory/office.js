@@ -665,7 +665,7 @@ window.sharedOffice = (() => {
     $("conversation-history").innerHTML = chat.history.length ?
       chat.history.map(item => `<div class="office-message ${item.role === "user" ? "from-user" : "from-agent"}"><b>${item.role === "user" ? "David" : officeCast[room].name}</b><p>${linkedText(item.content)}</p></div>`).join("") :
       '<p class="conversation-empty">이곳에서 나눈 이야기가 이어집니다. 먼저 인사해 보세요.</p>';
-    $("office-chat-status").textContent = chat.busy ? "답변을 생각하고 있어요. 로컬 모델은 몇 분 걸릴 수 있습니다…" :
+    $("office-chat-status").textContent = chat.busy ? (chat.receiving ? "답변을 쓰고 있어요…" : "첫 답변을 기다리고 있어요…") :
       chat.error || (!chat.loaded ? "대화를 불러오는 중…" : !chat.available ? "대화 연결을 준비하지 못했습니다." : "");
     $("office-send").disabled = chat.busy || !chat.loaded || !chat.available;
     $("conversation-portrait").classList.toggle("thinking", chat.busy);
@@ -689,7 +689,7 @@ window.sharedOffice = (() => {
     const room = selected, chat = conversation(room), message = $("office-message").value.trim();
     if (!message || chat.busy || !chat.available) return;
     historyRequest++;
-    chat.busy = true; chat.error = "";
+    chat.busy = true; chat.receiving = false; chat.error = "";
     chat.history.push({role: "user", content: message});
     // The send action has started; do not leave a duplicate in the composer
     // while the local model works through a potentially long response.
@@ -697,16 +697,47 @@ window.sharedOffice = (() => {
     $("office-message").value = "";
     showConversation(room);
     try {
-      const response = await fetch("api/action", {
+      const response = await fetch("api/office-chat/stream", {
         method: "POST", headers: {"Content-Type": "application/json", "X-Hermes-Action": "1"},
         body: JSON.stringify({action: "office_chat", room, message}),
       });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "답변을 확인하지 못했습니다.");
-      chat.history.push({role: "assistant", content: result.response});
+      if (!response.ok) {
+        const result = await response.json();
+        throw new Error(result.error || "답변을 확인하지 못했습니다.");
+      }
+      if (!response.body || !response.headers.get("content-type")?.includes("text/event-stream")) {
+        throw new Error("스트리밍 연결을 확인하지 못했습니다.");
+      }
+      const reader = response.body.getReader(), decoder = new TextDecoder();
+      let buffer = "", answer = null, completed = false;
+      const receive = frame => {
+        const data = frame.split(/\r?\n/).filter(line => line.startsWith("data:")).map(line => line.slice(5).trimStart()).join("\n");
+        if (!data) return;
+        const item = JSON.parse(data);
+        if (item.event === "error") throw new Error(item.error || "답변 연결이 중단되었습니다.");
+        if (item.event === "delta" && typeof item.text === "string") {
+          if (!answer) { answer = {role: "assistant", content: ""}; chat.history.push(answer); }
+          answer.content += item.text; chat.receiving = true;
+          showConversation(room);
+        } else if (item.event === "complete") {
+          if (!answer) { answer = {role: "assistant", content: ""}; chat.history.push(answer); }
+          answer.content = item.response; completed = true;
+          showConversation(room);
+        }
+      };
+      try {
+        while (true) {
+          const {value, done} = await reader.read();
+          buffer += decoder.decode(value || new Uint8Array(), {stream: !done});
+          const frames = buffer.split(/\r?\n\r?\n/);
+          buffer = frames.pop(); frames.forEach(receive);
+          if (done) break;
+        }
+        if (!completed) throw new Error("답변이 끝나기 전에 연결이 끊겼습니다.");
+      } finally { reader.releaseLock(); }
     } catch (err) {
       chat.error = err.message + " 기록을 새로고침해 저장 여부를 확인해 주세요.";
-    } finally { chat.busy = false; showConversation(room); }
+    } finally { chat.busy = false; chat.receiving = false; showConversation(room); }
   }
   function workbench(room) {
     const target = $("bench-character");

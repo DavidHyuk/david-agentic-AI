@@ -10,6 +10,14 @@ profile을 `~/.hermes/profiles/english`로 동기화합니다.
 
 ## 전체 아키텍처
 
+2026-10-03 실행 중인 공유 llama.cpp provider는 요청당 128K × 2 슬롯입니다.
+Hermes profile 설정의 context length는 별도로 64K이므로 아래 구성도의
+64K 표기는 agent 설정을 뜻합니다. `local-model/eval/interactive_latency.py`와
+`experiment_tracker.py`는 이 provider를 변경하지 않고 대화형 지연을 측정하고,
+기존 MTP 결과를 통합한 로컬 HTML 및 선택적 Langfuse/LangSmith export를 만듭니다.
+실제 도구 실행·메시지 전달까지 포함하는 측정은 아닙니다.
+실험 도구이므로 새 Observatory room이나 cron을 추가하지 않습니다.
+
 ```
 DGX Spark (128GB 통합 메모리)
   └── llama.cpp 서버 :8003
@@ -41,6 +49,18 @@ Tailscale browser → Hermes HQ :8788 (tailnet IP + loopback)
         ├── Morning Echo → watched links / source date / collection status
         └── HQ mission → Kanban graph → specialist workers → HQ synthesis
 ```
+
+HQ의 기존 대화 참고 기능에 선택적 ChatGPT export archive가 추가됩니다.
+`scripts/chatgpt_archive.py`는 재사용한 임시 데스크톱 runtime에서 별도의
+ChatGPT Chromium profile을 열고 SSH 터널 `18781`로 직접 로그인을 받습니다.
+로그인 후 화면에서 내보내기를 한 번 요청하며, 이메일/SMS 도착 후 실제 ZIP을
+가져와야 검색할 수 있습니다. 이메일 접근은 연결하지 않습니다. 개인 컴퓨터의
+새 로컬 터미널에서 터널을 실행해야 하며 DGX SSH 셸에서 실행하면 맥북의
+`localhost`에 연결되지 않습니다. 상태·대화 수는 기존 HQ 작업실에 표시하고,
+실제 대화는 명시적 `search`/`show` 요청에서만 읽습니다. `~/.hermes/data/chatgpt/`
+아래 owner-only browser/download/SQLite 상태를 보관하며 기존 YouTube 계정과
+분리합니다. 새 agent/skill/room/profile/bot/cron 없이 David/HQ의 참고 자료
+연결 도구로 유지합니다.
 
 ---
 
@@ -87,6 +107,7 @@ David-Agent/
 │   ├── export_youtube_cookies.py # MacBook에서 YouTube 쿠키만 내보내기
 │   ├── youtube_history.py     # SSH 쿠키 연결 + headless 시청 기록 수집
 │   ├── youtube_browser_login.py # SSH 터널로 DGX Chromium 직접 로그인
+│   ├── chatgpt_archive.py     # ChatGPT 직접 로그인·내보내기·로컬 대화 검색
 │   ├── english_podcast.py     # 선택한 영상 대본·긴 문장 연습 / 요청 시 채널 대본
 │   ├── agenda.py              # 캘린더 이벤트 포맷팅 + 충돌 감지
 │   ├── cron_health.py         # cron tick lock / jobs.json 건강 검사 (+ 선택적 gateway restart)
@@ -781,4 +802,6 @@ Flash에는 CPU에서 해시를 계산하는 모델 내부 PLE n-gram이 실제�
 약 8.6ms는 실제 embedding 조회·복사·GPU 연산 시간을 포함하지 않습니다.
 세부 증거와 사용법은 [진단 사고 보고서](benchmarks/flash-prefill-diagnostic-incident-2026-10-03.md)에 있습니다.
 
-현재 전체 `pytest -q`는 499개, 진단·메타데이터 관련 검증은 18개가 통과했습니다.
+현재 전체 `pytest -q` 검증에는 ChatGPT 선택 branch·Unicode 검색·원자적 교체·
+ZIP 경로 격리·credential 오류 출력 방지 및 HQ source 상태 검증도 포함됩니다.
+2026-10-03 ChatGPT archive 변경 후 전체 546개 테스트가 통과했습니다.
