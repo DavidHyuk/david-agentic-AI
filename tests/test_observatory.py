@@ -105,6 +105,21 @@ def test_hq_chatgpt_status_reports_corruption_without_exposing_records(store):
     assert 'private' not in json.dumps(result)
 
 
+def test_hq_browser_index_is_distinct_from_an_imported_export(store):
+    import chatgpt_archive
+    root = store.home / 'data/chatgpt'
+    chatgpt_archive.save_json(root / 'browser-index.json', {
+        'captured_at': '2026-10-04T00:00:00+00:00', 'complete': False,
+        'conversations': [{'id': 'private-id', 'title': 'private-title', 'url': 'private-url'}]})
+    chatgpt_archive.save_json(root / 'browser-status.json', {'export_status': 'verification_loop'})
+    result = store.chatgpt_archive_status()
+    assert result['sidebar_conversation_count'] == 1
+    assert result['conversation_count'] == 0
+    assert result['sidebar_complete'] is False
+    assert result['export_status'] == 'verification_loop'
+    assert 'private' not in json.dumps(result)
+
+
 def test_recreated_cron_uses_task_not_injected_skill():
     prompt = 'Skill: weekly review, system design coach, English\n\nand nothing more.]\n\nDeliver today\'s Coding Coach using interview-prep.'
     assert room_for('david', 'cron_old_20260911', prompt, []) == 'coding'

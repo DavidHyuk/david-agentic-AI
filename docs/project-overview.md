@@ -20,6 +20,9 @@ Hermes profile 설정의 context length는 별도로 64K이므로 아래 구성�
 웹 캐릭터 대화는 동일한 Hermes session의 `/chat/stream`을 통해 부분 답변부터
 보여 주며, 실패 시 자동 재실행 없이 기록을 확인하도록 안내합니다.
 Langfuse Cloud 초기 설정과 실험 비교 방법은 `docs/langfuse-quickstart.md`에 있습니다.
+2026-10-04 Cloud의 `david-agent-performance`에 6 experiments / 105 traces /
+570 performance scores를 업로드하고 read API로 전량 조회를 확인했습니다.
+운영 대화 전체의 자동 추적은 아직 연결하지 않았습니다.
 
 ```
 DGX Spark (128GB 통합 메모리)
@@ -56,12 +59,15 @@ Tailscale browser → Hermes HQ :8788 (tailnet IP + loopback)
 HQ의 기존 대화 참고 기능에 선택적 ChatGPT export archive가 추가됩니다.
 `scripts/chatgpt_archive.py`는 재사용한 임시 데스크톱 runtime에서 별도의
 ChatGPT Chromium profile을 열고 SSH 터널 `18781`로 직접 로그인을 받습니다.
-로그인 후 화면에서 내보내기를 한 번 요청하며, 이메일/SMS 도착 후 실제 ZIP을
-가져와야 검색할 수 있습니다. 이메일 접근은 연결하지 않습니다. 개인 컴퓨터의
+기본 `login`은 내보내기 없이 로그인 화면을 열며, `sync-sidebar`로 관찰한 제목과
+링크를 검색하고 `read-browser <id>`로 선택한 대화의 화면 본문을 저장합니다.
+사이드바와 렌더링된 본문은 부분 관찰이며 전체 계정 백업으로 표시하지 않습니다.
+`login --request-export`는 화면에서 내보내기를 한 번 요청하며, 실제 ZIP을
+가져오면 SQLite export 검색을 우선합니다. 이메일 접근은 연결하지 않습니다. 개인 컴퓨터의
 새 로컬 터미널에서 터널을 실행해야 하며 DGX SSH 셸에서 실행하면 맥북의
 `localhost`에 연결되지 않습니다. 상태·대화 수는 기존 HQ 작업실에 표시하고,
-실제 대화는 명시적 `search`/`show` 요청에서만 읽습니다. `~/.hermes/data/chatgpt/`
-아래 owner-only browser/download/SQLite 상태를 보관하며 기존 YouTube 계정과
+실제 대화는 명시적 검색·선택 요청에서만 읽습니다. `~/.hermes/data/chatgpt/`
+아래 owner-only browser/download/SQLite 및 sidebar index/개별 본문 cache를 보관하며 기존 YouTube 계정과
 분리합니다. 새 agent/skill/room/profile/bot/cron 없이 David/HQ의 참고 자료
 연결 도구로 유지합니다.
 
@@ -70,11 +76,19 @@ ChatGPT Chromium profile을 열고 SSH 터널 `18781`로 직접 로그인을 받
 않습니다. 앱 승인 오류가 나면 원격 화면의 **Try with email**에서 본인이 코드를
 입력합니다. responsive 화면의 숨겨진 profile 버튼을 제외하고, 현재 Export
 버튼의 accessible name을 인식하여 설정 화면 변경에도 대응합니다.
+이메일 인증 후에도 인증 화면이 반복되면 `verification_loop` 상태로 멈추며,
+이미 로그인한 일반 대화 화면은 추가 인증 없이 읽을 수 있습니다. 최신 메시지
+DOM과 이전 DOM을 지원하고 저장 전 선택한 대화 ID를 재검증합니다.
+실제 계정에서 제목·링크 290개와 대화 하나의 메시지 10개 수집을 확인했습니다.
+전체 대화 수 또는 모든 turn의 수집 완료를 의미하지 않습니다.
 
 로그인 터널은 `-F /dev/null`과 실제 DGX 주소(`david@10.0.0.50`)를 사용하여
 기존 `ssh dgx`의 기본 `8501` forwarding 충돌을 피합니다.
 `ClearAllForwardings=yes`는 명령줄 `-L`도 제거하므로 로그인 터널에 사용하지
 않습니다. 이 옵션은 별도 터널 없이 쿠키를 전달하는 SSH 명령에만 유지합니다.
+SSH 터널은 원격 화면을 보는 동안만 유지하면 됩니다. 종료해도 서버의 저장
+데이터는 남으며, live 본문 조회에는 제한 시간 내의 DGX browser가 필요합니다.
+DGX 모니터 연결이나 Google 계정 로그인은 이 경로의 필수 조건이 아닙니다.
 
 ---
 
@@ -818,7 +832,7 @@ Flash에는 CPU에서 해시를 계산하는 모델 내부 PLE n-gram이 실제�
 
 현재 전체 `pytest -q` 검증에는 ChatGPT 선택 branch·Unicode 검색·원자적 교체·
 ZIP 경로 격리·credential 오류 출력 방지 및 HQ source 상태 검증도 포함됩니다.
-2026-10-04 ChatGPT export 인증 변경 후 전체 553개 테스트가 통과했습니다.
+2026-10-04 ChatGPT sidebar·본문 조회 변경 후 전체 560개 테스트가 통과했습니다.
 
 2026-10-04 대화 streaming·Langfuse private 설정·numeric score 검증 후 전체
 `pytest -q`는 549 passed입니다. 웹 helper와 office client의 배포 및 health를

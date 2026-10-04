@@ -61,7 +61,7 @@ Telegram streaming 설정은 바꾸지 않습니다. 브라우저에서 관제�
 
 ## Langfuse 준비 및 검증
 
-계정·프로젝트 키가 아직 없으므로 원격 ingestion을 수행하지 않았습니다.
+초기 보고 시에는 계정·프로젝트 키가 없어 원격 ingestion을 수행하지 않았습니다.
 가입·API Keys·웹 메뉴와 private 설정 방법은
 [Langfuse 처음 쓰기](../langfuse-quickstart.md)에 있습니다.
 초기 private 파일 `~/.config/david-agent/langfuse.env`는 US Base URL과 빈 키로
@@ -82,3 +82,9 @@ Chromium에서는 mock stream의 분할 UTF-8, 부분 답변 표시, 최종 답�
 이 browser test는 실제 대화를 보내거나 학습 진행 상태를 바꾸지 않았습니다.
 Langfuse credential 비공개 로딩, stable score 연결, 부분 rejection 실패 처리를
 unit/mock으로 검증했지만 실제 project에 대한 인증·ingestion은 남아 있습니다.
+
+후속 검증 (2026-10-04 07:25 UTC): 사용자가 private API 설정을 완료한 뒤
+`david-agent-performance` Cloud 프로젝트에 업로드했습니다. read API에서
+6 experiments / 105 traces / 570 scores를 전량 확인했으며 누락은 없습니다.
+로컬 `runtime/model-benchmarks/langfuse-upload-20261004.json`에 검증 영수증을
+보관합니다. 이 업로드로 운영 대화 자동 추적을 활성화하지는 않았습니다.

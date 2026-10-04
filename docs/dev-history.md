@@ -3,6 +3,38 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.34.0 — 2026-10-04 (minor: read observed ChatGPT history without export)
+
+- Add bounded sidebar indexing and explicit visible-browser conversation reads
+  after successful account login. Retain titles/links and selected rendered
+  user/assistant text in private local files, marked partial rather than claiming
+  a complete export. Search/show use this data when no export archive exists.
+- Support current and legacy message markup, verify the selected conversation
+  URL before caching, and retain prior observations after failures. Stop the
+  observed email-verification loop without retrying export confirmation; ordinary
+  account history remains usable. No authentication-loop cause is assumed.
+- Show safe partial-source counts and stopped-verification status in the existing
+  David/Hermes HQ workbench. This extends its reference source rather than adding
+  an agent, room, profile, bot, cron or delivery destination.
+- Document that SSH forwarding is needed for remote viewing only, the browser
+  session is bounded, and a physical DGX monitor/Google login is optional.
+- Validation: live sidebar saves 290 titles/links; one selected chat saves 10
+  user/assistant messages. Full account export remains unconfirmed. `pytest -q`
+  passes 560 tests, with invalid-link, partial-index, cached-query and redirected
+  conversation preservation checks; Python/JavaScript syntax and whitespace pass.
+
+## v1.33.4 — 2026-10-04 (patch: verify Langfuse Cloud experiment upload)
+
+- Publish the six existing performance experiments after the owner configured
+  private project credentials. Upload numeric metrics and hashes without raw
+  conversations, learner information or photos; retain local artifacts.
+- Read back all six experiments, 105 traces and 570 performance scores from
+  the project API with no missing records. Store a private local verification
+  receipt and update the first-use guide with the project link and time filters.
+- Validation: live authentication, OTLP and per-event score acceptance, plus
+  bounded read-back queries. Documentation-only change; executable source,
+  model configuration and production conversation tracing remain unchanged.
+
 ## v1.33.3 — 2026-10-04 (patch: recognize ChatGPT export controls and verification)
 
 - Recognize the visible profile button when responsive layouts retain a hidden

@@ -1,0 +1,10 @@
+name: david-langfuse
+version: "1.0.0"
+author: David Choi
+description: "Bounded conversation, LLM and tool tracing with background Langfuse export."
+kind: standalone
+provides_hooks:
+  - pre_api_request
+  - post_api_request
+  - pre_tool_call
+  - post_tool_call

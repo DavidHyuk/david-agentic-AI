@@ -1184,7 +1184,7 @@ observed on the DGX Spark's ARM64 environment.
 Hermes can search exported ChatGPT conversations as reference material in the
 existing **Hermes HQ** room. Signing in to Codex or using Sign in with ChatGPT
 does not grant access to earlier ChatGPT chats. This helper operates the visible
-ChatGPT website, then imports an actual export; it has no private history API,
+ChatGPT website to index visible chats or import an actual export; it has no private history API,
 new bot/profile, automatic polling, or recurring delivery.
 
 The existing temporary desktop runtime is reused, with a separate owner-only
@@ -1199,7 +1199,7 @@ python3 bootstrap/stage.py
 On the **DGX**, start a bounded browser session (30 minutes by default):
 
 ```bash
-~/.hermes/venvs/youtube-history/bin/python ~/.hermes/scripts/chatgpt_archive.py login --request-export
+~/.hermes/venvs/youtube-history/bin/python ~/.hermes/scripts/chatgpt_archive.py login
 ```
 
 On the **MacBook**, open a **new local terminal outside the DGX SSH session**.
@@ -1218,7 +1218,32 @@ apparently connected SSH session without the browser tunnel.
 
 Open `http://127.0.0.1:18781/vnc.html?autoconnect=true&resize=scale` in the MacBook
 browser and sign in directly, completing any additional authentication. The
-helper attempts Settings → Data controls → Export → Confirm export once and
+SSH tunnel is needed only while viewing this remote screen; `Ctrl+C` stops the
+tunnel without deleting the DGX browser profile or collected data. The DGX login
+browser itself closes at its configured timeout; reopen it for subsequent live
+reads. A physical DGX monitor is optional, and Google account sign-in is not required.
+
+For ordinary history retrieval, keep that browser open and run these commands
+on the DGX:
+
+```bash
+~/.hermes/venvs/youtube-history/bin/python ~/.hermes/scripts/chatgpt_archive.py sync-sidebar
+python3 ~/.hermes/scripts/chatgpt_archive.py search "interview"
+~/.hermes/venvs/youtube-history/bin/python ~/.hermes/scripts/chatgpt_archive.py read-browser <conversation-id>
+python3 ~/.hermes/scripts/chatgpt_archive.py show <conversation-id>
+```
+
+The sidebar index contains observed titles and links. Selected chats cache
+currently rendered user/assistant text. Both are explicitly partial observations:
+scrolling can miss older chats, and long conversations can have unrendered turns.
+They are not a complete account export. Existing observations survive later
+sidebar scans, and a failed read preserves the previous cached conversation.
+Search uses this index/cache when no export has been imported; an imported
+export remains the preferred search source. The browser reader supports current
+and legacy message layouts and verifies the selected conversation before saving.
+
+To request an official complete export instead, start `login --request-export`.
+The helper attempts Settings → Data controls → Export → Confirm export once and
 requires a success notice before reporting a confirmed request. If account UI
 controls change, use the visible browser to finish; an ambiguous result is never
 automatically retried. Some account types or automated-browser restrictions may
@@ -1232,6 +1257,10 @@ remote browser and enter the emailed code there. If mobile approval displays an
 authentication error, use that email alternative. Inspect the returned account
 settings for confirmation before claiming that an export was requested; do not
 automatically repeat an ambiguous confirmation click.
+If successful email verification repeatedly returns to verification, stop that
+flow and report `verification_loop`; ordinary signed-in sidebar reads can still
+work. A later export request can be tried in the owner's usual MacBook browser.
+The helper does not diagnose the cause of that authentication loop.
 
 The export email/SMS may take up to seven days; its download link expires after
 24 hours. Email access is not connected by this helper. When the link arrives,
@@ -1254,7 +1283,8 @@ python3 ~/.hermes/scripts/chatgpt_archive.py show <conversation-id>
 ```
 
 State stays under `~/.hermes/data/chatgpt/`: the private browser profile,
-downloads, and `archive.db`. ZIP members are not extracted; only a bounded
+downloads, `browser-index.json`, selected `browser-chats/`, and `archive.db`.
+ZIP members are not extracted; only a bounded
 `conversations.json` is read. Each successful import atomically replaces the
 local snapshot, preserving the previous archive on failure. Search/show include
 visible user/assistant text from the selected branch, excluding other branches,

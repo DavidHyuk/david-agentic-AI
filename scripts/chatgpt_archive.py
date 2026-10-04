@@ -24,13 +24,14 @@ import subprocess
 import sys
 import tempfile
 import time
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urljoin
 import zipfile
 
 DEFAULT_DATA = Path.home() / '.hermes/data/chatgpt'
 DEFAULT_RUNTIME = Path.home() / '.hermes/venvs/youtube-history'
 WEB_PORT, VNC_PORT, CDP_PORT = 18781, 15902, 19324
 MAX_EXPORT_BYTES = 512 * 1024 * 1024
+CONVERSATION_PATH = re.compile(r'^/(?:c/|g/[^/]+/c/)([0-9a-fA-F-]{36})/?$')
 
 
 class ArchiveError(ValueError):
@@ -181,6 +182,10 @@ def archive_status(data_dir: Path) -> dict:
     if database.is_file():
         with sqlite3.connect(database.as_uri() + '?mode=ro', uri=True) as connection:
             result.update(json.loads(connection.execute('SELECT value FROM metadata').fetchone()[0]))
+    sidebar = load_json(data_dir / 'browser-index.json')
+    result['sidebar_conversation_count'] = len(sidebar.get('conversations', []))
+    result['sidebar_captured_at'] = sidebar.get('captured_at')
+    result['sidebar_complete'] = False
     return result
 
 
@@ -206,9 +211,20 @@ def import_downloads(data_dir: Path, seen: set[tuple]) -> dict | None:
 
 def search_archive(data_dir: Path, query: str, limit: int) -> list[dict]:
     database = data_dir / 'archive.db'
-    if not database.is_file():
-        raise ArchiveError('No ChatGPT export has been imported yet.')
     words = query.casefold().split()
+    if not database.is_file():
+        sidebar = load_json(data_dir / 'browser-index.json')
+        if not sidebar:
+            raise ArchiveError('No ChatGPT export or browser conversation index is available yet.')
+        results = []
+        for row in sidebar_conversations(sidebar.get('conversations', [])):
+            cached = load_json(data_dir / 'browser-chats' / (row['id'] + '.json'))
+            text = row['title'] + '\n' + '\n'.join(message['text'] for message in cached.get('messages', []))
+            if all(word in text.casefold() for word in words):
+                results.append({**row, 'source': 'visible_sidebar', 'content_available': bool(cached)})
+                if len(results) >= limit:
+                    break
+        return results
     with sqlite3.connect(database.as_uri() + '?mode=ro', uri=True) as connection:
         results = []
         for identifier, title, text in connection.execute('SELECT id,title,text FROM conversations ORDER BY rowid DESC'):
@@ -222,12 +238,134 @@ def search_archive(data_dir: Path, query: str, limit: int) -> list[dict]:
 def show_conversation(data_dir: Path, identifier: str) -> dict:
     database = data_dir / 'archive.db'
     if not database.is_file():
+        index = sidebar_conversations(load_json(data_dir / 'browser-index.json').get('conversations', []))
+        row = next((row for row in index if row['id'] == identifier), None)
+        if row:
+            cached = load_json(data_dir / 'browser-chats' / (row['id'] + '.json'))
+            if cached:
+                return cached
+            raise ArchiveError('Only the title/link is indexed; use read-browser <id> to retrieve visible text.')
         raise ArchiveError('No ChatGPT export has been imported yet.')
     with sqlite3.connect(database.as_uri() + '?mode=ro', uri=True) as connection:
         row = connection.execute('SELECT title,messages FROM conversations WHERE id=?', (identifier,)).fetchone()
     if row is None:
         raise ArchiveError('Conversation not found.')
     return {'id': identifier, 'title': row[0], 'messages': json.loads(row[1])}
+
+
+def sidebar_conversations(rows: list[dict]) -> list[dict]:
+    """Accept only titled conversation links on ChatGPT, excluding projects/assets."""
+    result, seen = [], set()
+    for row in rows:
+        if not isinstance(row, dict) or not isinstance(row.get('url'), str):
+            continue
+        parsed = urlsplit(urljoin('https://chatgpt.com/', row['url']))
+        match = CONVERSATION_PATH.fullmatch(parsed.path)
+        title = row.get('title')
+        if (parsed.scheme != 'https' or parsed.hostname != 'chatgpt.com' or parsed.username
+                or parsed.password or not match or not isinstance(title, str) or not title.strip()):
+            continue
+        identifier = match.group(1).lower()
+        if identifier in seen:
+            continue
+        seen.add(identifier)
+        result.append({'id': identifier, 'title': title.strip(),
+                       'url': 'https://chatgpt.com' + parsed.path})
+    return result
+
+
+def sync_sidebar(data_dir: Path, max_scrolls: int) -> dict:
+    """Collect rendered sidebar links with bounded scrolling, without requesting export."""
+    from playwright.sync_api import sync_playwright
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.connect_over_cdp(f'http://127.0.0.1:{CDP_PORT}')
+        context = browser.contexts[0]
+        candidates = [page for page in context.pages if urlsplit(page.url).hostname == 'chatgpt.com']
+        if not candidates:
+            raise ArchiveError('Open the signed-in ChatGPT home page in the login browser first.')
+        page = candidates[-1]
+        if not is_authenticated(page):
+            raise ArchiveError('The browser does not show a signed-in ChatGPT home page.')
+        previous = load_json(data_dir / 'browser-index.json')
+        collected = {}
+        stalled = 0
+        for unused in range(max_scrolls + 1):
+            if not is_authenticated(page):
+                raise ArchiveError('ChatGPT login became unavailable; previous index retained.')
+            links = page.locator('a[href*="/c/"]')
+            rows = sidebar_conversations(links.evaluate_all(
+                'nodes => nodes.map(e => ({url:e.href,title:e.innerText.trim()}))'))
+            before = len(collected)
+            collected.update({row['id']: row for row in rows})
+            stalled = stalled + 1 if len(collected) == before else 0
+            if links.count() == 0 or stalled >= 3:
+                break
+            moved = links.first.evaluate('''e => {
+                for(let p=e.parentElement;p && p!==document.body;p=p.parentElement){
+                    if(p.scrollHeight>p.clientHeight && /auto|scroll/.test(getComputedStyle(p).overflowY)){
+                        const before=p.scrollTop;
+                        p.scrollTop=Math.min(p.scrollTop+p.clientHeight*0.8,p.scrollHeight);
+                        return p.scrollTop!==before;
+                    }
+                }
+                return false;
+            }''')
+            if not moved and stalled >= 2:
+                break
+            page.wait_for_timeout(750)
+        if not collected:
+            raise ArchiveError('No conversation links were visible; previous index retained.')
+        # Merge prior observations: the sidebar is not an authoritative full export.
+        merged = {row['id']: row for row in sidebar_conversations(previous.get('conversations', []))}
+        merged.update(collected)
+        snapshot = {'version': 1, 'captured_at': now(), 'source': 'visible_sidebar',
+                    'complete': False, 'conversations': list(merged.values())}
+        save_json(data_dir / 'browser-index.json', snapshot)
+        return {'sidebar_conversation_count': len(merged), 'observed_this_run': len(collected),
+                'captured_at': snapshot['captured_at'], 'complete': False}
+
+
+def read_browser_conversation(data_dir: Path, identifier: str) -> dict:
+    """Read one explicitly selected indexed chat through the visible web UI."""
+    from playwright.sync_api import sync_playwright
+    sidebar = load_json(data_dir / 'browser-index.json')
+    rows = sidebar_conversations(sidebar.get('conversations', []))
+    row = next((row for row in rows if row['id'] == identifier), None)
+    if row is None:
+        raise ArchiveError('Conversation is not in the observed browser index.')
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.connect_over_cdp(f'http://127.0.0.1:{CDP_PORT}')
+        context = browser.contexts[0]
+        page = context.new_page()
+        try:
+            page.goto(row['url'], wait_until='domcontentloaded', timeout=45_000)
+            modern_selector = ('main [data-user-message-bubble="true"]:visible,'
+                               'main [data-markdown-text-style="assistant-message"]:visible')
+            legacy_selector = ('main [data-message-author-role="user"]:visible,'
+                               'main [data-message-author-role="assistant"]:visible')
+            page.locator(modern_selector + ',' + legacy_selector).first.wait_for(timeout=30_000)
+            messages = page.locator(modern_selector)
+            if not messages.count():
+                messages = page.locator(legacy_selector)
+            # Avoid claiming all historical turns have rendered on a long chat.
+            page.wait_for_timeout(1500)
+            current = sidebar_conversations([{'url': page.url, 'title': row['title']}])
+            if not current or current[0]['id'] != row['id']:
+                raise ArchiveError('The selected conversation was not opened; no chat content was saved.')
+            texts = messages.evaluate_all('''nodes => nodes.map(e => ({
+                role:e.hasAttribute('data-user-message-bubble') ? 'user' :
+                     e.getAttribute('data-message-author-role') || 'assistant',
+                text:e.innerText.trim()
+            })).filter(e => e.text)''')
+            if not texts:
+                raise ArchiveError('No visible conversation text was found.')
+            result = {**row, 'source': 'visible_browser', 'captured_at': now(),
+                      'complete': False, 'messages': texts}
+            safe_filename = row['id'] + '.json'
+            save_json(data_dir / 'browser-chats' / safe_filename, result)
+            return result
+        finally:
+            page.close()
 
 
 def desktop_commands(runtime: Path, data_dir: Path, executable: Path) -> list[list[str]]:
@@ -448,6 +586,10 @@ def main(argv=None) -> int:
     show = commands.add_parser('show')
     show.add_argument('id')
     commands.add_parser('download', help='Read the private export URL from stdin; requires an open login browser.')
+    sidebar = commands.add_parser('sync-sidebar', help='Read visible conversation links without requesting export.')
+    sidebar.add_argument('--max-scrolls', type=int, default=40)
+    reader = commands.add_parser('read-browser', help='Read one indexed chat from the signed-in browser.')
+    reader.add_argument('id')
     args = parser.parse_args(argv)
     os.umask(0o077)
     def interrupted(*unused):
@@ -475,6 +617,14 @@ def main(argv=None) -> int:
             result = search_archive(args.data_dir, args.query, args.limit)
         elif args.command == 'show':
             result = show_conversation(args.data_dir, args.id)
+        elif args.command == 'sync-sidebar':
+            if not 0 <= args.max_scrolls <= 100:
+                parser.error('--max-scrolls must be between 0 and 100')
+            with locked(args.data_dir, '.browser-read.lock'):
+                result = sync_sidebar(args.data_dir, args.max_scrolls)
+        elif args.command == 'read-browser':
+            with locked(args.data_dir, '.browser-read.lock'):
+                result = read_browser_conversation(args.data_dir, args.id)
         else:
             result = archive_status(args.data_dir)
         print(json.dumps(result, ensure_ascii=False, indent=2))

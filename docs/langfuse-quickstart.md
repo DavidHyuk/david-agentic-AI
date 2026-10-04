@@ -61,12 +61,20 @@ python local-model/eval/experiment_tracker.py publish-langfuse \
 을 붙입니다. OTLP span 파일과 `.scores.json` 파일이 생성되고 네트워크 호출은 없습니다.
 traces는 v4 OTLP로, numeric performance scores는 지원되는 score-create batch로 보냅니다.
 HTTP 성공만으로 score 성공을 가정하지 않고 개별 오류도 확인합니다.
-현재까지는 dry run과 mock 검증만 통과했으며 실제 project ingestion은 미검증입니다.
+2026-10-04 실제 Cloud 인증·ingestion과 read-back 검증을 완료했습니다.
+`david-agent-performance` 프로젝트에서 6 experiments, 105 traces,
+570 numeric performance scores를 모두 다시 조회했으며 누락은 없었습니다.
+검증 영수증은 로컬 `runtime/model-benchmarks/langfuse-upload-20261004.json`에
+보관합니다. 실험을 업로드한 것이며, 운영 대화 전체의 자동 추적은 아직 별도입니다.
 
 ## 웹에서 어디를 보면 되나
 
 로그인 후 Project를 선택합니다. 화면 버전에 따라 메뉴 배치가 조금 달라도
 다음 기능 이름으로 찾을 수 있습니다.
+
+현재 프로젝트: [david-agent-performance](https://us.cloud.langfuse.com/project/cmuthqc2u09qiad0dy8x51ett).
+기록이 보이지 않으면 기간을 최근 7일로 설정하고 environment를 `experiment`로
+선택합니다. 업로드 날짜 대신 원래 실험/자료 기록 시각으로 표시됩니다.
 
 | 기능 | 확인할 내용 |
 | --- | --- |

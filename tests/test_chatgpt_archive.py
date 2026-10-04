@@ -247,3 +247,83 @@ def test_invalid_url_library_error_is_not_printed(tmp_path, monkeypatch, capsys)
     monkeypatch.setattr(archive.sys, 'stdin', io.StringIO('https://chatgpt.com:private-secret/export'))
     assert archive.main(['--data-dir', str(tmp_path), 'download']) == 1
     assert 'private-secret' not in capsys.readouterr().err
+
+
+CHAT_ID = '12345678-1234-1234-1234-123456789abc'
+
+
+def test_sidebar_keeps_only_titled_chatgpt_conversation_links_and_removes_duplicates():
+    good = {'url': '/c/' + CHAT_ID + '?private=discard', 'title': '  영어 interview  '}
+    rows = [good, good, {'url': 'https://evil.test/c/' + CHAT_ID, 'title': 'other'},
+            {'url': '/g/project', 'title': 'project'}, {'url': '/c/' + CHAT_ID, 'title': ''},
+            {'url': 'https://private@chatgpt.com/c/' + CHAT_ID, 'title': 'credentials'},
+            {'url': '/c/../../private', 'title': 'traversal'}]
+    assert archive.sidebar_conversations(rows) == [{
+        'id': CHAT_ID, 'title': '영어 interview', 'url': 'https://chatgpt.com/c/' + CHAT_ID}]
+
+
+def test_browser_index_search_does_not_claim_downloaded_content(tmp_path):
+    archive.save_json(tmp_path / 'browser-index.json', {'conversations': [
+        {'url': '/c/' + CHAT_ID, 'title': '영어 interview'}], 'captured_at': '2026-10-04T00:00:00+00:00'})
+    result = archive.search_archive(tmp_path, '영어', 20)
+    assert result[0]['id'] == CHAT_ID
+    assert result[0]['content_available'] is False
+    assert result[0]['source'] == 'visible_sidebar'
+    assert archive.archive_status(tmp_path)['conversation_count'] == 0
+    assert archive.archive_status(tmp_path)['sidebar_conversation_count'] == 1
+    assert archive.archive_status(tmp_path)['sidebar_complete'] is False
+    with pytest.raises(archive.ArchiveError, match='read-browser'):
+        archive.show_conversation(tmp_path, CHAT_ID)
+
+
+def test_search_and_show_can_use_one_cached_browser_chat_without_export(tmp_path):
+    row = {'id': CHAT_ID, 'url': '/c/' + CHAT_ID, 'title': 'Title'}
+    archive.save_json(tmp_path / 'browser-index.json', {'conversations': [row]})
+    cached = {**row, 'source': 'visible_browser', 'complete': False,
+              'messages': [{'role': 'user', 'text': 'Straße 영어 evidence'}]}
+    archive.save_json(tmp_path / 'browser-chats' / (CHAT_ID + '.json'), cached)
+    assert archive.search_archive(tmp_path, 'STRASSE', 20)[0]['content_available'] is True
+    assert archive.show_conversation(tmp_path, CHAT_ID) == cached
+    with pytest.raises(archive.ArchiveError):
+        archive.show_conversation(tmp_path, '../../outside')
+
+
+def test_nonindexed_browser_chat_is_rejected_before_launching_a_tab(tmp_path, monkeypatch):
+    import sys
+    monkeypatch.setitem(sys.modules, 'playwright.sync_api', SimpleNamespace(
+        sync_playwright=lambda: pytest.fail('Unindexed URL must not be opened')))
+    with pytest.raises(archive.ArchiveError, match='not in'):
+        archive.read_browser_conversation(tmp_path, '../../private')
+
+
+@pytest.mark.parametrize('redirect', ['https://auth.openai.com/verify',
+                                   'https://chatgpt.com/c/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'])
+def test_browser_redirect_never_saves_unrelated_conversation(tmp_path, monkeypatch, redirect):
+    import sys
+    archive.save_json(tmp_path / 'browser-index.json', {'conversations': [
+        {'url': '/c/' + CHAT_ID, 'title': 'Selected'}]})
+    cache = tmp_path / 'browser-chats' / (CHAT_ID + '.json')
+    previous = {'messages': [{'role': 'user', 'text': 'previous verified text'}]}
+    archive.save_json(cache, previous)
+    closed = []
+    locator = SimpleNamespace(count=lambda: 1, wait_for=lambda **kwargs: None,
+                              evaluate_all=lambda script: pytest.fail('Unrelated text must not be read'))
+    locator.first = locator
+    page = SimpleNamespace(url=redirect, goto=lambda *args, **kwargs: None,
+                           locator=lambda selector: locator, wait_for_timeout=lambda value: None,
+                           close=lambda: closed.append(True))
+    browser = SimpleNamespace(contexts=[SimpleNamespace(new_page=lambda: page)])
+    class Playwright:
+        chromium = SimpleNamespace(connect_over_cdp=lambda url: browser)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+    monkeypatch.setitem(sys.modules, 'playwright.sync_api', SimpleNamespace(sync_playwright=Playwright))
+    with pytest.raises(archive.ArchiveError, match='selected conversation'):
+        archive.read_browser_conversation(tmp_path, CHAT_ID)
+    assert archive.load_json(cache) == previous
+    assert closed == [True]
