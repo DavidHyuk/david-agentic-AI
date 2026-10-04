@@ -8,6 +8,29 @@ profile을 `~/.hermes/profiles/english`로 동기화합니다.
 
 ---
 
+## Codex 사용량 제한 자동 복구
+
+`scripts/codex_auto_resume.py`와 `bootstrap/install_codex_auto_resume.sh`는
+Hermes staging과 별도로 설치하는 host 내부 수명주기 도구입니다.
+`codex-auto-resume.service`가 Codex root session의 structured usage-limit
+종료를 10초마다 감지하고, 발생 시점 + 5시간 + 90초(서버 reset이 더 늦으면
+그 시점 + 90초)에 `codex exec resume --json`으로 같은 session의 작업을
+재개합니다. 최초 설치 시 최근 24시간의 미해결 제한만 복구하며, 이후 감시는
+서비스 downtime 중 추가된 실패도 처리합니다. 폴더·모델·reasoning effort·
+마지막 실제 turn의 파일 접근 권한을 유지하고 unattended approval은 never로
+설정합니다. 기존 `<SESSION_ID> HH:MM` 명령은 tmux sleep 대신 영속 예약을
+저장합니다. `now`, `status`, `cancel`, `exclude` 명령을 지원합니다.
+
+최대 3개 독립 systemd worker와 owner-only SQLite/JSONL state
+(`~/.local/state/codex-auto-resume/`)를 사용합니다. watcher 재시작은 진행 중
+worker를 종료하지 않고, 수동 새 turn은 대기 예약을 취소합니다. 새 quota 실패는
+다시 예약하고 다른 실패는 자동 반복하지 않습니다. 시작·완료 event와 exit code로
+실행을 검증하며 불명확한 crash는 `needs_review`로 남겨 중복 요청을 막습니다.
+이는 기존 Codex task 유지 도구이므로 Hermes profile/gateway/bot/cron 및
+Observatory room을 추가하지 않습니다. 별도 user-facing Hermes workflow가 없으며,
+운영 기록은 `codex-auto-resume status`와 systemd journal에서 확인합니다.
+핵심 기술은 Python 표준 라이브러리, SQLite WAL, JSONL, systemd user service입니다.
+
 ## 전체 아키텍처
 
 2026-10-03 실행 중인 공유 llama.cpp provider는 요청당 128K × 2 슬롯입니다.
@@ -832,7 +855,7 @@ Flash에는 CPU에서 해시를 계산하는 모델 내부 PLE n-gram이 실제�
 
 현재 전체 `pytest -q` 검증에는 ChatGPT 선택 branch·Unicode 검색·원자적 교체·
 ZIP 경로 격리·credential 오류 출력 방지 및 HQ source 상태 검증도 포함됩니다.
-2026-10-04 ChatGPT sidebar·본문 조회 변경 후 전체 560개 테스트가 통과했습니다.
+2026-10-04 중단 후 재검증에서 전체 595개 테스트가 통과했습니다.
 
 2026-10-04 대화 streaming·Langfuse private 설정·numeric score 검증 후 전체
 `pytest -q`는 549 passed입니다. 웹 helper와 office client의 배포 및 health를

@@ -1,0 +1,17 @@
+# __author__ = 'David Choi (bestshoot21@gmail.com)'
+# Purpose: detect Codex usage-limit stops and dispatch persistent per-session retries.
+[Unit]
+Description=Codex usage-limit automatic resume watcher
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 %h/.local/lib/codex-auto-resume/codex_auto_resume.py watch
+Environment=PATH=%h/.local/bin:%h/bin:/usr/local/bin:/usr/bin:/bin
+UMask=0077
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

@@ -77,6 +77,8 @@ the connected browser; use `~/.hermes/venvs/youtube-history/bin/python` for this
 command. These are partial observations, not a complete account backup. Do not
 repeat export verification when it loops; `sync-sidebar` can refresh visible
 title/link observations without requesting another export or approval.
-Account setup uses the helper's `login --request-export` command with
-`~/.hermes/venvs/youtube-history/bin/python`; David enters credentials directly
+If the bounded browser session has closed, reopen it with the helper's `login`
+command using `~/.hermes/venvs/youtube-history/bin/python` before live reads.
+Use `--request-export` only when David explicitly asks for a full export.
+David enters credentials directly
 in the SSH-forwarded browser. Never request passwords or cookies in chat.

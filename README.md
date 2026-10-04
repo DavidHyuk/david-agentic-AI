@@ -28,6 +28,54 @@ Keeping them version-controlled here makes the setup **reproducible, testable, a
 maintainable**: edit in the repo, re-run `stage.py`, done. The runtime stays a
 disposable cache.
 
+## Automatic Codex usage-limit recovery
+
+Install the standalone host helper (separate from Hermes staging):
+
+```bash
+bash bootstrap/install_codex_auto_resume.sh
+codex-auto-resume status
+journalctl --user -u codex-auto-resume.service -f
+```
+
+The enabled user service polls the local Codex thread index/rollouts every ten
+seconds. A root session ending with `usage_limit_exceeded` gets one persistent
+retry **five hours after the failure, plus 90 seconds**, or after a later server
+reset timestamp when supplied. Existing unresolved failures from the last 24
+hours are recovered on installation. Later failures also survive watcher downtime.
+A new manually submitted turn supersedes its pending retry. Context-window,
+network and ordinary tool errors do not trigger quota recovery.
+
+Retries use `codex exec resume --json`, preserving the original session ID,
+working directory, model, reasoning effort and last actual turn's sandbox access.
+Approval requests are disabled for unattended execution. Up to three independent
+systemd workers run concurrently; SSH/tmux disconnects and watcher restarts do
+not stop them. Persistent private state and JSONL worker output live in
+`~/.local/state/codex-auto-resume/`. A turn is marked complete only after verified
+`turn.started` / `turn.completed` events and a successful exit. Another quota
+failure schedules another five-hour retry; ambiguous worker crashes are recorded
+as `needs_review` rather than blindly replaying external actions.
+
+The former command remains available and now saves a persistent schedule:
+
+```bash
+codex-auto-resume <SESSION_ID> 03:10
+codex-auto-resume <SESSION_ID> now
+codex-auto-resume cancel <SESSION_ID>    # cancel this pending retry
+codex-auto-resume exclude <SESSION_ID>   # cancel and exclude future detection
+```
+
+The old script is backed up during installation. Local-time `HH:MM` reservations
+include the same 90-second grace; `now` runs at the next poll. `status` shows the
+worker unit and private output path. Reconnect to the resumed work with
+`codex resume <SESSION_ID>`; the TUI's previous limit error is historical, not a
+new request. The host's enabled user linger keeps the service running after logout
+and at boot. Tests use isolated `--codex-home` / `--state-dir` directories and
+shortened watcher delays; production uses the five-hour default.
+
+This is an internal Codex lifecycle helper for existing tasks, not a new Hermes
+agent, scheduled content workflow, profile, Telegram bot or Observatory room.
+
 ## Architecture
 
 ```

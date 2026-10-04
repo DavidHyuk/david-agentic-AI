@@ -3,6 +3,28 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.35.0 — 2026-10-04 (minor: persistent Codex usage-limit recovery)
+
+- Replace the host's sleeping interactive resume script with a backed-up,
+  version-controlled standalone helper and enabled systemd user watcher. Detect
+  structured quota failures per root session and persist one retry five hours
+  after failure plus 90 seconds, honoring later structured server reset times.
+- Submit actual non-interactive `codex exec resume --json` turns: Codex 0.160.0
+  restores a usage-limited TUI session without submitting its command-line
+  continuation prompt. Preserve the last actual turn's working directory, model,
+  reasoning effort and sandbox access rather than the later TUI permission downgrade.
+- Keep durable schedules, deduplicate failure turn IDs, cancel superseded retries,
+  recover independent workers across watcher restarts and verify start/completion.
+  Repeat only quota failures; record ambiguous worker loss without duplicate task
+  submission. Retain manual time scheduling plus status/cancel/exclude commands.
+- Routing decision: this maintains existing Codex tasks internally. It adds no
+  Hermes agent-like content workflow, profile, bot, gateway, cron or Observatory
+  room; private scheduler state and systemd journal provide lifecycle inspection.
+- Validation details are recorded after the unit suite and isolated live recovery
+  test. The live test injects a structured quota failure into an isolated test
+  rollout and shortens the delay, then uses real authenticated Codex inference
+  and a file-writing tool; it does not deliberately exhaust the account quota.
+
 ## v1.34.0 — 2026-10-04 (minor: read observed ChatGPT history without export)
 
 - Add bounded sidebar indexing and explicit visible-browser conversation reads
@@ -22,6 +44,11 @@ semantic versioning (major.minor.patch).
   user/assistant messages. Full account export remains unconfirmed. `pytest -q`
   passes 560 tests, with invalid-link, partial-index, cached-query and redirected
   conversation preservation checks; Python/JavaScript syntax and whitespace pass.
+- Resume verification confirms all four deployed files match their source,
+  private sidebar/cache data survives the closed browser, and HQ serves HTTP 200
+  with source counts. Mark the expired session closed and reopen with plain
+  `login` for later live reads; reserve export requests for an explicit full-export
+  request. The current full suite passes 595 tests after concurrent project work.
 
 ## v1.33.4 — 2026-10-04 (patch: verify Langfuse Cloud experiment upload)
 
