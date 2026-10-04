@@ -234,10 +234,18 @@ def accepted_submission_candidates(data: dict) -> list[dict]:
     return candidates
 
 
-def fetch_accepted_solutions(connection: dict, recent_submissions: dict) -> list[dict]:
+def fetch_accepted_solutions(connection: dict, recent_submissions: dict,
+                             existing: list[dict] | None = None) -> list[dict]:
     """Fetch actual source only for latest recent Accepted submissions."""
     solutions: list[dict] = []
+    saved = {row['slug']: row for row in (existing or [])
+             if isinstance(row, dict) and row.get('slug') and row.get('code')}
     for candidate in accepted_submission_candidates(recent_submissions):
+        previous = saved.get(candidate['slug'])
+        if (previous and candidate['accepted_at']
+                and previous.get('accepted_at') == candidate['accepted_at']):
+            solutions.append(previous)
+            continue
         data = graphql(
             SUBMISSION_DETAILS_QUERY,
             {'submissionId': candidate['submission_id']},
@@ -264,7 +272,7 @@ def fetch_accepted_solutions(connection: dict, recent_submissions: dict) -> list
 
 
 def sync(connection_path: Path, snapshot_path: Path, limit: int = MAX_HISTORY,
-         stats_only: bool = False) -> dict:
+         stats_only: bool = False, missing_only: bool = False) -> dict:
     if not 1 <= limit <= MAX_HISTORY:
         raise LeetCodeSyncError(f'History limit must be between 1 and {MAX_HISTORY}.')
     connection = load_connection(connection_path)
@@ -279,16 +287,24 @@ def sync(connection_path: Path, snapshot_path: Path, limit: int = MAX_HISTORY,
     save_private_json(snapshot_path, snapshot)
     if not stats_only:
         try:
+            verify_connection(connection)
             recent_submissions = graphql(
                 RECENT_SUBMISSIONS_QUERY,
                 {'username': connection['username'], 'limit': limit},
                 connection,
             )
-            snapshot['accepted_solutions'] = fetch_accepted_solutions(connection, recent_submissions)
+            fetched = fetch_accepted_solutions(
+                connection, recent_submissions,
+                snapshot.get('accepted_solutions', []) if missing_only else None,
+            )
+            saved = {row['slug']: row for row in snapshot.get('accepted_solutions', [])}
+            saved.update({row['slug']: row for row in fetched})
+            snapshot['accepted_solutions'] = sorted(
+                saved.values(), key=lambda row: str(row.get('accepted_at') or ''), reverse=True)
             snapshot['solutions_synced_at'] = utc_now()
             snapshot.pop('solution_sync_error', None)
-        except LeetCodeSyncError:
-            snapshot['solution_sync_error'] = 'Submitted source refresh failed; account totals were updated.'
+        except LeetCodeSyncError as exc:
+            snapshot['solution_sync_error'] = str(exc)
         save_private_json(snapshot_path, snapshot)
     return snapshot
 
@@ -486,6 +502,8 @@ def parse_args(argv=None) -> argparse.Namespace:
     login.add_argument('--timeout-seconds', type=int, default=300)
     syncing = sub.add_parser('sync', help='refresh the read-only history snapshot')
     syncing.add_argument('--limit', type=int, default=MAX_HISTORY)
+    syncing.add_argument('--missing-only', action='store_true',
+                         help='reuse unchanged accepted code and retain older downloaded problems')
     syncing.add_argument('--stats-only', action='store_true',
                          help='refresh account counts and recent accepts without fetching source')
     sub.add_parser('status', help='show connection and snapshot metadata without secrets')
@@ -533,10 +551,12 @@ def main(argv=None) -> int:
                 output = {'linked': True, 'username': verified_username,
                           'session_file': str(session_path), 'next': 'Run sync to fetch history.'}
             elif args.command == 'sync':
-                snapshot = sync(session_path, snapshot_path, args.limit, stats_only=args.stats_only)
+                snapshot = sync(session_path, snapshot_path, args.limit, stats_only=args.stats_only, missing_only=args.missing_only)
                 output = {'synced': True, 'username': snapshot['username'], 'synced_at': snapshot['synced_at'],
                           'total_solved': snapshot['total_solved'],
-                          'recent_accepted_count': len(snapshot['recent_accepted'])}
+                          'recent_accepted_count': len(snapshot['recent_accepted']),
+                          'downloaded_solution_count': len(snapshot.get('accepted_solutions', [])),
+                          'solution_sync_error': snapshot.get('solution_sync_error')}
             elif args.command == 'status':
                 output = public_status(session_path, snapshot_path)
             else:

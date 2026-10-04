@@ -3,6 +3,22 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.31.2 — 2026-10-03 (patch: incremental actual Accepted source ingestion)
+
+- Download actual Accepted code for recent solves whether or not David reported
+  them to the coach. Reuse unchanged submissions with `sync --missing-only` and
+  retain older downloaded problems outside the latest submission window.
+- Coding room entry starts a background incremental refresh with a five-minute
+  request guard. Display source count, source sync time and private-source errors
+  separately from public account totals. Verify account ownership before source
+  download and expose code-fetch failures in the helper CLI output.
+- Provide matching source evidence to Jun's existing web conversation as well as
+  the Telegram workbench chat. No new room, profile, bot or service is introduced.
+- Validation: `pytest -q` passes 499 tests. Live checks confirm 9 solved problems
+  and 5 retained code samples; the linked session is expired, so the 4 remaining
+  source samples require reauthentication instead of being invented or marked
+  downloaded. Accepted evidence does not invent coach duration or self-ratings.
+
 ## v1.31.1 — 2026-10-03 (patch: account progress and direct character workbenches)
 
 - Refresh linked LeetCode account totals and recent accepts on Coding workbench

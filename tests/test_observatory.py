@@ -1011,3 +1011,39 @@ def test_coding_workbench_reports_stale_snapshot_on_account_failure(store, monke
     assert data['leetcode_history']['total_solved'] == 9
     assert data['leetcode_refresh']['status'] == 'error'
     assert 'private credential' not in json.dumps(data)
+
+
+def test_character_coding_chat_uses_actual_unreported_accepted_source(store, monkeypatch):
+    path = store.home / 'data/interview/leetcode_history.json'
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps({'version': 1, 'accepted_solutions': [{
+        'title': 'Move Zeroes', 'slug': 'move-zeroes', 'language': 'Python3',
+        'accepted_at': '2026-10-03T00:00:00+00:00', 'code': 'def moveZeroes(nums): pass',
+    }]}))
+    calls=[]
+    def agent_api(method, path, payload=None, **kwargs):
+        if method == 'GET':
+            return {'_status': 404}
+        calls.append(payload)
+        return {'message': {'content': '제출한 코드입니다.'}}
+    monkeypatch.setattr(store, 'agent_api', agent_api)
+    monkeypatch.setattr(store, 'telegram_send', lambda *_args: pytest.fail('Web chat sent Telegram'))
+    store.office_chat({'room': 'coding', 'message': 'Move Zeroes 내 코드 설명해 줘'})
+    assert 'def moveZeroes' in calls[-1]['instructions']
+    assert store.coach_state()['coding'] == []
+
+
+def test_background_source_refresh_runs_once_and_releases_lock(store, monkeypatch):
+    root = store.home / 'data/interview'
+    root.mkdir(parents=True)
+    (root / 'leetcode_session.json').write_text(json.dumps({'username': 'david', 'session': 'private'}))
+    calls = []
+    class ImmediateThread:
+        def __init__(self, target, **_kwargs): self.target = target
+        def start(self): self.target()
+    monkeypatch.setattr(observatory_module.threading, 'Thread', ImmediateThread)
+    monkeypatch.setattr(store, 'helper', lambda name, args, **kwargs: calls.append((name, args, kwargs)))
+    store.refresh_leetcode_sources()
+    store.refresh_leetcode_sources()
+    assert calls == [('leetcode_sync.py', ['sync', '--missing-only'], {'timeout': 180})]
+    assert not store.leetcode_source_lock.locked()

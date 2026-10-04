@@ -83,6 +83,8 @@ def test_sync_writes_an_owner_only_snapshot_without_session(tmp_path, monkeypatc
     snapshot_path = tmp_path / 'leetcode_history.json'
     ls.save_private_json(session_path, connection())
     def fake_graphql(query, *_args, **_kwargs):
+        if query == ls.USER_STATUS_QUERY:
+            return {'userStatus': {'username': 'david_choi'}}
         if query == ls.HISTORY_QUERY:
             return history_data()
         if query == ls.RECENT_SUBMISSIONS_QUERY:
@@ -275,3 +277,37 @@ def test_stats_only_never_carries_source_from_another_account(tmp_path, monkeypa
     ls.save_private_json(snapshot, {'username': 'someone_else', 'accepted_solutions': [{'code': 'private'}]})
     monkeypatch.setattr(ls, 'graphql', lambda *_args: history_data())
     assert 'accepted_solutions' not in ls.sync(session, snapshot, stats_only=True)
+
+
+def test_incremental_download_reuses_unchanged_source_but_fetches_new_accept(monkeypatch):
+    saved = [{'slug': 'two-sum', 'accepted_at': '2026-09-14T12:00:00+00:00', 'code': 'original'}]
+    monkeypatch.setattr(ls, 'graphql', lambda *_args: pytest.fail('Unchanged source downloaded again'))
+    assert ls.fetch_accepted_solutions(connection(), recent_submissions_data(), saved) == saved
+    saved[0]['accepted_at'] = '2026-09-13T12:00:00+00:00'
+    monkeypatch.setattr(ls, 'graphql', lambda *_args: submission_details_data())
+    assert ls.fetch_accepted_solutions(connection(), recent_submissions_data(), saved)[0]['code'] != 'original'
+
+
+def test_sync_retains_older_downloads_outside_recent_list(tmp_path, monkeypatch):
+    session, snapshot = tmp_path / 'session.json', tmp_path / 'history.json'
+    ls.save_private_json(session, connection())
+    older = {'slug': 'old-problem', 'accepted_at': '2026-09-01T00:00:00+00:00', 'code': 'older source'}
+    ls.save_private_json(snapshot, {'username': 'david_choi', 'accepted_solutions': [older]})
+    def request(query, *_args):
+        return {ls.USER_STATUS_QUERY: {'userStatus': {'username': 'david_choi'}},
+                ls.HISTORY_QUERY: history_data(), ls.RECENT_SUBMISSIONS_QUERY: recent_submissions_data(),
+                ls.SUBMISSION_DETAILS_QUERY: submission_details_data()}[query]
+    monkeypatch.setattr(ls, 'graphql', request)
+    result = ls.sync(session, snapshot, missing_only=True)
+    assert {row['slug'] for row in result['accepted_solutions']} == {'old-problem', 'two-sum'}
+    assert result['solutions_synced_at']
+
+
+def test_expired_session_reports_source_failure_while_retaining_counts(tmp_path, monkeypatch):
+    session, snapshot = tmp_path / 'session.json', tmp_path / 'history.json'
+    ls.save_private_json(session, connection())
+    monkeypatch.setattr(ls, 'graphql', lambda query, *_args:
+                        history_data() if query == ls.HISTORY_QUERY else {'userStatus': None})
+    result = ls.sync(session, snapshot)
+    assert result['total_solved'] == 12
+    assert 'Log in again' in result['solution_sync_error']

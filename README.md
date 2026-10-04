@@ -839,6 +839,15 @@ separate. Submitted-source failures cannot prevent counts from updating. If the
 account request fails, the room labels the saved snapshot as stale and keeps its
 last sync time. Run `python3 ~/.hermes/scripts/leetcode_sync.py sync --stats-only`
 for an immediate counts-only refresh.
+The room also starts a background `sync --missing-only` source refresh (at most
+once every five minutes). It downloads actual Accepted code for recent problems,
+including solves never reported to the coach, reuses unchanged submissions, and
+retains older downloaded problems. Both the web character chat and Telegram
+workbench chat can explain matching downloaded code. The room shows the number
+of saved solutions, source sync time and any source-access failure separately
+from the account total. An expired session can still expose public counts while
+blocking private code; reconnect using `login --headed` or `connect` above.
+Manual incremental refresh: `python3 ~/.hermes/scripts/leetcode_sync.py sync --missing-only`.
 The LeetCode Gym Observatory room shows only the safe snapshot; it never returns
 the session cookie. To stop future account access while retaining the already
 saved progress snapshot, run:

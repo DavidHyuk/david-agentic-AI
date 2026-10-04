@@ -210,6 +210,8 @@ class Observatory:
         self.agent_api_url = agent_api_url.rstrip('/')
         self.agent_api_key = (agent_api_key if agent_api_key is not None
                               else os.environ.get('API_SERVER_KEY', '')).strip()
+        self.leetcode_source_lock = threading.Lock()
+        self.leetcode_source_refresh_at = None
         self.leetcode_lock = threading.Lock()
         self.leetcode_refresh_at = None
         self.leetcode_refresh_status = None
@@ -255,6 +257,27 @@ class Observatory:
             if not assignment.get('completed') and not assignment.get('superseded'):
                 latest[(assignment['track'], assignment['item_id'])] = assignment
         return list(latest.values())
+
+    def refresh_leetcode_sources(self):
+        """Run incremental source download in the background without delaying the room."""
+        connection = read_json(self.home / 'data/interview/leetcode_session.json', {}) or {}
+        if not connection.get('username') or not connection.get('session'):
+            return
+        if not self.leetcode_source_lock.acquire(blocking=False):
+            return
+        now = time.monotonic()
+        if self.leetcode_source_refresh_at is not None and now - self.leetcode_source_refresh_at < 300:
+            self.leetcode_source_lock.release()
+            return
+        self.leetcode_source_refresh_at = now
+        def download():
+            try:
+                self.helper('leetcode_sync.py', ['sync', '--missing-only'], timeout=180)
+            except (OSError, ValueError, subprocess.SubprocessError):
+                pass  # The helper persists successful counts and source errors privately.
+            finally:
+                self.leetcode_source_lock.release()
+        threading.Thread(target=download, daemon=True).start()
 
     def refresh_leetcode_progress(self):
         """Refresh linked account totals at most once a minute, retaining old data on failure."""
@@ -315,11 +338,15 @@ class Observatory:
                         catalog_available=bool(items))
             if room == 'coding':
                 data['leetcode_refresh'] = self.refresh_leetcode_progress()
+                self.refresh_leetcode_sources()
                 snapshot = read_json(self.home / 'data/interview/leetcode_history.json', {}) or {}
                 data['leetcode_history'] = {
                     key: snapshot.get(key) for key in (
-                        'username', 'synced_at', 'total_solved', 'solved_by_difficulty', 'recent_accepted')
+                        'username', 'synced_at', 'total_solved', 'solved_by_difficulty', 'recent_accepted',
+                        'solutions_synced_at', 'solution_sync_error')
                 } if isinstance(snapshot, dict) and snapshot.get('version') == 1 else None
+                if data['leetcode_history']:
+                    data['leetcode_history']['downloaded_solution_count'] = len(snapshot.get('accepted_solutions', []))
         elif room == 'english':
             cards = list(read_json(self.home / 'data/english/srs_deck.json', {'cards': {}})['cards'].values())
             due = sorted([c for c in cards if c['due'] <= today], key=lambda c: (c['box'], c['due']))
@@ -500,6 +527,10 @@ class Observatory:
                 'when necessary. For execution or saved study actions, direct the user to '
                 'the existing workbench. Give coding hints before revealing solutions.'
             )
+            if room == 'coding':
+                recent = self.office_conversation(room)['history'][-6:]
+                request_context = '\n'.join(str(row.get('content') or '') for row in recent) + '\n' + message
+                instructions += self.coding_source_context(request_context)
             result = self.agent_api('POST', f'/api/sessions/{session}/chat', {
                 'message': message, 'instructions': instructions,
             }, timeout=600)
@@ -677,9 +708,9 @@ class Observatory:
         detail['task']['room'] = SPECIALIST_ROOMS.get(detail['task'].get('assignee'), 'hq')
         return detail
 
-    def helper(self, name, arguments):
+    def helper(self, name, arguments, *, timeout=20):
         result = subprocess.run([sys.executable, str(Path(__file__).with_name(name)), *arguments],
-                                capture_output=True, text=True, timeout=20,
+                                capture_output=True, text=True, timeout=timeout,
                                 env={**os.environ, 'TZ': str(TZ), 'HERMES_HOME': str(self.home)})
         if result.returncode:
             raise ValueError(result.stderr.strip().splitlines()[-1] if result.stderr else '저장하지 못했습니다.')
