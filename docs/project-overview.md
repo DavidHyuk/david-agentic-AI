@@ -17,6 +17,9 @@ Hermes profile 설정의 context length는 별도로 64K이므로 아래 구성�
 기존 MTP 결과를 통합한 로컬 HTML 및 선택적 Langfuse/LangSmith export를 만듭니다.
 실제 도구 실행·메시지 전달까지 포함하는 측정은 아닙니다.
 실험 도구이므로 새 Observatory room이나 cron을 추가하지 않습니다.
+웹 캐릭터 대화는 동일한 Hermes session의 `/chat/stream`을 통해 부분 답변부터
+보여 주며, 실패 시 자동 재실행 없이 기록을 확인하도록 안내합니다.
+Langfuse Cloud 초기 설정과 실험 비교 방법은 `docs/langfuse-quickstart.md`에 있습니다.
 
 ```
 DGX Spark (128GB 통합 메모리)

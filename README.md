@@ -226,6 +226,11 @@ and two overlapping requests on the existing two-slot 128K provider. It imports
 the earlier matched MTP results, builds an offline comparison dashboard, and
 prepares metrics-only Langfuse exports (or optional LangSmith traces). It is an
 internal evaluation helper with no new room, schedule, gateway or messaging.
+Use `--input-tokens 2048` to compare a smaller synthetic payload while preserving
+the two 128K slots. Web character conversations now display streamed assistant
+text through the existing authenticated Hermes session API; complete history
+remains owned by Hermes. See the [Langfuse first-use guide](docs/langfuse-quickstart.md)
+for Cloud signup, private credentials, experiment comparisons and exports.
 
 The version-controlled [120-case synthetic benchmark](local-model/eval/README.md)
 uses four balanced buckets: short tasks, scripted multi-tool calls, multi-turn

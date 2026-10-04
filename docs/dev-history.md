@@ -3,6 +3,21 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.32.1 — 2026-10-04 (patch: progressive web replies and compact-input experiment)
+
+- Forward assistant text from the existing authenticated Hermes session stream
+  to office conversations. Render partial text before the final response, retain
+  session ownership, and avoid replaying an incomplete turn or exposing tool arguments.
+- Compare the same short-coaching questions, seeds and output caps using a 2K
+  synthetic payload while preserving two 128K slots. Keep the reduced payload
+  experiment distinct from a production tool/history policy change.
+- Prepare Langfuse Cloud onboarding, private credential-file loading and numeric
+  performance scores linked to experiment-item roots. Keep historical import
+  timestamps tied to artifact recording rather than inventing request starts.
+- Existing rooms and profiles retain their identity and purpose; no new room,
+  agent, bot, cron or model service is introduced. Only the Observatory web
+  helper and client need deployment; the model and gateway are unchanged.
+
 ## v1.33.0 — 2026-10-03 (minor: private ChatGPT account connection and archive)
 
 - Reuse the existing temporary Chromium/noVNC runtime for direct ChatGPT login

@@ -1388,6 +1388,8 @@ def make_handler(store, assets: Path, hosts):
                 if not 0 < length <= 65536 or self.headers.get('Content-Type') != 'application/json':
                     raise ValueError('64KB 이하의 JSON 요청이 필요합니다.')
                 body = json.loads(self.rfile.read(length))
+                if not isinstance(body, dict):
+                    raise ValueError('JSON object 요청이 필요합니다.')
                 if self.path == '/api/office-chat/stream':
                     self.stream_office_chat(body)
                 else:
