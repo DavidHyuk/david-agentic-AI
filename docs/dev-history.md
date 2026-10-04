@@ -24,6 +24,10 @@ semantic versioning (major.minor.patch).
 - Feed referenced imported learning into existing coding chat context even when
   submitted source code is unavailable, distinguishing questions from advice.
   Validation: `pytest -q` passes 659 tests; JavaScript syntax checks pass.
+  Deploy only the changed helper, skill and Observatory assets with private
+  backups; restart the existing Observatory service. Live API and headless
+  browser verify Two Sum II first, both imported records, the four-day practice
+  gap, expanded original-source links, no companion chat button and no page errors.
 
 ## v1.37.1 — 2026-10-04 (patch: retry Codex at its actual quota reset)
 
