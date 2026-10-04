@@ -73,9 +73,44 @@ def test_wrapper_scope_idempotence_and_original_exception(policy):
     messages = [{"role": "user", "content": "hint"}]
     result = a._build_api_kwargs(messages)
     assert result["messages"] is messages and result["temperature"] == 0.3
+    assert result["extra_body"]["chat_template_kwargs"]["enable_thinking"] is False
     assert "cronjob" not in a.valid_tool_names and "session_search" in a.valid_tool_names
     b = Agent();b.__dict__.update(vars(agent()));b.fail = True
     old = b.tools
     with pytest.raises(RuntimeError, match="original failure"):
         b._build_api_kwargs(messages)
     assert b.tools is old and "cronjob" in b.valid_tool_names
+
+
+def test_deep_mode_preserves_full_catalog_and_provider_overrides(policy):
+    a = agent(ephemeral_system_prompt="[jun-dialogue-mode:deep]\nJun persona")
+    assert not policy.selected(a, policy._CONFIG)
+    class Agent:
+        def _build_api_kwargs(self, messages):
+            return {"tools": self.tools, "extra_body": self.provider_extra}
+    policy.install(Agent)
+    a = Agent();a.__dict__.update(vars(agent()))
+    a.provider_extra = {"presence_penalty": 1.5, "chat_template_kwargs": {"other": True}}
+    result = a._build_api_kwargs([])
+    assert result["extra_body"]["presence_penalty"] == 1.5
+    assert result["extra_body"]["chat_template_kwargs"] == {"other": True, "enable_thinking": False}
+    assert "enable_thinking" not in a.provider_extra["chat_template_kwargs"]
+
+
+def test_staging_preserves_tracing_and_other_configuration(tmp_path):
+    import yaml
+    path = Path(__file__).resolve().parents[1] / "bootstrap/stage_leetcode_latency.py"
+    spec = importlib.util.spec_from_file_location("latency_stage", path)
+    module = importlib.util.module_from_spec(spec);spec.loader.exec_module(module)
+    home = tmp_path / ".hermes";home.mkdir()
+    (home / "config.yaml").write_text(yaml.safe_dump({"plugins": {"enabled": ["david-langfuse"],
+        "disabled": ["leetcode-latency", "other"]}, "model": {"context_length": 65536}}))
+    result = module.stage(path.parents[1], home)
+    config = yaml.safe_load((home / "config.yaml").read_text())
+    assert config["plugins"]["enabled"] == ["david-langfuse", "leetcode-latency"]
+    assert config["plugins"]["disabled"] == ["other"]
+    assert config["model"]["context_length"] == 65536
+    assert config["leetcode_latency"]["sessions"] == ["office_coding"]
+    assert Path(result["backup"], "config.yaml").stat().st_mode & 0o077 == 0
+    with pytest.raises(ValueError, match="default Hermes"):
+        module.stage(path.parents[1], tmp_path / "clawgram")

@@ -1,8 +1,9 @@
 # __author__ = 'David Choi (bestshoot21@gmail.com)'
 """Send a focused tool catalog for explicitly selected local coding conversations.
 
-Keep Hermes history, system prompt, reasoning, tool implementations and model
-unchanged. Installation is deferred through Hermes's pre_llm_call hook because
+Keep Hermes history, system prompt, tool implementations and model unchanged.
+Fast Jun dialogues disable optional hidden thinking; deep mode keeps the
+original catalog and reasoning. Installation uses Hermes's pre_llm_call because
 plugin discovery can happen during run_agent's import.
 """
 from __future__ import annotations
@@ -37,6 +38,8 @@ def settings():
 
 def selected(agent, config):
     if config.get("enabled") is not True:
+        return False
+    if str(getattr(agent, "ephemeral_system_prompt", "") or "").startswith("[jun-dialogue-mode:deep]\n"):
         return False
     home = Path(os.environ.get("HERMES_HOME", str(Path.home() / ".hermes")))
     if home.name not in {".hermes", "coding"}:
@@ -93,7 +96,16 @@ def install(agent_class):
             if previous:
                 agent.tools, agent.valid_tool_names = previous
         try:
-            return original(agent, messages)
+            result = original(agent, messages)
+            if previous:
+                # Copy nested overrides: never mutate provider-wide settings.
+                result = dict(result)
+                extra = dict(result.get("extra_body") or {})
+                template = dict(extra.get("chat_template_kwargs") or {})
+                template["enable_thinking"] = False
+                extra.update(chat_template_kwargs=template, cache_prompt=True)
+                result["extra_body"] = extra
+            return result
         except BaseException:
             if previous:
                 agent.tools, agent.valid_tool_names = previous

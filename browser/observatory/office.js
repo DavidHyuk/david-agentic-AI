@@ -199,7 +199,7 @@ window.sharedOffice = (() => {
           <div class="conversation-history" id="conversation-history" role="log" aria-label="대화 기록"></div>
           <div id="conversation-suggestions"></div>
           <form id="office-chat-form"><label class="sr-only" for="office-message">캐릭터에게 할 말</label><textarea id="office-message" maxlength="4000" rows="2" required placeholder="편하게 이야기해 보세요…"></textarea><button class="primary" id="office-send">보내기</button></form>
-          <div class="conversation-footer"><span id="office-chat-status" role="status"></span><button class="text-button" id="conversation-reload">기록 새로고침</button><button class="text-button" id="conversation-workbench">작업실 열기 ↗</button></div>
+          <div class="conversation-footer"><label id="jun-response-mode-label" hidden>답변 방식 <select id="jun-response-mode"><option value="fast">빠른 답변</option><option value="deep">깊이 생각</option></select></label><span id="office-chat-status" role="status"></span><button class="text-button" id="conversation-reload">기록 새로고침</button><button class="text-button" id="conversation-workbench">작업실 열기 ↗</button></div>
           <small class="conversation-note">사무실 대화는 웹에 저장됩니다 · Telegram 전송 없음</small>
         </div>
       </section>
@@ -650,6 +650,9 @@ window.sharedOffice = (() => {
     $("office-conversation").hidden = false;
     $("office-message").value = localRead("office-draft:" + room, "");
     $("office-message").placeholder = cast.name + "에게 이야기해 보세요…";
+    $("jun-response-mode-label").hidden = room !== "coding";
+    $("jun-response-mode").value = localRead("jun-response-mode", "fast") === "deep" ? "deep" : "fast";
+    $("jun-response-mode").onchange = () => localWrite("jun-response-mode", $("jun-response-mode").value);
     $("conversation-suggestions").innerHTML = ["어떤 일을 도와줄 수 있어?", "오늘 같이 뭘 해볼까?"].map(text =>
       `<button class="outline">${text}</button>`).join("");
     $("conversation-suggestions").querySelectorAll("button").forEach(button => {
@@ -699,7 +702,7 @@ window.sharedOffice = (() => {
     try {
       const response = await fetch("api/office-chat/stream", {
         method: "POST", headers: {"Content-Type": "application/json", "X-Hermes-Action": "1"},
-        body: JSON.stringify({action: "office_chat", room, message}),
+        body: JSON.stringify({action: "office_chat", room, message, response_mode: room === "coding" ? $("jun-response-mode").value : undefined}),
       });
       if (!response.ok) {
         const result = await response.json();
@@ -749,7 +752,7 @@ window.sharedOffice = (() => {
     }
     if (!officeCast[room]) { target.replaceChildren(); return; }
     const cast = officeCast[room];
-    target.innerHTML = `<div class="bench-companion">${sprite(room)}<div><small>${esc(cast.role)}</small><h2>${esc(cast.name)}와 함께하는 작업실</h2><p>자료를 함께 살펴보고, 이곳에서 이야기를 이어가세요.</p>${room === "coding" ? '<p class="bench-pace" id="bench-pace" aria-live="polite">다음 한 걸음을 준비하고 있어요.</p>' : ""}</div></div>`;
+    target.innerHTML = `<div class="bench-companion">${sprite(room)}<div><small>${esc(cast.role)}</small><h2>${esc(cast.name)}와 함께하는 작업실</h2><p>자료를 함께 살펴보고, 이곳에서 이야기를 이어가세요.</p>${room === "coding" ? '<p class="bench-pace" id="bench-pace" aria-live="polite">다음 한 걸음을 준비하고 있어요.</p><div class="bench-progress" id="bench-progress" aria-label="LeetCode 풀이 기록" aria-live="polite" hidden></div>' : ""}</div></div>`;
     select(room, true);
     $("conversation-workbench").hidden = true;
   }
@@ -764,7 +767,15 @@ window.sharedOffice = (() => {
         : `마지막 풀이 이후 ${days}일. 다음 한 걸음은 오늘부터.`;
     target.title = pace?.last_completed_date ? `마지막 확인된 완료: ${pace.last_completed_date}` : "";
   }
+  function leetcodeStats(history) {
+    const target = $("bench-progress");
+    if (!target) return;
+    target.hidden = !history;
+    if (!history) { target.replaceChildren(); return; }
+    target.innerHTML = `<div><b>${Number(history.total_solved || 0)}</b><span>LeetCode 전체 해결 문제</span></div><div><b>${Number(history.solved_by_difficulty?.easy || 0)} <i>/</i> ${Number(history.solved_by_difficulty?.medium || 0)} <i>/</i> ${Number(history.solved_by_difficulty?.hard || 0)}</b><span>Easy / Medium / Hard</span></div>`;
+    target.title = history.synced_at ? `마지막 갱신: ${history.synced_at}` : "갱신 시각 미확인";
+  }
   document.addEventListener("visibilitychange", visibility);
   reduced.addEventListener("change", visibility);
-  return {render, visibility, select, workbench, learningPace, setZoom: setOfficeZoom};
+  return {render, visibility, select, workbench, learningPace, leetcodeStats, setZoom: setOfficeZoom};
 })();

@@ -800,6 +800,9 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   만들지 않고 기존 coding 작업실과 소유 profile을 재사용합니다.
   문제를 언급한 작업실 채팅에도 해당 배움을 전달하므로 제출 코드가 없어도
   실제 질문·힌트 기준으로 설명할 수 있습니다.
+  Jun 인사 영역에 LeetCode 전체 해결 수와 Easy / Medium / Hard 집계도 함께
+  표시하고 작업실 갱신 시 최신 snapshot으로 업데이트합니다. 아래 계정 카드에서는
+  중복 집계를 없애고 갱신 상태·최근 정답·제출 코드 보관 정보를 표시합니다.
 - 기존 `interview-prep` 스킬 안에서 동작하며, `stage.py`가 standalone helper와
   `references/coach_catalog.json`을 그대로 배포합니다. 모델/엔진 구성은 현재
   Qwen3.8 Flash-Next 4비트 llama.cpp 64K 설정을 공유합니다.
@@ -920,7 +923,8 @@ Flash에는 CPU에서 해시를 계산하는 모델 내부 PLE n-gram이 실제�
 ZIP 경로 격리·credential 오류 출력 방지 및 HQ source 상태 검증도 포함됩니다.
 2026-10-04 Codex quota 복구·writer 충돌·최종 상태 재확인 검증 후 전체
 638개 테스트가 통과했습니다. 이후 코딩 대화 학습 import·원자적 거부·중복 방지·
-커리큘럼 진행·작업실 경과일·학습 근거 전달 검증까지 전체 659개가 통과했습니다.
+커리큘럼 진행·작업실 경과일·학습 근거 전달 검증 이후 Jun 풀이 집계를 상단으로
+옮긴 변경까지 전체 663개가 통과했습니다.
 서버 해제 시각·자정 넘김·기존 예약 migration과
 David·English 자동 tracing의 도구 인자 제외,
 session 묶음과 visible TTFT 처리 검증을 포함합니다.

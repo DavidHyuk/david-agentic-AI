@@ -902,6 +902,10 @@ the next assignment first, imported hints/lessons with source messages and links
 and days since the last verified completion below Jun's greeting. This practice
 gap uses Los Angeles dates and is not a scheduled deadline. The redundant
 “대화 이어가기” companion button is removed; the existing conversation remains.
+Jun's greeting also shows total LeetCode solves and the Easy / Medium / Hard
+breakdown from the linked account snapshot, alongside the practice gap. These
+counts move out of the lower account card and update whenever the workbench
+refreshes; source-sync status and recent accepted problems remain below.
 
 ### LeetCode account history (optional, read-only)
 

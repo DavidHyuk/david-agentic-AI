@@ -3,6 +3,18 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.38.1 — 2026-10-04 (patch: show LeetCode totals beside Jun's greeting)
+
+- Move total solved and Easy / Medium / Hard counts into the existing Jun
+  workbench companion, next to the practice gap. Refresh from the account
+  snapshot and hide the counts when no account history is available.
+- Remove duplicate counts from the lower account card while retaining its
+  source-sync status and recent Accepted history. Reuse the existing coding
+  room and read-only data; no new workflow or delivery is introduced.
+- Validation: `pytest -q` passes 663 tests and JavaScript syntax checks pass.
+  Deploy three UI assets without restarting services; live desktop/mobile views
+  show 9 solves and 6 / 3 / 0 beside Jun, with no duplicate totals or page errors.
+
 ## v1.38.0 — 2026-10-04 (minor: import verified coding learning into the workbench)
 
 - Import owner-selected ChatGPT questions, hints and lessons with original

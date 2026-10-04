@@ -144,7 +144,7 @@ function coachDesk(d) {
     ? `<article class="desk-card"><span class="tag">내 대화에서 가져온 배움</span><h2>완료한 문제 · 힌트와 배운 점</h2>${d.external_learning.map((r) => `<details class="desk-help"><summary>${esc(r.problem)} · ${esc(r.date)} Accepted</summary><h3>배운 점</h3><p class="completion-lesson">${esc(r.lesson)}</p><h3>대화에서 받은 힌트</h3><p class="completion-lesson">${esc(r.hint_notes)}</p><p class="muted">완료는 LeetCode Accepted로 확인했습니다. 가져온 대화에 없는 시간·자신감·독립 풀이 여부는 임의로 채우지 않았습니다.</p>${safeLink(r.source?.url, r.source?.title || "ChatGPT 원문")}<details><summary>근거 대화 보기</summary>${(r.source?.messages || []).map((m) => `<p class="completion-lesson"><b>${m.role === "user" ? "내 질문" : "받은 힌트"}</b><br>${esc(m.text)}</p>`).join("")}</details></details>`).join("")}</article>`
     : "";
   const lcSummary = d.room !== "coding" ? "" : lc
-    ? `<article class="desk-card"><span class="tag">LEETCODE · READ ONLY</span><h2>${esc(lc.username)} 풀이 기록</h2><p class="muted">${esc(lc.synced_at || "동기화 시각 미확인")} · ${esc(d.leetcode_refresh?.message || "LeetCode 계정 기준 · 에이전트에 보고하지 않은 풀이도 포함")}</p><div class="desk-metrics"><div><b>${Number(lc.total_solved || 0)}</b><span>LeetCode 전체 해결 문제</span></div><div><b>${Number(lc.solved_by_difficulty?.easy || 0)} / ${Number(lc.solved_by_difficulty?.medium || 0)} / ${Number(lc.solved_by_difficulty?.hard || 0)}</b><span>Easy / Medium / Hard</span></div></div>${`<p class="muted">실제 Accepted 코드 ${Number(lc.downloaded_solution_count || 0)}문제 보관 · ${lc.solutions_synced_at ? esc(lc.solutions_synced_at) : "코드 갱신 시각 미확인"}</p>${lc.solution_sync_error ? '<p class="muted">제출 코드 갱신 실패 · LeetCode 세션을 다시 연결해 주세요. 기존 코드는 보관됩니다.</p>' : '<p class="muted">새 풀이 코드는 백그라운드에서 가져옵니다. 잠시 후 다시 불러오면 확인할 수 있습니다.</p>'}`}${lc.recent_accepted?.length ? `<p class="muted">최근 정답: ${esc(lc.recent_accepted.slice(0, 3).map((item) => item.title).join(", "))}</p>` : ""}</article>`
+    ? `<article class="desk-card"><span class="tag">LEETCODE · READ ONLY</span><h2>${esc(lc.username)} 풀이 기록</h2><p class="muted">${esc(lc.synced_at || "동기화 시각 미확인")} · ${esc(d.leetcode_refresh?.message || "LeetCode 계정 기준 · 에이전트에 보고하지 않은 풀이도 포함")}</p>${`<p class="muted">실제 Accepted 코드 ${Number(lc.downloaded_solution_count || 0)}문제 보관 · ${lc.solutions_synced_at ? esc(lc.solutions_synced_at) : "코드 갱신 시각 미확인"}</p>${lc.solution_sync_error ? '<p class="muted">제출 코드 갱신 실패 · LeetCode 세션을 다시 연결해 주세요. 기존 코드는 보관됩니다.</p>' : '<p class="muted">새 풀이 코드는 백그라운드에서 가져옵니다. 잠시 후 다시 불러오면 확인할 수 있습니다.</p>'}`}${lc.recent_accepted?.length ? `<p class="muted">최근 정답: ${esc(lc.recent_accepted.slice(0, 3).map((item) => item.title).join(", "))}</p>` : ""}</article>`
     : `<article class="desk-card"><span class="tag">LEETCODE · OPTIONAL</span><h2>LeetCode 기록 미연동</h2><p class="muted">터미널에서 세션을 연결하면 이곳에 읽기 전용 풀이 기록이 나타납니다.</p></article>`;
   if (!a) {
     const design = d.track === "system_design";
@@ -249,6 +249,7 @@ function hqDesk(d) {
 }
 function renderWorkbench(d) {
   window.sharedOffice?.learningPace(d.learning_pace);
+  window.sharedOffice?.leetcodeStats(d.leetcode_history);
   let body;
   if (["coding", "design"].includes(d.room)) body = coachDesk(d);
   else if (d.room === "english") body = englishDesk(d);

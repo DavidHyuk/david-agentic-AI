@@ -572,6 +572,9 @@ class Observatory:
         if not isinstance(room, str) or room not in OFFICE_CHARACTERS:
             raise ValueError('알 수 없는 캐릭터입니다.')
         message = self.text_field(body, 'message', maximum=4000)
+        response_mode = body.get('response_mode', 'fast')
+        if room == 'coding' and response_mode not in ('fast', 'deep'):
+            raise ValueError('알 수 없는 답변 방식입니다.')
         if not self.office_locks[room].acquire(blocking=False):
             raise ValueError('이 캐릭터가 답변 중입니다. 잠시 후 대화 기록을 확인하세요.')
         try:
@@ -596,6 +599,7 @@ class Observatory:
                 'the existing workbench. Give coding hints before revealing solutions.'
             )
             if room == 'coding':
+                instructions = f'[jun-dialogue-mode:{response_mode}]\n' + instructions
                 recent = self.office_conversation(room)['history'][-6:]
                 request_context = '\n'.join(str(row.get('content') or '') for row in recent) + '\n' + message
                 instructions += self.coding_source_context(request_context)

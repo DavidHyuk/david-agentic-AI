@@ -89,7 +89,7 @@ def request(prompt, case, repeat, phase, slot, concurrency=1):
         "finish_limit": final.get("stopped_limit"), "tool_call_present": "<tool_call>" in text}
 
 
-def fixture():
+def fixture(thinking):
     from dotenv import load_dotenv
     load_dotenv(str(Path.home() / ".hermes/.env"), override=False)
     os.environ["HERMES_HOME"] = str(Path.home() / ".hermes")
@@ -115,7 +115,8 @@ def fixture():
             messages = [{"role": "system", "content": prompt + "\nYou are Jun, David's coding coach. Give concise Korean hints before solutions. These are synthetic practice questions; do not use tools or claim access to real records."},
                 {"role": "user", "content": case["question"]}]
             rendered = base.api("http://127.0.0.1:8003", "/apply-template", {
-                "messages": messages, "tools": catalog, "add_generation_prompt": True})["prompt"]
+                "messages": messages, "tools": catalog, "add_generation_prompt": True,
+                "chat_template_kwargs": {"enable_thinking": thinking}})["prompt"]
             prompts[variant][case["id"]] = rendered
     return prompts, {k: len(v) for k, v in tools.items()}, agent.model
 
@@ -124,19 +125,19 @@ def run(args):
     endpoint = "http://127.0.0.1:8003"
     props = base.api(endpoint, "/props")
     assert props["total_slots"] == 2 and props["default_generation_settings"]["n_ctx"] == 131072
-    prompts, counts, model = fixture()
+    prompts, counts, model = fixture(args.thinking)
     out = args.output.expanduser().resolve();out.mkdir(parents=True, exist_ok=True)
     reports, outputs = {}, {}
     for variant in prompts:
         reports[variant] = {"schema_version": 1, "run_id": str(uuid4()),
-            "label": f"Jun coding · {variant} tools · reasoning unchanged", "source": "hermes_tool_catalog_replay",
+            "label": f"Jun coding · {variant} tools · thinking {'on' if args.thinking else 'off'}", "source": "hermes_tool_catalog_replay",
             "started_at": base.utcnow(), "model": model, "context_per_request": 131072, "slots": 2,
             "mtp": "off", "batch": 4096, "ubatch": 1024,
             "dataset_digest": base.digest(QUESTIONS), "sampling": {"temperature": 0.3, "seed_base": 1234,
                 "top_k": 20, "top_p": 0.95, "min_p": 0.0, "presence_penalty": 1.5},
             "scope": f"Frozen Hermes request replay, {counts[variant]} original tool schemas; visible TTFT excludes hidden reasoning",
             "cold_definition": "cache_prompt=false; cold prompt, resident/warm engine",
-            "limitations": ["No full agent/tool loop or browser delivery measurement", "Warm replay repeats the same request, not a conversation follow-up", "No p95 or filled 128K×2 endurance measurement", "Native decode TPS includes generated hidden reasoning", "Only the tool catalog differs; no model/build or reasoning setting change"],
+            "limitations": ["No full agent/tool loop or browser delivery measurement", "Warm replay repeats the same request, not a conversation follow-up", "No p95 or filled 128K×2 endurance measurement", "Native decode TPS includes any generated hidden reasoning", "Only the tool catalog differs between arms; both share the chosen thinking mode"],
             "records": []}
         outputs[variant] = []
     jobs = [(case, rep, 1) for case in QUESTIONS for rep in range(args.repetitions if case['id']=='binary_hint' else 1)]
@@ -173,6 +174,7 @@ def main():
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--repetitions', type=int, choices=range(1,4), default=3)
     parser.add_argument('--concurrent', action='store_true')
+    parser.add_argument('--thinking', action='store_true', help='keep optional hidden reasoning; default tests fast mode')
     run(parser.parse_args())
 
 
