@@ -26,10 +26,16 @@ Hermes staging과 별도로 설치하는 host 내부 수명주기 도구입니�
 worker를 종료하지 않고, 수동 새 turn은 대기 예약을 취소합니다. 새 quota 실패는
 다시 예약하고 다른 실패는 자동 반복하지 않습니다. 시작·완료 event와 exit code로
 실행을 검증하며 불명확한 crash는 `needs_review`로 남겨 중복 요청을 막습니다.
+실행 직전에 원래 usage-limit 종료가 여전히 최신 상태인지 확인하며, 정상 완료·
+수동 중단·이미 재개한 session은 자동 실행 및 수동 시간 예약 모두 거부합니다.
+열린 TUI가 idle session의 writer를 소유하면 같은 local daemon에 `turn/start`를
+전달하고 기존 rollout으로 완료를 확인합니다. active turn은 건드리지 않습니다.
 이는 기존 Codex task 유지 도구이므로 Hermes profile/gateway/bot/cron 및
 Observatory room을 추가하지 않습니다. 별도 user-facing Hermes workflow가 없으며,
 운영 기록은 `codex-auto-resume status`와 systemd journal에서 확인합니다.
-핵심 기술은 Python 표준 라이브러리, SQLite WAL, JSONL, systemd user service입니다.
+핵심 기술은 Python 표준 라이브러리, SQLite WAL, JSONL, systemd user service와
+Unix WebSocket JSON-RPC입니다. 격리된 synthetic quota 종료와 2초 대기로 실제
+Codex 도구의 파일 생성을 검증했고, writer 충돌 경로에서도 session 수는 1개였습니다.
 
 ## 전체 아키텍처
 
@@ -855,7 +861,8 @@ Flash에는 CPU에서 해시를 계산하는 모델 내부 PLE n-gram이 실제�
 
 현재 전체 `pytest -q` 검증에는 ChatGPT 선택 branch·Unicode 검색·원자적 교체·
 ZIP 경로 격리·credential 오류 출력 방지 및 HQ source 상태 검증도 포함됩니다.
-2026-10-04 중단 후 재검증에서 전체 595개 테스트가 통과했습니다.
+2026-10-04 Codex quota 복구·writer 충돌·최종 상태 재확인 검증 후 전체
+609개 테스트가 통과했습니다.
 
 2026-10-04 대화 streaming·Langfuse private 설정·numeric score 검증 후 전체
 `pytest -q`는 549 passed입니다. 웹 helper와 office client의 배포 및 health를

@@ -45,9 +45,15 @@ reset timestamp when supplied. Existing unresolved failures from the last 24
 hours are recovered on installation. Later failures also survive watcher downtime.
 A new manually submitted turn supersedes its pending retry. Context-window,
 network and ordinary tool errors do not trigger quota recovery.
+Every submission rechecks that the original quota failure is still current;
+completed, manually stopped and already resumed sessions are skipped. Manual
+time reservations also require a currently unresolved usage-limit stop.
 
 Retries use `codex exec resume --json`, preserving the original session ID,
 working directory, model, reasoning effort and last actual turn's sandbox access.
+When an open TUI owns the idle session's writer, the helper submits `turn/start`
+through that same local Codex daemon and observes its durable outcome. An active
+turn is skipped. It does not fork another session or merely queue a message.
 Approval requests are disabled for unattended execution. Up to three independent
 systemd workers run concurrently; SSH/tmux disconnects and watcher restarts do
 not stop them. Persistent private state and JSONL worker output live in
@@ -72,6 +78,9 @@ worker unit and private output path. Reconnect to the resumed work with
 new request. The host's enabled user linger keeps the service running after logout
 and at boot. Tests use isolated `--codex-home` / `--state-dir` directories and
 shortened watcher delays; production uses the five-hour default.
+Live validation used a synthetic quota failure in an isolated rollout, a two-second
+delay and real authenticated Codex turns that wrote verified files. Both normal
+execution and the shared-daemon writer-conflict path kept one original session.
 
 This is an internal Codex lifecycle helper for existing tasks, not a new Hermes
 agent, scheduled content workflow, profile, Telegram bot or Observatory room.

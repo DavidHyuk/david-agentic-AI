@@ -20,10 +20,16 @@ semantic versioning (major.minor.patch).
 - Routing decision: this maintains existing Codex tasks internally. It adds no
   Hermes agent-like content workflow, profile, bot, gateway, cron or Observatory
   room; private scheduler state and systemd journal provide lifecycle inspection.
-- Validation details are recorded after the unit suite and isolated live recovery
-  test. The live test injects a structured quota failure into an isolated test
-  rollout and shortens the delay, then uses real authenticated Codex inference
-  and a file-writing tool; it does not deliberately exhaust the account quota.
+- Handle an idle session held by an open TUI through the same shared daemon's
+  `turn/start` RPC, verifying its original ID and observing durable completion.
+  Recheck the original quota failure before worker and daemon submission; normal
+  completion, manual stop and newer turns invalidate the retry. Manual time
+  reservations also reject sessions without an unresolved quota failure.
+- Validation: `pytest -q` passes 609 tests. Isolated live tests inject a structured
+  quota failure and shorten the delay to two seconds, then use real authenticated
+  Codex inference and file-writing tools. Watcher restart preserves one reservation;
+  normal execution and shared-daemon writer-conflict recovery each preserve the
+  same session ID and a thread count of one. The account quota is not exhausted.
 
 ## v1.34.0 — 2026-10-04 (minor: read observed ChatGPT history without export)
 

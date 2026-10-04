@@ -15,4 +15,5 @@ ln -sfn "$RESUME_INSTALL_DIR/codex_auto_resume.py" "$HOME/bin/codex-auto-resume"
 install -m 0644 "$RESUME_SOURCE_DIR/codex-auto-resume.service" "$RESUME_UNIT_DIR/codex-auto-resume.service"
 systemctl --user daemon-reload
 systemctl --user enable --now codex-auto-resume.service
+systemctl --user restart codex-auto-resume.service
 systemctl --user --no-pager status codex-auto-resume.service

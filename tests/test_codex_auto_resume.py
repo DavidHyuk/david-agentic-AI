@@ -236,6 +236,48 @@ def test_worker_rechecks_user_turn_before_submitting(environment):
     assert environment.store.jobs()[0]['status'] == 'superseded'
 
 
+@pytest.mark.parametrize('ending', ['complete', 'aborted', 'network-error'])
+def test_resolved_quota_never_runs_even_without_a_new_start(environment, monkeypatch, ending):
+    resume.scan(environment.store, environment.home, wait=0, grace=0)
+    job = environment.store.jobs()[0]
+    payload = {'type': 'turn_aborted' if ending == 'aborted' else 'task_complete', 'turn_id': TURN}
+    if ending == 'network-error':
+        payload['error'] = {'message': 'stream disconnected'}
+    append(environment.path, 'event_msg', payload, environment.now)
+    snapshots = resume.scan(environment.store, environment.home)
+    monkeypatch.setattr(resume.subprocess, 'run', lambda *a, **k: pytest.fail('Unexpected worker launch'))
+    resume.launch_due(environment.store, snapshots, environment.home, '/does/not/exist')
+    assert environment.store.jobs()[0]['status'] == 'pending'
+    resume.reconcile(environment.store, snapshots)
+    assert environment.store.jobs()[0]['status'] == 'superseded'
+    environment.store.update(job['id'], status='launching')
+    assert resume.worker(environment.store, environment.home, '/does/not/exist', job['id']) == 0
+    assert environment.store.jobs()[0]['status'] == 'superseded'
+    calls = []
+    class Client:
+        def __init__(self, home):
+            pass
+        def call(self, method, params):
+            calls.append(method)
+            assert method == 'thread/read'
+            return {'thread': {'id': THREAD, 'status': {'type': 'idle'}}}
+        def close(self):
+            pass
+    monkeypatch.setattr(resume, 'DaemonClient', Client)
+    assert resume.submit_to_loaded_daemon(environment.store, job, environment.home) == 0
+    assert calls == ['thread/read']
+    assert environment.store.jobs()[0]['status'] == 'superseded'
+
+
+def test_manual_schedule_also_refuses_a_normal_completed_session(environment):
+    append(environment.path, 'event_msg', {'type': 'task_complete', 'turn_id': TURN}, environment.now)
+    with pytest.raises(SystemExit) as error:
+        resume.main(['--codex-home', str(environment.home), '--state-dir', str(environment.store.directory),
+                     'schedule', THREAD, 'now'])
+    assert error.value.code == 2
+    assert not environment.store.jobs()
+
+
 def test_install_retains_old_command_and_service_restarts():
     root = Path(__file__).resolve().parents[1]
     installer = (root / 'bootstrap/install_codex_auto_resume.sh').read_text()
