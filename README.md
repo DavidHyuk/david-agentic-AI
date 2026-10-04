@@ -1224,6 +1224,15 @@ controls change, use the visible browser to finish; an ambiguous result is never
 automatically retried. Some account types or automated-browser restrictions may
 prevent exporting. See [OpenAI's export instructions](https://help.openai.com/en/articles/7260999-exporting-your-chatgpt-history-and-data).
 
+Export confirmation can require additional account verification even after
+successful sign-in. The helper reports `awaiting_verification` when ChatGPT
+redirects to its authentication page; this is not a submitted export. Approve
+the request in an already signed-in ChatGPT app or use **Try with email** in the
+remote browser and enter the emailed code there. If mobile approval displays an
+authentication error, use that email alternative. Inspect the returned account
+settings for confirmation before claiming that an export was requested; do not
+automatically repeat an ambiguous confirmation click.
+
 The export email/SMS may take up to seven days; its download link expires after
 24 hours. Email access is not connected by this helper. When the link arrives,
 reopen the same login browser and navigate to it there. Completed ZIP downloads

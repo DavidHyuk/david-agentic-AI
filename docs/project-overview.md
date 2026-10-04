@@ -65,6 +65,12 @@ ChatGPT Chromium profile을 열고 SSH 터널 `18781`로 직접 로그인을 받
 분리합니다. 새 agent/skill/room/profile/bot/cron 없이 David/HQ의 참고 자료
 연결 도구로 유지합니다.
 
+실제 로그인 후 Export 확인 시 ChatGPT가 추가 앱/이메일 인증으로 이동할 수
+있습니다. HQ는 `awaiting_verification`을 표시하며 이를 요청 접수로 간주하지
+않습니다. 앱 승인 오류가 나면 원격 화면의 **Try with email**에서 본인이 코드를
+입력합니다. responsive 화면의 숨겨진 profile 버튼을 제외하고, 현재 Export
+버튼의 accessible name을 인식하여 설정 화면 변경에도 대응합니다.
+
 로그인 터널은 `-F /dev/null`과 실제 DGX 주소(`david@10.0.0.50`)를 사용하여
 기존 `ssh dgx`의 기본 `8501` forwarding 충돌을 피합니다.
 `ClearAllForwardings=yes`는 명령줄 `-L`도 제거하므로 로그인 터널에 사용하지
@@ -812,4 +818,8 @@ Flash에는 CPU에서 해시를 계산하는 모델 내부 PLE n-gram이 실제�
 
 현재 전체 `pytest -q` 검증에는 ChatGPT 선택 branch·Unicode 검색·원자적 교체·
 ZIP 경로 격리·credential 오류 출력 방지 및 HQ source 상태 검증도 포함됩니다.
-2026-10-03 ChatGPT archive 변경 후 전체 546개 테스트가 통과했습니다.
+2026-10-04 ChatGPT export 인증 변경 후 전체 553개 테스트가 통과했습니다.
+
+2026-10-04 대화 streaming·Langfuse private 설정·numeric score 검증 후 전체
+`pytest -q`는 549 passed입니다. 웹 helper와 office client의 배포 및 health를
+확인했고 공유 model PID, 요청당 128K와 두 슬롯을 유지했습니다.

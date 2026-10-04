@@ -3,6 +3,44 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.33.3 — 2026-10-04 (patch: recognize ChatGPT export controls and verification)
+
+- Recognize the visible profile button when responsive layouts retain a hidden
+  duplicate. Match the current export button's accessible name, `Export ChatGPT
+  account data`, rather than relying only on its shorter visible label.
+- Distinguish export verification from confirmed submission. A live Confirm
+  export click redirected to ChatGPT device approval; the mobile app reported an
+  authentication error, so the existing browser was switched to email-code
+  verification. Codes are entered directly by the owner. Show the separate
+  `awaiting_verification` state in the existing HQ reference-source card and
+  never automatically replay an ambiguous export submission.
+- Validation: `pytest -q` passes 553 tests, including responsive hidden-control
+  regression and confirmed, unconfirmed and verification-required export flows.
+  Browser login and the real settings/confirmation controls are verified;
+  actual export submission/download remain pending the owner's verification.
+  JavaScript syntax and whitespace checks pass. No new room, profile or cron.
+
+## v1.33.2 — 2026-10-04 (patch: progressive web replies and compact-input experiment)
+
+- Forward assistant text from the existing authenticated Hermes session stream
+  to office conversations. Render partial text before the final response, retain
+  session ownership, and avoid replaying an incomplete turn or exposing tool arguments.
+- Compare the same short-coaching questions, seeds and output caps using a 2K
+  synthetic payload while preserving two 128K slots. Keep the reduced payload
+  experiment distinct from a production tool/history policy change.
+- Prepare Langfuse Cloud onboarding, private credential-file loading and numeric
+  performance scores linked to experiment-item roots. Keep historical import
+  timestamps tied to artifact recording rather than inventing request starts.
+- Existing rooms and profiles retain their identity and purpose; no new room,
+  agent, bot, cron or model service is introduced. Deploy only the Observatory web
+  helper and client; verify web health and retain the same model PID and two
+  128K slots. A private rollback backup retains the previous web files.
+
+- Validation: `pytest -q` passes 549 tests. HTTP and real-browser mock-stream
+  checks confirm partial text before completion, UTF-8 chunk handling, final
+  reconciliation and incomplete-turn failure without replay. Langfuse remote
+  ingestion remains pending project credentials.
+
 ## v1.33.1 — 2026-10-04 (patch: repair direct browser SSH tunnel commands)
 
 - Remove `ClearAllForwardings=yes` from interactive browser tunnel instructions:
@@ -17,20 +55,6 @@ semantic versioning (major.minor.patch).
   the MacBook-side tunnel still requires the user's local SSH connection.
   Documentation-only repair; no runtime code, profile, room or cron changes.
 
-## v1.32.1 — 2026-10-04 (patch: progressive web replies and compact-input experiment)
-
-- Forward assistant text from the existing authenticated Hermes session stream
-  to office conversations. Render partial text before the final response, retain
-  session ownership, and avoid replaying an incomplete turn or exposing tool arguments.
-- Compare the same short-coaching questions, seeds and output caps using a 2K
-  synthetic payload while preserving two 128K slots. Keep the reduced payload
-  experiment distinct from a production tool/history policy change.
-- Prepare Langfuse Cloud onboarding, private credential-file loading and numeric
-  performance scores linked to experiment-item roots. Keep historical import
-  timestamps tied to artifact recording rather than inventing request starts.
-- Existing rooms and profiles retain their identity and purpose; no new room,
-  agent, bot, cron or model service is introduced. Only the Observatory web
-  helper and client need deployment; the model and gateway are unchanged.
 
 ## v1.33.0 — 2026-10-03 (minor: private ChatGPT account connection and archive)
 

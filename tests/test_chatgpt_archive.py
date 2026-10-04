@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 import zipfile
+from types import SimpleNamespace
 
 import pytest
 import chatgpt_archive as archive
@@ -182,6 +183,63 @@ def test_download_rejects_unrelated_origins_credentials_and_ports(url):
 
 def test_signed_official_download_url_is_accepted_without_rewriting():
     assert archive.validate_download_url('https://chatgpt.com/backend-api/content?token=private') is None
+
+
+def test_login_recognizes_one_visible_profile_among_responsive_hidden_duplicates():
+    visible = SimpleNamespace(count=lambda: 1, is_visible=lambda: True)
+    duplicate = SimpleNamespace(count=lambda: 2, is_visible=lambda: False)
+    absent = SimpleNamespace(count=lambda: 0, is_visible=lambda: False)
+    def locator(selector):
+        if 'Open profile menu' not in selector:
+            return absent
+        return visible if selector.endswith(':visible') else duplicate
+    page = SimpleNamespace(url='https://chatgpt.com/', locator=locator)
+    assert archive.profile_control(page) is visible
+    assert archive.is_authenticated(page)
+
+
+@pytest.mark.parametrize('outcome', ['confirmed', 'unconfirmed', 'verification'])
+def test_export_uses_current_accessible_account_control_and_confirms_once(outcome):
+    clicks = []
+    class Control:
+        def __init__(self, label, present=True):
+            self.label, self.present = label, present
+        def count(self):
+            return int(self.present)
+        def is_visible(self):
+            return self.present
+        def click(self, **kwargs):
+            clicks.append(self.label)
+            if self.label == 'Confirm export' and outcome == 'verification':
+                page.url = 'https://auth.openai.com/verification'
+        @property
+        def first(self):
+            return self
+        def wait_for(self, **kwargs):
+            if outcome != 'confirmed':
+                raise TimeoutError('No success notice.')
+    class Page:
+        url = 'https://chatgpt.com/'
+        def locator(self, selector):
+            return Control('profile', 'Open profile menu' in selector and ':visible' in selector)
+        def get_by_role(self, role, name):
+            labels = {'menuitem': ['Settings'], 'button': ['Data controls', 'Export ChatGPT account data', 'Confirm export']}
+            matching = [label for label in labels.get(role, []) if name.fullmatch(label)]
+            return Control(matching[0] if matching else '', bool(matching))
+        def wait_for_timeout(self, delay):
+            pass
+        def get_by_text(self, expression):
+            return Control('success notice')
+    page = Page()
+    if outcome == 'confirmed':
+        assert archive.request_export(page)
+    elif outcome == 'verification':
+        with pytest.raises(archive.ExportVerificationRequired):
+            archive.request_export(page)
+    else:
+        with pytest.raises(TimeoutError):
+            archive.request_export(page)
+    assert clicks == ['profile', 'Settings', 'Data controls', 'Export ChatGPT account data', 'Confirm export']
 
 
 def test_invalid_url_library_error_is_not_printed(tmp_path, monkeypatch, capsys):

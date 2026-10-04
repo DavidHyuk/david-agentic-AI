@@ -37,6 +37,10 @@ class ArchiveError(ValueError):
     """An explicitly safe error message suitable for CLI output."""
 
 
+class ExportVerificationRequired(ArchiveError):
+    """The account owner must complete ChatGPT's export verification."""
+
+
 def now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -267,7 +271,8 @@ def wait_port(port: int, processes: list, timeout: float = 20) -> None:
 def profile_control(page):
     for selector in ('[data-testid="accounts-profile-button"]', '[data-testid="user-menu-button"]',
                      'button[aria-label="Open profile menu"]'):
-        locator = page.locator(selector)
+        # Responsive layouts can retain a hidden copy of the same control.
+        locator = page.locator(selector + ':visible')
         if locator.count() == 1 and locator.is_visible():
             return locator
     return None
@@ -298,10 +303,18 @@ def request_export(page) -> str:
     page.wait_for_timeout(1200)
     click_named(page, ('tab', 'button'), r'^(Data controls|데이터 제어|데이터 관리)$')
     page.wait_for_timeout(700)
-    click_named(page, ('button',), r'^(Export|Export data|내보내기|데이터 내보내기)$')
+    click_named(page, ('button',), r'^(Export|Export data|Export ChatGPT account data|내보내기|데이터 내보내기)$')
     page.wait_for_timeout(500)
     click_named(page, ('button',), r'^(Confirm export|Confirm|내보내기 확인|내보내기 확정|확인)$')
-    page.get_by_text(re.compile(r'export (requested|has been requested)|successfully requested|내보내기.*요청', re.I)).first.wait_for(timeout=10_000)
+    page.wait_for_timeout(500)
+    if urlsplit(page.url).hostname == 'auth.openai.com':
+        raise ExportVerificationRequired('Complete the device or email verification in the visible browser.')
+    try:
+        page.get_by_text(re.compile(r'export (requested|has been requested)|successfully requested|내보내기.*요청', re.I)).first.wait_for(timeout=10_000)
+    except Exception:
+        if urlsplit(page.url).hostname == 'auth.openai.com':
+            raise ExportVerificationRequired('Complete the device or email verification in the visible browser.') from None
+        raise
     return now()
 
 
@@ -376,6 +389,9 @@ def run_browser(runtime: Path, data_dir: Path, timeout: int, export: bool) -> No
                             state['export_requested_at'] = request_export(candidate)
                             state['export_status'] = 'requested'
                             print('Export request confirmed. Waiting for the email/SMS download link.', flush=True)
+                        except ExportVerificationRequired:
+                            state['export_status'] = 'awaiting_verification'
+                            print('ChatGPT requires device or email verification before confirming the export request.', flush=True)
                         except Exception:
                             state['export_status'] = 'needs_browser_review'
                             print('Export confirmation could not be verified. Continue in the visible browser.', flush=True)

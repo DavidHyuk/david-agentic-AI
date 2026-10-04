@@ -214,7 +214,7 @@ function hqDesk(d) {
   const o = d.orchestration;
   const archive = d.chatgpt_archive || {};
   const archiveStates = {not_started: "연결 전", starting: "브라우저 준비 중", awaiting_login: "직접 로그인 대기", authenticated: "브라우저 로그인 확인", closed: "브라우저 닫힘"};
-  const exportStates = {not_requested: "", requesting: "내보내기 요청 중", requested: "내보내기 요청 확인 · 이메일/SMS 대기", needs_browser_review: "브라우저에서 내보내기 상태 확인 필요"};
+  const exportStates = {not_requested: "", requesting: "내보내기 요청 중", requested: "내보내기 요청 확인 · 이메일/SMS 대기", needs_browser_review: "브라우저에서 내보내기 상태 확인 필요", awaiting_verification: "ChatGPT 앱 또는 이메일 본인 인증 대기"};
   const archiveCard = `<article class="desk-card"><span class="tag">CHATGPT</span><h2>이전 대화 참고 자료</h2><p>${Number(archive.conversation_count || 0)}개 대화 · ${Number(archive.message_count || 0)}개 메시지</p><p class="muted">${esc(archiveStates[archive.browser_status] || "상태 확인 필요")}${exportStates[archive.export_status] ? " · " + esc(exportStates[archive.export_status]) : ""}</p>${archive.imported_at ? `<small>가져온 시각: ${when(archive.imported_at)}</small>` : '<small>내보내기 파일을 가져오면 HQ 대화에서 필요한 내용을 찾아 참고합니다.</small>'}${archive.error ? '<p class="muted">참고 자료 상태를 확인하지 못했습니다.</p>' : ""}</article>`;
   const rewards = d.rewards || {};
   const weekly = rewards.weekly || { counts: {}, goals: {} };

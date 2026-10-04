@@ -2,6 +2,12 @@
 
 ## Interactive coaching latency and experiment tracking
 
+See the [Langfuse first-use guide](../../docs/langfuse-quickstart.md) for Cloud signup,
+private credentials, UI navigation and numeric score comparisons. Use
+`--input-tokens 2048 --label coaching-compact-2k` to repeat the short coaching
+cases with a smaller synthetic payload; this does not cap real agent history.
+
+
 `interactive_latency.py` measures four synthetic coaching cases: a short coding
 hint, English correction, coding explanation and English drill. It uses the
 existing llama.cpp HTTP API, verifies **128K per request and two slots**, and
@@ -82,7 +88,12 @@ partial ingestion failures. Live ingestion is untested until a project is
 configured. Local dry runs require no credentials and perform no network calls.
 New measurements use actual request timestamps and first-token times.
 Historical records without request starts become zero-duration import spans;
-their measured timings remain metadata rather than invented trace durations.
+their measured timings remain metadata and numeric performance scores rather
+than invented trace durations. Import timestamps use artifact recording times.
+The exporter also writes `.scores.json` in dry-run mode and sends supported
+score-create batches after OTLP ingestion. Missing client timings are omitted.
+Use `--credentials ~/.config/david-agent/langfuse.env` to load a private settings
+file without putting keys in shell commands.
 
 [LangSmith](https://docs.langchain.com/langsmith/log-llm-trace) also supports
 TTFT and token accounting and fits existing ClawGram LangGraph evaluations.

@@ -259,7 +259,7 @@ class Observatory:
             allowed_states = {'starting', 'awaiting_login', 'authenticated', 'closed'}
             if status.get('browser_status') in allowed_states:
                 result['browser_status'] = status['browser_status']
-            if status.get('export_status') in {'not_requested', 'requesting', 'requested', 'needs_browser_review'}:
+            if status.get('export_status') in {'not_requested', 'requesting', 'requested', 'needs_browser_review', 'awaiting_verification'}:
                 result['export_status'] = status['export_status']
             database = root / 'archive.db'
             if database.is_file():
