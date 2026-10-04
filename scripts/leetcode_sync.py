@@ -263,19 +263,33 @@ def fetch_accepted_solutions(connection: dict, recent_submissions: dict) -> list
     return solutions
 
 
-def sync(connection_path: Path, snapshot_path: Path, limit: int = MAX_HISTORY) -> dict:
+def sync(connection_path: Path, snapshot_path: Path, limit: int = MAX_HISTORY,
+         stats_only: bool = False) -> dict:
     if not 1 <= limit <= MAX_HISTORY:
         raise LeetCodeSyncError(f'History limit must be between 1 and {MAX_HISTORY}.')
     connection = load_connection(connection_path)
     data = graphql(HISTORY_QUERY, {'username': connection['username'], 'limit': limit}, connection)
     snapshot = normalize_history(data, connection['username'])
-    recent_submissions = graphql(
-        RECENT_SUBMISSIONS_QUERY,
-        {'username': connection['username'], 'limit': limit},
-        connection,
-    )
-    snapshot['accepted_solutions'] = fetch_accepted_solutions(connection, recent_submissions)
+    previous = read_json(snapshot_path, {}) or {}
+    if previous.get('username', '').lower() == connection['username'].lower():
+        for key in ('accepted_solutions', 'solutions_synced_at', 'solution_sync_error'):
+            if key in previous:
+                snapshot[key] = previous[key]
+    # Account progress must survive an unavailable private solution endpoint.
     save_private_json(snapshot_path, snapshot)
+    if not stats_only:
+        try:
+            recent_submissions = graphql(
+                RECENT_SUBMISSIONS_QUERY,
+                {'username': connection['username'], 'limit': limit},
+                connection,
+            )
+            snapshot['accepted_solutions'] = fetch_accepted_solutions(connection, recent_submissions)
+            snapshot['solutions_synced_at'] = utc_now()
+            snapshot.pop('solution_sync_error', None)
+        except LeetCodeSyncError:
+            snapshot['solution_sync_error'] = 'Submitted source refresh failed; account totals were updated.'
+        save_private_json(snapshot_path, snapshot)
     return snapshot
 
 
@@ -472,6 +486,8 @@ def parse_args(argv=None) -> argparse.Namespace:
     login.add_argument('--timeout-seconds', type=int, default=300)
     syncing = sub.add_parser('sync', help='refresh the read-only history snapshot')
     syncing.add_argument('--limit', type=int, default=MAX_HISTORY)
+    syncing.add_argument('--stats-only', action='store_true',
+                         help='refresh account counts and recent accepts without fetching source')
     sub.add_parser('status', help='show connection and snapshot metadata without secrets')
     sub.add_parser('disconnect', help='remove only the saved session; retain history')
     return parser.parse_args(argv)
@@ -517,7 +533,7 @@ def main(argv=None) -> int:
                 output = {'linked': True, 'username': verified_username,
                           'session_file': str(session_path), 'next': 'Run sync to fetch history.'}
             elif args.command == 'sync':
-                snapshot = sync(session_path, snapshot_path, args.limit)
+                snapshot = sync(session_path, snapshot_path, args.limit, stats_only=args.stats_only)
                 output = {'synced': True, 'username': snapshot['username'], 'synced_at': snapshot['synced_at'],
                           'total_solved': snapshot['total_solved'],
                           'recent_accepted_count': len(snapshot['recent_accepted'])}

@@ -832,6 +832,13 @@ read-only `leetcode-history-sync` cron then refreshes the snapshot daily at
 06:35, and `coding-coach` refreshes it again before each scheduled coding lesson.
 The background sync remains available in the session archive but is omitted from
 Observatory recent-activity lists so maintenance does not bury study history.
+Opening or reloading LeetCode Gym refreshes account counts and recent accepts
+with `sync --stats-only` (at most once per minute). The account total includes
+problems solved without reporting to the coach; coach completion records remain
+separate. Submitted-source failures cannot prevent counts from updating. If the
+account request fails, the room labels the saved snapshot as stale and keeps its
+last sync time. Run `python3 ~/.hermes/scripts/leetcode_sync.py sync --stats-only`
+for an immediate counts-only refresh.
 The LeetCode Gym Observatory room shows only the safe snapshot; it never returns
 the session cookie. To stop future account access while retaining the already
 saved progress snapshot, run:
@@ -1213,9 +1220,10 @@ sudo tailscale serve --bg --https=8443 http://127.0.0.1:8788
 
 The first screen refreshes every ten seconds while preserving character positions.
 Specialists remain at their meaningful workstations while idle; Hermes periodically
-visits a teammate for a short, decorative check-in. Click a character to open a portrait and conversation
-panel over the office. Use **작업실 열기** for their study workbench, where the same
-character remains present and **대화 이어가기** opens the conversation in place.
+visits a teammate for a short, decorative check-in. Click a character to open their
+workbench directly. The persistent character conversation sits beside current
+assignments, progress and notes; on narrow screens they stack vertically.
+**대화 이어가기** focuses the composer, and entering a room does not send a message.
 The workbench companion is rendered as a complete, uncropped figure. Workbench
 navigation is part of browser history, so Back returns to the prior Observatory
 screen instead of leaving the site.

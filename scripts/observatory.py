@@ -210,6 +210,9 @@ class Observatory:
         self.agent_api_url = agent_api_url.rstrip('/')
         self.agent_api_key = (agent_api_key if agent_api_key is not None
                               else os.environ.get('API_SERVER_KEY', '')).strip()
+        self.leetcode_lock = threading.Lock()
+        self.leetcode_refresh_at = None
+        self.leetcode_refresh_status = None
         self.office_locks = {room: threading.Lock() for room in OFFICE_CHARACTERS}
 
     def profiles(self):
@@ -253,6 +256,24 @@ class Observatory:
                 latest[(assignment['track'], assignment['item_id'])] = assignment
         return list(latest.values())
 
+    def refresh_leetcode_progress(self):
+        """Refresh linked account totals at most once a minute, retaining old data on failure."""
+        if not (self.home / 'data/interview/leetcode_session.json').is_file():
+            return {'status': 'unlinked'}
+        with self.leetcode_lock:
+            now = time.monotonic()
+            if self.leetcode_refresh_at is not None and now - self.leetcode_refresh_at < 60:
+                return self.leetcode_refresh_status
+            try:
+                self.helper('leetcode_sync.py', ['sync', '--stats-only'])
+                status = {'status': 'updated'}
+            except (OSError, ValueError, subprocess.SubprocessError):
+                status = {'status': 'error', 'message':
+                          'LeetCode 갱신 실패 · 마지막 저장 기록입니다. 계정 연결을 확인해 주세요.'}
+            self.leetcode_refresh_at = time.monotonic()
+            self.leetcode_refresh_status = status
+            return status
+
     def workbench(self, room):
         allowed = {r[0] for r in ROOMS} | set(self.profiles())
         if room not in allowed:
@@ -293,6 +314,7 @@ class Observatory:
                         today_assignment=today_assignments[-1] if today_assignments else None,
                         catalog_available=bool(items))
             if room == 'coding':
+                data['leetcode_refresh'] = self.refresh_leetcode_progress()
                 snapshot = read_json(self.home / 'data/interview/leetcode_history.json', {}) or {}
                 data['leetcode_history'] = {
                     key: snapshot.get(key) for key in (

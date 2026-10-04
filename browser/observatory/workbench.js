@@ -141,7 +141,7 @@ function coachDesk(d) {
   const a = activeCoachAssignment(d);
   const lc = d.leetcode_history;
   const lcSummary = d.room !== "coding" ? "" : lc
-    ? `<article class="desk-card"><span class="tag">LEETCODE · READ ONLY</span><h2>${esc(lc.username)} 풀이 기록</h2><p class="muted">${esc(lc.synced_at || "동기화 시각 미확인")} · 제출이나 계정 변경 없이 동기화됩니다.</p><div class="desk-metrics"><div><b>${Number(lc.total_solved || 0)}</b><span>해결한 문제</span></div><div><b>${Number(lc.solved_by_difficulty?.easy || 0)} / ${Number(lc.solved_by_difficulty?.medium || 0)} / ${Number(lc.solved_by_difficulty?.hard || 0)}</b><span>Easy / Medium / Hard</span></div></div>${lc.recent_accepted?.length ? `<p class="muted">최근 정답: ${esc(lc.recent_accepted.slice(0, 3).map((item) => item.title).join(", "))}</p>` : ""}</article>`
+    ? `<article class="desk-card"><span class="tag">LEETCODE · READ ONLY</span><h2>${esc(lc.username)} 풀이 기록</h2><p class="muted">${esc(lc.synced_at || "동기화 시각 미확인")} · ${esc(d.leetcode_refresh?.message || "LeetCode 계정 기준 · 에이전트에 보고하지 않은 풀이도 포함")}</p><div class="desk-metrics"><div><b>${Number(lc.total_solved || 0)}</b><span>LeetCode 전체 해결 문제</span></div><div><b>${Number(lc.solved_by_difficulty?.easy || 0)} / ${Number(lc.solved_by_difficulty?.medium || 0)} / ${Number(lc.solved_by_difficulty?.hard || 0)}</b><span>Easy / Medium / Hard</span></div></div>${lc.recent_accepted?.length ? `<p class="muted">최근 정답: ${esc(lc.recent_accepted.slice(0, 3).map((item) => item.title).join(", "))}</p>` : ""}</article>`
     : `<article class="desk-card"><span class="tag">LEETCODE · OPTIONAL</span><h2>LeetCode 기록 미연동</h2><p class="muted">터미널에서 세션을 연결하면 이곳에 읽기 전용 풀이 기록이 나타납니다.</p></article>`;
   if (!a) {
     const design = d.track === "system_design";
@@ -256,7 +256,7 @@ function renderWorkbench(d) {
   $("bench-content").innerHTML =
     `<div class="workbench-grid"><div class="desk-main">${body}</div><aside class="desk-side">${editable ? `<article class="desk-card"><h2>${d.room === "interview" ? "내 답변 · 회고" : "작업실 노트"}</h2><form id="desk-note-form"><textarea id="desk-note" rows="10" maxlength="16000" required placeholder="오늘의 생각, 다음에 이어갈 내용을 남겨주세요.">${esc(draft ?? d.note)}</textarea><p class="muted">초안은 이 브라우저에 보관됩니다. 저장한 노트는 다른 기기에서도 이어볼 수 있습니다.</p><button class="primary">노트 저장</button></form></article>` : ""}<article class="desk-card"><h2>최근 기록</h2>${d.recent.map((s, i) => `<button class="desk-history" data-desk-session="${i}"><b>${esc(s.title)}</b><small>${when(s.started_at)}</small></button>`).join("") || '<p class="muted">저장된 세션이 없습니다.</p>'}</article>${
       d.completed
-        ? `<article class="desk-card"><h2>실제 완료 기록 ${d.completed.length}개</h2>${
+        ? `<article class="desk-card"><h2>코치 학습 완료 기록 ${d.completed.length}개</h2>${
             d.completed
               .slice(0, 5)
               .map(

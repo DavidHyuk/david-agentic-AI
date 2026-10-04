@@ -225,3 +225,53 @@ def test_disconnect_removes_only_session(tmp_path):
 
     assert not session_path.exists()
     assert snapshot_path.exists()
+
+
+def test_stats_only_updates_account_total_and_preserves_private_source(tmp_path, monkeypatch):
+    session, snapshot = tmp_path / 'session.json', tmp_path / 'history.json'
+    ls.save_private_json(session, connection())
+    source = [{'slug': 'two-sum', 'code': 'saved implementation'}]
+    ls.save_private_json(snapshot, {'username': 'david_choi', 'accepted_solutions': source})
+    calls = []
+    def request(query, *_args):
+        calls.append(query)
+        return history_data()
+    monkeypatch.setattr(ls, 'graphql', request)
+    result = ls.sync(session, snapshot, stats_only=True)
+    assert result['total_solved'] == 12
+    assert result['accepted_solutions'] == source
+    assert calls == [ls.HISTORY_QUERY]
+
+
+def test_solution_endpoint_failure_does_not_block_account_progress(tmp_path, monkeypatch):
+    session, snapshot = tmp_path / 'session.json', tmp_path / 'history.json'
+    ls.save_private_json(session, connection())
+    def request(query, *_args):
+        if query == ls.HISTORY_QUERY:
+            return history_data()
+        raise ls.LeetCodeSyncError('Private source endpoint unavailable')
+    monkeypatch.setattr(ls, 'graphql', request)
+    result = ls.sync(session, snapshot)
+    assert json.loads(snapshot.read_text())['total_solved'] == 12
+    assert result['solution_sync_error']
+
+
+def test_failed_account_refresh_preserves_snapshot(tmp_path, monkeypatch):
+    session, snapshot = tmp_path / 'session.json', tmp_path / 'history.json'
+    ls.save_private_json(session, connection())
+    ls.save_private_json(snapshot, {'total_solved': 9})
+    before = snapshot.read_bytes()
+    def request(*_args):
+        raise ls.LeetCodeSyncError('Unavailable')
+    monkeypatch.setattr(ls, 'graphql', request)
+    with pytest.raises(ls.LeetCodeSyncError):
+        ls.sync(session, snapshot, stats_only=True)
+    assert snapshot.read_bytes() == before
+
+
+def test_stats_only_never_carries_source_from_another_account(tmp_path, monkeypatch):
+    session, snapshot = tmp_path / 'session.json', tmp_path / 'history.json'
+    ls.save_private_json(session, connection())
+    ls.save_private_json(snapshot, {'username': 'someone_else', 'accepted_solutions': [{'code': 'private'}]})
+    monkeypatch.setattr(ls, 'graphql', lambda *_args: history_data())
+    assert 'accepted_solutions' not in ls.sync(session, snapshot, stats_only=True)

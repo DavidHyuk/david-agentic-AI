@@ -3,6 +3,24 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.31.1 — 2026-10-03 (patch: account progress and direct character workbenches)
+
+- Refresh linked LeetCode account totals and recent accepts on Coding workbench
+  entry/reload, with a one-minute request cache. Include solves never reported to
+  the coach while keeping coach completion, reviews and rewards separate.
+  Counts-only refresh retains submitted source; private source endpoint failures
+  no longer discard successful account totals. Failed account requests preserve
+  the snapshot and display a stale-data message and its last sync time.
+- Character and roster clicks open the existing room's workbench directly, with
+  persistent web conversation beside current assignments, progress and notes.
+  Stack panels on small screens and preserve room drafts, session history and
+  browser Back navigation. Opening a room does not submit a chat message.
+- Reuse existing Observatory rooms, profiles, chats and services; these fixes
+  introduce no new workflow or routing boundary.
+- Validation: `pytest -q` passes 494 tests. Live account refresh reports 9
+  solved problems (previous snapshot: 5); browser checks confirm direct entry,
+  desktop/mobile layout, Back navigation, room drafts and no automatic sends.
+
 ## v1.31.0 — 2026-10-03 (minor: direct DGX Chromium login through SSH)
 
 - Add temporary headed DGX Chromium displayed in local Chrome through an SSH

@@ -189,7 +189,7 @@ window.sharedOffice = (() => {
         <div class="furniture sound-desk"><span><strong>RINA · ON AIR</strong><small>LISTENING STUDIO</small></span><b>▥ ▥ ▥</b><i></i><div class="zone-actions" id="podcast-actions"></div></div>
         <div class="furniture green-plant plant-one">✺</div><div class="furniture green-plant plant-two">✺</div>
         <div class="walking-floor" id="walking-floor"></div>
-        <div class="shared-floor-caption">일상 연출 <span>캐릭터를 클릭해 이야기해 보세요</span></div>
+        <div class="shared-floor-caption">일상 연출 <span>캐릭터를 클릭해 작업실을 열어 보세요</span></div>
       </div></div>
       <section id="office-conversation" class="office-conversation" aria-label="캐릭터 대화" hidden>
         <div class="conversation-portrait" id="conversation-portrait"></div>
@@ -632,6 +632,7 @@ window.sharedOffice = (() => {
   }
   function select(room, insideWorkbench = false) {
     if (!officeCast[room]) return;
+    if (!insideWorkbench) { openWorkbench(room); return; }
     selected = room;
     if (state.replay) stopReplay();
     if (!insideWorkbench) view("office");
@@ -656,8 +657,7 @@ window.sharedOffice = (() => {
     });
     showConversation(room);
     loadHistory(room);
-    $("office-message").focus({preventScroll: true});
-    $("office-conversation").scrollIntoView({block: "nearest", behavior: reduced.matches ? "instant" : "smooth"});
+    // Opening a workbench keeps focus on its overview; typing starts on request.
   }
   function showConversation(room) {
     if (room !== selected) return;
@@ -719,7 +719,12 @@ window.sharedOffice = (() => {
     if (!officeCast[room]) { target.replaceChildren(); return; }
     const cast = officeCast[room];
     target.innerHTML = `<div class="bench-companion">${sprite(room)}<div><small>${esc(cast.role)}</small><h2>${esc(cast.name)}와 함께하는 작업실</h2><p>자료를 함께 살펴보고, 이곳에서 이야기를 이어가세요.</p><button class="primary" id="bench-talk">대화 이어가기</button></div></div>`;
-    $("bench-talk").onclick = () => select(room, true);
+    $("bench-talk").onclick = () => {
+      $("office-conversation").hidden = false;
+      $("office-message").focus({preventScroll: true});
+    };
+    select(room, true);
+    $("conversation-workbench").hidden = true;
   }
   document.addEventListener("visibilitychange", visibility);
   reduced.addEventListener("change", visibility);

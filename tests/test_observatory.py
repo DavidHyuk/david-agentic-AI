@@ -974,3 +974,40 @@ def test_podcast_workbench_exposes_only_safe_interactive_login_state(store, stat
     assert 'never expose' not in json.dumps(state)
     assert 'private-cookie-value' not in json.dumps(state)
     assert 'private.example' not in json.dumps(state)
+
+
+def test_coding_workbench_refreshes_account_without_creating_coach_completions(store, monkeypatch):
+    root = store.home / 'data/interview'
+    root.mkdir(parents=True)
+    (root / 'leetcode_session.json').write_text('{}')
+    calls = []
+    def helper(name, args):
+        calls.append((name, args))
+        (root / 'leetcode_history.json').write_text(json.dumps({
+            'version': 1, 'username': 'david', 'total_solved': 99,
+            'synced_at': '2026-10-04T00:00:00+00:00',
+        }))
+        return {'synced': True}
+    monkeypatch.setattr(store, 'helper', helper)
+    for _ in range(2):
+        data = store.workbench('coding')
+        assert data['leetcode_history']['total_solved'] == 99
+        assert data['completed'] == []
+        assert data['leetcode_refresh']['status'] == 'updated'
+    assert calls == [('leetcode_sync.py', ['sync', '--stats-only'])]
+
+
+def test_coding_workbench_reports_stale_snapshot_on_account_failure(store, monkeypatch):
+    root = store.home / 'data/interview'
+    root.mkdir(parents=True)
+    (root / 'leetcode_session.json').write_text('{}')
+    (root / 'leetcode_history.json').write_text(json.dumps({
+        'version': 1, 'username': 'david', 'total_solved': 9,
+    }))
+    def helper(*_args):
+        raise ValueError('private credential error')
+    monkeypatch.setattr(store, 'helper', helper)
+    data = store.workbench('coding')
+    assert data['leetcode_history']['total_solved'] == 9
+    assert data['leetcode_refresh']['status'] == 'error'
+    assert 'private credential' not in json.dumps(data)
