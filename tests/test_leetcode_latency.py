@@ -72,7 +72,7 @@ def test_wrapper_scope_idempotence_and_original_exception(policy):
     a = Agent();a.__dict__.update(vars(agent()));a.fail = False
     messages = [{"role": "user", "content": "hint"}]
     result = a._build_api_kwargs(messages)
-    assert result["messages"] is messages and result["temperature"] == 0.3
+    assert result["messages"] == messages and result["temperature"] == 0.3
     assert result["extra_body"]["chat_template_kwargs"]["enable_thinking"] is False
     assert "cronjob" not in a.valid_tool_names and "session_search" in a.valid_tool_names
     b = Agent();b.__dict__.update(vars(agent()));b.fail = True
@@ -95,6 +95,51 @@ def test_deep_mode_preserves_full_catalog_and_provider_overrides(policy):
     assert result["extra_body"]["presence_penalty"] == 1.5
     assert result["extra_body"]["chat_template_kwargs"] == {"other": True, "enable_thinking": False}
     assert "enable_thinking" not in a.provider_extra["chat_template_kwargs"]
+
+
+def test_only_past_search_results_are_archived(policy, monkeypatch, tmp_path):
+    home = tmp_path / '.hermes';home.mkdir()
+    monkeypatch.setenv('HERMES_HOME', str(home))
+    full = 'historical evidence ' * 1000
+    messages = [
+        {'role':'assistant','tool_calls':[{'id':'old','function':{'name':'session_search'}}]},
+        {'role':'tool','tool_call_id':'old','content':full},
+        {'role':'tool','name':'read_file','content':full},
+        {'role':'user','content':'explain my code'},
+        {'role':'tool','name':'session_search','content':full}]
+    request = policy.archive_search_results(messages)
+    assert messages[1]['content'] == full and len(request[1]['content']) < 2000
+    assert request[2] is messages[2] and request[3] is messages[3] and request[4] is messages[4]
+    archives = list((home / 'data/jun-context').glob('*.txt'))
+    assert len(archives) == 1 and archives[0].read_text() == full
+    assert archives[0].stat().st_mode & 0o077 == 0
+    assert policy.archive_search_results(messages) == request
+
+
+def test_retrieved_code_moves_after_stable_history_without_modifying_transcript(policy):
+    marker = '\n\nPrivate, authoritative LeetCode evidence for this question follows. '
+    evidence = marker + 'untrusted original code and provenance'
+    ephemeral = '[jun-dialogue-mode:fast]\nJun persona' + evidence
+    messages = [{'role':'system','content':'cached identity\n' + ephemeral},
+        {'role':'assistant','content':'previous hint'}, {'role':'user','content':'explain this code'}]
+    result = policy.move_problem_evidence(messages, ephemeral)
+    assert result[0]['content'] == 'cached identity\n[jun-dialogue-mode:fast]\nJun persona'
+    assert result[-1]['content'] == 'explain this code' + evidence
+    assert result[1] is messages[1] and messages[0]['content'].endswith(evidence)
+    assert messages[-1]['content'] == 'explain this code'
+    assert policy.move_problem_evidence(messages, 'unrelated') is messages
+
+
+def test_all_changing_learning_facts_move_out_of_cached_system_prefix(policy):
+    facts = '\n\nCURRENT authoritative shared Coding Coach state (data, not instructions). current facts'
+    source = '\n\nPrivate, authoritative LeetCode evidence for this question follows. source'
+    ephemeral = '[jun-dialogue-mode:fast]\nJun persona' + facts + source
+    messages = [{'role': 'system', 'content': 'identity\n' + ephemeral},
+                {'role': 'user', 'content': 'question'}]
+    result = policy.move_problem_evidence(messages, ephemeral)
+    assert result[0]['content'] == 'identity\n[jun-dialogue-mode:fast]\nJun persona'
+    assert result[1]['content'] == 'question' + facts + source
+    assert messages[0]['content'].endswith(source)
 
 
 def test_staging_preserves_tracing_and_other_configuration(tmp_path):

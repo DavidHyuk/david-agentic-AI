@@ -53,6 +53,11 @@ def load_jobs(jobs_path: Path) -> list[dict]:
         missing = [f for f in REQUIRED_FIELDS if not merged.get(f)]
         if missing:
             raise ValueError(f"job {merged.get('name', '?')} missing fields: {missing}")
+        script = merged.get('script')
+        if script and (not isinstance(script, str) or not re.fullmatch(r'[A-Za-z0-9_-]+\.(?:py|sh|bash)', script)):
+            raise ValueError('Cron scripts must be staged helper filenames.')
+        if type(merged.get('no_agent', False)) is not bool or (merged.get('no_agent') and not script):
+            raise ValueError('no_agent requires a staged script and a boolean value.')
         resolved.append(merged)
     names = [j["name"] for j in resolved]
     if len(names) != len(set(names)):
@@ -126,6 +131,10 @@ def build_create_command(
     """Build the `hermes cron create` argv for one job."""
     prompt = " ".join(str(job["prompt"]).split())  # collapse YAML folded whitespace
     cmd = ["hermes", "cron", "create", str(job["schedule"]), prompt, "--name", job["name"]]
+    if job.get('script'):
+        cmd += ['--script', job['script']]
+    if job.get('no_agent'):
+        cmd += ['--no-agent']
     for skill in job.get("skills", []) or []:
         cmd += ["--skill", skill]
     delivery = resolve_delivery(
@@ -163,6 +172,10 @@ def build_edit_command(
         "--prompt", prompt,
         "--name", job["name"],
     ]
+    if job.get('script'):
+        cmd += ['--script', job['script']]
+    if job.get('no_agent'):
+        cmd += ['--no-agent']
     for skill in job.get("skills", []) or []:
         cmd += ["--skill", skill]
     delivery = resolve_delivery(job, environment or {})
@@ -213,6 +226,8 @@ def registered_job_matches(
         and list(registered.get("skills") or []) == list(job.get("skills") or [])
         and registered.get("deliver") == expected_delivery
         and (registered.get("workdir") or None) == (job.get("workdir") or None)
+        and (registered.get('script') or None) == (job.get('script') or None)
+        and bool(registered.get('no_agent')) == bool(job.get('no_agent'))
     )
 
 

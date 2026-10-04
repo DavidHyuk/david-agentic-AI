@@ -29,6 +29,15 @@ SDK의 종료된 span은 background batch로 전송되므로 그래프를 실행
 4. Sessions에서는 `david:<Hermes session ID>` / `english:<Hermes session ID>`로 턴을 묶어 봅니다.
 5. 성능 실험은 environment `experiment`로 구분합니다.
 
+Jun 웹 코딩 대화는 `david:office_coding` Session에서 봅니다. 기본값은
+**빠른 답변**이며 **깊이 생각**도 선택할 수 있습니다. 추가 실험 4개 / 요청
+26개 / score 154개는 Experiments에서 `Jun coding` 또는 `Pilot · Jun` 이름으로
+찾습니다. Pilot에는 hidden reasoning 중 출력 한도에 도달한 실패도 있습니다.
+cold/warm replay와 동시성 1/2를 분리해 비교합니다. 동일 입력 반복의 0.1초
+TTFT를 실제 대화 지연으로 해석하지 않습니다. 기존 대화 복사본의 native
+검증은 별도 diagnostic Session에 있으며 원래 Jun 대화에는 추가하지 않았습니다.
+적용 범위·측정·한계는 [Jun 보고서](benchmarks/jun-latency-2026-10-04.md)를 따릅니다.
+
 기록 범위는 두 owning profile의 Hermes 요청입니다. David profile에서 실행하는
 코딩·면접·설계·논문 대화와 웹 캐릭터 대화, English profile의 영어 연습·podcast가
 같은 추적 hook을 거칩니다. ClawGram과 별도 specialist profile에는 이 helper를

@@ -210,3 +210,12 @@ def test_score_rejection_is_not_reported_as_success(tmp_path, monkeypatch):
     with pytest.raises(RuntimeError, match='rejected performance') as error:
         tracker.publish_langfuse(Namespace(input=[source],dry_run=None,credentials=None))
     assert 'PRIVATE SERVER ERROR' not in str(error.value)
+
+
+def test_experiment_import_rejects_duplicate_item_ids(tmp_path):
+    run = record()
+    run['records'].append(dict(run['records'][0]))
+    path = tmp_path / 'duplicate.json'
+    path.write_text(json.dumps(run))
+    with pytest.raises(ValueError, match='duplicate experiment items'):
+        tracker.load_runs([path])

@@ -140,15 +140,12 @@ function activeCoachAssignment(d) {
 function coachDesk(d) {
   const a = activeCoachAssignment(d);
   const lc = d.leetcode_history;
-  const imported = (d.external_learning || []).length
-    ? `<article class="desk-card"><span class="tag">내 대화에서 가져온 배움</span><h2>완료한 문제 · 힌트와 배운 점</h2>${d.external_learning.map((r) => `<details class="desk-help"><summary>${esc(r.problem)} · ${esc(r.date)} Accepted</summary><h3>배운 점</h3><p class="completion-lesson">${esc(r.lesson)}</p><h3>대화에서 받은 힌트</h3><p class="completion-lesson">${esc(r.hint_notes)}</p><p class="muted">완료는 LeetCode Accepted로 확인했습니다. 가져온 대화에 없는 시간·자신감·독립 풀이 여부는 임의로 채우지 않았습니다.</p>${safeLink(r.source?.url, r.source?.title || "ChatGPT 원문")}<details><summary>근거 대화 보기</summary>${(r.source?.messages || []).map((m) => `<p class="completion-lesson"><b>${m.role === "user" ? "내 질문" : "받은 힌트"}</b><br>${esc(m.text)}</p>`).join("")}</details></details>`).join("")}</article>`
-    : "";
   const lcSummary = d.room !== "coding" ? "" : lc
     ? `<article class="desk-card"><span class="tag">LEETCODE · READ ONLY</span><h2>${esc(lc.username)} 풀이 기록</h2><p class="muted">${esc(lc.synced_at || "동기화 시각 미확인")} · ${esc(d.leetcode_refresh?.message || "LeetCode 계정 기준 · 에이전트에 보고하지 않은 풀이도 포함")}</p>${`<p class="muted">실제 Accepted 코드 ${Number(lc.downloaded_solution_count || 0)}문제 보관 · ${lc.solutions_synced_at ? esc(lc.solutions_synced_at) : "코드 갱신 시각 미확인"}</p>${lc.solution_sync_error ? '<p class="muted">제출 코드 갱신 실패 · LeetCode 세션을 다시 연결해 주세요. 기존 코드는 보관됩니다.</p>' : '<p class="muted">새 풀이 코드는 백그라운드에서 가져옵니다. 잠시 후 다시 불러오면 확인할 수 있습니다.</p>'}`}${lc.recent_accepted?.length ? `<p class="muted">최근 정답: ${esc(lc.recent_accepted.slice(0, 3).map((item) => item.title).join(", "))}</p>` : ""}</article>`
     : `<article class="desk-card"><span class="tag">LEETCODE · OPTIONAL</span><h2>LeetCode 기록 미연동</h2><p class="muted">터미널에서 세션을 연결하면 이곳에 읽기 전용 풀이 기록이 나타납니다.</p></article>`;
   if (!a) {
     const design = d.track === "system_design";
-    return `<article class="desk-card"><span class="tag">TODAY</span><h2>${d.today_assignment?.completed ? "이번 주 인터뷰를 완료했습니다" : "이어갈 미완료 과제가 없습니다"}</h2><p>${design ? "새 인터뷰는 ISO 주당 하나만 열립니다. 추가 연습은 채팅의 /review로 짧게 진행하세요." : "<b>작업 이어가기</b>는 항상 다음 미해결 커리큘럼의 새 문제를 배정합니다. 이전 문제는 <b>복습하기</b>로만 다시 배정합니다."} 과제 배정은 학습 완료로 기록되지 않습니다.</p><div class="desk-actions"><button id="desk-plan" class="primary" ${!d.catalog_available ? "disabled" : ""}>${design ? "주간 인터뷰 열기" : "작업 이어가기 · 새 문제"}</button>${!design && d.completed?.length ? `<button id="desk-review" class="outline" ${!d.catalog_available ? "disabled" : ""}>복습하기</button>` : ""}</div>${!d.catalog_available ? "<p>커리큘럼 카탈로그가 아직 설치되지 않았습니다.</p>" : ""}</article>` + lcSummary + imported;
+    return `<article class="desk-card"><span class="tag">TODAY</span><h2>${d.today_assignment?.completed ? "이번 주 인터뷰를 완료했습니다" : "이어갈 미완료 과제가 없습니다"}</h2><p>${design ? "새 인터뷰는 ISO 주당 하나만 열립니다. 추가 연습은 채팅의 /review로 짧게 진행하세요." : "<b>작업 이어가기</b>는 항상 다음 미해결 커리큘럼의 새 문제를 배정합니다. 이전 문제는 <b>복습하기</b>로만 다시 배정합니다."} 과제 배정은 학습 완료로 기록되지 않습니다.</p><div class="desk-actions"><button id="desk-plan" class="primary" ${!d.catalog_available ? "disabled" : ""}>${design ? "주간 인터뷰 열기" : "작업 이어가기 · 새 문제"}</button>${!design && d.completed?.length ? `<button id="desk-review" class="outline" ${!d.catalog_available ? "disabled" : ""}>복습하기</button>` : ""}</div>${!d.catalog_available ? "<p>커리큘럼 카탈로그가 아직 설치되지 않았습니다.</p>" : ""}</article>` + lcSummary;
   }
   const item = a.item,
     coding = d.track === "coding";
@@ -167,7 +164,7 @@ function coachDesk(d) {
       "hint_level",
       [0, 1, 2, 3].map((n) => [n, String(n)]),
     )}
-    </div><label class="desk-field">배운 점 또는 실수<textarea name="lesson" required maxlength="16000" rows="4" placeholder="구체적인 경험을 남겨주세요."></textarea></label><button class="primary">결과 저장 · 완료 기록</button></form></article>` : `<article class="desk-card"><h2>면접 진행</h2><p><code>/answer</code>로 설계를 제출하고, 추가 질문에 답한 뒤 <code>/feedback</code>을 요청하세요. 피드백이 저장되면 <code>/solution</code>이 열립니다.</p><p class="muted">현재 단계: ${esc(a.phase || "problem")} · 저장된 추가 질문 ${(a.followups || []).length}개</p></article>`}` + lcSummary + imported;
+    </div><label class="desk-field">배운 점 또는 실수<textarea name="lesson" required maxlength="16000" rows="4" placeholder="구체적인 경험을 남겨주세요."></textarea></label><button class="primary">결과 저장 · 완료 기록</button></form></article>` : `<article class="desk-card"><h2>면접 진행</h2><p><code>/answer</code>로 설계를 제출하고, 추가 질문에 답한 뒤 <code>/feedback</code>을 요청하세요. 피드백이 저장되면 <code>/solution</code>이 열립니다.</p><p class="muted">현재 단계: ${esc(a.phase || "problem")} · 저장된 추가 질문 ${(a.followups || []).length}개</p></article>`}` + lcSummary;
 }
 function englishDesk(d) {
   return `<div class="desk-metrics"><div><b>${d.due_count}</b><span>오늘 복습할 카드</span></div><div><b>${d.total_cards}</b><span>전체 교정 카드</span></div></div><article class="desk-card"><h2>오늘의 영어 복습</h2><p class="muted">먼저 문장을 고쳐 말해보세요. 정답은 각 문장 바로 아래에 있습니다. 자기 채점 결과를 저장하면 다음 복습일이 바뀝니다.</p>${d.due.length ? d.due.map((c, i) => `<section class="srs-card"><span class="tag">${i + 1} · Box ${c.box} · ${esc(c.due)}</span><h3>${esc(c.wrong)}</h3><p class="srs-answer"><b>정답</b> ${esc(c.correct)}</p><p class="muted">${esc(c.note || "")}</p><div class="desk-actions"><button class="outline" data-srs="${i}" data-result="wrong">다시 연습할래요</button><button class="primary" data-srs="${i}" data-result="correct">맞혔어요</button></div></section>`).join("") : '<div class="empty">오늘 복습할 카드를 모두 마쳤습니다.</div>'}${d.due_count > 30 ? "<p>한 번에 30개씩 표시합니다. 복습하면 다음 카드가 나타납니다.</p>" : ""}</article>`;
@@ -216,12 +213,13 @@ function missionCard(task) {
 function hqDesk(d) {
   const o = d.orchestration;
   const archive = d.chatgpt_archive || {};
+  const dailySync = archive.daily_sync;
   const rag = d.chatgpt_project_rag || {};
   const archiveStates = {not_started: "연결 전", starting: "브라우저 준비 중", awaiting_login: "직접 로그인 대기", authenticated: "브라우저 로그인 확인", closed: "브라우저 닫힘"};
   const exportStates = {not_requested: "", requesting: "내보내기 요청 중", requested: "내보내기 요청 확인 · 이메일/SMS 대기", needs_browser_review: "브라우저에서 내보내기 상태 확인 필요", awaiting_verification: "ChatGPT 앱 또는 이메일 본인 인증 대기", verification_loop: "내보내기 인증 반복 · 요청 중단"};
   const sidebarSummary = archive.sidebar_conversation_count ? `<p>화면에서 읽은 제목·링크 ${Number(archive.sidebar_conversation_count)}개 · 전체 계정 백업은 아닙니다.</p><small>목록 확인: ${when(archive.sidebar_captured_at)}</small>` : "";
   const ragSummary = rag.project_name ? `<p><b>${esc(rag.project_name)}</b></p><p>${rag.ready ? "로컬 의미 검색 준비됨" : rag.stale ? "프로젝트 자료 변경 · 색인 갱신 필요" : "프로젝트 색인 준비 필요"} · ${Number(rag.conversation_count || 0)}개 대화 · ${Number(rag.message_count || 0)}개 메시지 · ${Number(rag.chunk_count || 0)}개 검색 구간</p><small>화면에서 읽은 본문 기준 · 전체 계정 백업은 아닙니다.${rag.indexed_at ? ` 색인: ${when(rag.indexed_at)}` : ""}</small>` : "";
-  const archiveCard = `<article class="desk-card"><span class="tag">CHATGPT</span><h2>이전 대화 참고 자료</h2>${ragSummary}<p>내보내기 파일: ${Number(archive.conversation_count || 0)}개 대화 · ${Number(archive.message_count || 0)}개 메시지</p>${sidebarSummary}<p class="muted">${esc(archiveStates[archive.browser_status] || "상태 확인 필요")}${exportStates[archive.export_status] ? " · " + esc(exportStates[archive.export_status]) : ""}</p>${archive.imported_at ? `<small>가져온 시각: ${when(archive.imported_at)}</small>` : '<small>HQ에서 프로젝트의 이전 대화를 요청하면 관련 원문을 검색하고 확인해 답합니다.</small>'}${archive.error || rag.error ? '<p class="muted">참고 자료 상태를 확인하지 못했습니다.</p>' : ""}</article>`;
+  const archiveCard = `<article class="desk-card"><span class="tag">CHATGPT</span><h2>이전 대화 참고 자료</h2>${dailySync ? `<p class="muted">프로젝트 자동 갱신: ${esc(dailySync.schedule)} · ${{pending: "첫 실행 대기", running: "갱신 중", ok: "최근 갱신 완료", error: "갱신 실패 · 기존 자료 보존"}[dailySync.status] || "상태 확인 중"}${dailySync.last_success_at ? " · 마지막 성공 " + when(dailySync.last_success_at) : ""}</p>` : ""}${ragSummary}<p>내보내기 파일: ${Number(archive.conversation_count || 0)}개 대화 · ${Number(archive.message_count || 0)}개 메시지</p>${sidebarSummary}<p class="muted">${esc(archiveStates[archive.browser_status] || "상태 확인 필요")}${exportStates[archive.export_status] ? " · " + esc(exportStates[archive.export_status]) : ""}</p>${archive.imported_at ? `<small>가져온 시각: ${when(archive.imported_at)}</small>` : '<small>HQ에서 프로젝트의 이전 대화를 요청하면 관련 원문을 검색하고 확인해 답합니다.</small>'}${archive.error || rag.error ? '<p class="muted">참고 자료 상태를 확인하지 못했습니다.</p>' : ""}</article>`;
   const rewards = d.rewards || {};
   const weekly = rewards.weekly || { counts: {}, goals: {} };
   const rewardCard = rewards.available === false
@@ -247,6 +245,28 @@ function hqDesk(d) {
       .join("")}</div></article><section id="mission-detail"></section>
     <article class="desk-card"><span class="tag">YOUR NEXT MOVE</span><h2>직접 확인할 학습</h2><div class="pending-list">${d.pending.map((a) => `<button data-open-desk="${a.track === "coding" ? "coding" : "design"}"><span>${a.track === "coding" ? "⌨" : "🏗"} ${esc(a.item_id)}</span><small>${esc(a.date)} · 결과 미입력 →</small></button>`).join("")}<button data-open-desk="english"><span>💬 영어 복습 ${d.due_count}개</span><small>교정 문장 연습 →</small></button><button data-open-desk="papers"><span>🔭 읽기 대기 ${d.reading_count}편</span><small>논문 읽기 목록 →</small></button></div></article>`;
 }
+function learningHistory(d) {
+  if (!d.completed) return "";
+  const records = d.completed.map((r) => ({ ...r }));
+  for (const imported of d.external_learning || []) {
+    const existing = records.find((r) => r.item_id === imported.item_id && r.date === imported.date);
+    if (existing) {
+      existing.hint_notes = imported.hint_notes;
+      existing.source = imported.source;
+      existing.imported_lesson = imported.lesson;
+    } else records.push({ ...imported });
+  }
+  for (const accepted of d.leetcode_history?.recent_accepted || []) {
+    if (!accepted.slug || records.some((r) => r.item_id === accepted.slug)) continue;
+    const instant = new Date(accepted.accepted_at);
+    if (!Number.isFinite(instant.getTime())) continue;
+    const parts = new Intl.DateTimeFormat("en", {timeZone: "America/Los_Angeles", year: "numeric", month: "2-digit", day: "2-digit"}).formatToParts(instant);
+    const part = (name) => parts.find((p) => p.type === name)?.value;
+    records.push({item_id: accepted.slug, problem: accepted.title, date: `${part("year")}-${part("month")}-${part("day")}`, lesson: "완료는 확인됐지만 풀이 과정과 배운 점은 아직 기록되지 않았습니다."});
+  }
+  records.sort((a, b) => b.date.localeCompare(a.date));
+  return `<article class="desk-card"><h2>학습 완료 기록 ${records.length}개</h2>${records.map((r) => `<details class="desk-help"><summary>${esc(r.problem || r.topic)} · ${esc(r.date)}</summary><p class="completion-lesson">${esc(r.lesson || r.next_improvement)}</p>${r.imported_lesson && r.imported_lesson !== r.lesson ? `<p class="completion-lesson">${esc(r.imported_lesson)}</p>` : ""}${r.hint_notes ? `<h3>힌트와 배운 점</h3><p class="completion-lesson">${esc(r.hint_notes)}</p>` : ""}${r.duration != null ? `<p>${Number(r.duration)}분 · 자신감 ${Number(r.confidence)}/5 · 다음 복습 ${esc(r.next_review_date)}</p>` : '<p class="muted">LeetCode Accepted로 완료 확인 · 시간과 자신감은 기록 없음</p>'}${r.source ? safeLink(r.source.url, r.source.title || "대화 원문") + `<details><summary>근거 대화 보기</summary>${(r.source.messages || []).map((m) => `<p class="completion-lesson"><b>${m.role === "user" ? "내 질문" : "받은 힌트"}</b><br>${esc(m.text)}</p>`).join("")}</details>` : ""}</details>`).join("") || '<p class="muted">완료한 문제의 배움이 여기에 쌓입니다.</p>'}</article>`;
+}
 function renderWorkbench(d) {
   window.sharedOffice?.learningPace(d.learning_pace);
   window.sharedOffice?.leetcodeStats(d.leetcode_history);
@@ -266,20 +286,7 @@ function renderWorkbench(d) {
   const editable = Boolean(deskTitles[d.room]);
   const draft = localRead(draftKey(d.room), null);
   $("bench-content").innerHTML =
-    `<div class="workbench-grid"><div class="desk-main">${body}</div><aside class="desk-side">${editable ? `<article class="desk-card"><h2>${d.room === "interview" ? "내 답변 · 회고" : "작업실 노트"}</h2><form id="desk-note-form"><textarea id="desk-note" rows="10" maxlength="16000" required placeholder="오늘의 생각, 다음에 이어갈 내용을 남겨주세요.">${esc(draft ?? d.note)}</textarea><p class="muted">초안은 이 브라우저에 보관됩니다. 저장한 노트는 다른 기기에서도 이어볼 수 있습니다.</p><button class="primary">노트 저장</button></form></article>` : ""}<article class="desk-card"><h2>최근 기록</h2>${d.recent.map((s, i) => `<button class="desk-history" data-desk-session="${i}"><b>${esc(s.title)}</b><small>${when(s.started_at)}</small></button>`).join("") || '<p class="muted">저장된 세션이 없습니다.</p>'}</article>${
-      d.completed
-        ? `<article class="desk-card"><h2>코치 학습 완료 기록 ${d.completed.length}개</h2>${
-            d.completed
-              .slice(0, 5)
-              .map(
-                (r) =>
-                  `<details class="desk-help"><summary>${esc(r.problem || r.topic)} · ${esc(r.date)}</summary><p class="completion-lesson">${esc(r.lesson || r.next_improvement)}</p><p>${r.duration}분 · 자신감 ${r.confidence}/5 · 다음 복습 ${esc(r.next_review_date)}</p></details>`,
-              )
-              .join("") ||
-            '<p class="muted">풀이 결과를 제출하면 여기에 표시됩니다.</p>'
-          }</article>`
-        : ""
-    }<article class="desk-card"><h2>작업실 활동</h2>${d.events.map((e) => `<div class="desk-event"><b>${esc({ note: "노트 저장", bookmark: "읽기 목록 추가", paper_read: "읽기 상태 변경" }[e.action] || e.action)}</b><small>${when(e.time)}</small>${e.note ? `<details><summary>이 버전 보기</summary><p class="saved-note">${esc(e.note)}</p></details>` : ""}</div>`).join("") || '<p class="muted">노트와 읽기 목록 변경이 여기에 남습니다.</p>'}</article></aside></div>`;
+    `<div class="workbench-grid"><div class="desk-main">${body}</div><aside class="desk-side">${editable ? `<article class="desk-card"><h2>${d.room === "interview" ? "내 답변 · 회고" : "작업실 노트"}</h2><form id="desk-note-form"><textarea id="desk-note" rows="10" maxlength="16000" required placeholder="오늘의 생각, 다음에 이어갈 내용을 남겨주세요.">${esc(draft ?? d.note)}</textarea><p class="muted">초안은 이 브라우저에 보관됩니다. 저장한 노트는 다른 기기에서도 이어볼 수 있습니다.</p><button class="primary">노트 저장</button></form></article>` : ""}<article class="desk-card"><h2>최근 기록</h2>${d.recent.map((s, i) => `<button class="desk-history" data-desk-session="${i}"><b>${esc(s.title)}</b><small>${when(s.started_at)}</small></button>`).join("") || '<p class="muted">저장된 세션이 없습니다.</p>'}</article>${learningHistory(d)}<article class="desk-card"><h2>작업실 활동</h2>${d.events.map((e) => `<div class="desk-event"><b>${esc({ note: "노트 저장", bookmark: "읽기 목록 추가", paper_read: "읽기 상태 변경" }[e.action] || e.action)}</b><small>${when(e.time)}</small>${e.note ? `<details><summary>이 버전 보기</summary><p class="saved-note">${esc(e.note)}</p></details>` : ""}</div>`).join("") || '<p class="muted">노트와 읽기 목록 변경이 여기에 남습니다.</p>'}</article></aside></div>`;
   if (editable) {
     $("desk-note").oninput = () =>
       localWrite(draftKey(d.room), $("desk-note").value);

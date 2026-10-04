@@ -3,6 +3,78 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.40.0 — 2026-10-04 (minor: faster Jun coding conversations)
+
+- Add fast/deep controls to the existing Jun web conversation. Fast mode
+  disables optional thinking and focuses local tools only for default
+  `office_coding`; deep keeps normal reasoning/tools. Preserve provider 128K
+  × 2 and the agent context setting. No new profile, room, cron or delivery.
+- Reference large historical search results through immutable private originals
+  without editing durable history/code. Move changing learning/source evidence
+  behind the stable system prefix. Prioritize the current problem and avoid
+  attaching another problem's submission when the requested source is missing.
+- Matched thinking-off replay cold TTFT median is 21.44s → 8.56s. Native Hermes
+  with cloned Jun history measures first question 25.35s and followup 1.27s;
+  this verification is separate from the matched comparison. Decode remains
+  approximately 23–27 TPS; record quality, cache, concurrency and thermal limits.
+- Publish/read back four experiments, 26 distinct traces and 154 score values.
+  Repair two single/concurrent item-ID collisions and reject duplicate imports;
+  do not repeat unrelated or earlier uploads.
+- Review a shared model guard stop at 23.80GiB available, archive the incident,
+  and restore the same guarded model and previously active David/English
+  gateways. Keep MTP off; ClawGram gateway PID remains unchanged. Validation:
+  680 tests, JS syntax, isolated native turns, Cloud read-back and headless
+  fast/deep UI controls. See `docs/benchmarks/jun-latency-2026-10-04.md`.
+
+## v1.39.0 — 2026-10-04 (minor: daily project sync and consistent coding evidence)
+
+- Refresh Silicon Valley Career 2027 daily at 03:17 LA using an existing Hermes
+  script-only cron job with local delivery. This slot precedes 06:35 LeetCode
+  sync, 08:00 paper ingestion and the study notifications. No LLM, new profile,
+  bot or persistent browser/VNC service is introduced. Route maintenance to HQ
+  and show its schedule/last success in the existing source card, not a new room.
+- Reuse the private login in a temporary browser; stage project/chat sources
+  and vector rebuild before publishing. Preserve originals on failed collection,
+  ambiguous partial overlap, embedding errors or interrupted publication. Retain
+  longer observations only through proven ordered overlap. Deduplicate successful
+  runs by LA date and bound execution with browser/read/index locks and timeouts.
+- Supply Jun fresh shared completion counts/patterns and the actual learning for
+  Two Pointers questions, including externally accepted attempts without saved
+  source code. Older assistant summaries no longer define current progress or
+  replace a new assignment with a due review.
+- Merge all workbench headings into one frame named like “Jun과 함께하는
+  LeetCode Gym”, retaining history/refresh controls and compact learning metrics.
+  Merge graded and imported learning into one chronological completion history;
+  retain hints, source messages, links and unknown metrics without fabricating them.
+- Include recent Accepted evidence in Jun's completion inventory and the unified
+  history without inventing coach assessments. Reverse String is additionally
+  confirmed on September 29, making three known Two Pointers completions; its
+  implementation/learning remain unknown until actual source is supplied.
+- Validation: `pytest -q` passes 680 tests. Live first collection updates nine
+  project chats to 132 observed messages / 289 chunks; same-day script replay
+  skips collection and the registered no-agent cron run succeeds. Next run is
+  October 5 at 03:17 LA. All seven desktop/mobile workbenches show a single
+  heading and preserve chat input; the merged coding history has nine problems.
+  The actual Jun web conversation confirms all three Two Pointers completions,
+  summarizes imported learning, and leaves Reverse String implementation unknown.
+
+## v1.38.2 — 2026-10-04 (patch: give every workbench more conversation space)
+
+- Move each character's compact introduction beside the workbench title,
+  including Jun's existing practice gap and LeetCode totals. Apply the same
+  layout to coding, design, English, podcast, papers, interview and HQ rooms.
+- Widen the conversation column and use the space freed by the introduction
+  for a taller history area. Keep the composer visible and scroll history
+  independently beside current work; stack the two columns on small screens.
+- Keep workbench conversations open when Escape is pressed and remove the
+  redundant close control there. Reuse existing rooms and conversation state;
+  no profile, bot, schedule or delivery changes are introduced.
+- Consolidate history/refresh controls under the title and avoid repeating the
+  character heading in the conversation. Validation: `pytest -q` passes 666
+  tests and JavaScript syntax checks pass. At 1440×1000 the conversation widens
+  from about 382px to 513px and its history from 380px to 442px, starting higher
+  while keeping the composer visible. Deploy four static assets with backups.
+
 ## v1.38.1 — 2026-10-04 (patch: show LeetCode totals beside Jun's greeting)
 
 - Move total solved and Easy / Medium / Hard counts into the existing Jun

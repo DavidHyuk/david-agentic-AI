@@ -622,6 +622,10 @@ window.sharedOffice = (() => {
     }, 3200 + Math.random() * 2800);
   }
   function close() {
+    if (state.view === "workbench") {
+      $("office-message")?.focus({preventScroll: true});
+      return;
+    }
     const last = selected;
     selected = null;
     historyRequest++;
@@ -671,6 +675,7 @@ window.sharedOffice = (() => {
     $("office-chat-status").textContent = chat.busy ? (chat.receiving ? "답변을 쓰고 있어요…" : "첫 답변을 기다리고 있어요…") :
       chat.error || (!chat.loaded ? "대화를 불러오는 중…" : !chat.available ? "대화 연결을 준비하지 못했습니다." : "");
     $("office-send").disabled = chat.busy || !chat.loaded || !chat.available;
+    $("jun-response-mode").disabled = chat.busy;
     $("conversation-portrait").classList.toggle("thinking", chat.busy);
     $("conversation-history").scrollTop = $("conversation-history").scrollHeight;
   }
@@ -744,15 +749,25 @@ window.sharedOffice = (() => {
   }
   function workbench(room) {
     const target = $("bench-character");
+    const companion = $("bench-companion");
+    const summary = $("bench-summary");
     if ($("office-conversation")) {
       $("rooms").append($("office-conversation"));
       $("office-conversation").hidden = true;
       selected = null;
       historyRequest++;
     }
-    if (!officeCast[room]) { target.replaceChildren(); return; }
+    target.replaceChildren();
+    companion.replaceChildren();
+    companion.hidden = !officeCast[room];
+    summary.replaceChildren();
+    summary.hidden = room !== "coding";
+    if (!officeCast[room]) return;
     const cast = officeCast[room];
-    target.innerHTML = `<div class="bench-companion">${sprite(room)}<div><small>${esc(cast.role)}</small><h2>${esc(cast.name)}와 함께하는 작업실</h2><p>자료를 함께 살펴보고, 이곳에서 이야기를 이어가세요.</p>${room === "coding" ? '<p class="bench-pace" id="bench-pace" aria-live="polite">다음 한 걸음을 준비하고 있어요.</p><div class="bench-progress" id="bench-progress" aria-label="LeetCode 풀이 기록" aria-live="polite" hidden></div>' : ""}</div></div>`;
+    $("bench-title").textContent = `${cast.name}${room === "coding" ? "과" : "와"} 함께하는 ${deskTitles[room] || roomName(room)}`;
+    companion.innerHTML = sprite(room);
+    if (room === "coding") summary.innerHTML = '<p class="bench-pace" id="bench-pace" aria-live="polite">다음 한 걸음을 준비하고 있어요.</p><div class="bench-progress" id="bench-progress" aria-label="LeetCode 풀이 기록" aria-live="polite" hidden></div>';
+
     select(room, true);
     $("conversation-workbench").hidden = true;
   }

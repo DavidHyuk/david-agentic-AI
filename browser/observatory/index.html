@@ -124,18 +124,19 @@
           </div>
         </section>
         <section id="workbench-view" hidden>
-          <div class="page-heading">
-            <div>
-              <div class="eyebrow">ONE ROOM. ONE NEXT STEP.</div>
+          <div class="page-heading bench-heading">
+            <div id="bench-companion" aria-label="작업실 파트너" hidden></div>
+            <div class="bench-heading-copy">
               <h1 id="bench-title">작업실</h1>
-              <p id="bench-subtitle"></p>
+              <p id="bench-subtitle" hidden></p>
+              <div class="bench-toolbar">
+                <button class="outline" id="bench-history">대화 & 작업 기록</button
+                ><button class="outline" id="bench-reload">↻ 다시 불러오기</button
+                ><button class="outline" id="bench-home">← 캠퍼스</button
+                ><span id="bench-status" role="status" aria-live="polite"></span>
+              </div>
             </div>
-            <button class="outline" id="bench-home">← 캠퍼스</button>
-          </div>
-          <div class="bench-toolbar">
-            <button class="outline" id="bench-history">대화 & 작업 기록</button
-            ><button class="outline" id="bench-reload">↻ 다시 불러오기</button
-            ><span id="bench-status" role="status" aria-live="polite"></span>
+            <div id="bench-summary" aria-label="학습 현황" hidden></div>
           </div>
           <div class="bench-workspace">
             <aside id="bench-character" aria-label="작업실 대화"></aside>

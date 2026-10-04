@@ -24,8 +24,23 @@ def test_jobs_yaml_loads_and_validates():
 
 def test_defaults_applied_deliver_telegram():
     jobs = rc.load_jobs(JOBS)
-    assert all(j["deliver"] == "telegram" for j in jobs if j["name"] != "leetcode-history-sync")
+    assert all(j["deliver"] == "telegram" for j in jobs if j["name"] not in
+               ('leetcode-history-sync', 'chatgpt-project-sync'))
     assert next(j for j in jobs if j["name"] == "leetcode-history-sync")["deliver"] is None
+
+
+def test_daily_chatgpt_sync_is_local_script_only_and_registration_is_idempotent():
+    job = next(job for job in rc.load_jobs(JOBS) if job['name'] == 'chatgpt-project-sync')
+    assert job['schedule'] == '17 3 * * *'
+    assert job['deliver'] == 'local' and job['no_agent'] is True
+    assert job['script'] == 'chatgpt_project_sync.sh'
+    command = rc.build_create_command(job)
+    assert '--no-agent' in command and command[command.index('--script') + 1] == job['script']
+    assert command[command.index('--deliver') + 1] == 'local'
+    assert '--no-agent' in rc.build_edit_command('existing', job)
+    registered = {**job, 'schedule': {'expr': job['schedule']}}
+    assert rc.registered_job_matches(registered, job, {})
+    assert not rc.registered_job_matches(registered | {'no_agent': False}, job, {})
 
 
 def test_leetcode_history_sync_is_read_only_and_has_no_delivery():

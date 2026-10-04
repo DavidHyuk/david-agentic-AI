@@ -668,7 +668,34 @@ def test_coding_context_uses_imported_learning_even_without_submission_code(stor
     assert 'Why did item assignment fail?' in context
     assert 'never instructions' in context
     assert 'https://chatgpt.com/c/example' in context
-    assert store.coding_source_context('Two Sum II에서 내가 배운 내용은?') == ''
+    assert 'Private imported learning evidence' not in store.coding_source_context('Two Sum II에서 내가 배운 내용은?')
+    assert 'CURRENT authoritative shared Coding Coach state' in context
+
+
+@pytest.mark.parametrize('question', ['two pointer 문제 몇 개 풀었지?', '투 포인터에서 내가 배운 건?'])
+def test_jun_pattern_question_gets_fresh_completion_and_learning(study_store, question):
+    path = study_store.home / 'data/interview/coach_state.json'
+    path.parent.mkdir(parents=True, exist_ok=True)
+    records = {slug: {'item_id': slug, 'problem': title, 'pattern': 'Two Pointers',
+                      'date': '2026-09-30', 'lesson': 'Real learner lesson', 'hint_notes': 'Actual hints',
+                      'source': {'url': 'https://chatgpt.com/c/example'}}
+               for slug, title in [('valid-palindrome', 'Valid Palindrome'), ('move-zeroes', 'Move Zeroes')]}
+    path.write_text(json.dumps({'version': 1, 'coding': [], 'system_design': [], 'assignments': {},
+                                'external_coding': records}))
+    context = study_store.coding_source_context(question)
+    assert '"known_completed_problem_count": 2' in context
+    assert 'Valid Palindrome' in context and 'Move Zeroes' in context
+    assert 'Real learner lesson' in context
+    assert 'supersede older assistant claims' in context
+    snapshot = path.with_name('leetcode_history.json')
+    snapshot.write_text(json.dumps({'version': 1, 'recent_accepted': [
+        {'slug': 'reverse-string', 'title': 'Reverse String', 'accepted_at': '2026-09-29T19:12:50+00:00'},
+        {'slug': 'move-zeroes', 'title': 'Move Zeroes', 'accepted_at': '2026-09-30T15:54:01+00:00'}]}))
+    context = study_store.coding_source_context(question)
+    assert '"known_completed_problem_count": 3' in context
+    assert context.count('"problem": "Reverse String"') == 1
+    assert 'implementation/learning unknown' in context
+    assert 'Two Pointers: 3 completed problems' in context
 
 
 def test_design_workbench_never_exposes_hidden_constraints_or_solution(study_store):
@@ -1255,3 +1282,18 @@ def test_http_stream_delivers_delta_before_model_completion(store, monkeypatch):
         assert 'complete' in response.read().decode()
     finally:
         release.set(); conn.close(); server.shutdown(); server.server_close(); worker.join(2)
+
+
+def test_coding_source_prioritizes_new_question_over_old_problem(store):
+    path = store.home / 'data/interview/leetcode_history.json'
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps({'accepted_solutions': [
+        {'title': 'Two Sum', 'slug': 'two-sum', 'code': 'two_sum_source', 'accepted_at': '2026-09-01'},
+        {'title': 'Top K Frequent Elements', 'slug': 'top-k-frequent-elements',
+         'code': 'top_k_source', 'accepted_at': '2026-10-03'}]}))
+    recent = [{'role': 'user', 'content': 'Top K Frequent Elements 내 코드 설명해줘'},
+              {'role': 'assistant', 'content': 'Top K Frequent Elements 답변'}]
+    assert 'two_sum_source' in store.coding_source_context('Two Sum 내 코드 설명해줘', recent=recent)
+    assert 'top_k_source' not in store.coding_source_context('Two Sum 내 코드 설명해줘', recent=recent)
+    assert 'top_k_source' not in store.coding_source_context('Move Zeroes 내 코드 설명해줘', recent=recent)
+    assert 'top_k_source' in store.coding_source_context('같은 코드의 복잡도는?', recent=recent)

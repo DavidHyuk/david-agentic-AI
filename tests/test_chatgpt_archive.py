@@ -4,9 +4,100 @@ import json
 from pathlib import Path
 import zipfile
 from types import SimpleNamespace
+from contextlib import nullcontext
 
 import pytest
 import chatgpt_archive as archive
+
+
+def prepare_daily_capture(tmp_path, monkeypatch, failure=None):
+    project_id = 'g-p-' + 'a' * 32
+    row = {'id': CHAT_ID, 'title': 'selected', 'url': f'https://chatgpt.com/g/{project_id}/c/{CHAT_ID}'}
+    manifest = {'id': project_id, 'name': archive.DAILY_PROJECT, 'conversations': [row]}
+    archive.save_json(tmp_path / 'browser-project.json', manifest)
+    archive.save_json(tmp_path / 'browser-index.json', {'conversations': [row]})
+    cache = {**row, 'messages': [{'role': 'user', 'text': 'old source'}]}
+    archive.save_json(tmp_path / 'browser-chats' / (CHAT_ID + '.json'), cache)
+    (tmp_path / 'project-rag.db').write_bytes(b'old index')
+    calls = []
+    monkeypatch.setattr(archive, 'project_browser', lambda *args: nullcontext())
+    monkeypatch.setattr(archive, 'sync_project', lambda *args: {})
+    def read(root, scrolls, refresh=False):
+        calls.append(refresh)
+        observed = [] if failure == 'shorter' else cache['messages'] + [{'role': 'assistant', 'text': 'new hint'}]
+        archive.save_json(root / 'browser-chats' / (CHAT_ID + '.json'), {**cache, 'messages': observed})
+        return {'failures': [{'id': CHAT_ID}] if failure == 'capture' else []}
+    monkeypatch.setattr(archive, 'read_project', read)
+    def rebuild(argv, **kwargs):
+        root = Path(argv[argv.index('--data-dir') + 1])
+        (root / 'project-rag.db').write_bytes(b'new index')
+        return SimpleNamespace(returncode=1 if failure == 'vectors' else 0,
+                               stdout=json.dumps({'conversation_count': 1, 'message_count': 2, 'chunk_count': 2}))
+    monkeypatch.setattr(archive.subprocess, 'run', rebuild)
+    return calls
+
+
+def test_daily_sync_refreshes_sources_and_vectors_once_per_day(tmp_path, monkeypatch):
+    calls = prepare_daily_capture(tmp_path, monkeypatch)
+    result = archive.sync_daily(tmp_path, tmp_path, Path('/python'), archive.DAILY_PROJECT)
+    assert result['status'] == 'ok' and calls == [True]
+    assert (tmp_path / 'project-rag.db').read_bytes() == b'new index'
+    assert len(archive.load_json(tmp_path / 'browser-chats' / (CHAT_ID + '.json'))['messages']) == 2
+    assert archive.sync_daily(tmp_path, tmp_path, Path('/python'), archive.DAILY_PROJECT)['skipped']
+    assert calls == [True]
+    assert not list(tmp_path.glob('.daily-sync-*'))
+
+
+@pytest.mark.parametrize('failure', ['capture', 'shorter', 'vectors'])
+def test_failed_daily_capture_preserves_original_sources_and_index(tmp_path, monkeypatch, failure):
+    prepare_daily_capture(tmp_path, monkeypatch, failure)
+    cache = tmp_path / 'browser-chats' / (CHAT_ID + '.json')
+    old = cache.read_bytes()
+    with pytest.raises(archive.ArchiveError):
+        archive.sync_daily(tmp_path, tmp_path, Path('/python'), archive.DAILY_PROJECT)
+    assert cache.read_bytes() == old
+    assert (tmp_path / 'project-rag.db').read_bytes() == b'old index'
+    assert archive.load_json(tmp_path / 'daily-sync.json')['status'] == 'error'
+
+
+def test_daily_sync_rejects_project_switch_and_existing_browser_lock(tmp_path, monkeypatch):
+    prepare_daily_capture(tmp_path, monkeypatch)
+    with pytest.raises(archive.ArchiveError, match='owner-selected'):
+        archive.sync_daily(tmp_path, tmp_path, Path('/python'), 'Another project')
+    with archive.locked(tmp_path, '.browser.lock'):
+        with pytest.raises(archive.ArchiveError, match='Another ChatGPT operation'):
+            archive.sync_daily(tmp_path, tmp_path, Path('/python'), archive.DAILY_PROJECT)
+
+
+def test_publish_capture_rolls_back_on_partial_write_failure(tmp_path, monkeypatch):
+    root, staging = tmp_path / 'live', tmp_path / 'staged'
+    for folder, label in ((root, 'old'), (staging, 'new')):
+        folder.mkdir()
+        (folder / 'browser-chats').mkdir()
+        for name in ('browser-project.json', 'browser-index.json', 'project-rag.db'):
+            (folder / name).write_text(label)
+    original = Path.replace
+    def fail_index(self, target):
+        if self == staging / 'project-rag.db':
+            raise OSError('write failed')
+        return original(self, target)
+    monkeypatch.setattr(Path, 'replace', fail_index)
+    with pytest.raises(OSError):
+        archive.publish_project_capture(root, staging)
+    assert all((root / name).read_text() == 'old' for name in
+               ('browser-project.json', 'browser-index.json', 'project-rag.db'))
+
+
+def test_partial_capture_merges_only_proven_ordered_overlap():
+    rows = [{'role': 'user' if index % 2 == 0 else 'assistant', 'text': str(index)} for index in range(6)]
+    old = {'messages': rows}
+    result = archive.merge_partial_capture(old, {'messages': rows[1:4]})
+    assert result['messages'] == rows and result['observed_message_count'] == 3
+    new_message = {'role': 'user', 'text': 'new question'}
+    result = archive.merge_partial_capture(old, {'messages': rows[-2:] + [new_message]})
+    assert result['messages'] == rows + [new_message]
+    with pytest.raises(archive.ArchiveError):
+        archive.merge_partial_capture(old, {'messages': [new_message]})
 
 
 def message(role, text, **extra):

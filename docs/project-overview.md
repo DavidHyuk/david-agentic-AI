@@ -63,6 +63,18 @@ Langfuse `production` 환경에 agent/LLM/tool spans와 제한된 질문·답변
 SDK background export를 사용하며, 실제 전달을 관측한 streaming 요청만 visible TTFT를
 기록합니다. tool 본문·이미지·system prompt는 제외하고 native prefill/TPS를 추정하지 않습니다.
 `bootstrap/stage_conversation_tracing.py`는 지정된 owning profile 하나만 변경합니다.
+
+Jun 웹 코딩 대화의 기본 `빠른 답변`은 optional `leetcode-latency` plugin으로
+thinking을 끄고 tool schema를 줄입니다. `깊이 생각`은 기존 reasoning/도구를
+사용합니다. `bootstrap/stage_leetcode_latency.py`는 default `office_coding`만
+활성화하며 cron/Telegram/다른 profile에는 적용하지 않습니다. 큰 과거 검색은
+private `data/jun-context` 원문을 참조하고, 현재 learning/source 자료는 안정된
+system prefix 뒤에 붙입니다. `local-model/eval/leetcode_latency.py`로 동일
+workload의 schema 비교를 측정합니다. 추가 4 experiments / 26 distinct traces /
+154 scores의 Cloud read-back과 복제 Jun의 native TTFT 첫 질문 25.35초 / 후속
+1.27초를 확인했습니다. Provider 128K × 2와 agent 64K를 유지하고 MTP는 OFF입니다.
+latency/source/cache/Cloud item ID 검증을 포함한 전체 680개 테스트가 통과했습니다.
+결과와 메모리 보호 중단·복구는 `docs/benchmarks/jun-latency-2026-10-04.md`에 있습니다.
 별도 specialist 및 ClawGram profile에는 자동 배포하지 않습니다. LangGraph state의
 Studio snapshot 경로와 Graph/Sessions 조회는 `docs/agent-observability.md`를 따릅니다.
 
@@ -126,6 +138,15 @@ DOM과 이전 DOM을 지원하고 저장 전 선택한 대화 ID를 재검증합
 프로젝트 main 목록의 같은 project-ID 링크만 기록하며 `read-project`는 해당
 9개 대화의 본문만 수집하고, 기존 scroll 관찰 완료 cache를 재수집하지 않습니다.
 현재 메시지 116개를 로컬에 저장했고, 전체 계정 또는 모든 turn의 완료를 뜻하지 않습니다.
+
+선택 프로젝트의 일일 갱신은 `chatgpt-project-sync`로 매일 03:17 LA에 동작합니다.
+`chatgpt_project_sync.sh` → `chatgpt_archive.py sync-daily`가 기존 로그인 profile로
+임시 브라우저만 실행하고 프로젝트 목록·본문·벡터 색인을 함께 준비한 뒤 게시합니다.
+Hermes `--no-agent` script cron + local delivery로 LLM과 Telegram 알림을 사용하지
+않고, 새 profile·bot·room을 만들지 않습니다. 기존 HQ에서 일정·마지막 시도/성공을
+보여줍니다. 성공은 LA 날짜로 중복 방지하며 browser/read/index lock과 25분 실행
+제한을 둡니다. 겹치는 원문으로 연속성을 검증한 부분 관찰만 병합하며 수집·embedding·
+게시 실패에는 기존 cache/index를 보존합니다. cron script timeout은 1800초입니다.
 
 `scripts/chatgpt_rag.py`는 이 프로젝트 manifest와 각 cache의 URL·ID·role을
 검증한 뒤 실제 tokenizer offset 기준으로 254개 검색 구간을 만들었습니다.
@@ -198,6 +219,7 @@ David-Agent/
 │   ├── youtube_history.py     # SSH 쿠키 연결 + headless 시청 기록 수집
 │   ├── youtube_browser_login.py # SSH 터널로 DGX Chromium 직접 로그인
 │   ├── chatgpt_archive.py     # ChatGPT 직접 로그인·내보내기·로컬 대화 검색
+│   ├── chatgpt_project_sync.sh # 선택 프로젝트 일일 수집·원자적 RAG 갱신
 │   ├── chatgpt_rag.py         # 선택 프로젝트 CPU 임베딩·벡터 검색·인용 원문
 │   ├── english_podcast.py     # 선택한 영상 대본·긴 문장 연습 / 요청 시 채널 대본
 │   ├── agenda.py              # 캘린더 이벤트 포맷팅 + 충돌 감지
@@ -349,6 +371,7 @@ history/search·알림 제어의 이점이 있으면 같은 bot을 별도 Telegr
 | `youtube_history.py` | SSH stdin 쿠키 연결, GUI 없는 headless 시청 기록 수집, 18시 링크 메시지 |
 | `youtube_browser_login.py` | DGX Chromium 직접 로그인, 임시 localhost noVNC, 연결과 재실행 검증 |
 | `chatgpt_archive.py` | ChatGPT 로그인·선택 프로젝트 목록/본문 관찰·공식 export import |
+| `chatgpt_project_sync.sh` | 기존 로그인으로 선택 프로젝트 일일 수집·RAG 갱신, 같은 날 중복 실행 방지 |
 | `chatgpt_rag.py` | 프로젝트 범위 검증·token chunk·CPU E5 embedding·로컬 hybrid retrieval·출처 조회 |
 | `export_youtube_cookies.py` | MacBook 브라우저에서 live YouTube 쿠키만 private 파일로 내보내기 |
 | `agenda.py` | 캘린더 이벤트 포맷팅 + 충돌·여유 슬롯 감지 |
@@ -363,6 +386,7 @@ Calendar 연동을 재개할 때까지 `morning-brief`는 등록하지 않습니
 | 잡 | 시간 | 내용 |
 |----|------|------|
 | `papers-digest` | 08:50 화/금 | 전용 Telegram 논문 그룹: 가장 핫한 LLM/LVM 논문 3편 |
+| `chatgpt-project-sync` | 매일 03:17 LA | 전송 없음: Silicon Valley Career 2027 대화 관찰·로컬 RAG 갱신 |
 | `interview-prep` | 12:05 월/수/금 | 전용 Interview 그룹: 실시간 트렌드 기반 Staff 레벨 드릴 1개 |
 | `coding-coach` | 12:10 화/목/토 | 전용 LeetCode 그룹: 같은 패턴 6문제 블록의 다음 35분 문제 |
 | `leetcode-history-sync` | 매일 06:35 | 전송 없음: 연결된 LeetCode 세션의 읽기 전용 풀이 이력 snapshot 갱신 |
@@ -788,6 +812,13 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   저장된 쿠키 내용은 Observatory에 제공하지 않습니다.
 
 ### 인터뷰 학습 코치 (interview_progress.py)
+- 모든 작업실 상단은 “Jun과 함께하는 LeetCode Gym” 형식의 하나의 프레임으로
+  통합합니다. 기록·새로고침 버튼과 기존 풀이 현황을 유지하고 중복 제목·소개 문구를
+  없앱니다. 완료 목록도 평가 기록과 ChatGPT 학습 기록을 날짜순으로 합치며,
+  같은 문제·같은 날짜의 근거는 한 항목에 모읍니다. Jun의 답변에는 공유 coach state의
+  최신 완료 목록·LeetCode Accepted 근거와 pattern별 실제 배움을 전달하므로 제출
+  코드가 없어도 완료를 압니다. Reverse String도 완료 사실을 표시하되 확인되지 않은
+  풀이 과정은 비워 둡니다.
 - `import-coding-history --file PRIVATE_JSON`은 선택 프로젝트에 속한 ChatGPT
   cache의 질문·힌트와 LeetCode의 실제 Accepted 시각을 검증해 `external_coding`에
   배운 점·원문·출처를 저장합니다. 알려진 커리큘럼 문제는 완료 처리하고 다음 신규
@@ -803,6 +834,11 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   Jun 인사 영역에 LeetCode 전체 해결 수와 Easy / Medium / Hard 집계도 함께
   표시하고 작업실 갱신 시 최신 snapshot으로 업데이트합니다. 아래 계정 카드에서는
   중복 집계를 없애고 갱신 상태·최근 정답·제출 코드 보관 정보를 표시합니다.
+  모든 작업실에서 캐릭터 소개를 작업실 제목 옆의 작은 상단 카드로 옮기고,
+  아래 대화 열을 넓혀 기존 소개 영역까지 사용합니다. 대화 이력은 확보된 높이에서
+  독립적으로 스크롤하고 입력창은 유지합니다. 데스크톱에서는 현재 작업과 나란히,
+  작은 화면에서는 대화·작업을 위아래로 표시합니다. 작업실에서 Escape는 대화창을
+  닫지 않고 입력창으로 돌아갑니다.
 - 기존 `interview-prep` 스킬 안에서 동작하며, `stage.py`가 standalone helper와
   `references/coach_catalog.json`을 그대로 배포합니다. 모델/엔진 구성은 현재
   Qwen3.8 Flash-Next 4비트 llama.cpp 64K 설정을 공유합니다.
@@ -924,7 +960,9 @@ ZIP 경로 격리·credential 오류 출력 방지 및 HQ source 상태 검증�
 2026-10-04 Codex quota 복구·writer 충돌·최종 상태 재확인 검증 후 전체
 638개 테스트가 통과했습니다. 이후 코딩 대화 학습 import·원자적 거부·중복 방지·
 커리큘럼 진행·작업실 경과일·학습 근거 전달 검증 이후 Jun 풀이 집계를 상단으로
-옮긴 변경까지 전체 663개가 통과했습니다.
+옮기고 모든 작업실의 상단 소개·확장 대화 배치를 적용한 변경까지 전체 666개가
+통과했습니다. 이후 일일 프로젝트 script cron·부분 원문 병합·게시 rollback·Jun 최신
+완료 근거와 통합 작업실 기록 검증까지 전체 680개가 통과했습니다.
 서버 해제 시각·자정 넘김·기존 예약 migration과
 David·English 자동 tracing의 도구 인자 제외,
 session 묶음과 visible TTFT 처리 검증을 포함합니다.

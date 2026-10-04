@@ -218,6 +218,10 @@ def load_runs(paths):
     ids = [r["run_id"] for r in result]
     if len(ids) != len(set(ids)):
         raise ValueError("duplicate experiments; do not double-count imported measurements")
+    for run in result:
+        item_ids = [row['id'] for row in run['records']]
+        if len(item_ids) != len(set(item_ids)):
+            raise ValueError("duplicate experiment items; give concurrency variants distinct IDs")
     return result
 
 

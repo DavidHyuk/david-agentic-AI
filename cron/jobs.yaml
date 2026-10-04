@@ -12,6 +12,16 @@ defaults:
   deliver: telegram
 
 jobs:
+  - name: chatgpt-project-sync
+    schedule: "17 3 * * *"         # 03:17 LA daily; before 06:35 account sync
+    deliver: local
+    script: chatgpt_project_sync.sh
+    no_agent: true
+    prompt: >
+      Refresh only the owner-selected Silicon Valley Career 2027 ChatGPT project
+      and its local vector index. Read-only source maintenance with no LLM or
+      Telegram delivery; retain prior sources when login or capture fails.
+
   - name: leetcode-history-sync
     schedule: "35 6 * * *"          # 06:35 daily; staggered, no Telegram delivery
     deliver: null

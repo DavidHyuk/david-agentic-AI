@@ -53,6 +53,7 @@ memory:
 # max_parallel_jobs: 1 runs jobs sequentially so one hung agent call cannot
 # block the entire scheduler behind a stuck tick lock.
 cron:
+  script_timeout_seconds: 1800  # bounded daily browser capture
   wrap_response: true
   max_parallel_jobs: 1
 

@@ -77,7 +77,10 @@ def request(prompt, case, repeat, phase, slot, concurrency=1):
     metrics = base.metrics_from_timings(timings, first, wall)
     # Visible delivery excludes hidden reasoning; do not estimate decode from it.
     metrics.pop("client_decode_tps", None)
-    row = {"id": f"{case['id']}-{repeat}-{phase}-{slot}", "case": case["id"],
+    identity = f"{case['id']}-{repeat}-{phase}-{slot}"
+    if concurrency > 1:
+        identity += f"-concurrency{concurrency}"
+    row = {"id": identity, "case": case["id"],
         "workflow": "coding", "phase": phase, "repeat": repeat, "concurrency": concurrency,
         "output_limit": case["limit"], "started_at": started, "completed_at": base.utcnow(),
         "prompt_sha256": base.digest(prompt), "output_sha256": base.digest(text),

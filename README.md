@@ -145,6 +145,7 @@ Local DGX Spark (llama.cpp @ :8003, Qwen3.8 Flash-Next IQ4_XS, 2 × 64K slots)
 | `scripts/interview_progress.py` | Concrete study messages, feedback, hints, adaptive reviews, weekly metrics |
 | `scripts/reward_system.py` | Evidence-backed Career Cash, streaks, weekly missions, and virtual offer unlocks |
 | `scripts/leetcode_sync.py` | Owner-only LeetCode session link and read-only solved-history snapshot |
+| `scripts/chatgpt_project_sync.sh` | Daily selected-project browser observation and atomic local RAG refresh |
 | `skills/career/interview-prep/references/coach_catalog.json` | Curated coding curriculum plus General/ML/Agent design interviews |
 | `skills/career/interview-prep/references/system-design-interviewer.md` | Stateful interview flow, commands, rubric, and solution gate |
 | `skills/career/interview-prep/references/company-coding-strategy.md` | Company-aware LeetCode/practical-coding preparation strategy |
@@ -305,6 +306,29 @@ system prompts, tool bodies and images are omitted. See the
 [agent visualization and tracing guide](docs/agent-observability.md) for
 Graph/Sessions navigation, isolated ClawGram Studio state inspection, and
 `bootstrap/stage_conversation_tracing.py` installation/disable commands.
+
+Jun's **코딩** web conversation defaults to **빠른 답변** and offers **깊이 생각**
+for normal reasoning/full tools. Fast mode disables hidden thinking, narrows
+tool schemas, and references oversized past `session_search` results through
+private immutable originals in `~/.hermes/data/jun-context/`. Jun can read those
+originals when needed. Durable history and code are preserved. Changing learning
+facts and retrieved code follow the stable system prefix for cached followups.
+Other rooms and Telegram conversations retain their existing request policy.
+
+Install the optional policy from this repository, then restart the idle owning
+gateway; use normal Observatory staging for the corresponding web controls:
+
+```bash
+/home/david/miniconda3/bin/python3 bootstrap/stage_leetcode_latency.py --hermes-home ~/.hermes
+systemctl --user restart hermes-gateway.service
+```
+
+The helper backs up config/plugin and preserves tracing. To disable, set
+`leetcode_latency.enabled: false` in `~/.hermes/config.yaml` and restart that
+gateway when idle. Restore the helper's private backup for rollback. Keep
+`data/jun-context` while archived references are in use. The provider retains
+two 128K slots and the agent's separate 64K setting. See the
+[Jun measurements and limits](docs/benchmarks/jun-latency-2026-10-04.md).
 
 The version-controlled [120-case synthetic benchmark](local-model/eval/README.md)
 uses four balanced buckets: short tasks, scripted multi-tool calls, multi-turn
@@ -706,6 +730,7 @@ coding, and system-design progress.
 | Job | When (local) | What |
 |---|---|---|
 | `papers-digest` | 08:50 Tue/Fri | Dedicated paper group: three hottest LLM/LVM papers after 08:00 ingestion |
+| `chatgpt-project-sync` | Daily 03:17 LA | Local script only: refresh Silicon Valley Career 2027 observations and RAG; no notification |
 | `interview-prep` | 12:05 Mon/Wed/Fri | Interview group: one focused Staff/Senior MLE drill |
 | `coding-coach` | 12:10 Tue/Thu/Sat | LeetCode group: 35-minute beginner problem with canonical links |
 | `system-design-coach` | 12:15 Sunday | System-design group: one adaptive 45-minute interview |
@@ -906,6 +931,18 @@ Jun's greeting also shows total LeetCode solves and the Easy / Medium / Hard
 breakdown from the linked account snapshot, alongside the practice gap. These
 counts move out of the lower account card and update whenever the workbench
 refreshes; source-sync status and recent accepted problems remain below.
+All workbenches use one compact heading such as **Jun과 함께하는 LeetCode Gym**,
+with history/refresh controls and existing learning metrics in the same frame.
+Below it, a wider conversation column uses the former introduction space and
+fills the available height, with independent history scrolling and a persistent
+composer. Current work remains alongside it; smaller screens stack conversation
+and work vertically. Escape keeps workbench conversations open.
+Graded attempts and imported ChatGPT learning appear in one chronological
+**학습 완료 기록** list, with available metrics, actual hints/lessons and original
+conversation links. Same-problem/same-date evidence merges into one entry.
+Jun receives the current shared completion inventory on each reply, including
+externally verified completions and pattern-specific learning. Missing submitted
+source is not evidence that a problem was never solved.
 
 ### LeetCode account history (optional, read-only)
 
@@ -1401,6 +1438,29 @@ contains nine observed chats; its cached 116 user/assistant messages form 254
 token-bounded search chunks. Other account chats are excluded from this index.
 These are browser observations, so unrendered historical turns or source files
 are not claimed collected. The official full-account export is still unconfirmed.
+
+The selected project is refreshed **daily at 03:17 America/Los_Angeles**, before
+the 06:35 LeetCode sync and the other scheduled study jobs. `chatgpt-project-sync`
+is a Hermes **script-only** cron job (`--no-agent`, local delivery): no model call,
+new bot/profile, VNC server or Telegram notification is needed. It temporarily
+reuses the saved ChatGPT browser login, refreshes the project list and each chat,
+and rebuilds local vectors without downloading another model.
+
+```bash
+python bootstrap/register_cron.py --name chatgpt-project-sync
+~/.hermes/venvs/youtube-history/bin/python ~/.hermes/scripts/chatgpt_archive.py sync-daily
+```
+
+The staged `chatgpt_project_sync.sh` has a 25-minute bound; the cron script limit
+is 1800 seconds. Browser/read/index locks avoid simultaneous manual collection;
+successful runs deduplicate by LA date. Sources and vectors are validated in a
+private staging directory and published together, restoring old files on write
+failure. Shorter observations retain earlier messages only when ordered overlap
+proves continuity; unverified overlap, login failures or partial chat failures
+preserve the last published sources/index. Browser captures remain partial.
+HQ shows the daily schedule, latest attempt and last successful refresh from
+`data/chatgpt/daily-sync.json`; the job is routed to the existing HQ room.
+This is internal source maintenance, so it does not create a separate room.
 
 The standalone `chatgpt_rag.py` helper uses pinned
 [`intfloat/multilingual-e5-small`](https://huggingface.co/intfloat/multilingual-e5-small)

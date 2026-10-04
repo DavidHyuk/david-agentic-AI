@@ -18,6 +18,7 @@ from pathlib import Path
 import re
 import secrets
 import signal
+import shutil
 import socket
 import sqlite3
 import subprocess
@@ -26,6 +27,7 @@ import tempfile
 import time
 from urllib.parse import urlsplit, urljoin
 import zipfile
+from zoneinfo import ZoneInfo
 
 DEFAULT_DATA = Path.home() / '.hermes/data/chatgpt'
 DEFAULT_RUNTIME = Path.home() / '.hermes/venvs/youtube-history'
@@ -33,6 +35,7 @@ WEB_PORT, VNC_PORT, CDP_PORT = 18781, 15902, 19324
 MAX_EXPORT_BYTES = 512 * 1024 * 1024
 CONVERSATION_PATH = re.compile(r'^/(?:c/|g/[^/]+/c/)([0-9a-fA-F-]{36})/?$')
 PROJECT_ID = re.compile(r'^g-p-[0-9a-f]{32}$')
+DAILY_PROJECT = 'Silicon Valley Career 2027'
 
 
 class ArchiveError(ValueError):
@@ -527,6 +530,156 @@ def read_project(data_dir: Path, max_scrolls: int, refresh: bool = False) -> dic
             'failures': failures, 'complete': False}
 
 
+@contextmanager
+def project_browser(runtime: Path, data_dir: Path):
+    """Temporarily reuse the saved ChatGPT profile without exposing a VNC server."""
+    from playwright.sync_api import sync_playwright
+    executables = sorted((runtime / 'browsers').glob('chromium-*/chrome-linux*/chrome'))
+    if not executables:
+        raise ArchiveError('The private ChatGPT browser runtime is not installed.')
+    private_directory(data_dir / 'browser')
+    authority = data_dir / 'login.xauth'
+    env = os.environ.copy()
+    env.update(DISPLAY=':98', LIBGL_ALWAYS_SOFTWARE='1', XAUTHORITY=str(authority))
+    env['LD_LIBRARY_PATH'] = ':'.join(map(str, sorted((runtime / 'desktop/usr/lib').glob('*-linux-gnu'))))
+    with socket.socket() as probe:
+        probe.bind(('127.0.0.1', CDP_PORT))
+    with ExitStack() as cleanup:
+        authority.touch(mode=0o600)
+        authority.chmod(0o600)
+        cleanup.callback(authority.unlink, missing_ok=True)
+        subprocess.run(['xauth', '-f', str(authority), 'add', ':98', 'MIT-MAGIC-COOKIE-1', secrets.token_hex(16)],
+                       check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        commands = desktop_commands(runtime, data_dir, executables[-1])
+        processes = []
+        for command in (commands[0], commands[3]):
+            process = subprocess.Popen(command, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            processes.append(process)
+            cleanup.callback(stop_process, process)
+            if len(processes) == 1:
+                time.sleep(1)
+            else:
+                wait_port(CDP_PORT, processes)
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.connect_over_cdp(f'http://127.0.0.1:{CDP_PORT}')
+            page = browser.contexts[0].pages[0]
+            page.goto('https://chatgpt.com/', wait_until='domcontentloaded', timeout=45_000)
+            deadline = time.monotonic() + 30
+            while not is_authenticated(page) and time.monotonic() < deadline:
+                page.wait_for_timeout(500)
+            if not is_authenticated(page):
+                raise ArchiveError('ChatGPT login needs owner attention; prior sources retained.')
+        # Each collector starts its own Playwright connection; do not nest sync loops.
+        yield
+
+
+def publish_project_capture(data_dir: Path, staging: Path) -> None:
+    """Publish validated sources then the index; restore originals on write failure."""
+    files = [Path('browser-project.json'), Path('browser-index.json')]
+    files += [path.relative_to(staging) for path in (staging / 'browser-chats').glob('*.json')]
+    files.append(Path('project-rag.db'))
+    rollback = staging / 'rollback'
+    changed = []
+    try:
+        for relative in files:
+            target = data_dir / relative
+            backup = rollback / relative
+            private_directory(target.parent)
+            if target.exists():
+                private_directory(backup.parent)
+                shutil.copy2(target, backup)
+            (staging / relative).replace(target)
+            changed.append((target, backup))
+    except BaseException:
+        for target, backup in reversed(changed):
+            if backup.exists():
+                backup.replace(target)
+            else:
+                target.unlink(missing_ok=True)
+        raise
+
+
+def merge_partial_capture(previous: dict, current: dict) -> dict:
+    """Retain an earlier longer observation only when overlap proves continuity."""
+    old, new = previous.get('messages', []), current.get('messages', [])
+    if len(new) >= len(old):
+        return current
+    pairs = lambda rows: [(row['role'], row['text']) for row in rows]
+    old_pairs, new_pairs = pairs(old), pairs(new)
+    if not new_pairs:
+        raise ArchiveError('An empty project capture was rejected; prior sources retained.')
+    cursor = 0
+    for pair in old_pairs:
+        if cursor < len(new_pairs) and pair == new_pairs[cursor]:
+            cursor += 1
+    if cursor == len(new_pairs):
+        return {**current, 'messages': old, 'retained_message_count': len(old) - len(new),
+                'observed_message_count': len(new)}
+    for overlap in range(min(len(old), len(new)), 1, -1):
+        if old_pairs[-overlap:] == new_pairs[:overlap]:
+            return {**current, 'messages': old + new[overlap:],
+                    'retained_message_count': len(old) - overlap, 'observed_message_count': len(new)}
+    raise ArchiveError('A partial capture lacked verified overlap; prior sources retained.')
+
+
+def sync_daily(data_dir: Path, runtime: Path, rag_python: Path, project_name: str,
+               max_scrolls: int = 400) -> dict:
+    """Refresh the selected project and vectors once per LA day, without exports."""
+    with locked(data_dir, '.daily-sync.lock'):
+        status_path = data_dir / 'daily-sync.json'
+        previous = load_json(status_path)
+        today = datetime.now(ZoneInfo('America/Los_Angeles')).date().isoformat()
+        if previous.get('last_success_date') == today and previous.get('project_name') == project_name:
+            return {**previous, 'skipped': True}
+        status = {**previous, 'project_name': project_name, 'status': 'running', 'last_attempt_at': now()}
+        status.pop('error', None)
+        save_json(status_path, status)
+        try:
+            manifest = load_json(data_dir / 'browser-project.json')
+            if manifest.get('name') != project_name:
+                raise ArchiveError('Daily sync must match the owner-selected cached project.')
+            with locked(data_dir, '.browser.lock'), locked(data_dir, '.browser-read.lock'), locked(data_dir, '.rag-build.lock'):
+                with tempfile.TemporaryDirectory(prefix='.daily-sync-', dir=data_dir) as temporary:
+                    staging = Path(temporary)
+                    for filename in ('browser-project.json', 'browser-index.json', 'project-rag.db'):
+                        if (data_dir / filename).exists():
+                            shutil.copy2(data_dir / filename, staging / filename)
+                    private_directory(staging / 'browser-chats')
+                    for row in project_conversations(manifest.get('conversations', []), manifest.get('id', '')):
+                        cache = data_dir / 'browser-chats' / (row['id'] + '.json')
+                        if cache.exists():
+                            shutil.copy2(cache, staging / 'browser-chats' / cache.name)
+                    with project_browser(runtime, data_dir):
+                        sync_project(staging, project_name, 40)
+                        result = read_project(staging, max_scrolls, refresh=True)
+                    if result['failures']:
+                        raise ArchiveError('Some project chats could not be refreshed; prior sources retained.')
+                    retained = 0
+                    for cache in (staging / 'browser-chats').glob('*.json'):
+                        old = load_json(data_dir / 'browser-chats' / cache.name)
+                        current = merge_partial_capture(old, load_json(cache))
+                        retained += bool(current.get('retained_message_count'))
+                        save_json(cache, current)
+                    rebuild = subprocess.run(
+                        [str(rag_python), str(Path(__file__).with_name('chatgpt_rag.py')),
+                         '--data-dir', str(staging), 'build'],
+                        capture_output=True, text=True, timeout=600)
+                    if rebuild.returncode:
+                        raise ArchiveError('Project vector rebuild failed; prior sources retained.')
+                    metadata = json.loads(rebuild.stdout)
+                    publish_project_capture(data_dir, staging)
+            status.update(status='ok', last_success_at=now(), last_success_date=today,
+                          conversation_count=metadata['conversation_count'], message_count=metadata['message_count'],
+                          chunk_count=metadata['chunk_count'])
+            status['retained_chat_count'] = retained
+        except BaseException as exc:
+            status.update(status='error', error=str(exc) if isinstance(exc, ArchiveError) else type(exc).__name__)
+            save_json(status_path, status)
+            raise
+        save_json(status_path, status)
+        return status
+
+
 def stop_process(process) -> None:
     if process.poll() is None:
         process.terminate()
@@ -741,6 +894,11 @@ def main(argv=None) -> int:
     project_reader = commands.add_parser('read-project', help='Cache selected project chats; skip prior observations.')
     project_reader.add_argument('--max-scrolls', type=int, default=400)
     project_reader.add_argument('--refresh', action='store_true')
+    daily = commands.add_parser('sync-daily', help='Refresh the selected project and local vectors without an agent.')
+    daily.add_argument('--project', default=DAILY_PROJECT)
+    daily.add_argument('--runtime-dir', type=Path, default=DEFAULT_RUNTIME)
+    daily.add_argument('--rag-python', type=Path, default=Path.home() / '.hermes/venvs/chatgpt-rag/bin/python')
+    daily.add_argument('--max-scrolls', type=int, default=400)
     args = parser.parse_args(argv)
     os.umask(0o077)
     def interrupted(*unused):
@@ -758,7 +916,12 @@ def main(argv=None) -> int:
                     state['browser_status'] = 'closed'
                     save_json(args.data_dir / 'browser-status.json', state)
             return 0
-        if args.command == 'import':
+        if args.command == 'sync-daily':
+            if not 0 <= args.max_scrolls <= 400:
+                parser.error('--max-scrolls must be between 0 and 400')
+            signal.signal(signal.SIGTERM, interrupted)
+            result = sync_daily(args.data_dir, args.runtime_dir, args.rag_python, args.project, args.max_scrolls)
+        elif args.command == 'import':
             result = import_export(args.file, args.data_dir)
         elif args.command == 'download':
             result = download_export(args.data_dir, sys.stdin.readline().strip())
