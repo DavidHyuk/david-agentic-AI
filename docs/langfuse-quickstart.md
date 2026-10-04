@@ -2,8 +2,10 @@
 
 Langfuse는 모델 실행·agent 요청·실험 결과를 저장하고 웹에서 비교하는 도구입니다.
 추론은 지금처럼 Spark에서 실행하고, 실험 지표는 Langfuse Cloud에 기록합니다.
-현재 실험 exporter는 숫자와 해시만 전송하며 대화 원문·사진·학습자 정보는 보내지 않습니다.
-웹 대화 전체의 자동 추적은 이 exporter와 별개이며 아직 연결하지 않았습니다.
+실험 exporter는 숫자와 해시만 전송하며 대화 원문·사진·학습자 정보는 보내지 않습니다.
+별도 Hermes observer plugin으로 David/English의 새 대화를 자동 기록합니다.
+자동 기록은 제한된 질문·답변 text도 전송하므로 실험 exporter와 범위를 구분합니다.
+조회·시각화·설치·제외 범위는 [에이전트 관측 안내](agent-observability.md)를 따릅니다.
 
 ## 가입 및 접속
 
@@ -65,7 +67,7 @@ HTTP 성공만으로 score 성공을 가정하지 않고 개별 오류도 확인
 `david-agent-performance` 프로젝트에서 6 experiments, 105 traces,
 570 numeric performance scores를 모두 다시 조회했으며 누락은 없었습니다.
 검증 영수증은 로컬 `runtime/model-benchmarks/langfuse-upload-20261004.json`에
-보관합니다. 실험을 업로드한 것이며, 운영 대화 전체의 자동 추적은 아직 별도입니다.
+보관합니다. 이 영수증은 실험 업로드 검증이며, 새 대화 자동 기록은 별도 plugin입니다.
 
 ## 웹에서 어디를 보면 되나
 

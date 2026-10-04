@@ -30,12 +30,16 @@ worker를 종료하지 않고, 수동 새 turn은 대기 예약을 취소합니�
 수동 중단·이미 재개한 session은 자동 실행 및 수동 시간 예약 모두 거부합니다.
 열린 TUI가 idle session의 writer를 소유하면 같은 local daemon에 `turn/start`를
 전달하고 기존 rollout으로 완료를 확인합니다. active turn은 건드리지 않습니다.
+같은 daemon에 연결된 기존 TUI는 재접속 없이 진행 메시지·도구 출력·최종 답변을
+받습니다. 별도 앱이나 `--no-daemon` 소유자는 잠금을 해제해야 복구가 가능합니다.
 이는 기존 Codex task 유지 도구이므로 Hermes profile/gateway/bot/cron 및
 Observatory room을 추가하지 않습니다. 별도 user-facing Hermes workflow가 없으며,
 운영 기록은 `codex-auto-resume status`와 systemd journal에서 확인합니다.
 핵심 기술은 Python 표준 라이브러리, SQLite WAL, JSONL, systemd user service와
 Unix WebSocket JSON-RPC입니다. 격리된 synthetic quota 종료와 2초 대기로 실제
 Codex 도구의 파일 생성을 검증했고, writer 충돌 경로에서도 session 수는 1개였습니다.
+추가 live TUI 검증에서 화면을 유지한 채 같은 RPC 경로의 진행·도구 결과·최종
+답변이 표시되는 것을 각각 캡처하고 생성 파일을 확인했습니다.
 
 ## 전체 아키텍처
 
@@ -51,7 +55,13 @@ Hermes profile 설정의 context length는 별도로 64K이므로 아래 구성�
 Langfuse Cloud 초기 설정과 실험 비교 방법은 `docs/langfuse-quickstart.md`에 있습니다.
 2026-10-04 Cloud의 `david-agent-performance`에 6 experiments / 105 traces /
 570 performance scores를 업로드하고 read API로 전량 조회를 확인했습니다.
-운영 대화 전체의 자동 추적은 아직 연결하지 않았습니다.
+David/English의 새 Hermes 대화는 `config/plugins/david-langfuse/` observer plugin이
+Langfuse `production` 환경에 agent/LLM/tool spans와 제한된 질문·답변을 자동 기록합니다.
+SDK background export를 사용하며, 실제 전달을 관측한 streaming 요청만 visible TTFT를
+기록합니다. tool 본문·이미지·system prompt는 제외하고 native prefill/TPS를 추정하지 않습니다.
+`bootstrap/stage_conversation_tracing.py`는 지정된 owning profile 하나만 변경합니다.
+별도 specialist 및 ClawGram profile에는 자동 배포하지 않습니다. LangGraph state의
+Studio snapshot 경로와 Graph/Sessions 조회는 `docs/agent-observability.md`를 따릅니다.
 
 ```
 DGX Spark (128GB 통합 메모리)

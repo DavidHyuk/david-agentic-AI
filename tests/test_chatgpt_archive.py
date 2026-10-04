@@ -252,6 +252,32 @@ def test_invalid_url_library_error_is_not_printed(tmp_path, monkeypatch, capsys)
 CHAT_ID = '12345678-1234-1234-1234-123456789abc'
 
 
+def test_project_index_excludes_global_and_other_project_chats():
+    project = 'g-p-' + 'a' * 32
+    rows = [{'title': 'selected', 'url': f'/g/{project}/c/{CHAT_ID}'},
+            {'title': 'global', 'url': f'/c/{CHAT_ID}'},
+            {'title': 'other', 'url': f'/g/g-p-{"b" * 32}/c/{CHAT_ID}'}]
+    assert [row['title'] for row in archive.project_conversations(rows, project)] == ['selected']
+    with pytest.raises(archive.ArchiveError):
+        archive.project_conversations(rows, '../../private')
+
+
+def test_browser_scroll_merges_stable_messages_and_preserves_turn_order():
+    observed = iter([
+        [{'key': 'a', 'ordinal': 1, 'role': 'assistant', 'text': 'part'},
+         {'key': 'u', 'ordinal': 0, 'role': 'user', 'text': 'question'}],
+        [{'key': 'a', 'ordinal': 1, 'role': 'assistant', 'text': 'full answer'}]])
+    moves = iter([True, False])
+    messages = SimpleNamespace(count=lambda: 1, evaluate_all=lambda script: next(observed))
+    scroll = SimpleNamespace(count=lambda: 1, evaluate=lambda script: None if 'flexDirection' in script else next(moves))
+    scroll.first = scroll
+    page = SimpleNamespace(locator=lambda selector: scroll if 'thread-scroll' in selector else messages,
+                           wait_for_timeout=lambda value: None)
+    result, boundary = archive.collect_browser_messages(page, 2)
+    assert result == [{'role': 'user', 'text': 'question'}, {'role': 'assistant', 'text': 'full answer'}]
+    assert boundary is True
+
+
 def test_sidebar_keeps_only_titled_chatgpt_conversation_links_and_removes_duplicates():
     good = {'url': '/c/' + CHAT_ID + '?private=discard', 'title': '  영어 interview  '}
     rows = [good, good, {'url': 'https://evil.test/c/' + CHAT_ID, 'title': 'other'},

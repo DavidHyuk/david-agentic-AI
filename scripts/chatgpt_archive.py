@@ -475,8 +475,8 @@ def read_browser_conversation(data_dir: Path, identifier: str, max_scrolls: int 
             if not current or current[0]['id'] != row['id']:
                 raise ArchiveError('The selected conversation was not opened; no chat content was saved.')
             texts, boundary = collect_browser_messages(page, max_scrolls)
-            current = project_conversations([row], urlsplit(row['url']).path.split('/')[2]) if '/g/' in row['url'] else [row]
-            if not current or page.url.rstrip('/') != row['url'].rstrip('/'):
+            current = sidebar_conversations([{'url': page.url, 'title': row['title']}])
+            if not current or current[0]['id'] != row['id']:
                 raise ArchiveError('Conversation changed while reading; previous cache retained.')
             if not texts:
                 raise ArchiveError('No visible conversation text was found.')

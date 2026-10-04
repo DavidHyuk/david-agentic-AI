@@ -134,10 +134,31 @@ def test_first_visible_text_is_once_per_generation_and_session_isolated(tracing,
     first = tracing._CLIENT.roots[0].children[0].attrs
     other = tracing._CLIENT.roots[1].children[0].attrs
     assert first["metadata"]["ttft_s"] == 2
-    assert first["metadata"]["decode_tps"] == 11
+    assert first["metadata"]["decode_tps"] is None
     assert "completion_start_time" in first
     assert other["metadata"]["ttft_s"] is None
     assert "completion_start_time" not in other
+
+
+def test_request_installs_visible_timing_after_run_agent_finishes_import(tracing, monkeypatch):
+    class Agent:
+        def _record_streamed_assistant_text(self, text):
+            return text
+    monkeypatch.setitem(sys.modules, "run_agent", SimpleNamespace(AIAgent=Agent))
+    pre(tracing)
+    assert Agent._record_streamed_assistant_text._david_tracing is True
+
+
+def test_children_propagate_the_same_session_group(tracing, monkeypatch):
+    propagated = []
+    def propagate(**kwargs):
+        propagated.append(kwargs)
+        return nullcontext()
+    monkeypatch.setitem(sys.modules, "langfuse", SimpleNamespace(propagate_attributes=propagate))
+    pre(tracing)
+    post(tracing, tools=1)
+    tracing.pre_tool(task_id="task", tool_name="fixture")
+    assert [p["session_id"] for p in propagated] == ["david:s", "david:s", "david:s"]
 
 
 def test_delivery_wrapper_preserves_result_exception_and_is_idempotent(tracing):

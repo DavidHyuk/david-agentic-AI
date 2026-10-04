@@ -30,6 +30,11 @@ semantic versioning (major.minor.patch).
   Codex inference and file-writing tools. Watcher restart preserves one reservation;
   normal execution and shared-daemon writer-conflict recovery each preserve the
   same session ID and a thread count of one. The account quota is not exhausted.
+- Additional live UI validation keeps a TUI attached to the test server and submits
+  through the recovery RPC path. The original screen displays progress, real tool
+  output and the final reply without reconnecting; before/progress/completion
+  captures and the verified output file are retained in private test evidence.
+  Document that writers outside the shared daemon must release their lock.
 
 ## v1.34.0 — 2026-10-04 (minor: read observed ChatGPT history without export)
 

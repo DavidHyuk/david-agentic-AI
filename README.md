@@ -54,6 +54,9 @@ working directory, model, reasoning effort and last actual turn's sandbox access
 When an open TUI owns the idle session's writer, the helper submits `turn/start`
 through that same local Codex daemon and observes its durable outcome. An active
 turn is skipped. It does not fork another session or merely queue a message.
+An existing TUI connected to that same daemon receives live progress, tool output
+and the final reply without reconnecting. A separate app or `--no-daemon` writer
+outside that daemon must release its lock before recovery can proceed.
 Approval requests are disabled for unattended execution. Up to three independent
 systemd workers run concurrently; SSH/tmux disconnects and watcher restarts do
 not stop them. Persistent private state and JSONL worker output live in
@@ -81,6 +84,8 @@ shortened watcher delays; production uses the five-hour default.
 Live validation used a synthetic quota failure in an isolated rollout, a two-second
 delay and real authenticated Codex turns that wrote verified files. Both normal
 execution and the shared-daemon writer-conflict path kept one original session.
+An additional live TUI test kept the terminal attached and captured progress,
+tool output and the final reply delivered through the same `turn/start` path.
 
 This is an internal Codex lifecycle helper for existing tasks, not a new Hermes
 agent, scheduled content workflow, profile, Telegram bot or Observatory room.
@@ -288,6 +293,14 @@ the two 128K slots. Web character conversations now display streamed assistant
 text through the existing authenticated Hermes session API; complete history
 remains owned by Hermes. See the [Langfuse first-use guide](docs/langfuse-quickstart.md)
 for Cloud signup, private credentials, experiment comparisons and exports.
+
+David/English Hermes conversations also use an optional observer plugin to
+record agent, LLM and tool spans in Langfuse with background export. It captures
+bounded question/answer text, usage, latency and observed visible-stream TTFT;
+system prompts, tool bodies and images are omitted. See the
+[agent visualization and tracing guide](docs/agent-observability.md) for
+Graph/Sessions navigation, isolated ClawGram Studio state inspection, and
+`bootstrap/stage_conversation_tracing.py` installation/disable commands.
 
 The version-controlled [120-case synthetic benchmark](local-model/eval/README.md)
 uses four balanced buckets: short tasks, scripted multi-tool calls, multi-turn

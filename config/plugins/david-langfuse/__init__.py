@@ -122,6 +122,13 @@ def pre_api(**kwargs):
     c = client()
     if c is None:
         return
+    # Plugins can be discovered during run_agent's own import. At request time
+    # AIAgent is fully defined, so deferred timing installation is now safe.
+    try:
+        from run_agent import AIAgent
+        install_visible_timing(AIAgent)
+    except Exception:
+        pass
     with _LOCK:
         now = time.monotonic()
         for old_key, old in list(_TURNS.items()):
@@ -152,13 +159,21 @@ def pre_api(**kwargs):
         if previous:
             previous["span"].update(level="ERROR", status_message="Provider request retried")
             previous["span"].end()
-        gen = state["root"].start_observation(name=f"LLM call {request_id}", as_type="generation",
+        gen = start_child(state, name=f"LLM call {request_id}", as_type="generation",
             model=kwargs.get("model"), input=safe(request[-12:]),
             metadata={"profile": profile_name(), "platform": kwargs.get("platform"),
                 "tool_schema_count": kwargs.get("tool_count"), "message_count": kwargs.get("message_count"),
                 "approx_input_tokens": kwargs.get("approx_input_tokens"), "state": "waiting",
                 "ttft_scope": "first visible text delivered by Hermes; absent when unobserved"})
         state["generations"][request_id] = {"span": gen, "started": now, "first": None}
+
+
+def start_child(state, **kwargs):
+    from langfuse import propagate_attributes
+    profile = profile_name()
+    with propagate_attributes(session_id=f"{profile}:{state['session']}",
+            trace_name=f"{profile} conversation", tags=["hermes", profile, "conversation"]):
+        return state["root"].start_observation(**kwargs)
 
 
 def visible_text(session_id):
@@ -197,9 +212,8 @@ def post_api(**kwargs):
             "full_input_tokens": sum(v for k, v in usage_details.items() if "input" in k),
             "cached_input_tokens": usage_details.get("cache_read_input_tokens", 0),
             "output_tokens": output_tokens, "ttft_s": first,
-            "decode_tps": (output_tokens - 1) / (duration - first)
-                if first is not None and duration > first and output_tokens > 1 else None,
-            "decode_tps_scope": "client estimate from output tokens and observed visible TTFT; not native timing"}
+            "decode_tps": None,
+            "decode_tps_scope": "unavailable: output usage can include hidden reasoning; native timings are not exposed by this hook"}
         pending["span"].update(output=output, usage_details=usage_details, metadata=metadata)
         pending["span"].end()
         has_tools = kwargs.get("assistant_tool_call_count", 0) or getattr(assistant, "tool_calls", None)
@@ -217,7 +231,7 @@ def pre_tool(**kwargs):
         if old:
             old["span"].update(level="ERROR", status_message="Tool observation superseded")
             old["span"].end()
-        span = state["root"].start_observation(name="Tool: " + str(kwargs.get("tool_name")),
+        span = start_child(state, name="Tool: " + str(kwargs.get("tool_name")),
             as_type="tool", input={"arguments": "[omitted]"},
             metadata={"tool_name": kwargs.get("tool_name"), "state": "running"})
         state["tools"][key] = {"span": span, "name": kwargs.get("tool_name")}
@@ -289,4 +303,4 @@ def register(ctx):
         from run_agent import AIAgent
         install_visible_timing(AIAgent)
     except Exception:
-        LOG.warning("Visible-stream timing unavailable; conversation tracing remains enabled")
+        pass  # Retry when the first request arrives after run_agent finishes importing.
