@@ -219,3 +219,49 @@ def test_experiment_import_rejects_duplicate_item_ids(tmp_path):
     path.write_text(json.dumps(run))
     with pytest.raises(ValueError, match='duplicate experiment items'):
         tracker.load_runs([path])
+
+
+def test_export_keeps_memory_policy_and_cache_budget_distinct_from_sampling():
+    run = record()
+    run.update(host_prompt_cache_mib=4096, minimum_available_gib=20, minimum_free_gib=4,
+               secret_key='must-not-export')
+    clean = tracker.sanitize(run)
+    assert 'secret_key' not in clean
+    payload = tracker.langfuse_payload([clean])
+    spans = payload['resourceSpans'][0]['scopeSpans'][0]['spans']
+    for span in spans:
+        attrs = {x['key']: x['value'] for x in span['attributes']}
+        assert attrs['langfuse.observation.metadata.host_prompt_cache_mib'] == {'intValue': '4096'}
+        assert attrs['langfuse.observation.metadata.minimum_available_gib'] == {'intValue': '20'}
+        assert attrs['langfuse.observation.metadata.minimum_free_gib'] == {'intValue': '4'}
+    assert 'must-not-export' not in json.dumps(payload)
+
+
+def test_queue_wait_and_admission_conditions_survive_experiment_export():
+    run = record()
+    run['admission_policy'] = {'slots': 2, 'minimum_available_gib': 2,
+        'request_memory_estimate_gib': 1.5, 'estimate_source': 'measured estimate'}
+    run['records'][0]['metrics']['queue_wait_s'] = .75
+    clean = tracker.sanitize(run)
+    assert clean['records'][0]['metrics']['queue_wait_s'] == .75
+    span = tracker.langfuse_payload([clean])['resourceSpans'][0]['scopeSpans'][0]['spans'][0]
+    exported = attrs(span)
+    assert exported['langfuse.observation.metadata.queue_wait_s'] == .75
+    assert json.loads(exported['langfuse.observation.metadata.admission_policy']) == run['admission_policy']
+
+
+def test_experiment_export_distinguishes_interrupted_run_and_board_sensor():
+    run = {"run_id": "interrupted", "label": "Interrupted baseline", "source": "local experiment",
+           "model": "test-model", "failure_class": "host_power_interruption", "completed_records": 1,
+           "scope": "partial baseline", "limitations": ["larger cache arm never started"],
+           "records": [{"id": "completed-row", "case": "baseline", "started_at": "2026-10-05T03:30:00+00:00",
+                        "completed_at": "2026-10-05T03:30:01+00:00", "metrics": {"ttft_s": .5},
+                        "telemetry": {"max_board_c": 96.2, "max_gpu_c": 85}, "raw_prompt": "private"}]}
+    clean = tracker.sanitize(run)
+    assert clean['records'][0]['telemetry']['max_board_c'] == 96.2
+    span = tracker.langfuse_payload([clean])['resourceSpans'][0]['scopeSpans'][0]['spans'][0]
+    attrs = {a['key']: a['value'] for a in span['attributes']}
+    assert attrs['langfuse.observation.metadata.failure_class']['stringValue'] == 'host_power_interruption'
+    assert attrs['langfuse.observation.metadata.completed_records']['intValue'] == '1'
+    assert 'larger cache arm never started' in attrs['langfuse.observation.metadata.limitations']['stringValue']
+    assert 'private' not in json.dumps(span)

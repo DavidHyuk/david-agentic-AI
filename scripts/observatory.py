@@ -322,9 +322,10 @@ class Observatory:
         return list(latest.values())
 
     def refresh_leetcode_sources(self):
-        """Run incremental source download in the background without delaying the room."""
+        """Download sources and precompute reviews without delaying the room."""
         connection = read_json(self.home / 'data/interview/leetcode_session.json', {}) or {}
-        if not connection.get('username') or not connection.get('session'):
+        linked = bool(connection.get('username') and connection.get('session'))
+        if not linked and not (self.home / 'data/interview/leetcode_history.json').exists():
             return
         if not self.leetcode_source_lock.acquire(blocking=False):
             return
@@ -335,9 +336,14 @@ class Observatory:
         self.leetcode_source_refresh_at = now
         def download():
             try:
-                self.helper('leetcode_sync.py', ['sync', '--missing-only'], timeout=180)
+                if linked:
+                    try:
+                        self.helper('leetcode_sync.py', ['sync', '--missing-only'], timeout=180)
+                    except (OSError, ValueError, subprocess.SubprocessError):
+                        pass  # Already saved source still supports private reviews.
+                self.helper('leetcode_review.py', ['prepare', '--limit', '3'], timeout=780)
             except (OSError, ValueError, subprocess.SubprocessError):
-                pass  # The helper persists successful counts and source errors privately.
+                pass  # Keep successful cached reviews; retry on a later refresh.
             finally:
                 self.leetcode_source_lock.release()
         threading.Thread(target=download, daemon=True).start()
@@ -421,6 +427,10 @@ class Observatory:
                 } if isinstance(snapshot, dict) and snapshot.get('version') == 1 else None
                 if data['leetcode_history']:
                     data['leetcode_history']['downloaded_solution_count'] = len(snapshot.get('accepted_solutions', []))
+                try:
+                    data['coding_reviews'] = self.helper('leetcode_review.py', ['list'])
+                except (OSError, ValueError, subprocess.SubprocessError):
+                    data['coding_reviews'] = {'items': [], 'ready_count': 0, 'unavailable': True}
         elif room == 'english':
             cards = list(read_json(self.home / 'data/english/srs_deck.json', {'cards': {}})['cards'].values())
             due = sorted([c for c in cards if c['due'] <= today], key=lambda c: (c['box'], c['due']))

@@ -17,6 +17,35 @@ import cron_health as ch
 PACIFIC = timezone(timedelta(hours=-7))
 
 
+@pytest.mark.parametrize('state,expected', [({'active':1,'waiting':0},True),
+    ({'active':0,'waiting':1},True),({'active':0,'waiting':0,'cooling_paused':True},True),
+    ({'active':0,'waiting':0,'resource_paused':True},True),({},True),
+    ({'active':0,'waiting':0},False)])
+def test_recovery_requires_verified_idle_inference(monkeypatch, state, expected):
+    from contextlib import contextmanager
+    import io
+    @contextmanager
+    def response(*args, **kwargs):
+        yield io.StringIO(json.dumps(state))
+    monkeypatch.setattr(ch, 'urlopen', response)
+    assert ch.inference_recovery_deferred('http://127.0.0.1:8003/admission') is expected
+
+
+def test_missing_admission_defers_recovery(monkeypatch):
+    monkeypatch.setattr(ch, 'urlopen', lambda *a, **k: (_ for _ in ()).throw(OSError('missing')))
+    assert ch.inference_recovery_deferred('http://127.0.0.1:8003/admission')
+
+
+def test_busy_inference_defers_gateway_restart_and_failed_cron_retry(hermes_home, monkeypatch, capsys):
+    monkeypatch.setattr(ch, 'assess_health', lambda *a, **k: {'critical':True,'jobs':{'failed_jobs':[]}})
+    monkeypatch.setattr(ch, 'inference_recovery_deferred', lambda url: True)
+    monkeypatch.setattr(ch, 'restart_gateway', lambda **k: pytest.fail('active answer interrupted'))
+    monkeypatch.setattr(ch, 'retry_failed_jobs_once', lambda *a, **k: pytest.fail('retry submitted while busy'))
+    assert ch.main(['--hermes-home',str(hermes_home),'--json','--restart','--retry-failed-once',
+                    '--inference-admission-url','http://127.0.0.1:8003/admission']) == 1
+    assert 'recovery deferred' in capsys.readouterr().out
+
+
 def _iso(dt: datetime) -> str:
     return dt.isoformat()
 

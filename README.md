@@ -330,6 +330,32 @@ gateway when idle. Restore the helper's private backup for rollback. Keep
 two 128K slots and the agent's separate 64K setting. See the
 [Jun measurements and limits](docs/benchmarks/jun-latency-2026-10-04.md).
 
+**Current provisional deployment (2026-10-04):**20GiB host-cache cap, MTP ON,
+128K per request×2 and shared memory/cooling queue at8003. At85°C limit model
+CPU execution to200% of one core; at90°C and above use1% and queue new requests
+while preserving active answers. There is no92°C board-triggered kill.
+Memory/GPU protection also queues and paces instead of killing the model.
+Recovery uses10s hysteresis; background work starts only at≤75°C. Watchdog
+recovery defers while inference is active, queued or protected. Real OOM,
+hardware faults and client timeouts can still interrupt answers. Filled20GiB
+cache and sustained cooling remain untested;24GiB has never run. See
+[current policy and bounded evidence](docs/benchmarks/jun-cache20-cooperative-2026-10-04.md).
+
+Earlier on 2026-10-04 the shared provider enabled MTP with the compatible feature
+runtime, shared Q8_0 head and two draft tokens. It retains 128K per request
+and two slots. That verified activation capped host prompt cache at 4GiB and
+stopped below 20GiB available
+or below 32GiB available with less than 4GiB free. ClawGram photo admission
+remains 24/8GiB. Matched completed hint decoding improves 26.60→32.75 TPS;
+the long Jun code review improves 25.21→29.49 TPS. Cold TTFT increases slightly.
+This is a decode improvement, with long-input prefill still limiting response
+time. Find the three new `Jun MTP activation` experiments in Langfuse
+(20 traces / 120 performance scores); the
+[activation report](docs/benchmarks/jun-mtp-2026-10-04.md) records output-length,
+concurrency, memory, thermal and quality limits. Experiment metadata includes
+the cache and memory guard budgets. Provider changes do not change agent
+profile ownership or add a new Observatory room.
+
 The version-controlled [120-case synthetic benchmark](local-model/eval/README.md)
 uses four balanced buckets: short tasks, scripted multi-tool calls, multi-turn
 long-horizon state, and context-heavy retrieval. Validate the fixture, then run
@@ -944,6 +970,29 @@ Jun receives the current shared completion inventory on each reply, including
 externally verified completions and pattern-specific learning. Missing submitted
 source is not evidence that a problem was never solved.
 
+Jun's workbench keeps its web conversation and **학습 완료 기록**, while removing
+the additional Dashboard ↔ Telegram composer, workbench notes and recent-session
+cards. **풀이 기록** lists completed problems in newest-first order. Click a
+problem to expand Jun's prepared approach, answer, complexity, review hints and
+edge cases, with the actual Accepted code and recorded learning alongside it.
+Historical hints retain their source; generated review hints are labeled
+separately. Problems without code or learning remain pending, and learning-only
+reviews explicitly mark the unavailable implementation and complexity.
+
+`leetcode_review.py` caches reviews privately in
+`~/.hermes/data/interview/leetcode_reviews.json`, using the configured loopback
+model through its background admission queue. Changed code, notes or account
+invalidate the relevant summary. Clicking a review reads the cache. The existing
+06:35 `leetcode-history-sync` cron runs `leetcode_refresh.sh` without an outer
+agent or Telegram delivery; workbench background refresh also prepares up to
+three missing reviews per run. No new profile, room, bot or schedule is needed.
+Use the existing workbench refresh button after background preparation, or run:
+
+```bash
+python3 ~/.hermes/scripts/leetcode_review.py prepare
+python3 ~/.hermes/scripts/leetcode_review.py list
+```
+
 ### LeetCode account history (optional, read-only)
 
 The Coding Coach can use your solved totals, recent accepted submissions, and
@@ -993,9 +1042,9 @@ The room also starts a background `sync --missing-only` source refresh (at most
 once every five minutes). It downloads actual Accepted code for recent problems,
 including solves never reported to the coach, reuses unchanged submissions, and
 retains older downloaded problems. Both the web character chat and Telegram
-workbench chat can explain matching downloaded code. The room shows the number
-of saved solutions, source sync time and any source-access failure separately
-from the account total. An expired session can still expose public counts while
+workbench chat can explain matching downloaded code. The room lists problems
+with prepared reviews, actual code and source-access status separately from
+the account total. An expired session can still expose public counts while
 blocking private code; reconnect using `login --headed` or `connect` above.
 Manual incremental refresh: `python3 ~/.hermes/scripts/leetcode_sync.py sync --missing-only`.
 The LeetCode Gym Observatory room shows only the safe snapshot; it never returns

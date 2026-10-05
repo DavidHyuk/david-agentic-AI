@@ -3,6 +3,118 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.42.0 — 2026-10-05 (minor: prepared Jun solution reviews)
+
+- Simplify Jun's coding workbench by removing its Dashboard ↔ Telegram
+  composer, workspace notes, recent-session card and note-activity card. Keep
+  the existing web conversation and learning completion records.
+- Replace the account-only solution card with a newest-first expandable problem
+  list. Jun precomputes approach, answer, complexity, review prompts and edge
+  cases from actual Accepted code and recorded learning. Keep historical hints
+  separate from generated prompts; unavailable code or evidence remains explicit.
+- Cache reviews atomically with private permissions and evidence/account
+  fingerprints. Local model requests use background admission, incremental
+  preparation, a process lock and retained successes on partial failure. Clicking
+  a problem does not invoke inference or change study completion.
+- Reuse the existing coding room and owner; its 06:35 maintenance cron runs
+  source sync and review preparation as a staged script with no outer agent or
+  Telegram delivery. Workbench background source refresh prepares reviews too.
+  This extends Jun's existing workflow without a new profile, bot, room or cron.
+- Validation: `pytest -q` — 704 passed, including evidence invalidation,
+  Accepted-source freshness, partial-failure retention, notes-only uncertainty,
+  process locking and background-provider boundaries.
+- Stage the changed UI and helpers, update only the existing maintenance job,
+  and prepare 9 of 10 recent problems. Reverse String remains pending without
+  implementation/learning evidence. Browser checks confirm expandable Anagram
+  review, retained web chat/completion history, unchanged Design notes, no JS
+  errors and no horizontal overflow at 390px.
+
+## v1.41.0 — 2026-10-04 (minor: shared cooperative protection and cache20 recovery)
+
+- Final deployment follows David's20GiB cache selection and no-forced-stop
+  preference:85°C CPUQuota200%,90°C and above1%, preserve active connections
+  and contexts, queue new work. Remove92°C board kill; use cooperative pacing
+  for memory/GPU/sensor protection with10s recovery. Real OOM, hardware faults,
+  submitted GPU kernels and client timeouts remain outside a continuity guarantee.
+- Remove the model'sBindsTo guard dependency so guard recovery cannot stop it.
+  Defer cron-watchdog gateway recovery/retries while inference is active,
+  queued, protected or unverified. Install policy with all model/gateway PIDs
+  unchanged. Retain the consumed English retry and future regular schedules.
+- Verify two20GiB short checks and one warm cooperative-policy check; distinguish
+  feature changes and warm cache from historical16GiB results below. No matched
+ 20/24 comparison or filled-cache/high-temperature endurance claim.
+- Final validation:691 David tests, ClawGram347 passed/2 skipped, resource
+  fault/recovery and active-answer preservation tests, runtime/service audits.
+  Final recovery exports:5 experiments/40 traces/235 scores, verified by
+  read-back of IDs, values and policy metadata without resending prior uploads.
+  Current report: `docs/benchmarks/jun-cache20-cooperative-2026-10-04.md`.
+
+Historical steps within this change:
+
+- Deploy the authorized16GiB host-cache cap with MTP ON and provider128K×2.
+  Queue at90°C, recover at≤85°C for10s and cancel active upstream requests
+  without replay. After a real92.2°C photo-triggered model stop, add75°C
+  background entry headroom. The host stayed up; memory protection remains.
+- Retry startup GPU telemetry for at most30s, without admitting an unverified
+  model or clearing existing OOM/thermal holds. Review/archive the exact boot
+  timeout and later thermal event before controlled recovery; restore model,
+  owning gateways and watchdog while preserving independent ClawGram identity.
+- Repair the watchdog's missing user CLI PATH after its attempted recovery of
+  the thermal-stop English drill connection error. Persist the existing single
+  retry key; never replay successful scheduled executions as a health check.
+- Verify five short health requests and a three-request burst: third waits1.85s.
+  Audit boot enabling/lingering, David8/English5 cron registrations and ClawGram
+  timers. No physical reboot, forced cron delivery or completed-work replay.
+  Filled-cache/endurance and broad coding/vision quality remain untested.
+- Export failure/scope/board-sensor metadata separately from GPU readings;
+  publish only three new experiments/37 traces/217 scores and read back all IDs,
+  score values and policy metadata. No new room: this is shared infrastructure.
+- Validation:683 David tests; ClawGram331 passed/2 skipped; installed systemd,
+  runtime flags, actual safety stop and post-recovery service/schedule audits.
+  See `docs/benchmarks/jun-cache16-cooling-2026-10-04.md`.
+
+## v1.40.2 — 2026-10-04 (patch: preserve interrupted cache experiment and hold recovery)
+
+- Archive the 31 completed cache-baseline requests, empty in-flight receipt,
+  previous-boot journals and durable memory/thermal snapshot after the host
+  power interruption. Verify the actual arm was cache4, not the unstarted
+  cache24 target. Root cause is unresolved; memory snapshots were not low,
+  but thermal slowdown and a 96.2°C board-zone reading require investigation.
+- Stop the owning cron watchdog after reboot and preserve model/photo holds.
+  Prepare a 16GiB cache candidate without installing it, restarting inference,
+  replaying requests or sending new experiment data. Document the implemented
+  shared admission queue's empirical memory estimate and unfinished live burst
+  validation; it cannot guarantee protection against physical shutdown.
+- Preserve queue wait and admission policy in experiment metadata. No new
+  profile, room or user-facing schedule: this is internal shared infrastructure.
+  See `docs/benchmarks/jun-cache-poweroff-2026-10-04.md` for current status.
+- Post-reboot verification: 682 David-Agent tests, ClawGram 320 passed /
+  2 skipped, installed systemd unit verification; model/proxy have no running
+  process and persistent holds remain. No GPU load safety result is claimed.
+
+## v1.40.1 — 2026-10-04 (patch: activate measured shared MTP configuration)
+
+- Enable the authorized shared Q8_0 MTP head/draft 2 using the verified
+  compatible runtime and repaired GGML. Preserve 128K per request × 2,
+  set the available stop margin to 20GiB and host prompt cache to 4GiB.
+  Preserve the existing free/thermal guard and ClawGram's separate 24/8GiB
+  photo admission. Restore previously active David/English gateways and
+  watchdog; ClawGram gateway PID remains unchanged.
+- Matched feature-build replays improve completed hint decoding 26.60→32.75
+  TPS and code review 25.21→29.49 TPS. Cold TTFT increases slightly.
+  Record changed output lengths, small concurrent gains, thermal slowdown
+  and the additional ~5.48GiB run-minimum headroom use. Actual isolated
+  Hermes first/followup TTFT is 27.80/2.43s; it is a separate verification.
+- Preserve prompt-cache and guard budgets in experiment import/export
+  metadata. Upload only three new experiments / 20 traces / 120 scores,
+  verifying all IDs/values and two native agent/LLM traces by read-back.
+  Record incomplete skill-intent replays and a flawed example in the native
+  answer instead of declaring broad coding-quality equivalence.
+- Validation: 681 David-Agent tests; ClawGram 304 passed / 2 skipped;
+  structured checks and unchanged-photo assessment, live readiness and
+  systemd verification. No new room/profile/cron or manual message delivery.
+  See `docs/benchmarks/jun-mtp-2026-10-04.md` for evidence and untested limits.
+
 ## v1.40.0 — 2026-10-04 (minor: faster Jun coding conversations)
 
 - Add fast/deep controls to the existing Jun web conversation. Fast mode

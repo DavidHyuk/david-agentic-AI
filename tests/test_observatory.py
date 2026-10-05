@@ -299,7 +299,7 @@ def test_design_workbench_does_not_render_coding_only_leetcode_card():
     workbench = (Path(__file__).resolve().parents[1] /
                  'browser/observatory/workbench.js').read_text()
 
-    assert 'const lcSummary = d.room !== "coding" ? "" : lc' in workbench
+    assert 'const lcSummary = d.room !== "coding" ? "" : codingReviewCard(d)' in workbench
 
 
 def test_office_randomizes_short_next_action_conversations():
@@ -1139,12 +1139,15 @@ def test_podcast_workbench_exposes_only_safe_interactive_login_state(store, stat
 
 
 def test_coding_workbench_refreshes_account_without_creating_coach_completions(store, monkeypatch):
+    monkeypatch.setattr(store, 'refresh_leetcode_sources', lambda: None)
     root = store.home / 'data/interview'
     root.mkdir(parents=True)
     (root / 'leetcode_session.json').write_text('{}')
     calls = []
     def helper(name, args):
         calls.append((name, args))
+        if name == 'leetcode_review.py':
+            return {'items': [], 'ready_count': 0}
         (root / 'leetcode_history.json').write_text(json.dumps({
             'version': 1, 'username': 'david', 'total_solved': 99,
             'synced_at': '2026-10-04T00:00:00+00:00',
@@ -1156,10 +1159,12 @@ def test_coding_workbench_refreshes_account_without_creating_coach_completions(s
         assert data['leetcode_history']['total_solved'] == 99
         assert data['completed'] == []
         assert data['leetcode_refresh']['status'] == 'updated'
-    assert calls == [('leetcode_sync.py', ['sync', '--stats-only'])]
+    assert calls == [('leetcode_sync.py', ['sync', '--stats-only']),
+                     ('leetcode_review.py', ['list']), ('leetcode_review.py', ['list'])]
 
 
 def test_coding_workbench_reports_stale_snapshot_on_account_failure(store, monkeypatch):
+    monkeypatch.setattr(store, 'refresh_leetcode_sources', lambda: None)
     root = store.home / 'data/interview'
     root.mkdir(parents=True)
     (root / 'leetcode_session.json').write_text('{}')
@@ -1207,7 +1212,8 @@ def test_background_source_refresh_runs_once_and_releases_lock(store, monkeypatc
     monkeypatch.setattr(store, 'helper', lambda name, args, **kwargs: calls.append((name, args, kwargs)))
     store.refresh_leetcode_sources()
     store.refresh_leetcode_sources()
-    assert calls == [('leetcode_sync.py', ['sync', '--missing-only'], {'timeout': 180})]
+    assert calls == [('leetcode_sync.py', ['sync', '--missing-only'], {'timeout': 180}),
+                     ('leetcode_review.py', ['prepare', '--limit', '3'], {'timeout': 780})]
     assert not store.leetcode_source_lock.locked()
 
 

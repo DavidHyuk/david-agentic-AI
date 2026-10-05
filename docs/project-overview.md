@@ -72,8 +72,32 @@ private `data/jun-context` 원문을 참조하고, 현재 learning/source 자료
 system prefix 뒤에 붙입니다. `local-model/eval/leetcode_latency.py`로 동일
 workload의 schema 비교를 측정합니다. 추가 4 experiments / 26 distinct traces /
 154 scores의 Cloud read-back과 복제 Jun의 native TTFT 첫 질문 25.35초 / 후속
-1.27초를 확인했습니다. Provider 128K × 2와 agent 64K를 유지하고 MTP는 OFF입니다.
-latency/source/cache/Cloud item ID 검증을 포함한 전체 680개 테스트가 통과했습니다.
+1.27초를 확인했습니다. 이 수치는 MTP OFF일 때의 과거 검증입니다.
+현재는20GiB host-cache cap/MTP ON/128K×2의 임시 운영 구성입니다.
+공유 proxy가 memory/2슬롯/온도 대기를 관리하고85°C부터 CPUQuota200%,
+90°C 이후1%로 실행량을 줄여 진행 중 연결/문맥을 보존합니다.92°C 중단은
+제거했고 메모리/GPU 위험도 강제 종료 대신 새 요청 대기와 실행량 제한으로
+처리합니다. watchdog은 추론/보호 중 gateway 재시작을 미룹니다. 실제 OOM,
+하드웨어 보호 및 client timeout 무중단은 보장하지 않습니다. background
+시작 기준75°C,10초 회복 조건과 기존 incident hold 수동 검토는 유지합니다.
+David8개/English5개 cron 및 ClawGram timer를 점검했고 모델/세 gateway
+PID를 유지해 정책을 적용했습니다. 전체 David691개, ClawGram347 passed/
+2 skipped입니다.20GiB 전체 cache/장기 냉각/재부팅 검증은 미완료입니다.
+종료 당시4GiB였고24GiB는 시작 전이었으며 이전 OOM과 온도를 구분합니다.
+`docs/benchmarks/jun-cache20-cooperative-2026-10-04.md`를 참고하세요.
+복구 관련 Cloud5 experiments/40 traces/235 scores의 ID·값·정책 metadata를
+read-back 확인했으며 이전 전송은 중복하지 않았습니다.
+이전 검증에서는 provider 128K × 2와 agent 64K를 유지한 채 MTP ON으로
+Q8_0 shared head/draft 2, host prompt cache 4GiB, available stop 20GiB를
+적용했습니다. 당시 available <32GiB/free <4GiB 및 지속 GPU thermal stop은
+유지하며 ClawGram 사진 진입은 별도 24/8GiB입니다. 동일 feature build의
+완료된 hint는 26.60→32.75 TPS, 긴 코드 검토는 25.21→29.49 TPS였고
+cold TTFT는 조금 늘었습니다. 새 3 experiments / 20 traces / 120 scores의
+Cloud read-back을 확인했습니다. 별도 native Hermes 검증은 첫 질문
+27.80초 / 후속 2.43초이며 입력이 달라 이전 검증과 matched 비교하지 않습니다.
+당시 전체681개 테스트가 통과했습니다. cache/guard 예산을 experiment metadata로
+보존하며 품질·열·동시성·출력 길이 한계는
+`docs/benchmarks/jun-mtp-2026-10-04.md`에 있습니다.
 결과와 메모리 보호 중단·복구는 `docs/benchmarks/jun-latency-2026-10-04.md`에 있습니다.
 별도 specialist 및 ClawGram profile에는 자동 배포하지 않습니다. LangGraph state의
 Studio snapshot 경로와 Graph/Sessions 조회는 `docs/agent-observability.md`를 따릅니다.
@@ -81,7 +105,7 @@ Studio snapshot 경로와 Graph/Sessions 조회는 `docs/agent-observability.md`
 ```
 DGX Spark (128GB 통합 메모리)
   └── llama.cpp 서버 :8003
-        └── Qwen3.8-Flash-Next-UD-IQ4_XS (64K × 2 슬롯)
+        └── Qwen3.8-Flash-Next-UD-IQ4_XS (provider 128K × 2, agent 64K, MTP ON)
                 │
                 ├── David Hermes gateway ── David Telegram bot
                 │     ├── dedicated paper group: Tue/Fri top-three papers digest
@@ -211,6 +235,8 @@ David-Agent/
 │   ├── papers_digest.py       # 새 논문 카탈로그 읽기 전용 조회
 │   ├── interview_progress.py  # 학습 자료 렌더링·힌트·진도·적응형 복습·주간 통계
 │   ├── leetcode_sync.py       # owner-only 세션 연결 + 읽기 전용 풀이 이력 snapshot
+│   ├── leetcode_review.py     # 실제 코드·학습 근거 기반 Jun 풀이 요약 cache
+│   ├── leetcode_refresh.sh    # 기존 06:35 cron의 source sync + 요약 준비
 │   ├── interview_trends.py    # HN·GitHub·논문 실시간 인터뷰 트렌드 수집
 │   ├── kakao_webhook.py       # Kakao 채널 피드백 수신·발신자 allowlist·로컬 큐
 │   ├── english_intake.py      # 새 레슨 탐지 + 이번 주 세션 조회 + 처리 상태 관리
@@ -364,6 +390,8 @@ history/search·알림 제어의 이점이 있으면 같은 bot을 별도 Telegr
 | `papers_digest.py` | SQLite 카탈로그 읽기 전용 조회 → 추천/최신/인기 digest |
 | `interview_progress.py` | 코딩 커리큘럼 + 적응형 설계 인터뷰 선택/단계 gate/답변·평가 저장/주간 통계 |
 | `leetcode_sync.py` | 로컬 headless Chromium 로그인 또는 숨김 세션 입력·검증, owner-only 저장, LeetCode solved/최근 정답·최근 문제별 실제 Accepted 코드 snapshot 갱신 |
+| `leetcode_review.py` | Accepted 코드와 기록된 배움으로 접근법·정답·복잡도·복습 힌트·경계 조건을 사전 요약. loopback 모델 background admission 사용, 근거 fingerprint로 변경 감지, owner-only 원자 저장, `list`는 cache만 조회 |
+| `leetcode_refresh.sh` | 기존 06:35 LeetCode 유지보수 cron에서 증분 source sync 후 요약 준비. outer agent·Telegram 전달 없이 기존 coding room·소유 profile 유지 |
 | `interview_trends.py` | HN·GitHub·논문 DB에서 실시간 인터뷰 트렌드 수집·캐시 |
 | `english_intake.py` | 새 레슨 탐지, Telegram 파일 저장, 이번 주 세션 조회, 처리 상태 관리 |
 | `english_srs.py` | Leitner SRS 덱 (카드 추가/리뷰/통계/취약 카드 랭킹) |
@@ -712,7 +740,8 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
 - **PagedAttention**: KV 캐시를 페이지 단위로 관리 → 긴 컨텍스트에서 메모리 낭비 최소화
 - **Prefix Caching**: 반복되는 프롬프트 앞부분을 캐싱 → 스킬의 시스템 프롬프트 재계산 없음
 - **Continuous Batching**: 여러 요청을 동시에 처리 → 처리량 향상
-- **Multi-Token Prediction (MTP)**: 한 번에 여러 토큰을 예측 → 생성 속도 증가 (추후 활성화 예정)
+- **Multi-Token Prediction (MTP)**: 공유 llama.cpp에 Q8_0 head/draft 2 활성화.
+  실제 Jun workload에서 생성 속도 개선을 측정했으며 TTFT 개선과는 구분합니다.
 - **FP8 KV Cache**: KV 캐시를 FP8로 저장 → 같은 VRAM으로 더 긴 시퀀스 처리
 
 ### AWQ / AutoRound 양자화 (모델 압축)
@@ -819,6 +848,16 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   최신 완료 목록·LeetCode Accepted 근거와 pattern별 실제 배움을 전달하므로 제출
   코드가 없어도 완료를 압니다. Reverse String도 완료 사실을 표시하되 확인되지 않은
   풀이 과정은 비워 둡니다.
+  Jun 작업실에서는 Dashboard ↔ Telegram 질문 영역·작업실 노트·최근 기록과
+  노트 활동 카드를 제거하고 기존 웹 대화와 학습 완료 기록을 유지합니다.
+  풀이 기록은 최신 문제 순의 클릭 가능한 목록으로, 항목을 열면 사전 저장된
+  정답·접근법·복잡도·복습 힌트·경계 조건 및 실제 Accepted 코드를 확인합니다.
+  실제 받은 힌트와 생성된 복습 힌트를 구분하고, 코드 없는 학습 요약은 실제 구현과
+  복잡도 미확보를 표시합니다. 근거 없는 완료 항목은 준비 대기로 남습니다.
+  `data/interview/leetcode_reviews.json`에 owner-only cache를 저장하며 코드·학습
+  근거·계정 변경 시 요약을 갱신합니다. 클릭은 cache 조회이며, 기존 06:35
+  유지보수 cron과 작업실 background refresh가 요약을 미리 준비합니다. 새 profile,
+  bot, room 또는 일정은 만들지 않습니다.
 - `import-coding-history --file PRIVATE_JSON`은 선택 프로젝트에 속한 ChatGPT
   cache의 질문·힌트와 LeetCode의 실제 Accepted 시각을 검증해 `external_coding`에
   배운 점·원문·출처를 저장합니다. 알려진 커리큘럼 문제는 완료 처리하고 다음 신규
@@ -833,7 +872,7 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   실제 질문·힌트 기준으로 설명할 수 있습니다.
   Jun 인사 영역에 LeetCode 전체 해결 수와 Easy / Medium / Hard 집계도 함께
   표시하고 작업실 갱신 시 최신 snapshot으로 업데이트합니다. 아래 계정 카드에서는
-  중복 집계를 없애고 갱신 상태·최근 정답·제출 코드 보관 정보를 표시합니다.
+  중복 집계를 없애고 갱신 상태·문제별 풀이 요약·실제 제출 코드를 표시합니다.
   모든 작업실에서 캐릭터 소개를 작업실 제목 옆의 작은 상단 카드로 옮기고,
   아래 대화 열을 넓혀 기존 소개 영역까지 사용합니다. 대화 이력은 확보된 높이에서
   독립적으로 스크롤하고 입력창은 유지합니다. 데스크톱에서는 현재 작업과 나란히,
@@ -963,6 +1002,8 @@ ZIP 경로 격리·credential 오류 출력 방지 및 HQ source 상태 검증�
 옮기고 모든 작업실의 상단 소개·확장 대화 배치를 적용한 변경까지 전체 666개가
 통과했습니다. 이후 일일 프로젝트 script cron·부분 원문 병합·게시 rollback·Jun 최신
 완료 근거와 통합 작업실 기록 검증까지 전체 680개가 통과했습니다.
+Jun 사전 풀이 요약의 근거 변경·Accepted 코드 freshness·실패 보존·동시 실행
+잠금·background provider 경계를 포함한 현재 전체 테스트는 704 passed입니다.
 서버 해제 시각·자정 넘김·기존 예약 migration과
 David·English 자동 tracing의 도구 인자 제외,
 session 묶음과 visible TTFT 처리 검증을 포함합니다.

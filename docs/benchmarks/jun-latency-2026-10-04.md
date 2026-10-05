@@ -1,5 +1,9 @@
 # Jun LeetCode 대화 지연 — 2026-10-04
 
+현재 공유 provider는 같은 날 이후 MTP ON으로 전환됐습니다. 아래 OFF 측정은
+Jun context/tool 최적화의 과거 결과입니다. 현재 설정과 새 matched MTP 결과는
+[MTP 활성화 기록](jun-mtp-2026-10-04.md)을 참조합니다.
+
 Jun 웹 코딩(`office_coding`)에 빠른 답변을 기본 적용했습니다. 깊이 생각은 기존
 reasoning/전체 도구를 사용합니다. Flash-Next UD-IQ4_XS, llama.cpp production
 build `526c43b8f`, MTP OFF, batch 4096 / ubatch 1024입니다. Provider는 요청당

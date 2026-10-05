@@ -6,8 +6,10 @@ After=hermes-gateway.service hermes-gateway-english.service
 
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/python3 %h/.hermes/scripts/cron_health.py --lock-stale-minutes 20 --check-api --restart --retry-failed-once
-ExecStart=/usr/bin/python3 %h/.hermes/scripts/cron_health.py --hermes-home %h/.hermes/profiles/english --profile english --gateway-service hermes-gateway-english.service --skip-missing-home --lock-stale-minutes 20 --restart --retry-failed-once
+SuccessExitStatus=1
+Environment="PATH=%h/.local/bin:%h/miniconda3/bin:/usr/local/bin:/usr/bin:/bin"
+ExecStart=/usr/bin/python3 %h/.hermes/scripts/cron_health.py --lock-stale-minutes 20 --check-api --restart --retry-failed-once --inference-admission-url http://127.0.0.1:8003/admission
+ExecStart=/usr/bin/python3 %h/.hermes/scripts/cron_health.py --hermes-home %h/.hermes/profiles/english --profile english --gateway-service hermes-gateway-english.service --skip-missing-home --lock-stale-minutes 20 --restart --retry-failed-once --inference-admission-url http://127.0.0.1:8003/admission
 TimeoutStartSec=180
 NoNewPrivileges=true
 PrivateTmp=true

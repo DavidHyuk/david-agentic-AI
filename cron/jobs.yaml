@@ -24,15 +24,19 @@ jobs:
 
   - name: leetcode-history-sync
     schedule: "35 6 * * *"          # 06:35 daily; staggered, no Telegram delivery
-    deliver: null
+    deliver: local
+    script: leetcode_refresh.sh
+    no_agent: true
     skills: [interview-prep]
     prompt: >
       Refresh the opt-in LeetCode history snapshot for the Coding Coach. Run
-      python3 ~/.hermes/scripts/leetcode_sync.py sync. If no valid session is
-      linked or LeetCode is temporarily unavailable, leave the prior snapshot
-      untouched and reply only [SILENT]. Never expose, request, or transmit a
-      session token. This is a read-only sync: do not submit code or edit the
-      LeetCode account. Reply only [SILENT] after a successful sync as well.
+      python3 ~/.hermes/scripts/leetcode_sync.py sync --missing-only, then
+      python3 ~/.hermes/scripts/leetcode_review.py prepare to precompute private
+      Jun solution reviews from actual Accepted code and recorded learning.
+      Retain prior sources and prepared reviews if account access or local
+      inference fails. Never expose, request, or transmit a session token.
+      This is a read-only sync: do not submit code or edit the LeetCode account.
+      Run the staged script without an outer agent or Telegram delivery.
 
   - name: papers-digest
     schedule: "50 8 * * 2,5"         # 08:50 Tue/Fri, after paper ingestion

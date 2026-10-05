@@ -414,6 +414,18 @@ def retryable_failed_jobs(hermes_home: Path, failed_jobs: list[dict[str, Any]]) 
     return [job for job in failed_jobs if job.get("id") and _retry_key(job) not in retried]
 
 
+def inference_recovery_deferred(url: str) -> bool:
+    """Require verified idle inference before a recovery can interrupt a gateway."""
+    try:
+        with urlopen(url, timeout=2) as response:
+            state = json.load(response)
+        return (state.get("active", 0) > 0 or state.get("waiting", 0) > 0
+                or bool(state.get("cooling_paused") or state.get("resource_paused"))
+                or "active" not in state or "waiting" not in state)
+    except (OSError, ValueError, TypeError):
+        return True
+
+
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -474,6 +486,8 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Exit successfully when the selected systemd gateway is not installed",
     )
     parser.add_argument("--json", action="store_true", help="Emit JSON report")
+    parser.add_argument("--inference-admission-url",
+                        help="Defer recovery/retries until the shared inference queue is verified idle")
     return parser.parse_args(argv)
 
 
@@ -505,6 +519,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     if should_recover:
         if args.restart:
+            if args.inference_admission_url and inference_recovery_deferred(args.inference_admission_url):
+                print("gateway recovery deferred: inference is active, queued, cooling or unverified")
+                return 1
             ok, msg = restart_gateway(service=args.gateway_service)
             if ok:
                 print("gateway restart: ok")

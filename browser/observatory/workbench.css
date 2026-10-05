@@ -147,6 +147,15 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.solution-review { border-top: 1px solid var(--line); }
+.solution-review > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 0; cursor: pointer; font-size: 13px; }
+.solution-review > summary:focus-visible { outline: 2px solid #577347; outline-offset: 3px; }
+.solution-review summary small { display: block; color: var(--muted); font-size: 10px; margin-top: 6px; }
+.review-status { flex-shrink: 0; color: #577347; font-size: 10px; }
+.review-body { border-radius: 8px; background: #f5f7ee; padding: 16px; margin-bottom: 16px; }
+.review-body h3 { font-size: 12px; margin: 18px 0 6px; }
+.review-body h3:first-child { margin-top: 0; }
+.review-code { font-size: 11px; line-height: 1.7; overflow-x: auto; padding: 12px; background: #fffdf5; border: 1px solid var(--line); border-radius: 6px; }
 .desk-help textarea {
   margin-top: 10px;
   min-height: 120px;

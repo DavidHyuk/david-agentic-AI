@@ -25,15 +25,16 @@ from urllib.parse import urlsplit
 
 METRIC_KEYS = {"ttft_s", "wall_s", "server_total_s", "prefill_s", "decode_s",
     "full_input_tokens", "processed_input_tokens", "cached_input_tokens", "output_tokens",
-    "prefill_tps", "decode_tps", "client_decode_tps", "draft_tokens", "accepted_draft_tokens"}
+    "prefill_tps", "decode_tps", "client_decode_tps", "draft_tokens", "accepted_draft_tokens", "queue_wait_s"}
 ROW_KEYS = {"id", "case", "workflow", "phase", "repeat", "concurrency", "output_limit",
     "started_at", "completed_at", "prompt_sha256", "output_sha256", "pair_wall_s", "pair_output_wall_tps"}
 TELEMETRY_KEYS = {"available", "sample_interval_s", "samples", "min_available_gib", "min_free_gib",
-    "max_gpu_reported_used_gib", "max_gpu_c", "min_gpu_margin_c", "hw_thermal_observed", "sw_thermal_observed",
+    "max_gpu_reported_used_gib", "max_gpu_c", "max_board_c", "min_gpu_margin_c", "hw_thermal_observed", "sw_thermal_observed",
     "max_requests_processing", "max_requests_deferred", "sampling_errors", "accounting"}
 RUN_KEYS = {"schema_version", "run_id", "label", "source", "started_at", "completed_at", "model", "build",
     "dataset_digest", "context_per_request", "slots", "mtp", "scope", "sampling", "cold_definition",
-    "failure_class", "completed_records", "limitations", "session_usage", "kernel_audit", "batch", "ubatch", "input_budget_tokens", "recorded_at"}
+    "failure_class", "completed_records", "limitations", "session_usage", "kernel_audit", "batch", "ubatch", "input_budget_tokens", "recorded_at",
+    "host_prompt_cache_mib", "minimum_available_gib", "minimum_free_gib", "admission_policy"}
 
 
 def utcnow():
@@ -276,6 +277,14 @@ def langfuse_payload(runs):
                 "langfuse.observation.metadata.build": run.get("build"),
                 "langfuse.observation.metadata.batch": run.get("batch"),
                 "langfuse.observation.metadata.ubatch": run.get("ubatch"),
+                "langfuse.observation.metadata.host_prompt_cache_mib": run.get("host_prompt_cache_mib"),
+                "langfuse.observation.metadata.minimum_available_gib": run.get("minimum_available_gib"),
+                "langfuse.observation.metadata.minimum_free_gib": run.get("minimum_free_gib"),
+                "langfuse.observation.metadata.admission_policy": run.get("admission_policy"),
+                "langfuse.observation.metadata.scope": run.get("scope"),
+                "langfuse.observation.metadata.limitations": run.get("limitations"),
+                "langfuse.observation.metadata.failure_class": run.get("failure_class"),
+                "langfuse.observation.metadata.completed_records": run.get("completed_records"),
                 "langfuse.observation.metadata.sampling": run.get("sampling"),
                 "langfuse.observation.metadata.output_limit": row.get("output_limit"),
                 "langfuse.observation.metadata.input_budget_tokens": run.get("input_budget_tokens"),

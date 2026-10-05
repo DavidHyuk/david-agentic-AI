@@ -26,7 +26,7 @@ def test_defaults_applied_deliver_telegram():
     jobs = rc.load_jobs(JOBS)
     assert all(j["deliver"] == "telegram" for j in jobs if j["name"] not in
                ('leetcode-history-sync', 'chatgpt-project-sync'))
-    assert next(j for j in jobs if j["name"] == "leetcode-history-sync")["deliver"] is None
+    assert next(j for j in jobs if j["name"] == "leetcode-history-sync")["deliver"] == 'local'
 
 
 def test_daily_chatgpt_sync_is_local_script_only_and_registration_is_idempotent():
@@ -49,7 +49,13 @@ def test_leetcode_history_sync_is_read_only_and_has_no_delivery():
     assert sync["schedule"] == "35 6 * * *"
     assert "leetcode_sync.py sync" in sync["prompt"]
     assert "read-only" in sync["prompt"]
-    assert "--deliver" not in rc.build_create_command(sync, environment={})
+    assert sync['script'] == 'leetcode_refresh.sh' and sync['no_agent'] is True
+    assert 'leetcode_review.py prepare' in sync['prompt']
+    command = rc.build_create_command(sync, environment={})
+    assert '--no-agent' in command
+    assert command[command.index('--deliver') + 1] == 'local'
+    registered = {**sync, 'schedule': {'expr': sync['schedule']}}
+    assert rc.registered_job_matches(registered, sync, {})
 
 
 def test_papers_digest_uses_dedicated_telegram_chat_from_environment():
