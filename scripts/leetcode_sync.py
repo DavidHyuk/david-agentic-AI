@@ -66,6 +66,10 @@ class LeetCodeSyncError(ValueError):
     """A safe-to-display connection, response, or local-state error."""
 
 
+class LeetCodeAuthError(LeetCodeSyncError):
+    """The linked session no longer authenticates the intended account."""
+
+
 def default_home() -> Path:
     return Path(os.environ.get('HERMES_HOME', '~/.hermes')).expanduser()
 
@@ -169,9 +173,9 @@ def verify_connection(connection: dict) -> str:
     status = data.get('userStatus') or {}
     username = status.get('username') if isinstance(status, dict) else None
     if not isinstance(username, str) or not username:
-        raise LeetCodeSyncError('LeetCode rejected the session. Log in again and relink a fresh session.')
+        raise LeetCodeAuthError('LeetCode rejected the session. Log in again and relink a fresh session.')
     if username.lower() != connection['username'].lower():
-        raise LeetCodeSyncError('The session belongs to a different LeetCode username.')
+        raise LeetCodeAuthError('The session belongs to a different LeetCode username.')
     return username
 
 
@@ -280,7 +284,7 @@ def sync(connection_path: Path, snapshot_path: Path, limit: int = MAX_HISTORY,
     snapshot = normalize_history(data, connection['username'])
     previous = read_json(snapshot_path, {}) or {}
     if previous.get('username', '').lower() == connection['username'].lower():
-        for key in ('accepted_solutions', 'solutions_synced_at', 'solution_sync_error'):
+        for key in ('accepted_solutions', 'solutions_synced_at', 'solution_sync_error', 'solution_sync_status'):
             if key in previous:
                 snapshot[key] = previous[key]
     # Account progress must survive an unavailable private solution endpoint.
@@ -303,8 +307,13 @@ def sync(connection_path: Path, snapshot_path: Path, limit: int = MAX_HISTORY,
                 saved.values(), key=lambda row: str(row.get('accepted_at') or ''), reverse=True)
             snapshot['solutions_synced_at'] = utc_now()
             snapshot.pop('solution_sync_error', None)
+            snapshot['solution_sync_status'] = 'ok'
+        except LeetCodeAuthError as exc:
+            snapshot['solution_sync_error'] = str(exc)
+            snapshot['solution_sync_status'] = 'reauth_required'
         except LeetCodeSyncError as exc:
             snapshot['solution_sync_error'] = str(exc)
+            snapshot['solution_sync_status'] = 'error'
         save_private_json(snapshot_path, snapshot)
     return snapshot
 
@@ -318,7 +327,8 @@ def public_status(connection_path: Path, snapshot_path: Path) -> dict:
         pass
     snapshot = read_json(snapshot_path, {}) or {}
     return {'linked': linked, 'snapshot': {
-        key: snapshot.get(key) for key in ('username', 'synced_at', 'total_solved', 'solved_by_difficulty')
+        key: snapshot.get(key) for key in ('username', 'synced_at', 'total_solved', 'solved_by_difficulty',
+                                         'solution_sync_status', 'solution_sync_error')
     } if isinstance(snapshot, dict) and snapshot else None}
 
 
@@ -556,6 +566,7 @@ def main(argv=None) -> int:
                           'total_solved': snapshot['total_solved'],
                           'recent_accepted_count': len(snapshot['recent_accepted']),
                           'downloaded_solution_count': len(snapshot.get('accepted_solutions', [])),
+                          'solution_sync_status': snapshot.get('solution_sync_status'),
                           'solution_sync_error': snapshot.get('solution_sync_error')}
             elif args.command == 'status':
                 output = public_status(session_path, snapshot_path)

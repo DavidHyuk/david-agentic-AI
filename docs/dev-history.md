@@ -3,6 +3,27 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.42.1 — 2026-10-05 (patch: require submitted source for Jun reviews)
+
+- Diagnose missing Move Zeroes / Two Sum II implementations against LeetCode:
+  their Accepted rows and submission IDs are present, but the saved session
+  returns no authenticated account and no private submission details. Existing
+  five code snapshots predate the failed connection; this is not a missing
+  completion or a recent-history range failure.
+- Require actual Accepted code to prepare or display a solution review. Hide
+  former notes-only cached summaries; keep learning notes separately and use
+  them only as supplementary context for submitted-code reviews.
+- Persist typed `reauth_required` / `error` / `ok` source status, preserving
+  existing account counts and downloaded code. Show actionable reconnection
+  status on the account card and affected problems. A successful relink and
+  source sync clears the status and prepares actual-code reviews on the same
+  existing coding room, bot, profile and schedule.
+- Validation: 706 tests pass. Live API/browser checks show 5 actual-code reviews
+  retained and all 5 missing implementations labeled for reconnection, including
+  Move Zeroes and Two Sum II. Their former notes-only summaries are hidden;
+  completion history remains. Fresh authenticated source and review replacement
+  are covered in tests; live code recovery awaits user-completed LeetCode relink.
+
 ## v1.42.0 — 2026-10-05 (minor: prepared Jun solution reviews)
 
 - Simplify Jun's coding workbench by removing its Dashboard ↔ Telegram

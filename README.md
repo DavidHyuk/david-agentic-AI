@@ -976,8 +976,10 @@ cards. **풀이 기록** lists completed problems in newest-first order. Click a
 problem to expand Jun's prepared approach, answer, complexity, review hints and
 edge cases, with the actual Accepted code and recorded learning alongside it.
 Historical hints retain their source; generated review hints are labeled
-separately. Problems without code or learning remain pending, and learning-only
-reviews explicitly mark the unavailable implementation and complexity.
+separately. A solution review requires the actual Accepted code: notes never
+substitute for the implementation. Problems without downloaded code stay pending,
+including any formerly cached notes-only reviews. Recorded learning remains in
+**학습 완료 기록** and supplements code-backed reviews.
 
 `leetcode_review.py` caches reviews privately in
 `~/.hermes/data/interview/leetcode_reviews.json`, using the configured loopback
@@ -1046,6 +1048,11 @@ workbench chat can explain matching downloaded code. The room lists problems
 with prepared reviews, actual code and source-access status separately from
 the account total. An expired session can still expose public counts while
 blocking private code; reconnect using `login --headed` or `connect` above.
+If public solves update while missing problems show **LeetCode 재연결 필요**,
+the linked session no longer authenticates the account. Saved older code can
+still be reviewed; public Accepted history alone does not grant private source
+access. Relink a fresh session, then run `bash ~/.hermes/scripts/leetcode_refresh.sh`
+and refresh the workbench to replace pending entries with actual-code reviews.
 Manual incremental refresh: `python3 ~/.hermes/scripts/leetcode_sync.py sync --missing-only`.
 The LeetCode Gym Observatory room shows only the safe snapshot; it never returns
 the session cookie. To stop future account access while retaining the already

@@ -423,7 +423,7 @@ class Observatory:
                 data['leetcode_history'] = {
                     key: snapshot.get(key) for key in (
                         'username', 'synced_at', 'total_solved', 'solved_by_difficulty', 'recent_accepted',
-                        'solutions_synced_at', 'solution_sync_error')
+                        'solutions_synced_at', 'solution_sync_error', 'solution_sync_status')
                 } if isinstance(snapshot, dict) and snapshot.get('version') == 1 else None
                 if data['leetcode_history']:
                     data['leetcode_history']['downloaded_solution_count'] = len(snapshot.get('accepted_solutions', []))

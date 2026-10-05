@@ -256,6 +256,7 @@ def test_solution_endpoint_failure_does_not_block_account_progress(tmp_path, mon
     result = ls.sync(session, snapshot)
     assert json.loads(snapshot.read_text())['total_solved'] == 12
     assert result['solution_sync_error']
+    assert result['solution_sync_status'] == 'error'
 
 
 def test_failed_account_refresh_preserves_snapshot(tmp_path, monkeypatch):
@@ -301,6 +302,7 @@ def test_sync_retains_older_downloads_outside_recent_list(tmp_path, monkeypatch)
     result = ls.sync(session, snapshot, missing_only=True)
     assert {row['slug'] for row in result['accepted_solutions']} == {'old-problem', 'two-sum'}
     assert result['solutions_synced_at']
+    assert result['solution_sync_status'] == 'ok'
 
 
 def test_expired_session_reports_source_failure_while_retaining_counts(tmp_path, monkeypatch):
@@ -311,3 +313,20 @@ def test_expired_session_reports_source_failure_while_retaining_counts(tmp_path,
     result = ls.sync(session, snapshot)
     assert result['total_solved'] == 12
     assert 'Log in again' in result['solution_sync_error']
+    assert result['solution_sync_status'] == 'reauth_required'
+
+
+def test_reauthenticated_sync_downloads_missing_code_and_clears_auth_failure(tmp_path, monkeypatch):
+    session, snapshot = tmp_path / 'session.json', tmp_path / 'history.json'
+    ls.save_private_json(session, connection())
+    ls.save_private_json(snapshot, {'username': 'david_choi', 'solution_sync_status': 'reauth_required',
+        'solution_sync_error': 'Log in again', 'accepted_solutions': []})
+    responses = {ls.USER_STATUS_QUERY: {'userStatus': {'username': 'david_choi'}},
+                 ls.HISTORY_QUERY: history_data(), ls.RECENT_SUBMISSIONS_QUERY: recent_submissions_data(),
+                 ls.SUBMISSION_DETAILS_QUERY: submission_details_data()}
+    monkeypatch.setattr(ls, 'graphql', lambda query, *_: responses[query])
+    result = ls.sync(session, snapshot, missing_only=True)
+    assert result['solution_sync_status'] == 'ok'
+    assert 'solution_sync_error' not in result
+    assert result['accepted_solutions'][0]['code'] == submission_details_data()['submissionDetails']['code']
+    assert 'session' not in result

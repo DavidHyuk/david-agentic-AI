@@ -84,10 +84,11 @@ def test_newer_accepted_event_does_not_show_old_code(home):
 
 
 def test_partial_failure_retains_saved_reviews_and_stops_batch(home):
-    state = review.paths(home)[1]
-    data = json.loads(state.read_text())
-    data['coding'] = [{'item_id': 'two-sum', 'date': '2026-10-03', 'lesson': '해시맵'}]
-    state.write_text(json.dumps(data))
+    history = review.paths(home)[0]
+    data = json.loads(history.read_text())
+    data['accepted_solutions'].append({'slug': 'two-sum', 'title': 'Two Sum',
+                                     'accepted_at': '2026-10-03', 'code': 'return [0, 1]'})
+    history.write_text(json.dumps(data))
     calls = []
     def generator(source, _):
         calls.append(source['slug'])
@@ -107,17 +108,38 @@ def test_preparation_lock_prevents_duplicate_model_requests(home):
     assert result['status'] == 'busy'
 
 
-def test_learning_only_review_keeps_implementation_and_complexity_unknown(home):
+def test_notes_never_substitute_for_actual_accepted_source_even_in_old_cache(home):
+    review.prepare(home, generator=lambda *_: SUMMARY)
     history = review.paths(home)[0]
     data = json.loads(history.read_text())
     data['accepted_solutions'] = []
     history.write_text(json.dumps(data))
-    review.prepare(home, generator=lambda *_: SUMMARY)
+    assert review.prepare(home, generator=lambda *_: pytest.fail('Notes-only inference'))['prepared'] == 0
     row = review.list_reviews(home)['items'][0]
     assert not row.get('code')
-    assert row['summary']['answer'].startswith('실제 Accepted 코드 미확보')
-    assert '확인하지 못했습니다' in row['summary']['complexity']
+    assert row['status'] == 'pending'
+    assert 'summary' not in row
     assert row['notes'][0]['hint_notes'] == '정렬 없이 세기'
+    # Even a cache created by the former notes-only fallback is hidden.
+    cache = review.paths(home)[2]
+    value = json.loads(cache.read_text())
+    _, sources = review.load_sources(home)
+    value['reviews']['valid-anagram']['fingerprint'] = review.fingerprint(sources[0], 'david')
+    cache.write_text(json.dumps(value))
+    assert review.list_reviews(home)['ready_count'] == 0
+
+
+def test_actual_code_arrival_replaces_notes_only_cache(home):
+    history = review.paths(home)[0]
+    original = json.loads(history.read_text())
+    history.write_text(json.dumps(original | {'accepted_solutions': []}))
+    assert review.prepare(home, generator=lambda *_: pytest.fail('No submitted code'))['prepared'] == 0
+    history.write_text(json.dumps(original))
+    assert review.prepare(home, generator=lambda *_: SUMMARY)['prepared'] == 1
+    row = review.list_reviews(home)['items'][0]
+    assert row['status'] == 'ready'
+    assert row['code'] == original['accepted_solutions'][0]['code']
+    assert row['summary']['answer'] == SUMMARY['answer']
 
 
 def test_local_model_request_marks_background_and_omits_credentials(home, monkeypatch):
@@ -136,7 +158,7 @@ def test_local_model_request_marks_background_and_omits_credentials(home, monkey
     config = home / 'config.yaml'
     config.write_text(config.read_text().replace('http://localhost:8003', 'https://external.example'))
     with pytest.raises(ValueError, match='local model'):
-        review.summarize({}, home)
+        review.summarize(review.load_sources(home)[1][0], home)
     assert len(requests) == 1
 
 
