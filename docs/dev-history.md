@@ -26,7 +26,10 @@ semantic versioning (major.minor.patch).
   checks, lock boundaries, cookie stdin transport, rejected credentials and
   nonblocking workbench readiness. Live native Chromium shows webdriver=false
   and no automation launch flag, and the remote sign-in form is accessible.
-  Google's final authentication still requires David's manual login.
+  David completed manual login; private source access is restored and all 10
+  Accepted implementations and 10 matching reviews are ready in the live Jun
+  workbench, including Move Zeroes and Two Sum II. The newly issued token does
+  not declare an explicit expiry in its payload; indefinite access is not assumed.
 
 ## v1.43.1 — 2026-10-05 (patch: headless DGX login through Jun)
 
