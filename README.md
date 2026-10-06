@@ -1013,47 +1013,47 @@ The token is entered through a hidden prompt and is stored only at
 separate owner-only snapshot (including submitted source code) is
 `~/.hermes/data/interview/leetcode_history.json`.
 
-The preferred setup opens a one-time local GUI Chromium window. Complete the
-LeetCode login, Cloudflare check, and any MFA yourself; the temporary browser
-profile is deleted afterward and only the issued session is stored. Run this in
-a terminal attached to the DGX desktop (not a headless SSH-only shell):
+For a DGX without a monitor, open **Jun → 풀이 기록 → LeetCode 로그인 창
+준비하기** in your private Observatory dashboard. After a few seconds, follow
+**LeetCode 로그인 창 열기** from Chrome/Chromium on Windows or Mac. The temporary
+Chromium runs on DGX and its screen/input use the dashboard's existing address;
+no HDMI connection or extra SSH port forwarding is needed. Complete LeetCode
+login, Cloudflare verification and any MFA yourself. The browser profile is
+isolated from other workflows and deleted afterward.
+
+The dashboard starts a bounded transient user systemd unit so the window survives
+HTTP request completion, SSH disconnection and agent turns. Repeated requests
+reuse an active window. The login window expires after 15 minutes. Only a
+session verified against the linked handle is saved; the desktop then closes
+and actual Accepted-code sync and review preparation run automatically. Jun
+shows readiness and sync status. The existing daily source sync stays at 06:35.
+No new room, bot, profile or persistent desktop service is added.
+
+To start the same window from a DGX terminal:
+
+```bash
+python3 ~/.hermes/scripts/leetcode_browser_login.py --start
+```
+
+It uses the linked LeetCode handle; add `--username HANDLE` for a first
+connection. Open the resulting link in Jun, or use the dashboard-relative URL
+`/leetcode-login/vnc.html?autoconnect=true&resize=scale&path=leetcode-login/websockify`.
+The proxy accepts only an active login desktop on fixed loopback ports
+18782/15903 and validates WebSocket origin. Credentials are entered directly
+into LeetCode and never sent in dashboard API bodies. Diagnostic output stays
+in the owner-only `~/.hermes/data/interview/leetcode-login.log`.
+
+If using an attached DGX desktop, manual local login remains available:
 
 ```bash
 python3 ~/.hermes/scripts/leetcode_sync.py login --headed --username <your-leetcode-handle>
-python3 ~/.hermes/scripts/leetcode_sync.py sync
-python3 ~/.hermes/scripts/leetcode_sync.py status
+bash ~/.hermes/scripts/leetcode_refresh.sh
 ```
 
-The first command verifies that the session belongs to the supplied handle. The
-plain `login` command remains headless and asks for a login/password through
-hidden terminal input, but LeetCode currently blocks that route with Cloudflare.
-If no local GUI is available, sign in in a normal browser and use `connect` to
-paste only the `LEETCODE_SESSION` cookie into its hidden prompt instead. A
-read-only `leetcode-history-sync` cron then refreshes the snapshot daily at
-06:35, and `coding-coach` refreshes it again before each scheduled coding lesson.
-
-For a DGX without a monitor, reuse the installed temporary desktop runtime and
-log in from your personal computer without copying cookies. On the DGX run:
-
-```bash
-python3 ~/.hermes/scripts/leetcode_browser_login.py
-```
-
-It uses the linked LeetCode handle by default; add `--username HANDLE` for a
-first connection. On your **personal computer**, keep this SSH tunnel running:
-
-```bash
-ssh -F /dev/null -N -o ExitOnForwardFailure=yes -L 127.0.0.1:18782:127.0.0.1:18782 david@10.0.0.50
-```
-
-Open `http://127.0.0.1:18782/vnc.html?autoconnect=true&resize=scale` and complete
-LeetCode login and browser verification yourself. The window expires after
-15 minutes. Only a verified account session is saved; the temporary desktop
-then closes and actual-code sync and review preparation run automatically.
-The existing Jun workbench shows login readiness and reconnection status.
-Ports and browser profiles are separate from YouTube/ChatGPT login windows.
-This reuses the installed runtime, existing coding room and daily source sync;
-it does not add a persistent service or a new agent workflow.
+Alternatively, sign in in a normal personal browser and use
+`leetcode_sync.py connect --username HANDLE` to paste the issued
+`LEETCODE_SESSION` cookie into its hidden terminal prompt. The plain `login`
+command remains headless; LeetCode currently blocks that route with Cloudflare.
 Session lifetime is controlled by LeetCode. The previously linked cookie's
 metadata specified 14 days from its September 14 refresh; it was past that
 period when source access failed. This does not establish a service-wide

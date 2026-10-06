@@ -3,6 +3,28 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.43.1 — 2026-10-05 (patch: headless DGX login through Jun)
+
+- Replace the extra SSH tunnel step with Jun's reconnection button and a
+  dashboard-origin noVNC link. Relay static assets and bidirectional WebSocket
+  bytes only to the active loopback login desktop, enforce existing private
+  host policy and matching WebSocket Origin, and preserve buffered first frames.
+  Windows/Mac users can log in without attaching a DGX monitor.
+- Start/reuse a bounded transient user systemd unit so the desktop survives the
+  dashboard request, agent turn and SSH exit. Keep the 15 minute manual login
+  limit and isolated Chromium profile; keep diagnostics in an owner-only log.
+- Keep polling when an issued browser cookie does not yet authenticate the
+  linked account, instead of closing the window before manual login completes.
+  Save only the verified session, then run the existing code/review refresh.
+- Reuse Jun's room, credential owner and schedule. This fixes an existing
+  account connection and does not introduce a separate agent, room or bot.
+- Validation: 726 tests pass, including active-window reuse, failed launch,
+  prelogin-cookie retry, proxy credential boundaries, origin rejection and
+  bidirectional WebSocket forwarding with a coalesced first frame. Live
+  Chromium testing through the Tailscale dashboard completed the RFB handshake
+  and rendered the LeetCode sign-in form. Account relink still requires David's
+  direct login.
+
 ## v1.43.0 — 2026-10-05 (minor: direct LeetCode browser reconnection)
 
 - Inspect the linked session metadata: refreshed September 14 with a 1,209,600

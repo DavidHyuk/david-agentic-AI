@@ -253,8 +253,18 @@ def test_coding_login_status_exposes_fixed_local_port_without_credentials(store,
     path.write_text(json.dumps({'status': 'awaiting_login', 'web_port': 1234,
                                 'session': 'PRIVATE', 'password': 'PRIVATE'}))
     status = store.workbench('coding')['leetcode_login']
-    assert status == {'status': 'awaiting_login', 'web_port': 18782}
+    assert status == {'status': 'awaiting_login', 'web_port': 18782,
+                      'url': '/leetcode-login/vnc.html?autoconnect=true&resize=scale&path=leetcode-login/websockify'}
     assert 'PRIVATE' not in json.dumps(status)
+
+
+def test_login_action_uses_fixed_helper_and_rejects_other_rooms(store, monkeypatch):
+    calls = []
+    monkeypatch.setattr(store, 'helper', lambda name, args, **kw: calls.append((name, args)) or {'status': 'awaiting_login'})
+    assert store.study_action({'action': 'leetcode_login', 'room': 'coding', 'command': 'untrusted'})['saved']
+    assert calls == [('leetcode_browser_login.py', ['--start'])]
+    with pytest.raises(ValueError, match='Jun'):
+        store.study_action({'action': 'leetcode_login', 'room': 'english'})
 
 
 def test_observatory_chats_clear_sent_drafts_and_support_shift_enter():
@@ -1314,3 +1324,119 @@ def test_coding_source_prioritizes_new_question_over_old_problem(store):
     assert 'top_k_source' not in store.coding_source_context('Two Sum 내 코드 설명해줘', recent=recent)
     assert 'top_k_source' not in store.coding_source_context('Move Zeroes 내 코드 설명해줘', recent=recent)
     assert 'top_k_source' in store.coding_source_context('같은 코드의 복잡도는?', recent=recent)
+
+
+@pytest.fixture
+def login_http(store):
+    path = store.home / 'data/interview/leetcode-login-status.json'
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps({'status': 'awaiting_login'}))
+    server = ThreadingHTTPServer(('127.0.0.1', 0), make_handler(store, Path('/unused'), {'127.0.0.1'}))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    yield server, path
+    server.shutdown()
+    server.server_close()
+    thread.join(timeout=3)
+
+
+def test_login_proxy_keeps_assets_on_loopback_and_excludes_client_credentials(login_http, monkeypatch):
+    from http.server import BaseHTTPRequestHandler
+    requests = []
+    class Upstream(BaseHTTPRequestHandler):
+        def log_message(self, *args):
+            pass
+        def do_GET(self):
+            requests.append((self.path, dict(self.headers)))
+            body = b'login asset'
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/javascript')
+            self.send_header('Content-Length', str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+    upstream = ThreadingHTTPServer(('127.0.0.1', 0), Upstream)
+    thread = threading.Thread(target=upstream.serve_forever, daemon=True)
+    thread.start()
+    monkeypatch.setattr(observatory_module, 'LEETCODE_LOGIN_PORT', upstream.server_port)
+    server, status_path = login_http
+    conn = HTTPConnection(*server.server_address, timeout=3)
+    try:
+        conn.request('GET', '/leetcode-login/app/ui.js?sample=1', headers={'Cookie': 'PRIVATE', 'Authorization': 'PRIVATE'})
+        response = conn.getresponse()
+        assert response.status == 200 and response.read() == b'login asset'
+        assert response.getheader('Cache-Control') == 'no-store'
+        assert requests[0][0] == '/app/ui.js?sample=1'
+        assert 'PRIVATE' not in str(requests)
+        conn.request('GET', '/leetcode-login/../secret')
+        response = conn.getresponse()
+        assert response.status == 404
+        response.read()
+        conn.request('GET', '/leetcode-login/websockify', headers={'Upgrade': 'websocket', 'Origin': 'http://evil.example'})
+        response = conn.getresponse()
+        assert response.status == 403
+        response.read()
+        status_path.write_text(json.dumps({'status': 'connected'}))
+        conn.request('GET', '/leetcode-login/vnc.html')
+        response = conn.getresponse()
+        assert response.status == 503
+        response.read()
+        assert len(requests) == 1
+    finally:
+        conn.close()
+        upstream.shutdown()
+        upstream.server_close()
+        thread.join(timeout=3)
+
+
+def test_login_websocket_preserves_coalesced_first_frame_and_bidirectional_bytes(login_http, monkeypatch):
+    import socket
+    listener = socket.socket()
+    listener.bind(('127.0.0.1', 0))
+    listener.listen()
+    listener.settimeout(3)
+    monkeypatch.setattr(observatory_module, 'LEETCODE_LOGIN_PORT', listener.getsockname()[1])
+    server, _ = login_http
+    headers_seen, received, errors = [], [], []
+    first_frame = b'\x82\x0cRFB 003.008\n'
+    client_frame = b'\x82\x80MASK'
+    reply = b'\x82\x02OK'
+    def backend():
+        try:
+            with listener.accept()[0] as peer:
+                peer.settimeout(3)
+                header = b''
+                while b'\r\n\r\n' not in header:
+                    header += peer.recv(4096)
+                headers_seen.append(header)
+                peer.sendall(b'HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n' + first_frame)
+                received.append(peer.recv(len(client_frame)))
+                peer.sendall(reply)
+        except Exception as exc:
+            errors.append(exc)
+    thread = threading.Thread(target=backend, daemon=True)
+    thread.start()
+    try:
+        with socket.create_connection(server.server_address, timeout=3) as client:
+            host = '%s:%s' % server.server_address
+            client.sendall(('GET /leetcode-login/websockify HTTP/1.1\r\nHost: ' + host + '\r\nOrigin: http://' + host + '\r\nUpgrade: websocket\r\nSec-WebSocket-Key: test-key\r\nSec-WebSocket-Version: 13\r\nCookie: PRIVATE\r\n\r\n').encode())
+            data = b''
+            while b'\r\n\r\n' not in data:
+                data += client.recv(4096)
+            assert data.startswith(b'HTTP/1.1 101 ')
+            frame = data.split(b'\r\n\r\n', 1)[1]
+            while len(frame) < len(first_frame):
+                frame += client.recv(4096)
+            assert frame == first_frame
+            client.sendall(client_frame)
+            data = b''
+            while len(data) < len(reply):
+                data += client.recv(4096)
+            assert data == reply
+        thread.join(timeout=3)
+        assert not errors and received == [client_frame]
+        assert b'GET /websockify HTTP/1.1' in headers_seen[0]
+        assert b'Sec-WebSocket-Key: test-key' in headers_seen[0]
+        assert b'PRIVATE' not in headers_seen[0]
+    finally:
+        listener.close()
+        thread.join(timeout=3)

@@ -72,3 +72,33 @@ def test_duplicate_login_does_not_change_existing_status(tmp_path, monkeypatch):
         fcntl.flock(handle, fcntl.LOCK_EX)
         assert login.main(['--home', str(tmp_path), '--username', 'david']) == 1
     assert json.loads(status.read_text())['status'] == 'awaiting_login'
+
+
+def test_background_start_survives_request_and_reuses_active_window(tmp_path):
+    status_path = tmp_path / 'data/interview/leetcode-login-status.json'
+    calls = []
+    def runner(command, **kwargs):
+        calls.append(command)
+        if command[0] == 'systemctl':
+            return SimpleNamespace(returncode=1)
+        login.save_status(status_path, 'awaiting_login', session='PRIVATE')
+        return SimpleNamespace(returncode=0)
+    result = login.start_login(tmp_path, Path('/runtime'), 'david', 900, runner)
+    assert result == {'status': 'awaiting_login', 'url': login.LOGIN_URL}
+    assert calls[1][:5] == ['systemd-run', '--user', '--unit=hermes-leetcode-login', '--collect', '--property=RuntimeMaxSec=55min']
+    assert '--home' in calls[1] and '--username' in calls[1]
+    calls.clear()
+    def active(command, **kwargs):
+        calls.append(command)
+        return SimpleNamespace(returncode=0)
+    assert login.start_login(tmp_path, Path('/runtime'), 'david', 900, active) == result
+    assert len(calls) == 1
+    assert 'PRIVATE' not in json.dumps(result)
+
+
+def test_background_start_reports_launch_failure_without_credentials(tmp_path):
+    def runner(command, **kwargs):
+        return SimpleNamespace(returncode=1, stderr=b'potentially-private')
+    with pytest.raises(RuntimeError, match='Could not start'):
+        login.start_login(tmp_path, Path('/runtime'), 'david', 900, runner)
+    assert json.loads((tmp_path / 'data/interview/leetcode-login-status.json').read_text())['status'] == 'failed'

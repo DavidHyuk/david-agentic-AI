@@ -515,14 +515,22 @@ def login_in_headed_browser(username: str, executable: str, timeout_seconds: int
                     page.goto('https://leetcode.com/accounts/login/', wait_until='domcontentloaded', timeout=20_000)
                     print('Complete LeetCode sign-in and any browser verification in the opened window.', flush=True)
                     deadline = time.monotonic() + timeout_seconds
+                    last_checked_session = None
+                    last_checked_at = 0
                     while time.monotonic() < deadline:
                         cookies = context.cookies('https://leetcode.com')
                         session = _cookie_value(cookies, 'LEETCODE_SESSION')
-                        if session:
+                        now = time.monotonic()
+                        if session and (session != last_checked_session or now - last_checked_at >= 5):
+                            last_checked_session, last_checked_at = session, now
                             candidate = {'username': username, 'session': session,
                                          'csrf_token': _cookie_value(cookies, 'csrftoken'), 'linked_at': ''}
-                            verify_connection(candidate)
-                            return {'session': session, 'csrf_token': _cookie_value(cookies, 'csrftoken')}
+                            try:
+                                verify_connection(candidate)
+                            except LeetCodeSyncError:
+                                pass  # A cookie alone does not mean manual login is finished.
+                            else:
+                                return {'session': candidate['session'], 'csrf_token': candidate['csrf_token']}
                         page.wait_for_timeout(500)
                     raise LeetCodeSyncError('Timed out waiting for a LeetCode session; no credentials were saved.')
                 finally:

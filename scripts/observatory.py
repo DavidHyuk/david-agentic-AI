@@ -16,8 +16,11 @@ import ipaddress
 import fcntl
 import json
 import mimetypes
+from http.client import HTTPConnection
 from pathlib import Path
 import re
+import select
+import socket
 import sqlite3
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import time
@@ -49,6 +52,7 @@ JOB_ROOMS = {'papers-digest': 'papers', 'interview-prep': 'interview',
              'english-podcast-daily': 'podcast', 'english-podcast-weekend-review': 'podcast',
              'career-rewards-daily': 'hq'}
 BACKGROUND_MAINTENANCE_JOBS = frozenset({'leetcode-history-sync'})
+LEETCODE_LOGIN_PORT = 18782
 ROOM_PROFILES = {'hq': 'david', 'podcast': 'english'}
 SECRET_KEY = re.compile(r'(token|secret|password|api[_-]?key|authorization|cookie|credential)', re.I)
 TASK_ID = re.compile(r't_[0-9a-f]{8}')
@@ -435,7 +439,8 @@ class Observatory:
                 if login.get('status') in ('awaiting_login', 'syncing', 'connected', 'stopped', 'failed'):
                     data['leetcode_login'] = {'status': login['status']}
                     if login['status'] == 'awaiting_login':
-                        data['leetcode_login']['web_port'] = 18782
+                        data['leetcode_login']['web_port'] = LEETCODE_LOGIN_PORT
+                        data['leetcode_login']['url'] = '/leetcode-login/vnc.html?autoconnect=true&resize=scale&path=leetcode-login/websockify'
         elif room == 'english':
             cards = list(read_json(self.home / 'data/english/srs_deck.json', {'cards': {}})['cards'].values())
             due = sorted([c for c in cards if c['due'] <= today], key=lambda c: (c['box'], c['due']))
@@ -981,6 +986,10 @@ class Observatory:
             raise ValueError('JSON 객체가 필요합니다.')
         action = body.get('action')
         today = datetime.now(TZ).date().isoformat()
+        if action == 'leetcode_login':
+            if body.get('room') != 'coding':
+                raise ValueError('Jun 작업실에서만 LeetCode를 연결할 수 있습니다.')
+            return {'saved': True, 'result': self.helper('leetcode_browser_login.py', ['--start'], timeout=35)}
         if action in ('plan', 'feedback'):
             track = body.get('track')
             if track not in ('coding', 'system_design'):
@@ -1500,12 +1509,85 @@ def make_handler(store, assets: Path, hosts):
             self.end_headers()
             self.wfile.write(body)
 
+        def login_desktop(self, url):
+            """Relay only the active login desktop on the existing private origin."""
+            status = read_json(store.home / 'data/interview/leetcode-login-status.json', {})
+            if status.get('status') != 'awaiting_login':
+                self.respond(503, {'error': '로그인 창이 닫혀 있습니다. Jun 작업실에서 다시 열어 주세요.'})
+                return
+            path = url.path.removeprefix('/leetcode-login')
+            if '..' in path.split('/') or '\\' in path:
+                self.respond(404, {'error': '찾을 수 없습니다.'})
+                return
+            if url.query:
+                path += '?' + url.query
+            websocket = self.headers.get('Upgrade', '').lower() == 'websocket'
+            if websocket:
+                origin = urlsplit(self.headers.get('Origin', ''))
+                if origin.scheme not in ('http', 'https') or origin.netloc.lower() != self.headers.get('Host', '').lower():
+                    self.respond(403, {'error': '허용되지 않은 연결입니다.'})
+                    return
+                self.login_websocket(path)
+                return
+            upstream = HTTPConnection('127.0.0.1', LEETCODE_LOGIN_PORT, timeout=10)
+            try:
+                upstream.request('GET', path)
+                response = upstream.getresponse()
+                body = response.read(5_000_001)
+                if len(body) > 5_000_000:
+                    raise OSError('Login asset too large.')
+                self.respond(response.status, body, response.getheader('Content-Type') or 'application/octet-stream')
+            except OSError:
+                self.respond(503, {'error': '로그인 화면 연결이 종료됐습니다. 다시 열어 주세요.'})
+            finally:
+                upstream.close()
+
+        def login_websocket(self, path):
+            """Preserve handshake and buffered first frames, then relay both ways."""
+            upgraded = False
+            self.close_connection = True
+            try:
+                with socket.create_connection(('127.0.0.1', LEETCODE_LOGIN_PORT), timeout=10) as upstream:
+                    headers = [f'GET {path} HTTP/1.1', f'Host: 127.0.0.1:{LEETCODE_LOGIN_PORT}',
+                               'Connection: Upgrade', 'Upgrade: websocket']
+                    for name in ('Sec-WebSocket-Key', 'Sec-WebSocket-Version', 'Sec-WebSocket-Protocol', 'Origin'):
+                        value = self.headers.get(name)
+                        if value:
+                            headers.append(name + ': ' + value)
+                    upstream.sendall(('\r\n'.join(headers) + '\r\n\r\n').encode('latin-1'))
+                    handshake = b''
+                    while b'\r\n\r\n' not in handshake:
+                        block = upstream.recv(65536)
+                        if not block or len(handshake) + len(block) > 131072:
+                            raise OSError('Invalid login WebSocket handshake.')
+                        handshake += block
+                    if not handshake.split(b'\r\n', 1)[0].startswith(b'HTTP/1.1 101 '):
+                        raise OSError('Login WebSocket did not upgrade.')
+                    self.wfile.write(handshake)
+                    self.wfile.flush()
+                    upgraded = True
+                    self.connection.settimeout(10)
+                    while True:
+                        ready, _, _ = select.select([self.connection, upstream], [], [], 1)
+                        for source in ready:
+                            block = source.recv(65536)
+                            if not block:
+                                return
+                            target = upstream if source is self.connection else self.connection
+                            target.sendall(block)
+            except OSError:
+                if not upgraded:
+                    self.respond(503, {'error': '로그인 화면 연결에 실패했습니다. 다시 열어 주세요.'})
+
         def do_GET(self):
             host = self.headers.get('Host', '').split(':')[0].lower()
             if host not in hosts or self.headers.get('Sec-Fetch-Site') == 'cross-site':
                 self.respond(403, {'error': '허용되지 않은 요청입니다.'})
                 return
             url = urlsplit(self.path)
+            if url.path.startswith('/leetcode-login/'):
+                self.login_desktop(url)
+                return
             args = {k: v[0] for k, v in parse_qs(url.query).items()}
             try:
                 offset = max(0, int(args.get('offset', 0)))

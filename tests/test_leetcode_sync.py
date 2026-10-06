@@ -406,3 +406,32 @@ def test_reauthenticated_sync_downloads_missing_code_and_clears_auth_failure(tmp
     assert 'solution_sync_error' not in result
     assert result['accepted_solutions'][0]['code'] == submission_details_data()['submissionDetails']['code']
     assert 'session' not in result
+
+
+def test_headed_login_waits_for_verified_account_after_prelogin_cookie(tmp_path, monkeypatch):
+    from contextlib import contextmanager
+    import sys
+    from types import SimpleNamespace
+    monkeypatch.setenv('DISPLAY', ':98')
+    executable = tmp_path / 'chrome'
+    executable.write_text('fixture')
+    executable.chmod(0o700)
+    sessions = iter(['prelogin', 'actual-login'])
+    waits, checked, closed = [], [], []
+    page = SimpleNamespace(goto=lambda *a, **k: None, wait_for_timeout=lambda ms: waits.append(ms))
+    context = SimpleNamespace(pages=[page], cookies=lambda _: [
+        {'name': 'LEETCODE_SESSION', 'value': next(sessions)}, {'name': 'csrftoken', 'value': 'csrf'}],
+        close=lambda: closed.append(True))
+    @contextmanager
+    def playwright():
+        yield SimpleNamespace(chromium=SimpleNamespace(launch_persistent_context=lambda *a, **k: context))
+    monkeypatch.setitem(sys.modules, 'playwright.sync_api', SimpleNamespace(Error=RuntimeError, sync_playwright=playwright))
+    def verify(candidate):
+        checked.append(candidate['session'])
+        if candidate['session'] == 'prelogin':
+            raise ls.LeetCodeSyncError('Not signed in yet')
+        return 'david'
+    monkeypatch.setattr(ls, 'verify_connection', verify)
+    assert ls.login_in_headed_browser('david', str(executable), 60, tmp_path)['session'] == 'actual-login'
+    assert checked == ['prelogin', 'actual-login'] and waits == [500] and closed == [True]
+    assert not list(tmp_path.glob('leetcode-login-*'))

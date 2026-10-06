@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # __author__ = 'David Choi (bestshoot21@gmail.com)'
-"""Reconnect LeetCode through a temporary DGX browser viewed over an SSH tunnel.
+"""Reconnect LeetCode through a temporary DGX browser in the private dashboard.
 
 Reuse the installed YouTube desktop runtime without sharing browser profiles or
-credentials. Forward localhost:18782 and open /vnc.html. The user completes login
+credentials. Open the Jun workbench's login link. The user completes login
 and browser verification; the existing sync CLI verifies and saves the session.
 Close the temporary desktop, download Accepted code and rebuild missing reviews.
 """
@@ -27,6 +27,8 @@ import time
 WEB_PORT = 18782
 VNC_PORT = 15903
 DISPLAY = ':98'
+LOGIN_URL = '/leetcode-login/vnc.html?autoconnect=true&resize=scale&path=leetcode-login/websockify'
+LOGIN_UNIT = 'hermes-leetcode-login'
 
 
 def save_status(path, status, **fields):
@@ -76,6 +78,39 @@ def desktop_commands(runtime, authority):
     ]
 
 
+def start_login(home, runtime, username, timeout, runner=subprocess.run):
+    """Start a bounded user unit that survives dashboard requests and SSH exits."""
+    root = home / 'data/interview'
+    root.mkdir(parents=True, exist_ok=True, mode=0o700)
+    status_path = root / 'leetcode-login-status.json'
+    with (root / '.leetcode-login-start.lock').open('a') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        active = runner(['systemctl', '--user', 'is-active', '--quiet', LOGIN_UNIT],
+                        capture_output=True, timeout=5)
+        if active.returncode:
+            save_status(status_path, 'starting')
+            command = ['systemd-run', '--user', '--unit=' + LOGIN_UNIT, '--collect',
+                       '--property=RuntimeMaxSec=55min', sys.executable, str(Path(__file__).resolve()),
+                       '--home', str(home), '--runtime-dir', str(runtime),
+                       '--username', username, '--timeout', str(timeout)]
+            result = runner(command, capture_output=True, timeout=10)
+            if result.returncode:
+                save_status(status_path, 'failed')
+                raise RuntimeError('Could not start the temporary login service.')
+        deadline = time.monotonic() + 15
+        while time.monotonic() < deadline:
+            try:
+                status = json.loads(status_path.read_text()).get('status')
+            except (OSError, ValueError):
+                status = None
+            if status in ('awaiting_login', 'syncing', 'connected'):
+                return {'status': status, 'url': LOGIN_URL if status == 'awaiting_login' else None}
+            if status in ('failed', 'stopped'):
+                raise RuntimeError('Temporary login did not start. Check the private login log.')
+            time.sleep(0.2)
+        raise RuntimeError('Login window is still starting. Refresh the Jun workbench shortly.')
+
+
 def reconnect(home, runtime, username, timeout, status_path):
     """Run the existing manual-login CLI on an isolated temporary display."""
     browsers = sorted((runtime / 'browsers').glob('chromium-*/chrome-linux*/chrome'))
@@ -108,13 +143,16 @@ def reconnect(home, runtime, username, timeout, status_path):
                     wait_port((VNC_PORT, WEB_PORT)[index - 1], processes)
             save_status(status_path, 'awaiting_login', web_port=WEB_PORT,
                         started_at=datetime.now(timezone.utc).isoformat(), expires_in_seconds=timeout)
-            print(f'LeetCode browser ready on localhost:{WEB_PORT}; open /vnc.html through SSH.', flush=True)
+            print('LeetCode browser ready; open the login link in the Jun workbench.', flush=True)
             command = [str(runtime / 'bin/python'), str(Path(__file__).with_name('leetcode_sync.py')),
                        '--session-file', str(home / 'data/interview/leetcode_session.json'),
                        'login', '--headed', '--username', username,
                        '--browser-executable', str(browsers[-1]), '--timeout-seconds', str(timeout)]
-            result = subprocess.run(command, env=env, stdout=subprocess.DEVNULL,
-                                    stderr=subprocess.DEVNULL, timeout=timeout + 40)
+            log_path = status_path.parent / 'leetcode-login.log'
+            with log_path.open('w') as log:
+                log_path.chmod(0o600)
+                result = subprocess.run(command, env=env, stdout=log,
+                                        stderr=log, timeout=timeout + 40)
             if result.returncode:
                 raise RuntimeError('User login or account verification did not complete.')
     # ExitStack closes desktop components before any inference begins.
@@ -141,6 +179,7 @@ def main(argv=None):
     parser.add_argument('--runtime-dir', type=Path, default=Path.home() / '.hermes/venvs/youtube-history')
     parser.add_argument('--username')
     parser.add_argument('--timeout', type=int, default=900)
+    parser.add_argument('--start', action='store_true', help='start/reuse a bounded background login window')
     args = parser.parse_args(argv)
     if not 60 <= args.timeout <= 900:
         parser.error('--timeout must be between 60 and 900 seconds')
@@ -153,6 +192,13 @@ def main(argv=None):
     if not isinstance(username, str) or not username:
         parser.error('--username is required for the first connection')
     status_path = root / 'leetcode-login-status.json'
+    if args.start:
+        try:
+            print(json.dumps(start_login(args.home, args.runtime_dir, username, args.timeout)), flush=True)
+            return 0
+        except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
+            print(str(exc), file=sys.stderr)
+            return 1
     def interrupted(*_):
         raise KeyboardInterrupt
     signal.signal(signal.SIGTERM, interrupted)
