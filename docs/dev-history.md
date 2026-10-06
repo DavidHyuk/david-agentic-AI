@@ -3,6 +3,32 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.43.0 — 2026-10-05 (minor: direct LeetCode browser reconnection)
+
+- Inspect the linked session metadata: refreshed September 14 with a 1,209,600
+  second (14 day) lifetime; it is over 21 days old when account authentication
+  and private source access fail. No claim that 14 days is a service-wide maximum
+  or that editing a local cookie can extend server authorization.
+- Add a bounded temporary LeetCode login desktop, reusing the installed runtime
+  with separate loopback ports/display/profile. David logs in directly from his
+  personal computer over SSH; verified credentials remain on DGX. Shut down the
+  desktop before downloading actual Accepted source and preparing reviews.
+- Pass browser-issued CSRF cookies during session verification instead of
+  dropping them. Keep the existing Jun workbench's safe login readiness state,
+  source history, credentials owner and daily maintenance schedule. This is
+  account reconnection for Jun, not a new agent-like workflow; no empty room,
+  profile, gateway or permanent desktop service is introduced.
+- Honor valid session/CSRF rotation in successful GraphQL responses, then
+  persist only after verifying the same linked account. Ignore deleted cookies
+  and never replace the credential with an anonymous session. The failed live
+  request explicitly instructs cookie deletion; it cannot renew the expired
+  session. No unsigned expiry modification or indefinite-access guarantee.
+- Validation: 720 tests pass, including private temporary desktop/status,
+  bounded/duplicate login, source verification before inference, CSRF handoff
+  and same-owner cookie rotation. Live noVNC endpoint responds on loopback and
+  the Jun workbench exposes only safe readiness state. Actual relink/download
+  remains pending David's direct browser login.
+
 ## v1.42.1 — 2026-10-05 (patch: require submitted source for Jun reviews)
 
 - Diagnose missing Move Zeroes / Two Sum II implementations against LeetCode:

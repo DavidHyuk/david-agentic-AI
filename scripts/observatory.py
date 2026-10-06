@@ -431,6 +431,11 @@ class Observatory:
                     data['coding_reviews'] = self.helper('leetcode_review.py', ['list'])
                 except (OSError, ValueError, subprocess.SubprocessError):
                     data['coding_reviews'] = {'items': [], 'ready_count': 0, 'unavailable': True}
+                login = read_json(self.home / 'data/interview/leetcode-login-status.json', {})
+                if login.get('status') in ('awaiting_login', 'syncing', 'connected', 'stopped', 'failed'):
+                    data['leetcode_login'] = {'status': login['status']}
+                    if login['status'] == 'awaiting_login':
+                        data['leetcode_login']['web_port'] = 18782
         elif room == 'english':
             cards = list(read_json(self.home / 'data/english/srs_deck.json', {'cards': {}})['cards'].values())
             due = sorted([c for c in cards if c['due'] <= today], key=lambda c: (c['box'], c['due']))

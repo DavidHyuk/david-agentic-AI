@@ -22,6 +22,7 @@ import argparse
 from datetime import datetime, timezone
 import fcntl
 import getpass
+from http.cookies import CookieError, SimpleCookie
 import json
 import os
 from pathlib import Path
@@ -143,6 +144,30 @@ def load_connection(path: Path) -> dict:
     }
 
 
+def response_cookie_updates(headers: list[str]) -> dict:
+    """Accept only nondeleted LeetCode credentials issued by the service."""
+    updates = {}
+    for header in headers:
+        cookies = SimpleCookie()
+        try:
+            cookies.load(header)
+        except CookieError:
+            continue
+        for name, cookie in cookies.items():
+            key = {'LEETCODE_SESSION': 'session', 'csrftoken': 'csrf_token'}.get(name)
+            if (not key or not cookie.value or cookie['max-age'] == '0'
+                    or cookie['domain'].lstrip('.').lower() not in ('', 'leetcode.com')
+                    or len(cookie.value) > 8192 or any(c.isspace() for c in cookie.value)):
+                continue
+            if key == 'session':
+                try:
+                    validate_session(cookie.value)
+                except LeetCodeSyncError:
+                    continue
+            updates[key] = cookie.value
+    return updates
+
+
 def graphql(query: str, variables: dict, connection: dict, timeout: int = 20) -> dict:
     """Make one authenticated, read-only GraphQL request without logging secrets."""
     cookies = [f"LEETCODE_SESSION={connection['session']}"]
@@ -161,10 +186,12 @@ def graphql(query: str, variables: dict, connection: dict, timeout: int = 20) ->
     try:
         with urlopen(request, timeout=timeout) as response:
             document = json.loads(response.read().decode())
+            updates = response_cookie_updates(response.headers.get_all('Set-Cookie', []))
     except (HTTPError, URLError, OSError, json.JSONDecodeError) as exc:
         raise LeetCodeSyncError('LeetCode could not be reached; the saved history was left unchanged.') from exc
     if not isinstance(document, dict) or document.get('errors') or not isinstance(document.get('data'), dict):
         raise LeetCodeSyncError('LeetCode rejected the session or returned an unexpected response.')
+    connection.update(updates)
     return document['data']
 
 
@@ -280,6 +307,7 @@ def sync(connection_path: Path, snapshot_path: Path, limit: int = MAX_HISTORY,
     if not 1 <= limit <= MAX_HISTORY:
         raise LeetCodeSyncError(f'History limit must be between 1 and {MAX_HISTORY}.')
     connection = load_connection(connection_path)
+    original_credentials = connection['session'], connection.get('csrf_token', '')
     data = graphql(HISTORY_QUERY, {'username': connection['username'], 'limit': limit}, connection)
     snapshot = normalize_history(data, connection['username'])
     previous = read_json(snapshot_path, {}) or {}
@@ -315,6 +343,15 @@ def sync(connection_path: Path, snapshot_path: Path, limit: int = MAX_HISTORY,
             snapshot['solution_sync_error'] = str(exc)
             snapshot['solution_sync_status'] = 'error'
         save_private_json(snapshot_path, snapshot)
+    if original_credentials != (connection['session'], connection.get('csrf_token', '')):
+        # A public endpoint can issue anonymous cookies too. Never replace the
+        # linked credential until the rotated session identifies the same owner.
+        try:
+            verify_connection(connection)
+        except LeetCodeSyncError:
+            pass
+        else:
+            save_private_json(connection_path, {'version': 1, **connection})
     return snapshot
 
 
@@ -392,7 +429,8 @@ def login_with_browser(cdp_url: str, username: str, login: str, password: str) -
                 context = browser.contexts[0]
                 existing = _cookie_value(context.cookies('https://leetcode.com'), 'LEETCODE_SESSION')
                 if existing:
-                    candidate = {'username': username, 'session': existing, 'csrf_token': '', 'linked_at': ''}
+                    candidate = {'username': username, 'session': existing, 'csrf_token': _cookie_value(
+                        context.cookies('https://leetcode.com'), 'csrftoken'), 'linked_at': ''}
                     verify_connection(candidate)
                     return {'session': existing, 'csrf_token': _cookie_value(
                         context.cookies('https://leetcode.com'), 'csrftoken')}
@@ -419,7 +457,8 @@ def login_with_browser(cdp_url: str, username: str, login: str, password: str) -
                         cookies = context.cookies('https://leetcode.com')
                         session = _cookie_value(cookies, 'LEETCODE_SESSION')
                         if session:
-                            candidate = {'username': username, 'session': session, 'csrf_token': '', 'linked_at': ''}
+                            candidate = {'username': username, 'session': session,
+                                         'csrf_token': _cookie_value(cookies, 'csrftoken'), 'linked_at': ''}
                             verify_connection(candidate)
                             return {'session': session, 'csrf_token': _cookie_value(cookies, 'csrftoken')}
                         reason = login_failure_reason(page.locator('body').inner_text(timeout=1_000))
@@ -480,7 +519,8 @@ def login_in_headed_browser(username: str, executable: str, timeout_seconds: int
                         cookies = context.cookies('https://leetcode.com')
                         session = _cookie_value(cookies, 'LEETCODE_SESSION')
                         if session:
-                            candidate = {'username': username, 'session': session, 'csrf_token': '', 'linked_at': ''}
+                            candidate = {'username': username, 'session': session,
+                                         'csrf_token': _cookie_value(cookies, 'csrftoken'), 'linked_at': ''}
                             verify_connection(candidate)
                             return {'session': session, 'csrf_token': _cookie_value(cookies, 'csrftoken')}
                         page.wait_for_timeout(500)

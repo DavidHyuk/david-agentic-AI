@@ -1031,6 +1031,39 @@ If no local GUI is available, sign in in a normal browser and use `connect` to
 paste only the `LEETCODE_SESSION` cookie into its hidden prompt instead. A
 read-only `leetcode-history-sync` cron then refreshes the snapshot daily at
 06:35, and `coding-coach` refreshes it again before each scheduled coding lesson.
+
+For a DGX without a monitor, reuse the installed temporary desktop runtime and
+log in from your personal computer without copying cookies. On the DGX run:
+
+```bash
+python3 ~/.hermes/scripts/leetcode_browser_login.py
+```
+
+It uses the linked LeetCode handle by default; add `--username HANDLE` for a
+first connection. On your **personal computer**, keep this SSH tunnel running:
+
+```bash
+ssh -F /dev/null -N -o ExitOnForwardFailure=yes -L 127.0.0.1:18782:127.0.0.1:18782 david@10.0.0.50
+```
+
+Open `http://127.0.0.1:18782/vnc.html?autoconnect=true&resize=scale` and complete
+LeetCode login and browser verification yourself. The window expires after
+15 minutes. Only a verified account session is saved; the temporary desktop
+then closes and actual-code sync and review preparation run automatically.
+The existing Jun workbench shows login readiness and reconnection status.
+Ports and browser profiles are separate from YouTube/ChatGPT login windows.
+This reuses the installed runtime, existing coding room and daily source sync;
+it does not add a persistent service or a new agent workflow.
+Session lifetime is controlled by LeetCode. The previously linked cookie's
+metadata specified 14 days from its September 14 refresh; it was past that
+period when source access failed. This does not establish a service-wide
+maximum or a supported permanent session.
+Successful sync now retains nondeleted session/CSRF cookies reissued by LeetCode
+after verifying they still authenticate the linked account. It follows server
+rotation rather than extending signed cookie contents locally. Deleted or
+anonymous sessions never replace the saved credential. This can preserve normal
+server renewals; logout, revocation or a required fresh login still need user
+interaction, and indefinite access is not guaranteed.
 The background sync remains available in the session archive but is omitted from
 Observatory recent-activity lists so maintenance does not bury study history.
 Opening or reloading LeetCode Gym refreshes account counts and recent accepts

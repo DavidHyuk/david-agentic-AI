@@ -246,6 +246,17 @@ def test_coding_workbench_exposes_only_safe_leetcode_snapshot(store):
     assert 'session' not in history
 
 
+def test_coding_login_status_exposes_fixed_local_port_without_credentials(store, monkeypatch):
+    monkeypatch.setattr(store, 'refresh_leetcode_sources', lambda: None)
+    path = store.home / 'data/interview/leetcode-login-status.json'
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps({'status': 'awaiting_login', 'web_port': 1234,
+                                'session': 'PRIVATE', 'password': 'PRIVATE'}))
+    status = store.workbench('coding')['leetcode_login']
+    assert status == {'status': 'awaiting_login', 'web_port': 18782}
+    assert 'PRIVATE' not in json.dumps(status)
+
+
 def test_observatory_chats_clear_sent_drafts_and_support_shift_enter():
     root = Path(__file__).resolve().parents[1] / 'browser/observatory'
     workbench = (root / 'workbench.js').read_text()

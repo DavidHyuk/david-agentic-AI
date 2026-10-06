@@ -172,6 +172,34 @@ def test_cookie_value_selects_only_the_requested_cookie():
     assert ls._cookie_value(cookies, 'missing') == ''
 
 
+def test_headed_login_verifies_the_issued_csrf_cookie(tmp_path, monkeypatch):
+    from contextlib import contextmanager
+    import sys
+    from types import SimpleNamespace
+    monkeypatch.setenv('DISPLAY', ':98')
+    executable = tmp_path / 'chrome'
+    executable.write_text('browser fixture')
+    executable.chmod(0o700)
+    cookies = [{'name': 'LEETCODE_SESSION', 'value': 's' * 32},
+               {'name': 'csrftoken', 'value': 'issued-csrf'}]
+    page = SimpleNamespace(goto=lambda *a, **k: None)
+    closed = []
+    context = SimpleNamespace(pages=[page], cookies=lambda _: cookies,
+                              close=lambda: closed.append(True))
+    @contextmanager
+    def playwright():
+        yield SimpleNamespace(chromium=SimpleNamespace(launch_persistent_context=lambda *a, **k: context))
+    monkeypatch.setitem(sys.modules, 'playwright.sync_api', SimpleNamespace(
+        Error=RuntimeError, sync_playwright=playwright))
+    candidates = []
+    monkeypatch.setattr(ls, 'verify_connection', lambda candidate: candidates.append(candidate) or 'david')
+    result = ls.login_in_headed_browser('david', str(executable), 60, tmp_path)
+    assert candidates[0]['csrf_token'] == 'issued-csrf'
+    assert result['csrf_token'] == 'issued-csrf'
+    assert closed == [True]
+    assert not list(tmp_path.glob('leetcode-login-*'))
+
+
 @pytest.mark.parametrize(('page_text', 'expected'), [
     ('Your username or password is incorrect.', 'rejected the login ID or password'),
     ('Just a moment... Cloudflare 보안 확인 수행 중', 'Cloudflare blocked the headless browser'),
@@ -227,6 +255,54 @@ def test_disconnect_removes_only_session(tmp_path):
 
     assert not session_path.exists()
     assert snapshot_path.exists()
+
+
+def test_cookie_rotation_ignores_deleted_and_unrelated_cookies():
+    fresh = 'fresh-session-' + 'x' * 32
+    assert ls.response_cookie_updates([
+        'LEETCODE_SESSION=; Max-Age=0; Domain=.leetcode.com',
+        'csrftoken=csrf-issued; Domain=.leetcode.com',
+        f'LEETCODE_SESSION={fresh}; Domain=.leetcode.com; Max-Age=1209600',
+        'unrelated=private', 'csrftoken=wrong-site; Domain=other.example']) == {
+            'session': fresh, 'csrf_token': 'csrf-issued'}
+
+
+@pytest.mark.parametrize('authenticated', [True, False])
+def test_source_sync_persists_only_server_rotations_verified_for_the_same_owner(tmp_path, monkeypatch, authenticated):
+    session, snapshot = tmp_path / 'session.json', tmp_path / 'history.json'
+    original = connection()
+    ls.save_private_json(session, original)
+    calls = []
+    def request(query, variables, linked):
+        calls.append(query)
+        if query == ls.HISTORY_QUERY:
+            linked['session'] = 'rotated-server-session-' + 'x' * 32
+            linked['csrf_token'] = 'issued-csrf'
+            return history_data()
+        assert query == ls.USER_STATUS_QUERY
+        return {'userStatus': {'username': original['username'] if authenticated else None}}
+    monkeypatch.setattr(ls, 'graphql', request)
+    ls.sync(session, snapshot, stats_only=True)
+    saved = json.loads(session.read_text())
+    assert (saved['session'] != original['session']) is authenticated
+    assert saved['linked_at'] == original['linked_at']
+    assert len(calls) == 2
+    assert session.stat().st_mode & 0o777 == 0o600
+
+
+def test_graphql_applies_only_cookies_from_a_successful_response(monkeypatch):
+    import io
+    from email.message import Message
+    headers = Message()
+    headers.add_header('Set-Cookie', 'LEETCODE_SESSION=' + 'r' * 32 + '; Domain=.leetcode.com')
+    class Response(io.BytesIO):
+        pass
+    response = Response(json.dumps({'data': {'userStatus': {'username': 'david_choi'}}}).encode())
+    response.headers = headers
+    monkeypatch.setattr(ls, 'urlopen', lambda *_args, **_kwargs: response)
+    linked = connection()
+    assert ls.graphql(ls.USER_STATUS_QUERY, {}, linked)['userStatus']['username'] == 'david_choi'
+    assert linked['session'] == 'r' * 32
 
 
 def test_stats_only_updates_account_total_and_preserves_private_source(tmp_path, monkeypatch):

@@ -237,6 +237,7 @@ David-Agent/
 │   ├── leetcode_sync.py       # owner-only 세션 연결 + 읽기 전용 풀이 이력 snapshot
 │   ├── leetcode_review.py     # 실제 코드·학습 근거 기반 Jun 풀이 요약 cache
 │   ├── leetcode_refresh.sh    # 기존 06:35 cron의 source sync + 요약 준비
+│   ├── leetcode_browser_login.py # SSH 터널로 개인 PC에서 계정 재연결·코드 자동 갱신
 │   ├── interview_trends.py    # HN·GitHub·논문 실시간 인터뷰 트렌드 수집
 │   ├── kakao_webhook.py       # Kakao 채널 피드백 수신·발신자 allowlist·로컬 큐
 │   ├── english_intake.py      # 새 레슨 탐지 + 이번 주 세션 조회 + 처리 상태 관리
@@ -392,6 +393,7 @@ history/search·알림 제어의 이점이 있으면 같은 bot을 별도 Telegr
 | `leetcode_sync.py` | 로컬 headless Chromium 로그인 또는 숨김 세션 입력·검증, owner-only 저장, LeetCode solved/최근 정답·최근 문제별 실제 Accepted 코드 snapshot 갱신 |
 | `leetcode_review.py` | Accepted 코드와 기록된 배움으로 접근법·정답·복잡도·복습 힌트·경계 조건을 사전 요약. loopback 모델 background admission 사용, 근거 fingerprint로 변경 감지, owner-only 원자 저장, `list`는 cache만 조회 |
 | `leetcode_refresh.sh` | 기존 06:35 LeetCode 유지보수 cron에서 증분 source sync 후 요약 준비. outer agent·Telegram 전달 없이 기존 coding room·소유 profile 유지 |
+| `leetcode_browser_login.py` | 기존 임시 desktop runtime을 재사용해 loopback noVNC :18782로 LeetCode 수동 로그인. 15분 제한·별도 임시 profile·계정 검증 후 세션 저장, desktop 종료 후 실제 코드·요약 갱신. Jun 방에 연결 상태 표시 |
 | `interview_trends.py` | HN·GitHub·논문 DB에서 실시간 인터뷰 트렌드 수집·캐시 |
 | `english_intake.py` | 새 레슨 탐지, Telegram 파일 저장, 이번 주 세션 조회, 처리 상태 관리 |
 | `english_srs.py` | Leitner SRS 덱 (카드 추가/리뷰/통계/취약 카드 랭킹) |
@@ -857,6 +859,16 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   이전의 notes-only cache는 준비 대기로 남습니다. 계정 인증 실패 시 공개 완료
   기록은 유지하면서 재로그인 필요를 표시하며, 재연결 후 누락 코드를 가져와
   요약을 준비합니다. 별도의 학습 완료 기록은 유지합니다.
+  모니터 없는 DGX에서는 `leetcode_browser_login.py`가 기존 YouTube desktop
+  runtime을 재사용해 개인 PC의 SSH 터널로 접속할 임시 수동 로그인 창을 엽니다.
+  loopback :18782 및 :15903, 별도 display :98을 사용하고 15분 후 종료합니다.
+  로그인과 계정 검증 후에만 세션을 저장하고 desktop 종료 뒤 코드·요약을 갱신합니다.
+  기존 Jun 작업실에 로그인 준비 상태를 표시하며 새 profile·gateway·상시 서비스·
+  room·일정은 추가하지 않습니다. LeetCode 발급 세션의 수명은 서버 정책입니다.
+  정상 동기화 응답에서 서버가 재발급한 세션·CSRF cookie는 같은 계정으로
+  재검증한 뒤 저장합니다. 삭제 cookie나 익명 세션으로 기존 자격을 덮어쓰지
+  않으며, signed cookie의 기간을 로컬에서 바꾸지 않습니다. 서버 갱신은 따르지만
+  로그아웃·강제 만료·추가 인증을 무기한 피할 수 있다는 보장은 없습니다.
   `data/interview/leetcode_reviews.json`에 owner-only cache를 저장하며 코드·학습
   근거·계정 변경 시 요약을 갱신합니다. 클릭은 cache 조회이며, 기존 06:35
   유지보수 cron과 작업실 background refresh가 요약을 미리 준비합니다. 새 profile,
@@ -1007,7 +1019,8 @@ ZIP 경로 격리·credential 오류 출력 방지 및 HQ source 상태 검증�
 완료 근거와 통합 작업실 기록 검증까지 전체 680개가 통과했습니다.
 Jun 사전 풀이 요약의 근거 변경·Accepted 코드 freshness·실패 보존·동시 실행
 잠금·background provider 경계 및 재인증 상태·실제 코드 필수 조건을 포함한
-현재 전체 테스트는 706 passed입니다.
+원격 계정 재연결·CSRF 전달·동일 계정의 서버 cookie 갱신 검증까지 포함한
+현재 전체 테스트는 720 passed입니다.
 서버 해제 시각·자정 넘김·기존 예약 migration과
 David·English 자동 tracing의 도구 인자 제외,
 session 묶음과 visible TTFT 처리 검증을 포함합니다.
