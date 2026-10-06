@@ -231,14 +231,31 @@ function reviewAnswer(text, language) {
   const pythonSource = /^\s*(?:class\s+\w+(?:\([^\n]*\))?\s*:|(?:async\s+)?def\s+\w+\s*\(|from\s+\S+\s+import\s+|import\s+\w+)/.test(text);
   return pythonSource ? reviewCodeBlock(text, language || "python3") : `<p class="completion-lesson">${esc(text)}</p>`;
 }
+function codingReviewBody(r, needsLogin) {
+  const summary = r.summary;
+  const bullets = (rows) => `<ul class="desk-focus">${rows.map((text) => `<li>${esc(text)}</li>`).join("")}</ul>`;
+  let body = summary
+    ? `<h3>접근법</h3><p class="completion-lesson">${esc(summary.approach)}</p>`
+    : `<p class="muted">${r.code ? "실제 제출 코드를 바탕으로 요약을 준비하고 있습니다. 잠시 후 새로고침해 주세요." : needsLogin ? "LeetCode 로그인 연결이 해제되어 실제 제출 코드를 가져오지 못했습니다. 계정을 재연결하면 Accepted 코드로 요약을 준비합니다." : "완료는 확인됐지만 실제 제출 코드가 아직 확보되지 않았습니다. LeetCode 코드를 가져온 뒤 요약을 준비합니다."}</p>`;
+  body += `<h3>정답과 풀이</h3>${r.code
+    ? `<p class="muted">LeetCode에서 가져온 내 Accepted 제출 코드 · ${esc(r.language)}</p>${reviewCodeBlock(r.code, r.language)}`
+    : '<p class="muted">Accepted 제출 코드 미확보</p>'}`;
+  if (summary) {
+    const explanation = reviewAnswer(summary.answer, r.language);
+    // Older model summaries can repeat or rewrite source. Only the fetched
+    // submission above is displayed as code; keep prose explanations below it.
+    if (!explanation.includes('<pre class="review-code">')) body += explanation;
+    body += `<h3>복잡도</h3><p class="completion-lesson">${esc(summary.complexity)}</p><h3>복습용 힌트</h3>${bullets(summary.hints)}<h3>확인할 경계 조건</h3>${bullets(summary.pitfalls)}<p class="muted">Jun이 실제 제출 코드를 바탕으로 미리 정리한 요약 · ${esc(r.prepared_at || "")}</p>`;
+  }
+  return body;
+}
 function codingReviewCard(d) {
   const lc = d.leetcode_history;
   const reviews = d.coding_reviews || {items: [], ready_count: 0};
   const needsLogin = lc?.solution_sync_status === "reauth_required";
   const list = reviews.items.map((r) => {
     const summary = r.summary;
-    const bullets = (rows) => `<ul class="desk-focus">${rows.map((text) => `<li>${esc(text)}</li>`).join("")}</ul>`;
-    return `<details class="solution-review" name="jun-solution-reviews"><summary><span><b>${esc(r.title)}</b><small>${r.accepted_at ? when(new Date(r.accepted_at).getTime() / 1000) : esc(r.date || "완료 기록")} · ${r.code ? "Accepted 코드" : "제출 코드 미확보"}</small></span><span class="review-status">${summary ? "요약 보기" : needsLogin && !r.code ? "LeetCode 재연결 필요" : "요약 준비 중"}</span></summary><div class="review-body">${summary ? `<h3>접근법</h3><p class="completion-lesson">${esc(summary.approach)}</p><h3>정답과 풀이</h3>${reviewAnswer(summary.answer, r.language)}<h3>복잡도</h3><p class="completion-lesson">${esc(summary.complexity)}</p><h3>복습용 힌트</h3>${bullets(summary.hints)}<h3>확인할 경계 조건</h3>${bullets(summary.pitfalls)}<p class="muted">Jun이 저장된 근거로 미리 정리한 요약 · ${esc(r.prepared_at || "")}</p>` : `<p class="muted">${r.code ? "실제 제출 코드를 바탕으로 요약을 준비하고 있습니다. 잠시 후 새로고침해 주세요." : needsLogin ? "LeetCode 로그인 연결이 해제되어 실제 제출 코드를 가져오지 못했습니다. 계정을 재연결하면 Accepted 코드로 요약을 준비합니다." : "완료는 확인됐지만 실제 제출 코드가 아직 확보되지 않았습니다. LeetCode 코드를 가져온 뒤 요약을 준비합니다."}</p>`}${r.code ? `<details class="desk-help"><summary>내 Accepted 코드 · ${esc(r.language)}</summary>${reviewCodeBlock(r.code, r.language)}</details>` : '<p class="muted">Accepted 제출 코드 미확보</p>'}${(r.notes || []).map((n) => `<details class="desk-help"><summary>기록된 배움과 실제 힌트 · ${esc(n.date || "")}</summary>${n.lesson ? `<p class="completion-lesson">${esc(n.lesson)}</p>` : ""}${n.hint_notes ? `<p class="completion-lesson">${esc(n.hint_notes)}</p>` : ""}${n.source?.url ? safeLink(n.source.url, n.source.title || "근거 대화") : ""}</details>`).join("")}${safeLink(`https://leetcode.com/problems/${encodeURIComponent(r.slug)}/`, "LeetCode 문제")}</div></details>`;
+    return `<details class="solution-review" name="jun-solution-reviews"><summary><span><b>${esc(r.title)}</b><small>${r.accepted_at ? when(new Date(r.accepted_at).getTime() / 1000) : esc(r.date || "완료 기록")} · ${r.code ? "Accepted 코드" : "제출 코드 미확보"}</small></span><span class="review-status">${summary ? "요약 보기" : needsLogin && !r.code ? "LeetCode 재연결 필요" : "요약 준비 중"}</span></summary><div class="review-body">${codingReviewBody(r, needsLogin)}${(r.notes || []).map((n) => `<details class="desk-help"><summary>기록된 배움과 실제 힌트 · ${esc(n.date || "")}</summary>${n.lesson ? `<p class="completion-lesson">${esc(n.lesson)}</p>` : ""}${n.hint_notes ? `<p class="completion-lesson">${esc(n.hint_notes)}</p>` : ""}${n.source?.url ? safeLink(n.source.url, n.source.title || "근거 대화") : ""}</details>`).join("")}${safeLink(`https://leetcode.com/problems/${encodeURIComponent(r.slug)}/`, "LeetCode 문제")}</div></details>`;
   }).join("");
   return `<article class="desk-card coding-reviews"><span class="tag">JUN · 풀이 복습</span><h2>풀이 기록${reviews.items.length ? ` ${reviews.items.length}문제` : ""}</h2><p class="muted">최근 푼 문제를 선택하면 실제 Accepted 코드로 미리 정리한 정답·접근법·복습용 힌트를 볼 수 있습니다. 요약 ${Number(reviews.ready_count)}개 준비됨.</p>${lc ? `<p class="muted">${esc(lc.username)} · ${esc(d.leetcode_refresh?.message || "LeetCode 계정 기준")} · ${esc(lc.synced_at || "")}</p>${needsLogin ? `<div class="review-connection" role="status"><b>LeetCode 재로그인 필요</b><p>공개 완료 기록은 조회되지만 저장된 로그인 세션이 인정되지 않아 제출 코드 조회가 막혔습니다. 계정을 재연결하면 실제 Accepted 코드와 요약이 갱신됩니다.</p><p>위의 계정·연결 설정에서 LeetCode를 다시 연결하세요.</p><details class="desk-help"><summary>계정 재연결 방법</summary><p>로그인 창 준비하기 버튼을 누른 뒤 나타나는 링크를 개인 PC의 Chrome 또는 Chromium에서 여세요. 모니터 연결이나 SSH 포트 전달 없이 사용할 수 있습니다. 대시보드와 같은 주소로 접속하며, 로그인 후 제출 코드와 요약은 자동 갱신됩니다.</p><p>DGX 데스크톱을 직접 쓰는 경우에는 <code>python3 ~/.hermes/scripts/leetcode_sync.py login --headed --username &lt;LeetCode 아이디&gt;</code>로 로그인한 뒤, <code>bash ~/.hermes/scripts/leetcode_refresh.sh</code>를 실행하고 이 화면을 새로고침하세요. 개인 PC의 브라우저에서 로그인한 경우에는 DGX 터미널에서 <code>python3 ~/.hermes/scripts/leetcode_sync.py connect --username &lt;LeetCode 아이디&gt;</code>의 숨김 입력에 새 LEETCODE_SESSION 쿠키를 연결하세요.</p></details></div>` : lc.solution_sync_error ? '<p class="muted">제출 코드 갱신 실패 · 계정 연결을 확인해 주세요. 저장된 코드는 보관됩니다.</p>' : ""}` : '<p class="muted">LeetCode 계정을 연결하면 실제 Accepted 코드도 함께 모입니다.</p>'}${reviews.unavailable ? '<p class="muted">풀이 요약을 불러오지 못했습니다. 새로고침해 주세요.</p>' : list || '<p class="muted">최근 푼 문제의 코드나 학습 기록이 모이면 이곳에 표시됩니다.</p>'}</article>`;
 }

@@ -1035,10 +1035,13 @@ In the LeetCode workbench chat, the referenced problem (including a follow-up
 that refers to the immediately preceding problem) automatically provides only
 that matching local submission to the coach; the reply and its Telegram mirror
 therefore explain the submitted implementation rather than a guessed template.
-Python in **정답과 풀이** and **내 Accepted 코드** is displayed in a labeled
-code block with monospace text, preserved indentation/line breaks, horizontal
-scrolling and local Python syntax colors. Fenced code mixed with prose is also
-formatted; HTML-like source text stays escaped and cannot become page markup.
+Opening **요약 보기** shows the exact LeetCode Accepted submission immediately
+under **정답과 풀이**, including when the prose summary is still being prepared.
+The source is displayed in a labeled code block with monospace text, preserved
+indentation/line breaks, horizontal scrolling and local Python syntax colors.
+Jun's prose explanation follows the source. Code repeated or rewritten in an
+older model summary is omitted so the displayed code is always the fetched
+submission. HTML-like source text stays escaped and cannot become page markup.
 After a dashboard update, reload the browser tab once to pick up the new
 renderer. The dashboard's **새로고침** and workbench's **다시 불러오기** buttons
 also reload the full page, preserving the current room; automatic polling

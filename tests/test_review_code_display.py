@@ -25,6 +25,42 @@ class CodeContent(HTMLParser):
             self.blocks[-1] += data
 
 
+@pytest.mark.parametrize(('answer', 'has_code', 'has_summary'), [
+    ('해시맵을 사용한 실제 구현 설명입니다.', True, True),
+    ('class Solution:\n    def solve(self):\n        return "model rewrite"', True, True),
+    ('', True, False),
+    ('class Solution:\n    def solve(self):\n        return "invented answer"', False, True),
+])
+def test_solution_card_shows_exact_submission_without_another_expansion(answer, has_code, has_summary):
+    source = Path(__file__).resolve().parents[1] / 'browser/observatory/workbench.js'
+    code = 'class Solution:\n    def solve(self):\n        # <img onerror=bad()>\n        return "actual submission"\n'
+    row = {'slug': 'two-sum', 'title': 'Two Sum', 'language': 'Python3',
+           'code': code if has_code else '', 'notes': []}
+    if has_summary:
+        row['summary'] = {'approach': '실제 구현 접근법', 'answer': answer,
+                          'complexity': 'O(n)', 'hints': [], 'pitfalls': []}
+    script = '''const fs=require('fs'), vm=require('vm');
+const row=JSON.parse(fs.readFileSync(0,'utf8'));
+const context={$:()=>({}),window:{},setInterval:()=>0,
+esc:value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))};
+vm.runInNewContext(fs.readFileSync(process.argv[1],'utf8'),context);
+process.stdout.write(context.codingReviewCard({coding_reviews:{items:[row],ready_count:1}}));'''
+    result = subprocess.run(['node', '-e', script, str(source)], input=json.dumps(row),
+                            capture_output=True, text=True, check=True, timeout=10)
+    parsed = CodeContent()
+    parsed.feed(result.stdout)
+    assert parsed.blocks == ([code] if has_code else [])
+    assert parsed.tags.count('details') == 1  # Only the problem's outer expansion.
+    assert 'img' not in parsed.tags
+    assert 'model rewrite' not in result.stdout and 'invented answer' not in result.stdout
+    if has_code:
+        assert 'LeetCode에서 가져온 내 Accepted 제출 코드' in result.stdout
+    else:
+        assert 'Accepted 제출 코드 미확보' in result.stdout
+    if has_summary and not answer.startswith('class'):
+        assert answer in result.stdout
+
+
 @pytest.mark.parametrize(('text', 'language', 'expected'), [
     ('class Solution:\n    def solve(self):\n        # <script>ignore</script>\n        return "<img onerror=evil()>"\n', 'python3',
      ['class Solution:\n    def solve(self):\n        # <script>ignore</script>\n        return "<img onerror=evil()>"\n']),

@@ -3,6 +3,20 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.44.2 — 2026-10-05 (patch: show actual LeetCode source when opening a solution)
+
+- All six reported problems already had fetched Accepted source, but their
+  summaries contained prose or one-line expressions while the original code
+  was hidden behind another expansion. Show the exact fetched submission
+  immediately under the answer section of every problem, including pending
+  summaries. Keep Jun's prose below it and omit repeated or rewritten code
+  from older model summaries. Recorded learning remains supplementary context.
+- Remove the redundant collapsed source section and update asset versions.
+  Reuse Jun's existing room, credentials, source cache and sync schedule.
+- Validation: 758 tests pass, including exact-source rendering for prose,
+  generated-code, pending-summary and missing-source cases with escaped markup.
+  Live-check all six reported problems against their stored LeetCode source.
+
 ## v1.44.1 — 2026-10-05 (patch: reload the dashboard renderer on manual refresh)
 
 - The reported Reverse String screenshot still used the plain-text renderer,
