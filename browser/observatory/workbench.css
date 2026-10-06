@@ -166,6 +166,7 @@
 .review-code .code-number { color: #f2be87; }
 .review-code .code-comment { color: #a0aec0; font-style: italic; }
 .account-row { border-top: 1px solid var(--line); padding: 12px 0; }
+.workbench-grid + .account-settings { margin-top: 20px; }
 .account-row .muted { margin: 5px 0 10px; }
 .account-row .desk-actions { flex-wrap: wrap; }
 .clipboard-transfer { position: fixed; left: -10000px; top: 0; }

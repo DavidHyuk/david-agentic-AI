@@ -3,6 +3,14 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.44.3 — 2026-10-05 (patch: move Jun account settings below study content)
+
+- Move Jun's account/connection card below solution reviews and learning
+  history, keeping study content first. Preserve its existing reconnect actions
+  and status polling. Other rooms retain their existing account-card placement.
+- Validation: 758 tests pass; check desktop and mobile ordering and both Jun
+  reconnect buttons in the live dashboard.
+
 ## v1.44.2 — 2026-10-05 (patch: show actual LeetCode source when opening a solution)
 
 - All six reported problems already had fetched Accepted source, but their

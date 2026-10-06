@@ -970,7 +970,9 @@ Jun receives the current shared completion inventory on each reply, including
 externally verified completions and pattern-specific learning. Missing submitted
 source is not evidence that a problem was never solved.
 
-Each workbench has **계정·연결 설정** above its main cards:
+Each workbench has **계정·연결 설정**. In Jun it sits at the bottom, below
+solution reviews and learning history; the other rooms show it above their
+main cards:
 
 | Workbench | Connection action |
 | --- | --- |
