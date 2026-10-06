@@ -700,7 +700,7 @@ function wireTimer(id) {
   window.hermesStudyClock = setInterval(paintTimer, 1000);
 }
 $("bench-home").onclick = () => view("office");
-$("bench-reload").onclick = loadWorkbench;
+$("bench-reload").onclick = () => window.location.reload();
 $("bench-history").onclick = () => {
   clearFilters();
   $("room-filter").value = bench.room;

@@ -3,6 +3,18 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.44.1 — 2026-10-05 (patch: reload the dashboard renderer on manual refresh)
+
+- The reported Reverse String screenshot still used the plain-text renderer,
+  while a fresh live page rendered the same saved answer as a Python block.
+  Manual refresh previously fetched data only, leaving an open tab's older
+  JavaScript and CSS loaded. Reload the whole page on both manual refresh
+  buttons, retain the room URL, and version the changed frontend asset URLs.
+  Background polling and saving actions continue to update data in place.
+- Validation: 754 tests pass, including a regression check that workbench
+  manual refresh reloads the renderer instead of fetching data only. Verify
+  the Reverse String code block and room-preserving manual reload in Chromium.
+
 ## v1.44.0 — 2026-10-05 (minor: reconnect accounts inside each workbench)
 
 - Add a visible account/connection card: Jun reconnects LeetCode and ChatGPT,

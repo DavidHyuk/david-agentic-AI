@@ -50,3 +50,18 @@ process.stdout.write(context.reviewAnswer(data.text,data.language));'''
         assert 'code-keyword' in result.stdout
     if not expected:
         assert 'completion-lesson' in result.stdout and 'pre' not in parsed.tags
+
+
+def test_manual_workbench_refresh_reloads_frontend_and_retains_room_url():
+    source = Path(__file__).resolve().parents[1] / 'browser/observatory/workbench.js'
+    script = '''const fs=require('fs'), vm=require('vm');
+const elements={};
+const location={hash:'#workbench?room=coding',reload(){this.reloaded=true;}};
+const context={$:id=>elements[id]||(elements[id]={}),window:{location},
+setInterval:()=>0,api:()=>{throw new Error('Data refresh leaves the old renderer loaded');}};
+vm.runInNewContext(fs.readFileSync(process.argv[1],'utf8'),context);
+elements['bench-reload'].onclick();
+process.stdout.write(JSON.stringify(location));'''
+    result = subprocess.run(['node', '-e', script, str(source)], capture_output=True,
+                            text=True, check=True, timeout=10)
+    assert json.loads(result.stdout) == {'hash': '#workbench?room=coding', 'reloaded': True}

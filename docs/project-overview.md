@@ -859,6 +859,8 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   Python 소스는 정답과 풀이 및 실제 Accepted 코드 모두 언어 표시·고정폭 글꼴·
   들여쓰기·줄바꿈·가로 스크롤·문법 색상을 적용한 코드 블록으로 표시합니다.
   일반 설명과 fenced code를 구분하며 source의 HTML 문자는 escape합니다.
+  새로고침·다시 불러오기 버튼은 현재 작업실 경로를 유지한 채 페이지 전체를
+  다시 열어 최신 화면 코드와 스타일도 적용합니다. 자동 갱신은 데이터만 읽습니다.
   각 작업실에 계정·연결 설정 카드가 있습니다. Jun은 LeetCode·ChatGPT,
   Rina는 Google/YouTube, Ellie는 카카오 챗봇 관리자센터·채널 관리·스킬 URL 복사를
   제공합니다. ChatGPT 연결은 HQ와 같은 저장 profile을 재사용하고 로그인 확인 뒤
@@ -1047,7 +1049,7 @@ ZIP 경로 격리·credential 오류 출력 방지 및 HQ source 상태 검증�
 Jun 사전 풀이 요약의 근거 변경·Accepted 코드 freshness·실패 보존·동시 실행
 잠금·background provider 경계 및 재인증 상태·실제 코드 필수 조건을 포함한
 원격 계정 재연결·CSRF 전달·동일 계정의 서버 cookie 갱신 검증까지 포함한
-현재 전체 테스트는 753 passed입니다.
+현재 전체 테스트는 754 passed입니다.
 서버 해제 시각·자정 넘김·기존 예약 migration과
 David·English 자동 tracing의 도구 인자 제외,
 session 묶음과 visible TTFT 처리 검증을 포함합니다.

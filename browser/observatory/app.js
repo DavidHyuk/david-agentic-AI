@@ -508,7 +508,7 @@ $("sidebar-toggle").onclick = () => {
 };
 renderSidebar();
 $("all-history").onclick = () => view("sessions");
-$("refresh").onclick = refresh;
+$("refresh").onclick = () => window.location.reload();
 $("search-form").onsubmit = (e) => {
   e.preventDefault();
   state.sessionsOffset = 0;

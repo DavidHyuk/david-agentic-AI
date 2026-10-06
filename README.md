@@ -1039,6 +1039,10 @@ Python in **정답과 풀이** and **내 Accepted 코드** is displayed in a lab
 code block with monospace text, preserved indentation/line breaks, horizontal
 scrolling and local Python syntax colors. Fenced code mixed with prose is also
 formatted; HTML-like source text stays escaped and cannot become page markup.
+After a dashboard update, reload the browser tab once to pick up the new
+renderer. The dashboard's **새로고침** and workbench's **다시 불러오기** buttons
+also reload the full page, preserving the current room; automatic polling
+continues to refresh data without reloading the page.
 
 The token is entered through a hidden prompt and is stored only at
 `~/.hermes/data/interview/leetcode_session.json` with `0600` permissions; the
