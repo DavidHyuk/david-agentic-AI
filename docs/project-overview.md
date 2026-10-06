@@ -237,6 +237,7 @@ David-Agent/
 │   ├── leetcode_sync.py       # owner-only 세션 연결 + 읽기 전용 풀이 이력 snapshot
 │   ├── leetcode_review.py     # 실제 코드·학습 근거 기반 Jun 풀이 요약 cache
 │   ├── leetcode_refresh.sh    # 기존 06:35 cron의 source sync + 요약 준비
+│   ├── account_login.py # 작업실별 계정 상태·기존 로그인 helper 실행·카카오 설정 복사
 │   ├── leetcode_browser_login.py # Jun 버튼으로 원격 로그인·실제 제출 코드 자동 갱신
 │   ├── interview_trends.py    # HN·GitHub·논문 실시간 인터뷰 트렌드 수집
 │   ├── kakao_webhook.py       # Kakao 채널 피드백 수신·발신자 allowlist·로컬 큐
@@ -393,6 +394,7 @@ history/search·알림 제어의 이점이 있으면 같은 bot을 별도 Telegr
 | `leetcode_sync.py` | 로컬 headless Chromium 로그인 또는 숨김 세션 입력·검증, owner-only 저장, LeetCode solved/최근 정답·최근 문제별 실제 Accepted 코드 snapshot 갱신 |
 | `leetcode_review.py` | Accepted 코드와 기록된 배움으로 접근법·정답·복잡도·복습 힌트·경계 조건을 사전 요약. loopback 모델 background admission 사용, 근거 fingerprint로 변경 감지, owner-only 원자 저장, `list`는 cache만 조회 |
 | `leetcode_refresh.sh` | 기존 06:35 LeetCode 유지보수 cron에서 증분 source sync 후 요약 준비. outer agent·Telegram 전달 없이 기존 coding room·소유 profile 유지 |
+| `account_login.py` | Jun/HQ ChatGPT·Rina Google/YouTube 계정 재연결을 기존 helper와 bounded transient unit으로 시작·재사용·종료. 서비스별 준비 상태만 노출하고 Ellie의 카카오 스킬 URL은 명시적 복사 요청에만 반환 |
 | `leetcode_browser_login.py` | 기존 임시 desktop runtime과 Jun 재연결 버튼을 사용. bounded transient user unit으로 실행하고 대시보드가 loopback noVNC :18782 화면·WebSocket을 중계. 15분 로그인 제한·별도 임시 profile·계정 검증 후 세션 저장, desktop 종료 후 실제 코드·요약 갱신 |
 | `interview_trends.py` | HN·GitHub·논문 DB에서 실시간 인터뷰 트렌드 수집·캐시 |
 | `english_intake.py` | 새 레슨 탐지, Telegram 파일 저장, 이번 주 세션 조회, 처리 상태 관리 |
@@ -854,6 +856,18 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   노트 활동 카드를 제거하고 기존 웹 대화와 학습 완료 기록을 유지합니다.
   풀이 기록은 최신 문제 순의 클릭 가능한 목록으로, 항목을 열면 사전 저장된
   정답·접근법·복잡도·복습 힌트·경계 조건 및 실제 Accepted 코드를 확인합니다.
+  Python 소스는 정답과 풀이 및 실제 Accepted 코드 모두 언어 표시·고정폭 글꼴·
+  들여쓰기·줄바꿈·가로 스크롤·문법 색상을 적용한 코드 블록으로 표시합니다.
+  일반 설명과 fenced code를 구분하며 source의 HTML 문자는 escape합니다.
+  각 작업실에 계정·연결 설정 카드가 있습니다. Jun은 LeetCode·ChatGPT,
+  Rina는 Google/YouTube, Ellie는 카카오 챗봇 관리자센터·채널 관리·스킬 URL 복사를
+  제공합니다. ChatGPT 연결은 HQ와 같은 저장 profile을 재사용하고 로그인 확인 뒤
+  창을 닫습니다. 내보내기를 자동 요청하지 않습니다. Google 연결은 기존 YouTube
+  helper와 세션 재실행 검증을 재사용합니다. 일반 상태 API에는 쿠키·계정 신원·
+  카카오 비밀 URL을 넣지 않으며 복사 요청은 Ellie의 명시적 same-origin action입니다.
+  로그인 창은 LeetCode :96 / YouTube :97 / ChatGPT :98과 각각의 loopback 포트를
+  사용하며 같은 대시보드 주소로 static/WebSocket 연결을 중계합니다. 새 방·봇·
+  profile·상시 서비스·일정은 추가하지 않습니다. 인증 표시와 자료 갱신 오류를 구분합니다.
   실제 받은 힌트와 생성된 복습 힌트를 구분합니다. 풀이 요약은 실제 Accepted
   코드를 필수로 요구하며 노트로 구현을 대신하지 않습니다. 코드 없는 완료 항목과
   이전의 notes-only cache는 준비 대기로 남습니다. 계정 인증 실패 시 공개 완료
@@ -865,7 +879,7 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   모니터나 SSH 포트 전달이 필요하지 않습니다. WebSocket Origin을 검증합니다.
   bounded transient user unit이 요청·SSH 종료 이후에도 창을 유지하고
   중복 실행은 기존 창을 재사용합니다. 진단 로그는 owner-only로 저장합니다.
-  loopback :18782 및 :15903, 별도 display :98을 사용하고 15분 후 종료합니다.
+  loopback :18782 및 :15903, 별도 display :96을 사용하고 15분 후 종료합니다.
   로그인 Chromium은 자동화 launcher 대신 일반 native process로 실행하고,
   loopback CDP로 발급된 LeetCode cookie만 읽습니다. 로그인 조작은 사용자에게
   맡기며 User-Agent나 automation property를 바꾸지 않습니다. Google의 승인 여부는
@@ -1033,7 +1047,7 @@ ZIP 경로 격리·credential 오류 출력 방지 및 HQ source 상태 검증�
 Jun 사전 풀이 요약의 근거 변경·Accepted 코드 freshness·실패 보존·동시 실행
 잠금·background provider 경계 및 재인증 상태·실제 코드 필수 조건을 포함한
 원격 계정 재연결·CSRF 전달·동일 계정의 서버 cookie 갱신 검증까지 포함한
-현재 전체 테스트는 733 passed입니다.
+현재 전체 테스트는 753 passed입니다.
 서버 해제 시각·자정 넘김·기존 예약 migration과
 David·English 자동 tracing의 도구 인자 제외,
 session 묶음과 visible TTFT 처리 검증을 포함합니다.

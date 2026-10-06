@@ -53,6 +53,11 @@ JOB_ROOMS = {'papers-digest': 'papers', 'interview-prep': 'interview',
              'career-rewards-daily': 'hq'}
 BACKGROUND_MAINTENANCE_JOBS = frozenset({'leetcode-history-sync'})
 LEETCODE_LOGIN_PORT = 18782
+ACCOUNT_DESKTOPS = {
+    'chatgpt': (18781, 'data/chatgpt/browser-status.json', 'browser_status', ('awaiting_login', 'authenticated')),
+    'youtube': (18780, 'data/youtube-history/login-status.json', 'status', ('awaiting_login',)),
+}
+ACCOUNT_ROOMS = {'chatgpt': ('coding', 'hq'), 'youtube': ('podcast',)}
 ROOM_PROFILES = {'hq': 'david', 'podcast': 'english'}
 SECRET_KEY = re.compile(r'(token|secret|password|api[_-]?key|authorization|cookie|credential)', re.I)
 TASK_ID = re.compile(r't_[0-9a-f]{8}')
@@ -985,12 +990,27 @@ class Observatory:
             raise ValueError(result.stderr.strip().splitlines()[-1] if result.stderr else '저장하지 못했습니다.')
         return json.loads(result.stdout)
 
+    def account_connections(self, room):
+        if room not in ('coding', 'hq', 'podcast', 'english'):
+            return {'accounts': []}
+        return self.helper('account_login.py', ['status', '--room', room], timeout=15)
+
     def study_action(self, body):
         """Allow only concrete study and mission mutations, never shell input."""
         if not isinstance(body, dict):
             raise ValueError('JSON 객체가 필요합니다.')
         action = body.get('action')
         today = datetime.now(TZ).date().isoformat()
+        if action in ('account_login', 'account_login_stop'):
+            service = body.get('service')
+            if service not in ACCOUNT_ROOMS or body.get('room') not in ACCOUNT_ROOMS[service]:
+                raise ValueError('이 작업실에서 연결할 수 없는 계정입니다.')
+            return {'saved': True, 'result': self.helper('account_login.py',
+                    ['start' if action == 'account_login' else 'stop', '--service', service], timeout=25)}
+        if action == 'kakao_setup_url':
+            if body.get('room') != 'english':
+                raise ValueError('Ellie 작업실에서만 카카오 챗봇을 설정할 수 있습니다.')
+            return {'saved': True, 'result': self.helper('account_login.py', ['kakao-url'])}
         if action == 'leetcode_login':
             if body.get('room') != 'coding':
                 raise ValueError('Jun 작업실에서만 LeetCode를 연결할 수 있습니다.')
@@ -1525,13 +1545,17 @@ def make_handler(store, assets: Path, hosts):
             self.end_headers()
             self.wfile.write(body)
 
-        def login_desktop(self, url):
+        def login_desktop(self, url, service='leetcode'):
             """Relay only the active login desktop on the existing private origin."""
-            status = read_json(store.home / 'data/interview/leetcode-login-status.json', {})
-            if status.get('status') != 'awaiting_login':
+            if service == 'leetcode':
+                port, filename, key, phases = LEETCODE_LOGIN_PORT, 'data/interview/leetcode-login-status.json', 'status', ('awaiting_login',)
+            else:
+                port, filename, key, phases = ACCOUNT_DESKTOPS[service]
+            status = read_json(store.home / filename, {})
+            if status.get(key) not in phases:
                 self.respond(503, {'error': '로그인 창이 닫혀 있습니다. Jun 작업실에서 다시 열어 주세요.'})
                 return
-            path = url.path.removeprefix('/leetcode-login')
+            path = url.path.removeprefix('/' + service + '-login')
             if '..' in path.split('/') or '\\' in path:
                 self.respond(404, {'error': '찾을 수 없습니다.'})
                 return
@@ -1543,9 +1567,9 @@ def make_handler(store, assets: Path, hosts):
                 if origin.scheme not in ('http', 'https') or origin.netloc.lower() != self.headers.get('Host', '').lower():
                     self.respond(403, {'error': '허용되지 않은 연결입니다.'})
                     return
-                self.login_websocket(path)
+                self.login_websocket(path, port)
                 return
-            upstream = HTTPConnection('127.0.0.1', LEETCODE_LOGIN_PORT, timeout=10)
+            upstream = HTTPConnection('127.0.0.1', port, timeout=10)
             try:
                 upstream.request('GET', path)
                 response = upstream.getresponse()
@@ -1558,13 +1582,13 @@ def make_handler(store, assets: Path, hosts):
             finally:
                 upstream.close()
 
-        def login_websocket(self, path):
+        def login_websocket(self, path, port):
             """Preserve handshake and buffered first frames, then relay both ways."""
             upgraded = False
             self.close_connection = True
             try:
-                with socket.create_connection(('127.0.0.1', LEETCODE_LOGIN_PORT), timeout=10) as upstream:
-                    headers = [f'GET {path} HTTP/1.1', f'Host: 127.0.0.1:{LEETCODE_LOGIN_PORT}',
+                with socket.create_connection(('127.0.0.1', port), timeout=10) as upstream:
+                    headers = [f'GET {path} HTTP/1.1', f'Host: 127.0.0.1:{port}',
                                'Connection: Upgrade', 'Upgrade: websocket']
                     for name in ('Sec-WebSocket-Key', 'Sec-WebSocket-Version', 'Sec-WebSocket-Protocol', 'Origin'):
                         value = self.headers.get(name)
@@ -1604,6 +1628,10 @@ def make_handler(store, assets: Path, hosts):
             if url.path.startswith('/leetcode-login/'):
                 self.login_desktop(url)
                 return
+            for service in ACCOUNT_DESKTOPS:
+                if url.path.startswith('/' + service + '-login/'):
+                    self.login_desktop(url, service)
+                    return
             args = {k: v[0] for k, v in parse_qs(url.query).items()}
             try:
                 offset = max(0, int(args.get('offset', 0)))
@@ -1616,6 +1644,8 @@ def make_handler(store, assets: Path, hosts):
                     data = store.office_conversation(args.get('room', 'hq'))
                 elif url.path == '/api/workbench':
                     data = store.workbench(args.get('room', 'hq'))
+                elif url.path == '/api/accounts':
+                    data = store.account_connections(args.get('room', 'hq'))
                 elif url.path == '/api/mission':
                     data = store.mission_detail(args.get('task', ''))
                 elif url.path == '/api/sessions':

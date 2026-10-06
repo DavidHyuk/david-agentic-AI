@@ -140,17 +140,107 @@ function activeCoachAssignment(d) {
 function leetcodeSessionForm() {
   return `<details class="desk-help"><summary>Google 로그인 거부 시 · PC 브라우저 세션 연결</summary><p>평소 쓰는 Windows/Mac Chrome에서 <a href="https://leetcode.com/accounts/login/" target="_blank" rel="noopener noreferrer">LeetCode에 로그인</a>하세요. 이 대시보드의 원격 로그인 창이 아닌 PC 브라우저에서 로그인합니다.</p><p>로그인된 LeetCode 페이지에서 개발자 도구(F12 또는 ⌥⌘I) → Application → Storage → Cookies → https://leetcode.com → LEETCODE_SESSION의 Value를 복사하세요.</p><form id="leetcode-session-form" autocomplete="off"><label class="desk-field">LeetCode 세션 쿠키<input id="leetcode-session" type="password" autocomplete="off" required minlength="20" maxlength="8192" placeholder="LEETCODE_SESSION의 Value만 붙여넣기"></label><p class="muted">연결된 LeetCode 계정과 일치하는지 확인한 후 DGX에 저장합니다. 입력값은 브라우저에 저장하지 않습니다.</p><button class="primary">세션 연결하고 풀이 갱신</button></form></details>`;
 }
+async function loadAccountSettings(room) {
+  clearTimeout(bench.accountTimer);
+  if (bench.room !== room || state.view !== "workbench") return;
+  const panel = $("account-settings"), field = $("leetcode-session");
+  if ((panel?.contains(document.activeElement) && ["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName)) || field?.value) {
+    bench.accountTimer = setTimeout(() => loadAccountSettings(room), 5000);
+    return;
+  }
+  const request = bench.request;
+  try {
+    const data = await api("accounts", { room });
+    if (bench.room !== room || bench.request !== request || !$("account-settings")) return;
+    const names = { leetcode: "LeetCode", chatgpt: "ChatGPT", youtube: "Google · YouTube", kakao: "카카오톡 챗봇" };
+    const statuses = { starting: "로그인 창 준비 중…", awaiting_login: "로그인 대기", verifying: "연결 확인·자료 갱신 중", verified: "최근 연결 확인", reconnect: "재연결 필요", sync_error: "최근 자료 갱신 실패", not_connected: "연결 확인 필요" };
+    for (const account of data.accounts) {
+      if (account.status === "verified" && ["starting", "awaiting_login", "verifying"].includes(bench.accountStatuses?.[account.service])) $("bench-status").textContent = `${names[account.service]} 연결 확인 완료`;
+    }
+    bench.accountStatuses = Object.fromEntries(data.accounts.map(account => [account.service, account.status]));
+    $("account-settings").innerHTML = '<h2>계정·연결 설정</h2>' + data.accounts.map(account => {
+      if (account.service === "kakao") return `<section class="account-row"><div><b>카카오톡 챗봇</b><p class="muted">수집 서버 ${account.webhook_running ? "실행 중" : "중지"} · 공개 연결 ${account.tunnel_running ? "실행 중" : "중지"}</p></div><div class="desk-actions">${safeLink(account.manager_url, "챗봇 관리자센터 열기")}${safeLink(account.channel_url, "카카오톡 채널 관리")}<button class="outline" id="kakao-setup-copy" ${account.skill_url_available ? "" : "disabled"}>스킬 URL 복사</button></div><details class="desk-help"><summary>챗봇 설정 순서</summary><p>관리자센터에서 English Feedback Intake 스킬의 URL에 복사한 값을 넣고 저장하세요. 폴백 블록에서 이 스킬을 선택하고 봇 응답을 ‘스킬데이터로 사용’으로 설정한 뒤, David English Feed 운영 채널에 연결하고 배포합니다.</p><p class="muted">카카오 쪽 배포·채널 연결은 관리자센터에서 확인하세요. 여기에 표시되는 상태는 DGX 수집 서버 상태입니다.</p></details></section>`;
+      const waiting = ["starting", "awaiting_login", "verifying"].includes(account.status);
+      const link = account.status === "awaiting_login" ? `<a class="outline desk-link" href="${esc(account.url)}" target="_blank" rel="noopener noreferrer">로그인 창 열기 ↗</a>` : "";
+      const button = account.service === "leetcode" ? '<button class="outline" id="leetcode-login-start">LeetCode 다시 연결</button>' : `<button class="outline" data-account-start="${esc(account.service)}">${esc(names[account.service])} 다시 연결</button>`;
+      return `<section class="account-row"><div><b>${esc(names[account.service])}</b><p class="muted">${esc(statuses[account.status] || "연결 확인 필요")}</p></div><div class="desk-actions">${waiting ? link : button}${waiting && account.service !== "leetcode" ? `<button class="text-button" data-account-stop="${esc(account.service)}">로그인 창 닫기</button>` : ""}</div>${account.service === "leetcode" ? leetcodeSessionForm() : ""}${account.service === "chatgpt" ? '<p class="muted">Jun과 Hermes HQ가 같은 ChatGPT 연결을 사용합니다.</p>' : ""}</section>`;
+    }).join("");
+    if ($("leetcode-login-start")) $("leetcode-login-start").onclick = () => deskAction({action: "leetcode_login", room: "coding"}, "로그인 창을 준비했습니다.");
+    if ($("leetcode-session-form")) $("leetcode-session-form").onsubmit = async event => {
+      event.preventDefault();
+      const field = $("leetcode-session"), session = field.value.trim();
+      field.value = "";
+      await deskAction({action: "leetcode_connect", room: "coding", session}, "계정 연결 완료 · 실제 제출 코드와 요약을 갱신 중입니다.");
+    };
+    document.querySelectorAll("[data-account-start]").forEach(button => button.onclick = () => deskAction({action: "account_login", room, service: button.dataset.accountStart}, "로그인 창을 준비하고 있습니다."));
+    document.querySelectorAll("[data-account-stop]").forEach(button => button.onclick = () => deskAction({action: "account_login_stop", room, service: button.dataset.accountStop}, "로그인 창을 닫았습니다."));
+    if ($("kakao-setup-copy")) $("kakao-setup-copy").onclick = copyKakaoSetupUrl;
+    if (data.accounts.some(account => ["starting", "awaiting_login", "verifying"].includes(account.status)) && !$("account-settings").contains(document.activeElement)) bench.accountTimer = setTimeout(() => loadAccountSettings(room), 5000);
+  } catch (error) {
+    if (bench.room === room && $("account-settings")) $("account-settings").innerHTML = `<h2>계정·연결 설정</h2><p>${esc(error.message)}</p>`;
+  }
+}
+async function copyKakaoSetupUrl() {
+  const button = $("kakao-setup-copy");
+  button.disabled = true;
+  try {
+    const response = await fetch("api/action", {method: "POST", headers: {"Content-Type": "application/json", "X-Hermes-Action": "1"}, body: JSON.stringify({action: "kakao_setup_url", room: "english"})});
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "스킬 URL을 읽지 못했습니다.");
+    if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(data.result.url);
+    else {
+      const transfer = document.createElement("textarea");
+      transfer.value = data.result.url;
+      transfer.className = "clipboard-transfer";
+      document.body.append(transfer);
+      try {
+        transfer.select();
+        if (!document.execCommand("copy")) throw new Error("이 브라우저에서 복사를 허용하지 않았습니다.");
+      } finally { transfer.value = ""; transfer.remove(); }
+    }
+    $("bench-status").textContent = "스킬 URL을 복사했습니다. 챗봇 관리자센터의 스킬 URL에 붙여넣으세요.";
+  } catch (error) { $("bench-status").textContent = error.message; }
+  finally { button.disabled = false; }
+}
+function reviewCodeBlock(source, language = "python3") {
+  const python = /^(python3?|py)$/i.test(language);
+  let content = esc(source);
+  if (python) {
+    const tokens = /("""[\s\S]*?"""|'''[\s\S]*?'''|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|#[^\r\n]*|\b(?:class|def|if|elif|else|while|for|in|return|import|from|as|and|or|not|True|False|None|async|await|break|continue|pass|with|try|except|finally|raise|yield|lambda|is|global|nonlocal|del|assert)\b|\b\d+(?:\.\d+)?\b)/g;
+    let offset = 0;
+    content = "";
+    for (const match of source.matchAll(tokens)) {
+      const token = match[0];
+      const kind = token.startsWith("#") ? "comment" : /^["']/.test(token) ? "string" : /^\d/.test(token) ? "number" : "keyword";
+      content += esc(source.slice(offset, match.index)) + `<span class="code-${kind}">${esc(token)}</span>`;
+      offset = match.index + token.length;
+    }
+    content += esc(source.slice(offset));
+  }
+  return `<figure class="review-source"><figcaption>${esc(python ? "Python" : language || "Code")}</figcaption><pre class="review-code"><code>${content}</code></pre></figure>`;
+}
+function reviewAnswer(text, language) {
+  const fenced = /```([\w+-]*)[ \t]*\r?\n([\s\S]*?)```/g;
+  let html = "", offset = 0;
+  for (const match of text.matchAll(fenced)) {
+    if (match.index > offset) html += `<p class="completion-lesson">${esc(text.slice(offset, match.index))}</p>`;
+    html += reviewCodeBlock(match[2], match[1] || language);
+    offset = match.index + match[0].length;
+  }
+  if (html) return html + (offset < text.length ? `<p class="completion-lesson">${esc(text.slice(offset))}</p>` : "");
+  const pythonSource = /^\s*(?:class\s+\w+(?:\([^\n]*\))?\s*:|(?:async\s+)?def\s+\w+\s*\(|from\s+\S+\s+import\s+|import\s+\w+)/.test(text);
+  return pythonSource ? reviewCodeBlock(text, language || "python3") : `<p class="completion-lesson">${esc(text)}</p>`;
+}
 function codingReviewCard(d) {
   const lc = d.leetcode_history;
   const reviews = d.coding_reviews || {items: [], ready_count: 0};
   const needsLogin = lc?.solution_sync_status === "reauth_required";
-  const loginNotice = d.leetcode_login?.status === "awaiting_login" ? `<p>개인 PC에서 연결할 임시 로그인 창이 준비됐습니다. <a href="/leetcode-login/vnc.html?autoconnect=true&amp;resize=scale&amp;path=leetcode-login/websockify" target="_blank" rel="noopener noreferrer">LeetCode 로그인 창 열기 ↗</a>로 직접 로그인하세요.</p>` : d.leetcode_login?.status === "syncing" ? "<p>새 로그인 확인 완료 · 실제 제출 코드와 요약을 갱신하고 있습니다.</p>" : "";
   const list = reviews.items.map((r) => {
     const summary = r.summary;
     const bullets = (rows) => `<ul class="desk-focus">${rows.map((text) => `<li>${esc(text)}</li>`).join("")}</ul>`;
-    return `<details class="solution-review" name="jun-solution-reviews"><summary><span><b>${esc(r.title)}</b><small>${r.accepted_at ? when(new Date(r.accepted_at).getTime() / 1000) : esc(r.date || "완료 기록")} · ${r.code ? "Accepted 코드" : "제출 코드 미확보"}</small></span><span class="review-status">${summary ? "요약 보기" : needsLogin && !r.code ? "LeetCode 재연결 필요" : "요약 준비 중"}</span></summary><div class="review-body">${summary ? `<h3>접근법</h3><p class="completion-lesson">${esc(summary.approach)}</p><h3>정답과 풀이</h3><p class="completion-lesson">${esc(summary.answer)}</p><h3>복잡도</h3><p class="completion-lesson">${esc(summary.complexity)}</p><h3>복습용 힌트</h3>${bullets(summary.hints)}<h3>확인할 경계 조건</h3>${bullets(summary.pitfalls)}<p class="muted">Jun이 저장된 근거로 미리 정리한 요약 · ${esc(r.prepared_at || "")}</p>` : `<p class="muted">${r.code ? "실제 제출 코드를 바탕으로 요약을 준비하고 있습니다. 잠시 후 새로고침해 주세요." : needsLogin ? "LeetCode 로그인 연결이 해제되어 실제 제출 코드를 가져오지 못했습니다. 계정을 재연결하면 Accepted 코드로 요약을 준비합니다." : "완료는 확인됐지만 실제 제출 코드가 아직 확보되지 않았습니다. LeetCode 코드를 가져온 뒤 요약을 준비합니다."}</p>`}${r.code ? `<details class="desk-help"><summary>내 Accepted 코드 · ${esc(r.language)}</summary><pre class="review-code"><code>${esc(r.code)}</code></pre></details>` : '<p class="muted">Accepted 제출 코드 미확보</p>'}${(r.notes || []).map((n) => `<details class="desk-help"><summary>기록된 배움과 실제 힌트 · ${esc(n.date || "")}</summary>${n.lesson ? `<p class="completion-lesson">${esc(n.lesson)}</p>` : ""}${n.hint_notes ? `<p class="completion-lesson">${esc(n.hint_notes)}</p>` : ""}${n.source?.url ? safeLink(n.source.url, n.source.title || "근거 대화") : ""}</details>`).join("")}${safeLink(`https://leetcode.com/problems/${encodeURIComponent(r.slug)}/`, "LeetCode 문제")}</div></details>`;
+    return `<details class="solution-review" name="jun-solution-reviews"><summary><span><b>${esc(r.title)}</b><small>${r.accepted_at ? when(new Date(r.accepted_at).getTime() / 1000) : esc(r.date || "완료 기록")} · ${r.code ? "Accepted 코드" : "제출 코드 미확보"}</small></span><span class="review-status">${summary ? "요약 보기" : needsLogin && !r.code ? "LeetCode 재연결 필요" : "요약 준비 중"}</span></summary><div class="review-body">${summary ? `<h3>접근법</h3><p class="completion-lesson">${esc(summary.approach)}</p><h3>정답과 풀이</h3>${reviewAnswer(summary.answer, r.language)}<h3>복잡도</h3><p class="completion-lesson">${esc(summary.complexity)}</p><h3>복습용 힌트</h3>${bullets(summary.hints)}<h3>확인할 경계 조건</h3>${bullets(summary.pitfalls)}<p class="muted">Jun이 저장된 근거로 미리 정리한 요약 · ${esc(r.prepared_at || "")}</p>` : `<p class="muted">${r.code ? "실제 제출 코드를 바탕으로 요약을 준비하고 있습니다. 잠시 후 새로고침해 주세요." : needsLogin ? "LeetCode 로그인 연결이 해제되어 실제 제출 코드를 가져오지 못했습니다. 계정을 재연결하면 Accepted 코드로 요약을 준비합니다." : "완료는 확인됐지만 실제 제출 코드가 아직 확보되지 않았습니다. LeetCode 코드를 가져온 뒤 요약을 준비합니다."}</p>`}${r.code ? `<details class="desk-help"><summary>내 Accepted 코드 · ${esc(r.language)}</summary>${reviewCodeBlock(r.code, r.language)}</details>` : '<p class="muted">Accepted 제출 코드 미확보</p>'}${(r.notes || []).map((n) => `<details class="desk-help"><summary>기록된 배움과 실제 힌트 · ${esc(n.date || "")}</summary>${n.lesson ? `<p class="completion-lesson">${esc(n.lesson)}</p>` : ""}${n.hint_notes ? `<p class="completion-lesson">${esc(n.hint_notes)}</p>` : ""}${n.source?.url ? safeLink(n.source.url, n.source.title || "근거 대화") : ""}</details>`).join("")}${safeLink(`https://leetcode.com/problems/${encodeURIComponent(r.slug)}/`, "LeetCode 문제")}</div></details>`;
   }).join("");
-  return `<article class="desk-card coding-reviews"><span class="tag">JUN · 풀이 복습</span><h2>풀이 기록${reviews.items.length ? ` ${reviews.items.length}문제` : ""}</h2><p class="muted">최근 푼 문제를 선택하면 실제 Accepted 코드로 미리 정리한 정답·접근법·복습용 힌트를 볼 수 있습니다. 요약 ${Number(reviews.ready_count)}개 준비됨.</p>${lc ? `<p class="muted">${esc(lc.username)} · ${esc(d.leetcode_refresh?.message || "LeetCode 계정 기준")} · ${esc(lc.synced_at || "")}</p>${needsLogin ? `<div class="review-connection" role="status"><b>LeetCode 재로그인 필요</b><p>공개 완료 기록은 조회되지만 저장된 로그인 세션이 인정되지 않아 제출 코드 조회가 막혔습니다. 계정을 재연결하면 실제 Accepted 코드와 요약이 갱신됩니다.</p>${leetcodeSessionForm()}${loginNotice}${!["awaiting_login", "syncing"].includes(d.leetcode_login?.status) ? '<button class="primary" id="leetcode-login-start">LeetCode 로그인 창 준비하기</button>' : ""}<details class="desk-help"><summary>계정 재연결 방법</summary><p>로그인 창 준비하기 버튼을 누른 뒤 나타나는 링크를 개인 PC의 Chrome 또는 Chromium에서 여세요. 모니터 연결이나 SSH 포트 전달 없이 사용할 수 있습니다. 대시보드와 같은 주소로 접속하며, 로그인 후 제출 코드와 요약은 자동 갱신됩니다.</p><p>DGX 데스크톱을 직접 쓰는 경우에는 <code>python3 ~/.hermes/scripts/leetcode_sync.py login --headed --username &lt;LeetCode 아이디&gt;</code>로 로그인한 뒤, <code>bash ~/.hermes/scripts/leetcode_refresh.sh</code>를 실행하고 이 화면을 새로고침하세요. 개인 PC의 브라우저에서 로그인한 경우에는 DGX 터미널에서 <code>python3 ~/.hermes/scripts/leetcode_sync.py connect --username &lt;LeetCode 아이디&gt;</code>의 숨김 입력에 새 LEETCODE_SESSION 쿠키를 연결하세요.</p></details></div>` : lc.solution_sync_error ? '<p class="muted">제출 코드 갱신 실패 · 계정 연결을 확인해 주세요. 저장된 코드는 보관됩니다.</p>' : ""}` : '<p class="muted">LeetCode 계정을 연결하면 실제 Accepted 코드도 함께 모입니다.</p>'}${reviews.unavailable ? '<p class="muted">풀이 요약을 불러오지 못했습니다. 새로고침해 주세요.</p>' : list || '<p class="muted">최근 푼 문제의 코드나 학습 기록이 모이면 이곳에 표시됩니다.</p>'}</article>`;
+  return `<article class="desk-card coding-reviews"><span class="tag">JUN · 풀이 복습</span><h2>풀이 기록${reviews.items.length ? ` ${reviews.items.length}문제` : ""}</h2><p class="muted">최근 푼 문제를 선택하면 실제 Accepted 코드로 미리 정리한 정답·접근법·복습용 힌트를 볼 수 있습니다. 요약 ${Number(reviews.ready_count)}개 준비됨.</p>${lc ? `<p class="muted">${esc(lc.username)} · ${esc(d.leetcode_refresh?.message || "LeetCode 계정 기준")} · ${esc(lc.synced_at || "")}</p>${needsLogin ? `<div class="review-connection" role="status"><b>LeetCode 재로그인 필요</b><p>공개 완료 기록은 조회되지만 저장된 로그인 세션이 인정되지 않아 제출 코드 조회가 막혔습니다. 계정을 재연결하면 실제 Accepted 코드와 요약이 갱신됩니다.</p><p>위의 계정·연결 설정에서 LeetCode를 다시 연결하세요.</p><details class="desk-help"><summary>계정 재연결 방법</summary><p>로그인 창 준비하기 버튼을 누른 뒤 나타나는 링크를 개인 PC의 Chrome 또는 Chromium에서 여세요. 모니터 연결이나 SSH 포트 전달 없이 사용할 수 있습니다. 대시보드와 같은 주소로 접속하며, 로그인 후 제출 코드와 요약은 자동 갱신됩니다.</p><p>DGX 데스크톱을 직접 쓰는 경우에는 <code>python3 ~/.hermes/scripts/leetcode_sync.py login --headed --username &lt;LeetCode 아이디&gt;</code>로 로그인한 뒤, <code>bash ~/.hermes/scripts/leetcode_refresh.sh</code>를 실행하고 이 화면을 새로고침하세요. 개인 PC의 브라우저에서 로그인한 경우에는 DGX 터미널에서 <code>python3 ~/.hermes/scripts/leetcode_sync.py connect --username &lt;LeetCode 아이디&gt;</code>의 숨김 입력에 새 LEETCODE_SESSION 쿠키를 연결하세요.</p></details></div>` : lc.solution_sync_error ? '<p class="muted">제출 코드 갱신 실패 · 계정 연결을 확인해 주세요. 저장된 코드는 보관됩니다.</p>' : ""}` : '<p class="muted">LeetCode 계정을 연결하면 실제 Accepted 코드도 함께 모입니다.</p>'}${reviews.unavailable ? '<p class="muted">풀이 요약을 불러오지 못했습니다. 새로고침해 주세요.</p>' : list || '<p class="muted">최근 푼 문제의 코드나 학습 기록이 모이면 이곳에 표시됩니다.</p>'}</article>`;
 }
 function coachDesk(d) {
   const a = activeCoachAssignment(d);
@@ -184,7 +274,7 @@ function englishDesk(d) {
 function podcastDesk(d) {
   const history = d.watch_history || {};
   const videos = history.videos || [];
-  const connection = history.interactive_login_status === "awaiting_login" ? "DGX Chromium에서 직접 로그인 대기" : history.interactive_login_status === "verifying" ? "로그인 세션 재실행 검증 중" : history.connected ? "계정 연결 확인됨" : history.authenticated ? "로그인 확인됨 · 기록 수집 대기" : history.session_saved ? "세션 전달됨 · 연결 확인 대기" : "개인 컴퓨터에서 SSH로 DGX Chromium에 로그인해 주세요.";
+  const connection = history.interactive_login_status === "awaiting_login" ? "DGX Chromium에서 직접 로그인 대기" : history.interactive_login_status === "verifying" ? "로그인 세션 재실행 검증 중" : history.connected ? "계정 연결 확인됨" : history.authenticated ? "로그인 확인됨 · 기록 수집 대기" : history.session_saved ? "세션 전달됨 · 연결 확인 대기" : "위의 계정·연결 설정에서 Google 계정을 연결하세요.";
   const state = d.podcast_review?.status === "ready" ? "주중 팟캐스트 복습" : history.is_today ? "가장 최근에 본 팟캐스트" : history.date ? "이전 수집 결과 · 갱신 대기" : "계정 연결 후 첫 수집 대기";
   const review = d.podcast_review;
   const reviewCard = review ? `<article class="desk-card"><h2>주말 복습 · ${esc(review.week_start)} ~ ${esc(review.week_end)}</h2>${review.status === "ready" ? (review.episodes || []).map(item => `<div class="reading-row"><div><strong>${esc(item.title)}</strong><small>${(item.source_dates || []).map(esc).join(" · ")}</small></div><div>${safeLink(item.url, "주중 영상 다시 듣기")}</div></div>`).join("") + '<p class="muted">주중 대본 문장과 약점 표현을 Telegram에서 복습합니다.</p>' : `<p>${esc(review.reason || "이번 주 복습 자료가 없습니다.")}</p>`}</article>` : "";
@@ -295,18 +385,12 @@ function renderWorkbench(d) {
       '<article class="desk-card"><h2>프로필 활동</h2><p>이 독립 프로필의 대화·작업 기록을 확인할 수 있습니다.</p></article>';
   if (!["coding", "design"].includes(d.room) && d.telegram_chat?.available)
     body += telegramComposer(d);
+  if (["coding", "hq", "podcast", "english"].includes(d.room)) body = '<article class="desk-card account-settings" id="account-settings"><h2>계정·연결 설정</h2><p class="muted">연결 상태를 확인하고 있어요…</p></article>' + body;
   const editable = d.room !== "coding" && Boolean(deskTitles[d.room]);
   const draft = localRead(draftKey(d.room), null);
   $("bench-content").innerHTML =
     `<div class="workbench-grid"><div class="desk-main">${body}</div><aside class="desk-side">${editable ? `<article class="desk-card"><h2>${d.room === "interview" ? "내 답변 · 회고" : "작업실 노트"}</h2><form id="desk-note-form"><textarea id="desk-note" rows="10" maxlength="16000" required placeholder="오늘의 생각, 다음에 이어갈 내용을 남겨주세요.">${esc(draft ?? d.note)}</textarea><p class="muted">초안은 이 브라우저에 보관됩니다. 저장한 노트는 다른 기기에서도 이어볼 수 있습니다.</p><button class="primary">노트 저장</button></form></article>` : ""}${d.room === "coding" ? "" : `<article class="desk-card"><h2>최근 기록</h2>${d.recent.map((s, i) => `<button class="desk-history" data-desk-session="${i}"><b>${esc(s.title)}</b><small>${when(s.started_at)}</small></button>`).join("") || '<p class="muted">저장된 세션이 없습니다.</p>'}</article>`}${learningHistory(d)}${d.room === "coding" ? "" : `<article class="desk-card"><h2>작업실 활동</h2>${d.events.map((e) => `<div class="desk-event"><b>${esc({ note: "노트 저장", bookmark: "읽기 목록 추가", paper_read: "읽기 상태 변경" }[e.action] || e.action)}</b><small>${when(e.time)}</small>${e.note ? `<details><summary>이 버전 보기</summary><p class="saved-note">${esc(e.note)}</p></details>` : ""}</div>`).join("") || '<p class="muted">노트와 읽기 목록 변경이 여기에 남습니다.</p>'}</article>`}</aside></div>`;
-  if ($("leetcode-session-form")) $("leetcode-session-form").onsubmit = async (event) => {
-    event.preventDefault();
-    const field = $("leetcode-session"), session = field.value.trim();
-    field.value = "";
-    await deskAction({ action: "leetcode_connect", room: "coding", session }, "계정 연결 완료 · 실제 제출 코드와 요약을 갱신 중입니다.");
-  };
-  if ($("leetcode-login-start")) $("leetcode-login-start").onclick = () =>
-    deskAction({ action: "leetcode_login", room: "coding" }, "로그인 창 링크를 열어 직접 로그인하세요.");
+  if ($("account-settings")) loadAccountSettings(d.room);
   if (editable) {
     $("desk-note").oninput = () =>
       localWrite(draftKey(d.room), $("desk-note").value);

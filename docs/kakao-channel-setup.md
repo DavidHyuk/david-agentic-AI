@@ -45,7 +45,11 @@ journalctl --user -u kakao-tunnel.service --no-pager | grep trycloudflare.com
 ```
 
 The installer combines the current origin and secret path in a private mode-0600
-file. Copy its entire contents directly into Open Builder's skill URL field:
+file. In the private Observatory, Ellie → **계정·연결 설정** provides **챗봇 관리자센터
+열기** and **스킬 URL 복사**. Copy directly into Open Builder's skill URL field;
+the normal status view does not include the secret endpoint. Collector/tunnel
+status does not prove that Kakao's channel has been deployed. The terminal
+alternative is:
 
 ```bash
 cat ~/.hermes/data/english/kakao-skill-url.txt

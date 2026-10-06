@@ -474,3 +474,21 @@ def test_browser_redirect_never_saves_unrelated_conversation(tmp_path, monkeypat
         archive.read_browser_conversation(tmp_path, CHAT_ID)
     assert archive.load_json(cache) == previous
     assert closed == [True]
+
+
+def test_reconnect_closes_window_after_login_without_export_or_deleting_profile(tmp_path, monkeypatch):
+    calls = []
+    profile = tmp_path / 'browser'
+    profile.mkdir()
+    (profile / 'saved-profile').write_text('preserve')
+    def run(runtime, data_dir, timeout, export, **options):
+        calls.append((export, options))
+        archive.save_json(data_dir / 'browser-status.json', {'browser_status': 'authenticated',
+                                                         'authenticated_at': '2026-10-05T00:00:00+00:00'})
+    monkeypatch.setattr(archive, 'run_browser', run)
+    monkeypatch.setattr(archive.signal, 'signal', lambda *a: None)
+    assert archive.main(['--data-dir', str(tmp_path), 'login', '--close-after-login']) == 0
+    assert calls == [(False, {'close_after_login': True})]
+    state = archive.load_json(tmp_path / 'browser-status.json')
+    assert state['browser_status'] == 'closed' and state['authenticated_at']
+    assert (profile / 'saved-profile').read_text() == 'preserve'

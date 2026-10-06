@@ -970,6 +970,33 @@ Jun receives the current shared completion inventory on each reply, including
 externally verified completions and pattern-specific learning. Missing submitted
 source is not evidence that a problem was never solved.
 
+Each workbench has **계정·연결 설정** above its main cards:
+
+| Workbench | Connection action |
+| --- | --- |
+| Jun | **LeetCode 다시 연결** and **ChatGPT 다시 연결** |
+| Rina | **Google · YouTube 다시 연결** for the existing watched-history account |
+| Ellie | **챗봇 관리자센터 열기**, channel management, and **스킬 URL 복사** |
+| Hermes HQ | The same ChatGPT reconnect button and saved profile used by Jun |
+
+Click reconnect, then **로그인 창 열기** when ready. Log in directly through
+the dashboard's existing private address without SSH forwarding or a monitor.
+ChatGPT reconnection closes its window after confirmed login while preserving
+the existing browser profile; it does not request an export. YouTube verifies
+that the saved session can collect history again. Repeated clicks reuse an active
+window. Only bounded transient units are started; bots, profiles and schedules
+stay with their existing owners. Login windows use separate displays and ports.
+The connection cards show last-known verification, not a guarantee of permanent
+access. A source refresh error is distinguished from an authentication error.
+
+For Ellie, the Kakao manager opens on your own PC browser. Copy the private skill
+URL with **스킬 URL 복사**, paste it into **English Feedback Intake → URL** in
+Open Builder, select that skill on the fallback block, choose **스킬데이터로
+사용**, connect the operating channel, and deploy. The card reports local
+collector/tunnel readiness; confirm channel deployment in Kakao's manager.
+The secret URL is fetched only by the explicit copy action and never appears in
+normal connection status, browser storage or the workspace archive.
+
 Jun's workbench keeps its web conversation and **학습 완료 기록**, while removing
 the additional Dashboard ↔ Telegram composer, workbench notes and recent-session
 cards. **풀이 기록** lists completed problems in newest-first order. Click a
@@ -1008,6 +1035,11 @@ In the LeetCode workbench chat, the referenced problem (including a follow-up
 that refers to the immediately preceding problem) automatically provides only
 that matching local submission to the coach; the reply and its Telegram mirror
 therefore explain the submitted implementation rather than a guessed template.
+Python in **정답과 풀이** and **내 Accepted 코드** is displayed in a labeled
+code block with monospace text, preserved indentation/line breaks, horizontal
+scrolling and local Python syntax colors. Fenced code mixed with prose is also
+formatted; HTML-like source text stays escaped and cannot become page markup.
+
 The token is entered through a hidden prompt and is stored only at
 `~/.hermes/data/interview/leetcode_session.json` with `0600` permissions; the
 separate owner-only snapshot (including submitted source code) is

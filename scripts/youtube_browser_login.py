@@ -135,6 +135,7 @@ def run_desktop(runtime: Path, data_dir: Path, timeout: int) -> list[dict]:
     env['LD_LIBRARY_PATH'] += ':' + os.environ.get('LD_LIBRARY_PATH', '')
     for port in (15901, 18780, 19323):
         with socket.socket() as probe:
+            probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             probe.bind(('127.0.0.1', port))
     # X11 requires an owner-only authorization file; VNC/WebSocket bind loopback.
     authority = data_dir / 'login.xauth'
@@ -161,7 +162,7 @@ def run_desktop(runtime: Path, data_dir: Path, timeout: int) -> list[dict]:
             'status': 'awaiting_login', 'started_at': datetime.now(timezone.utc).isoformat(),
             'web_port': 18780, 'expires_in_seconds': timeout,
         })
-        print('DGX Chromium ready: forward 127.0.0.1:18780 over SSH and open /vnc.html.', flush=True)
+        print('DGX Chromium ready: open the Google login link in the Rina workbench.', flush=True)
         with sync_playwright() as playwright:
             browser = playwright.chromium.connect_over_cdp('http://127.0.0.1:19323')
             context = browser.contexts[0]

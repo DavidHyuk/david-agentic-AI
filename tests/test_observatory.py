@@ -1388,13 +1388,22 @@ def test_login_proxy_keeps_assets_on_loopback_and_excludes_client_credentials(lo
         thread.join(timeout=3)
 
 
-def test_login_websocket_preserves_coalesced_first_frame_and_bidirectional_bytes(login_http, monkeypatch):
+@pytest.mark.parametrize("service", ["leetcode", "chatgpt", "youtube"])
+def test_login_websocket_preserves_coalesced_first_frame_and_bidirectional_bytes(login_http, store, monkeypatch, service):
     import socket
     listener = socket.socket()
     listener.bind(('127.0.0.1', 0))
     listener.listen()
     listener.settimeout(3)
-    monkeypatch.setattr(observatory_module, 'LEETCODE_LOGIN_PORT', listener.getsockname()[1])
+    if service == 'leetcode':
+        monkeypatch.setattr(observatory_module, 'LEETCODE_LOGIN_PORT', listener.getsockname()[1])
+    else:
+        _, filename, key, phases = observatory_module.ACCOUNT_DESKTOPS[service]
+        monkeypatch.setitem(observatory_module.ACCOUNT_DESKTOPS, service,
+                            (listener.getsockname()[1], filename, key, phases))
+        path = store.home / filename
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({key: 'awaiting_login'}))
     server, _ = login_http
     headers_seen, received, errors = [], [], []
     first_frame = b'\x82\x0cRFB 003.008\n'
@@ -1418,7 +1427,7 @@ def test_login_websocket_preserves_coalesced_first_frame_and_bidirectional_bytes
     try:
         with socket.create_connection(server.server_address, timeout=3) as client:
             host = '%s:%s' % server.server_address
-            client.sendall(('GET /leetcode-login/websockify HTTP/1.1\r\nHost: ' + host + '\r\nOrigin: http://' + host + '\r\nUpgrade: websocket\r\nSec-WebSocket-Key: test-key\r\nSec-WebSocket-Version: 13\r\nCookie: PRIVATE\r\n\r\n').encode())
+            client.sendall(('GET /' + service + '-login/websockify HTTP/1.1\r\nHost: ' + host + '\r\nOrigin: http://' + host + '\r\nUpgrade: websocket\r\nSec-WebSocket-Key: test-key\r\nSec-WebSocket-Version: 13\r\nCookie: PRIVATE\r\n\r\n').encode())
             data = b''
             while b'\r\n\r\n' not in data:
                 data += client.recv(4096)
@@ -1467,3 +1476,27 @@ def test_open_manual_login_does_not_block_workbench_with_source_sync(store, monk
     assert store.refresh_leetcode_progress()['status'] == 'login_pending'
     store.refresh_leetcode_sources()
     assert not store.leetcode_source_lock.locked()
+
+
+@pytest.mark.parametrize(('room', 'service'), [('coding', 'chatgpt'), ('hq', 'chatgpt'), ('podcast', 'youtube')])
+def test_account_reconnect_actions_reuse_fixed_helper_only_for_owning_rooms(store, monkeypatch, room, service):
+    calls = []
+    monkeypatch.setattr(store, 'helper', lambda name, args, **kw: calls.append((name, args)) or {'status': 'starting'})
+    assert store.study_action({'action': 'account_login', 'room': room, 'service': service})['saved']
+    assert calls == [('account_login.py', ['start', '--service', service])]
+    with pytest.raises(ValueError):
+        store.study_action({'action': 'account_login', 'room': 'papers', 'service': service})
+    with pytest.raises(ValueError):
+        store.study_action({'action': 'account_login', 'room': room, 'service': '../../untrusted'})
+    assert len(calls) == 1
+
+
+def test_private_kakao_setup_value_is_only_available_via_explicit_english_action(store, monkeypatch):
+    calls = []
+    monkeypatch.setattr(store, 'helper', lambda name, args, **kw: calls.append((name, args)) or {'url': 'https://example.com/kakao/private-setup'})
+    with pytest.raises(ValueError):
+        store.study_action({'action': 'kakao_setup_url', 'room': 'coding'})
+    assert not calls
+    result = store.study_action({'action': 'kakao_setup_url', 'room': 'english'})
+    assert result['result']['url'].endswith('/private-setup')
+    assert calls == [('account_login.py', ['kakao-url'])]

@@ -753,7 +753,7 @@ def request_export(page) -> str:
     return now()
 
 
-def run_browser(runtime: Path, data_dir: Path, timeout: int, export: bool) -> None:
+def run_browser(runtime: Path, data_dir: Path, timeout: int, export: bool, *, close_after_login=False) -> None:
     from playwright.sync_api import sync_playwright
     executables = sorted((runtime / 'browsers').glob('chromium-*/chrome-linux*/chrome'))
     if not executables:
@@ -766,6 +766,7 @@ def run_browser(runtime: Path, data_dir: Path, timeout: int, export: bool) -> No
     env['LD_LIBRARY_PATH'] = ':'.join(map(str, libraries)) + ':' + os.environ.get('LD_LIBRARY_PATH', '')
     for port in (VNC_PORT, WEB_PORT, CDP_PORT):
         with socket.socket() as probe:
+            probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             probe.bind(('127.0.0.1', port))
     authority = data_dir / 'login.xauth'
     authority.touch(mode=0o600)
@@ -794,7 +795,7 @@ def run_browser(runtime: Path, data_dir: Path, timeout: int, export: bool) -> No
             session.send('Browser.setDownloadBehavior', {'behavior': 'allow', 'downloadPath': str(data_dir / 'downloads')})
             state.update(browser_status='awaiting_login', started_at=now())
             save_json(data_dir / 'browser-status.json', state)
-            print(f'ChatGPT browser ready: SSH-forward localhost:{WEB_PORT}; open /vnc.html.', flush=True)
+            print('ChatGPT browser ready: open the login link in the Jun or HQ workbench.', flush=True)
             deadline, attempted = time.monotonic() + timeout, False
             seen_downloads = set()
             while time.monotonic() < deadline:
@@ -815,6 +816,9 @@ def run_browser(runtime: Path, data_dir: Path, timeout: int, export: bool) -> No
                         state.update(browser_status='authenticated', authenticated_at=now())
                         save_json(data_dir / 'browser-status.json', state)
                         print('ChatGPT login confirmed. Session remains in the private browser profile.', flush=True)
+                    if authenticated and close_after_login:
+                        browser.close()
+                        return
                     if authenticated and export and not attempted:
                         attempted = True
                         # Persist the attempt before clicking. Never auto retry ambiguous submission.
@@ -874,6 +878,7 @@ def main(argv=None) -> int:
     login.add_argument('--runtime-dir', type=Path, default=DEFAULT_RUNTIME)
     login.add_argument('--timeout', type=int, default=1800)
     login.add_argument('--request-export', action='store_true')
+    login.add_argument('--close-after-login', action='store_true', help='close after verified manual login, keeping the saved profile')
     commands.add_parser('status')
     importer = commands.add_parser('import')
     importer.add_argument('--file', type=Path, required=True)
@@ -905,12 +910,15 @@ def main(argv=None) -> int:
         raise KeyboardInterrupt
     try:
         if args.command == 'login':
+            if args.close_after_login and args.request_export:
+                parser.error('--close-after-login cannot be combined with --request-export')
             if not 60 <= args.timeout <= 3600:
                 parser.error('--timeout must be between 60 and 3600 seconds')
             signal.signal(signal.SIGTERM, interrupted)
             with locked(args.data_dir, '.browser.lock'):
                 try:
-                    run_browser(args.runtime_dir, args.data_dir, args.timeout, args.request_export)
+                    options = {'close_after_login': True} if args.close_after_login else {}
+                    run_browser(args.runtime_dir, args.data_dir, args.timeout, args.request_export, **options)
                 finally:
                     state = load_json(args.data_dir / 'browser-status.json')
                     state['browser_status'] = 'closed'

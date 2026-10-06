@@ -3,6 +3,36 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.44.0 — 2026-10-05 (minor: reconnect accounts inside each workbench)
+
+- Add a visible account/connection card: Jun reconnects LeetCode and ChatGPT,
+  Rina reconnects the existing Google/YouTube history account, and Ellie opens
+  Kakao's chatbot/channel managers and explicitly copies the private skill URL.
+  HQ and Jun reuse the same ChatGPT credential owner and persisted profile.
+- Reuse existing manual browser helpers with bounded transient user units,
+  duplicate-window reuse, dashboard-origin static/WebSocket forwarding and
+  matching-origin validation. Separate LeetCode :96, YouTube :97 and ChatGPT
+  :98 displays prevent login windows from competing. No SSH forwarding or
+  physical DGX monitor is required. ChatGPT login closes after verification;
+  no export, new bot, profile, room or recurring schedule is introduced.
+- Keep credentials and account identity out of connection status. Expose
+  Kakao's secret endpoint only after Ellie's explicit same-origin copy action,
+  then discard clipboard-transfer DOM. Show collector/tunnel readiness without
+  claiming that Kakao's channel deployment has been checked. Preserve cookie
+  input while editing instead of clearing it during connection-status polling.
+- Render code in Jun's answer and Accepted-source sections as labeled blocks
+  with preserved whitespace, monospace font, horizontal scrolling and Python
+  syntax colors. Handle fenced code mixed with prose; escape every source token.
+- Validation: 753 tests pass, including account ownership/routing, bounded and
+  duplicate startup, private status, credential-preserving failure, separated
+  displays, proxy forwarding for all three services, and exact code whitespace
+  with hostile markup. Live workbench checks confirm all room buttons and the
+  Python code block. Live ChatGPT reconnect verifies the existing profile and
+  closes the window, Rina reaches the Google login desktop through the dashboard,
+  and Ellie copies the setup URL without leaving it in browser storage.
+  Existing schedules, session routes and state owners remain
+  unchanged because this is account maintenance for existing workflows.
+
 ## v1.43.2 — 2026-10-05 (patch: manual Chromium login and PC session handoff)
 
 - Google rejects the Playwright-launched sign-in browser. Open Chromium as a

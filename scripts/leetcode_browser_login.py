@@ -26,7 +26,7 @@ import time
 
 WEB_PORT = 18782
 VNC_PORT = 15903
-DISPLAY = ':98'
+DISPLAY = ':96'
 LOGIN_URL = '/leetcode-login/vnc.html?autoconnect=true&resize=scale&path=leetcode-login/websockify'
 LOGIN_UNIT = 'hermes-leetcode-login'
 
