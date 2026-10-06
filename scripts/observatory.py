@@ -327,6 +327,8 @@ class Observatory:
 
     def refresh_leetcode_sources(self):
         """Download sources and precompute reviews without delaying the room."""
+        if read_json(self.home / 'data/interview/leetcode-login-status.json', {}).get('status') == 'awaiting_login':
+            return
         connection = read_json(self.home / 'data/interview/leetcode_session.json', {}) or {}
         linked = bool(connection.get('username') and connection.get('session'))
         if not linked and not (self.home / 'data/interview/leetcode_history.json').exists():
@@ -354,6 +356,8 @@ class Observatory:
 
     def refresh_leetcode_progress(self):
         """Refresh linked account totals at most once a minute, retaining old data on failure."""
+        if read_json(self.home / 'data/interview/leetcode-login-status.json', {}).get('status') == 'awaiting_login':
+            return {'status': 'login_pending', 'message': 'LeetCode 로그인 진행 중 · 저장된 기록입니다.'}
         if not (self.home / 'data/interview/leetcode_session.json').is_file():
             return {'status': 'unlinked'}
         with self.leetcode_lock:
@@ -972,9 +976,10 @@ class Observatory:
         detail['task']['room'] = SPECIALIST_ROOMS.get(detail['task'].get('assignee'), 'hq')
         return detail
 
-    def helper(self, name, arguments, *, timeout=20):
+    def helper(self, name, arguments, *, timeout=20, input_text=None):
         result = subprocess.run([sys.executable, str(Path(__file__).with_name(name)), *arguments],
                                 capture_output=True, text=True, timeout=timeout,
+                                **({'input': input_text} if input_text is not None else {}),
                                 env={**os.environ, 'TZ': str(TZ), 'HERMES_HOME': str(self.home)})
         if result.returncode:
             raise ValueError(result.stderr.strip().splitlines()[-1] if result.stderr else '저장하지 못했습니다.')
@@ -990,6 +995,17 @@ class Observatory:
             if body.get('room') != 'coding':
                 raise ValueError('Jun 작업실에서만 LeetCode를 연결할 수 있습니다.')
             return {'saved': True, 'result': self.helper('leetcode_browser_login.py', ['--start'], timeout=35)}
+        if action == 'leetcode_connect':
+            if body.get('room') != 'coding':
+                raise ValueError('Jun 작업실에서만 LeetCode를 연결할 수 있습니다.')
+            session = body.get('session')
+            if not isinstance(session, str) or not 20 <= len(session.strip()) <= 8192 or any(c.isspace() for c in session.strip()):
+                raise ValueError('LEETCODE_SESSION 쿠키의 Value를 입력하세요.')
+            result = self.helper('leetcode_browser_login.py', ['--connect-stdin'],
+                                 timeout=80, input_text=session.strip())
+            if not result.get('refresh_started'):
+                raise ValueError('계정 연결은 완료됐지만 코드 갱신을 시작하지 못했습니다. 잠시 후 새로고침하세요.')
+            return {'saved': True, 'result': result}
         if action in ('plan', 'feedback'):
             track = body.get('track')
             if track not in ('coding', 'system_design'):

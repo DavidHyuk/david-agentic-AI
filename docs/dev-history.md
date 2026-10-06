@@ -3,6 +3,31 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.43.2 — 2026-10-05 (patch: manual Chromium login and PC session handoff)
+
+- Google rejects the Playwright-launched sign-in browser. Open Chromium as a
+  normal native process instead and read issued LeetCode cookies through
+  loopback CDP. Users perform every login step; no user-agent or automation
+  property modification. Disable GPU use for the headless DGX virtual display.
+  This removes the previous launch mode, not Google's account-specific checks.
+- Add a Jun fallback for users who log in from their regular Windows/Mac
+  browser: masked LEETCODE_SESSION input, cleared immediately without browser
+  persistence, passed to the existing verification CLI over stdin rather than
+  command arguments. Save only after same-account verification; reject invalid
+  cookies without replacing the credential. Stop the unused login window and
+  start existing source/review refresh in a bounded transient unit.
+- Do not hold the source lock during minutes of manual authentication; relock
+  for the verified save. Keep the workbench responsive during pending login.
+  Allow loopback port reuse while recently closed connections remain in TIME_WAIT,
+  instead of mistaking them for an occupied desktop port. Preserve private diagnostics.
+- Reuse Jun's existing room, schedule and credential ownership. No new bot,
+  profile or permanent service is needed for this account reconnection fix.
+- Validation: 733 tests pass, covering native-browser cleanup, CSRF and account
+  checks, lock boundaries, cookie stdin transport, rejected credentials and
+  nonblocking workbench readiness. Live native Chromium shows webdriver=false
+  and no automation launch flag, and the remote sign-in form is accessible.
+  Google's final authentication still requires David's manual login.
+
 ## v1.43.1 — 2026-10-05 (patch: headless DGX login through Jun)
 
 - Replace the extra SSH tunnel step with Jun's reconnection button and a

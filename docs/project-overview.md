@@ -866,6 +866,15 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   bounded transient user unit이 요청·SSH 종료 이후에도 창을 유지하고
   중복 실행은 기존 창을 재사용합니다. 진단 로그는 owner-only로 저장합니다.
   loopback :18782 및 :15903, 별도 display :98을 사용하고 15분 후 종료합니다.
+  로그인 Chromium은 자동화 launcher 대신 일반 native process로 실행하고,
+  loopback CDP로 발급된 LeetCode cookie만 읽습니다. 로그인 조작은 사용자에게
+  맡기며 User-Agent나 automation property를 바꾸지 않습니다. Google의 승인 여부는
+  별개입니다. Google이 거부하면 PC의 평소 Chrome에서 로그인한 LeetCode의
+  LEETCODE_SESSION을 Jun의 마스킹 입력으로 연결할 수 있습니다. 값은 stdin으로
+  검증 CLI에 전달하고 브라우저 저장소나 명령 인자에 남기지 않습니다. 입력은
+  제출 즉시 비우며 같은 계정 검증 후에만 저장하고 background 코드·요약 갱신을
+  시작합니다. 로그인 대기 중 동기화는 작업실을 막지 않습니다. 재시작 시 TIME_WAIT
+  연결을 활성 listener로 오인하지 않습니다.
   로그인과 계정 검증 후에만 세션을 저장하고 desktop 종료 뒤 코드·요약을 갱신합니다.
   기존 Jun 작업실에 로그인 준비 상태를 표시하며 새 profile·gateway·상시 서비스·
   room·일정은 추가하지 않습니다. LeetCode 발급 세션의 수명은 서버 정책입니다.
@@ -1024,7 +1033,7 @@ ZIP 경로 격리·credential 오류 출력 방지 및 HQ source 상태 검증�
 Jun 사전 풀이 요약의 근거 변경·Accepted 코드 freshness·실패 보존·동시 실행
 잠금·background provider 경계 및 재인증 상태·실제 코드 필수 조건을 포함한
 원격 계정 재연결·CSRF 전달·동일 계정의 서버 cookie 갱신 검증까지 포함한
-현재 전체 테스트는 726 passed입니다.
+현재 전체 테스트는 733 passed입니다.
 서버 해제 시각·자정 넘김·기존 예약 migration과
 David·English 자동 tracing의 도구 인자 제외,
 session 묶음과 visible TTFT 처리 검증을 포함합니다.

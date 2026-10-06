@@ -2,6 +2,7 @@
 """Read-only LeetCode session linking and history snapshot tests."""
 import json
 import os
+from pathlib import Path
 import stat
 
 import pytest
@@ -187,10 +188,14 @@ def test_headed_login_verifies_the_issued_csrf_cookie(tmp_path, monkeypatch):
     context = SimpleNamespace(pages=[page], cookies=lambda _: cookies,
                               close=lambda: closed.append(True))
     @contextmanager
-    def playwright():
-        yield SimpleNamespace(chromium=SimpleNamespace(launch_persistent_context=lambda *a, **k: context))
+    def native(*args):
+        try:
+            yield context
+        finally:
+            context.close()
+    monkeypatch.setattr(ls, 'manual_browser', native)
     monkeypatch.setitem(sys.modules, 'playwright.sync_api', SimpleNamespace(
-        Error=RuntimeError, sync_playwright=playwright))
+        Error=RuntimeError))
     candidates = []
     monkeypatch.setattr(ls, 'verify_connection', lambda candidate: candidates.append(candidate) or 'david')
     result = ls.login_in_headed_browser('david', str(executable), 60, tmp_path)
@@ -418,14 +423,19 @@ def test_headed_login_waits_for_verified_account_after_prelogin_cookie(tmp_path,
     executable.chmod(0o700)
     sessions = iter(['prelogin', 'actual-login'])
     waits, checked, closed = [], [], []
+    monkeypatch.setattr(ls.time, 'sleep', lambda seconds: waits.append(seconds))
     page = SimpleNamespace(goto=lambda *a, **k: None, wait_for_timeout=lambda ms: waits.append(ms))
     context = SimpleNamespace(pages=[page], cookies=lambda _: [
         {'name': 'LEETCODE_SESSION', 'value': next(sessions)}, {'name': 'csrftoken', 'value': 'csrf'}],
         close=lambda: closed.append(True))
     @contextmanager
-    def playwright():
-        yield SimpleNamespace(chromium=SimpleNamespace(launch_persistent_context=lambda *a, **k: context))
-    monkeypatch.setitem(sys.modules, 'playwright.sync_api', SimpleNamespace(Error=RuntimeError, sync_playwright=playwright))
+    def native(*args):
+        try:
+            yield context
+        finally:
+            context.close()
+    monkeypatch.setattr(ls, 'manual_browser', native)
+    monkeypatch.setitem(sys.modules, 'playwright.sync_api', SimpleNamespace(Error=RuntimeError))
     def verify(candidate):
         checked.append(candidate['session'])
         if candidate['session'] == 'prelogin':
@@ -433,5 +443,60 @@ def test_headed_login_waits_for_verified_account_after_prelogin_cookie(tmp_path,
         return 'david'
     monkeypatch.setattr(ls, 'verify_connection', verify)
     assert ls.login_in_headed_browser('david', str(executable), 60, tmp_path)['session'] == 'actual-login'
-    assert checked == ['prelogin', 'actual-login'] and waits == [500] and closed == [True]
+    assert checked == ['prelogin', 'actual-login'] and waits == [0.5] and closed == [True]
     assert not list(tmp_path.glob('leetcode-login-*'))
+
+
+@pytest.mark.parametrize('failed', [False, True])
+def test_native_browser_keeps_manual_ui_and_cleans_up_on_reader_failure(tmp_path, monkeypatch, failed):
+    from contextlib import contextmanager
+    import sys
+    from types import SimpleNamespace
+    calls, cleanup = [], []
+    process = SimpleNamespace(poll=lambda: None, terminate=lambda: cleanup.append('terminate'),
+                              wait=lambda **kw: cleanup.append('wait'))
+    monkeypatch.setattr(ls.subprocess, 'Popen', lambda command, **kw: calls.append(command) or process)
+    @contextmanager
+    def response(*a, **kw):
+        yield SimpleNamespace(status=200)
+    monkeypatch.setattr(ls, 'urlopen', response)
+    context = SimpleNamespace(cookies=lambda _: [])
+    browser = SimpleNamespace(contexts=[context], close=lambda: cleanup.append('disconnect'))
+    @contextmanager
+    def playwright():
+        yield SimpleNamespace(chromium=SimpleNamespace(connect_over_cdp=lambda endpoint, **kw: browser))
+    monkeypatch.setitem(sys.modules, 'playwright.sync_api', SimpleNamespace(sync_playwright=playwright))
+    def read():
+        with ls.manual_browser(Path('/chrome'), tmp_path) as connected:
+            assert connected is context
+            if failed:
+                raise RuntimeError('reader failed')
+    if failed:
+        with pytest.raises(RuntimeError, match='reader failed'):
+            read()
+    else:
+        read()
+    assert cleanup == ['disconnect', 'terminate', 'wait']
+    assert '--remote-debugging-address=127.0.0.1' in calls[0]
+    assert any(a.startswith('--user-data-dir=') for a in calls[0])
+    assert calls[0][-1] == 'https://leetcode.com/accounts/login/'
+    assert not any('headless' in a or 'enable-automation' in a or 'user-agent' in a or 'AutomationControlled' in a for a in calls[0])
+
+
+def test_manual_login_releases_source_lock_then_locks_verified_save(tmp_path, monkeypatch):
+    import fcntl
+    path = tmp_path / '.leetcode-sync.lock'
+    def obtain(*args):
+        with path.open('a') as probe:
+            fcntl.flock(probe, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return {'session': 's' * 32, 'csrf_token': ''}
+    def verify(candidate):
+        with path.open('a') as probe:
+            with pytest.raises(BlockingIOError):
+                fcntl.flock(probe, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return candidate['username']
+    monkeypatch.setattr(ls, 'login_in_headed_browser', obtain)
+    monkeypatch.setattr(ls, 'verify_connection', verify)
+    assert ls.main(['--session-file', str(tmp_path / 'session.json'),
+                    '--snapshot-file', str(tmp_path / 'history.json'), 'login',
+                    '--headed', '--username', 'david']) == 0

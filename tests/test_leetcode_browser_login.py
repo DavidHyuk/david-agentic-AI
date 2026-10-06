@@ -102,3 +102,36 @@ def test_background_start_reports_launch_failure_without_credentials(tmp_path):
     with pytest.raises(RuntimeError, match='Could not start'):
         login.start_login(tmp_path, Path('/runtime'), 'david', 900, runner)
     assert json.loads((tmp_path / 'data/interview/leetcode-login-status.json').read_text())['status'] == 'failed'
+
+
+def test_pc_browser_session_is_passed_only_on_stdin_then_refreshes(tmp_path):
+    secret = 'fake-session-for-tests-only'
+    calls = []
+    def runner(command, **kwargs):
+        calls.append((command, kwargs))
+        return SimpleNamespace(returncode=0)
+    result = login.connect_session(tmp_path, 'david', secret, runner)
+    assert result == {'verified': True, 'refresh_started': True, 'status': 'syncing'}
+    assert calls[0][0] == ['systemctl', '--user', 'stop', login.LOGIN_UNIT]
+    assert calls[1][0][-4:] == ['connect', '--username', 'david', '--stdin']
+    assert calls[1][1]['input'] == secret
+    assert calls[2][0][-1] == '--refresh'
+    assert all(secret not in str(command) for command, _ in calls)
+    assert secret not in json.dumps(result)
+
+
+def test_pc_browser_session_rejection_preserves_saved_credential_and_skips_refresh(tmp_path):
+    path = tmp_path / 'data/interview/leetcode_session.json'
+    path.parent.mkdir(parents=True)
+    path.write_text('prior verified session')
+    calls = []
+    def runner(command, **kwargs):
+        calls.append(command)
+        return SimpleNamespace(returncode=int('--stdin' in command), stderr='PRIVATE')
+    with pytest.raises(RuntimeError, match='verification failed'):
+        login.connect_session(tmp_path, 'david', 'fake-session-for-tests-only', runner)
+    assert len(calls) == 2
+    assert path.read_text() == 'prior verified session'
+    with pytest.raises(RuntimeError, match='malformed'):
+        login.connect_session(tmp_path, 'david', 'short', runner)
+    assert len(calls) == 2

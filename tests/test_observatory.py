@@ -1440,3 +1440,30 @@ def test_login_websocket_preserves_coalesced_first_frame_and_bidirectional_bytes
     finally:
         listener.close()
         thread.join(timeout=3)
+
+
+def test_pc_browser_connection_action_validates_room_and_passes_cookie_through_stdin(store, monkeypatch):
+    secret = 'fake-session-for-tests-only'
+    calls = []
+    def helper(name, args, **kwargs):
+        calls.append((name, args, kwargs))
+        return {'verified': True, 'refresh_started': True, 'status': 'syncing'}
+    monkeypatch.setattr(store, 'helper', helper)
+    result = store.study_action({'action': 'leetcode_connect', 'room': 'coding', 'session': secret})
+    assert result['saved'] and secret not in json.dumps(result)
+    assert calls[0][:2] == ('leetcode_browser_login.py', ['--connect-stdin'])
+    assert calls[0][2]['input_text'] == secret
+    for room, session in [('english', secret), ('coding', 'short'), ('coding', secret + '\nother')]:
+        with pytest.raises(ValueError):
+            store.study_action({'action': 'leetcode_connect', 'room': room, 'session': session})
+    assert len(calls) == 1
+
+
+def test_open_manual_login_does_not_block_workbench_with_source_sync(store, monkeypatch):
+    path = store.home / 'data/interview/leetcode-login-status.json'
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps({'status': 'awaiting_login'}))
+    monkeypatch.setattr(store, 'helper', lambda *a, **kw: pytest.fail('sync while login is open'))
+    assert store.refresh_leetcode_progress()['status'] == 'login_pending'
+    store.refresh_leetcode_sources()
+    assert not store.leetcode_source_lock.locked()

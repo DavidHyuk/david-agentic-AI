@@ -1021,6 +1021,25 @@ no HDMI connection or extra SSH port forwarding is needed. Complete LeetCode
 login, Cloudflare verification and any MFA yourself. The browser profile is
 isolated from other workflows and deleted afterward.
 
+Google sign-in may reject browsers launched by automation frameworks. The
+manual login now opens Chromium as a normal native process; users enter all
+credentials and perform all login clicks themselves. The helper attaches only
+on loopback to read the issued LeetCode cookies and verifies the linked account.
+It does not alter the user agent or browser automation properties. This changes
+the launch mode but does not guarantee that Google will accept every account.
+
+If Google still rejects the remote window, expand **Google 로그인 거부 시 · PC
+브라우저 세션 연결** in Jun. Sign in to LeetCode using your normal Windows/Mac
+Chrome. On the signed-in LeetCode page, open DevTools (F12 or Option–Command–I)
+→ Application → Storage → Cookies → `https://leetcode.com`, then copy the Value
+of `LEETCODE_SESSION`. Paste that value into Jun's masked field and click
+**세션 연결하고 풀이 갱신**. The field clears on submission and is not saved in
+browser storage. Only this LeetCode cookie is submitted; no Google credentials
+are imported. The backend stops the unused remote login, passes the value to the
+existing verifier through stdin, saves it only for the linked account, and starts
+the existing code/review refresh in a bounded background unit. Rejected cookies
+leave the saved credential intact. No SSH command or HDMI is needed.
+
 The dashboard starts a bounded transient user systemd unit so the window survives
 HTTP request completion, SSH disconnection and agent turns. Repeated requests
 reuse an active window. The login window expires after 15 minutes. Only a

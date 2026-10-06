@@ -111,6 +111,30 @@ def start_login(home, runtime, username, timeout, runner=subprocess.run):
         raise RuntimeError('Login window is still starting. Refresh the Jun workbench shortly.')
 
 
+def connect_session(home, username, session, runner=subprocess.run):
+    """Verify a user-pasted LeetCode cookie through stdin, then refresh in background."""
+    if not isinstance(session, str) or not 20 <= len(session.strip()) <= 8192 or any(c.isspace() for c in session.strip()):
+        raise RuntimeError('LEETCODE_SESSION value is missing or malformed.')
+    runner(['systemctl', '--user', 'stop', LOGIN_UNIT], capture_output=True, timeout=15)
+    result = runner([sys.executable, str(Path(__file__).with_name('leetcode_sync.py')),
+                     '--session-file', str(home / 'data/interview/leetcode_session.json'),
+                     'connect', '--username', username, '--stdin'],
+                    input=session.strip(), capture_output=True, text=True, timeout=45,
+                    env={**os.environ, 'HERMES_HOME': str(home)})
+    if result.returncode:
+        raise RuntimeError('LeetCode session verification failed. Use a fresh cookie for the linked account.')
+    status_path = home / 'data/interview/leetcode-login-status.json'
+    save_status(status_path, 'syncing')
+    result = runner(['systemd-run', '--user', '--unit=' + LOGIN_UNIT, '--collect',
+                     '--property=RuntimeMaxSec=45min', sys.executable, str(Path(__file__).resolve()),
+                     '--home', str(home), '--username', username, '--refresh'],
+                    capture_output=True, timeout=10)
+    if result.returncode:
+        save_status(status_path, 'failed')
+        return {'verified': True, 'refresh_started': False}
+    return {'verified': True, 'refresh_started': True, 'status': 'syncing'}
+
+
 def reconnect(home, runtime, username, timeout, status_path):
     """Run the existing manual-login CLI on an isolated temporary display."""
     browsers = sorted((runtime / 'browsers').glob('chromium-*/chrome-linux*/chrome'))
@@ -118,6 +142,7 @@ def reconnect(home, runtime, username, timeout, status_path):
         raise RuntimeError('Install the temporary browser desktop runtime first.')
     for port in (VNC_PORT, WEB_PORT):
         with socket.socket() as probe:
+            probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             probe.bind(('127.0.0.1', port))
     env = {**os.environ, 'HERMES_HOME': str(home), 'DISPLAY': DISPLAY,
            'LIBGL_ALWAYS_SOFTWARE': '1'}
@@ -152,7 +177,7 @@ def reconnect(home, runtime, username, timeout, status_path):
             with log_path.open('w') as log:
                 log_path.chmod(0o600)
                 result = subprocess.run(command, env=env, stdout=log,
-                                        stderr=log, timeout=timeout + 40)
+                                        stderr=log, timeout=timeout + 90)
             if result.returncode:
                 raise RuntimeError('User login or account verification did not complete.')
     # ExitStack closes desktop components before any inference begins.
@@ -180,6 +205,8 @@ def main(argv=None):
     parser.add_argument('--username')
     parser.add_argument('--timeout', type=int, default=900)
     parser.add_argument('--start', action='store_true', help='start/reuse a bounded background login window')
+    parser.add_argument('--connect-stdin', action='store_true', help='verify a PC browser session from stdin')
+    parser.add_argument('--refresh', action='store_true', help='refresh verified source and reviews without a login window')
     args = parser.parse_args(argv)
     if not 60 <= args.timeout <= 900:
         parser.error('--timeout must be between 60 and 900 seconds')
@@ -192,9 +219,11 @@ def main(argv=None):
     if not isinstance(username, str) or not username:
         parser.error('--username is required for the first connection')
     status_path = root / 'leetcode-login-status.json'
-    if args.start:
+    if args.start or args.connect_stdin:
         try:
-            print(json.dumps(start_login(args.home, args.runtime_dir, username, args.timeout)), flush=True)
+            result = (connect_session(args.home, username, sys.stdin.read(8193)) if args.connect_stdin
+                      else start_login(args.home, args.runtime_dir, username, args.timeout))
+            print(json.dumps(result), flush=True)
             return 0
         except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
             print(str(exc), file=sys.stderr)
@@ -209,7 +238,8 @@ def main(argv=None):
             print('A LeetCode login window is already running.', file=sys.stderr)
             return 1
         try:
-            reconnect(args.home, args.runtime_dir, username, args.timeout, status_path)
+            if not args.refresh:
+                reconnect(args.home, args.runtime_dir, username, args.timeout, status_path)
             save_status(status_path, 'syncing')
             result = refresh_sources(args.home)
             save_status(status_path, 'connected', completed_at=datetime.now(timezone.utc).isoformat(), **result)
