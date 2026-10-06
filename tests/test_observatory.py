@@ -1122,12 +1122,59 @@ def test_weekend_review_workbench_exposes_current_week_sources_without_private_f
     (root / 'review.json').write_text(json.dumps({
         'lesson_date': today, 'week_start': today, 'status': 'ready', 'private_path': '/private',
         'episodes': [{'title': 'Weekday podcast', 'url': 'https://www.youtube.com/watch?v=abcdefghijk',
-                      'source_dates': [today], 'secret': 'never expose'}],
+                      'source_dates': [today], 'secret': 'never expose',
+                      'sentences': [{'source_quote': 'This is a weekday sentence.', 'timestamp': '01:00',
+                                     'patterns': [{'marker': 'if', 'meaning': '조건', 'cookie': 'never expose'}]}]}],
     }))
     review = store.workbench('podcast')['podcast_review']
     assert review['episodes'][0]['title'] == 'Weekday podcast'
+    assert review['episodes'][0]['sentences'][0]['source_quote'] == 'This is a weekday sentence.'
     assert 'never expose' not in json.dumps(review)
     assert 'private_path' not in review
+
+
+def test_podcast_workbench_keeps_yesterdays_sentences_and_short_candidates_available(store):
+    from datetime import datetime, timedelta
+    yesterday = (datetime.now(observatory_module.TZ).date() - timedelta(days=1)).isoformat()
+    root = store.home / 'data/english-podcast/watched'
+    root.mkdir(parents=True)
+    record = {'lesson_date': yesterday, 'video_id': 'abcdefghijk', 'title': 'Saved podcast',
+              'url': 'https://www.youtube.com/watch?v=abcdefghijk', 'status': 'ready', 'cookie': 'never expose',
+              'sentences': [{'source_quote': 'A long sentence from yesterday.', 'private_path': '/secret'}],
+              'weakness_candidates': [{'source_quote': 'A short practice sentence.', 'patterns': [
+                  {'marker': 'because', 'meaning': '이유', 'token': 'never expose'}]}]}
+    (root / 'practice.json').write_text(json.dumps(record))
+    before = (root / 'practice.json').read_bytes()
+    data = store.workbench('podcast')
+    assert data['long_sentence_practice'] is None
+    saved = data['saved_sentence_practice']
+    assert saved['lesson_date'] == yesterday
+    assert saved['sentences'][0]['source_quote'] == record['sentences'][0]['source_quote']
+    assert saved['weakness_candidates'][0]['source_quote'] == 'A short practice sentence.'
+    assert 'never expose' not in json.dumps(saved) and '/secret' not in json.dumps(saved)
+    assert (root / 'practice.json').read_bytes() == before
+
+
+@pytest.mark.parametrize('invalid', ['malformed', 'future', 'wrong-url', 'filename', 'empty'])
+def test_saved_podcast_practice_skips_invalid_new_record_and_uses_valid_archive(tmp_path, invalid):
+    root = tmp_path / 'watched'
+    (root / 'practice').mkdir(parents=True)
+    archived = {'lesson_date': '2026-10-05', 'video_id': 'abcdefghijk', 'status': 'ready',
+                'url': 'https://www.youtube.com/watch?v=abcdefghijk',
+                'weakness_candidates': [{'source_quote': 'An archived short sentence.'}]}
+    (root / 'practice/2026-10-05.json').write_text(json.dumps(archived))
+    bad = archived | {'lesson_date': '2026-10-06'}
+    if invalid == 'future':
+        bad['lesson_date'] = '2026-10-07'
+    elif invalid == 'wrong-url':
+        bad['url'] = 'https://www.youtube.com/watch?v=other'
+    elif invalid == 'empty':
+        bad['weakness_candidates'] = []
+    path = root / ('practice/2026-10-04.json' if invalid == 'filename' else 'practice.json')
+    path.write_text('{broken' if invalid == 'malformed' else json.dumps(bad))
+    saved = observatory_module.latest_saved_podcast_practice(root, '2026-10-06')
+    assert saved['lesson_date'] == '2026-10-05'
+    assert saved['weakness_candidates'][0]['source_quote'] == 'An archived short sentence.'
 
 
 def test_podcast_workbench_distinguishes_authenticated_login_from_pending_collection(store):

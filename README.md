@@ -676,7 +676,11 @@ Open Builder에서 다음 순서로 설정합니다.
 누적 SRS 카드에서 취약 패턴을 골라 짧은 코칭을 보냅니다. 일요일 20:15
 `english-weekly-review`는 그 주의 전체 피드백과 누적 취약 카드를 전용
 English bot으로 복습합니다. 21:10 `english-drill`은
-당일 복습 문제를 전송합니다.
+당일 복습 문제를 전송합니다. Ellie 작업실의 **오늘의 영어 복습**은 부연설명을
+한국어로 먼저 보여주고 기존 영어 설명을 **영어 참고**로 함께 보관합니다.
+새 카드는 `english_srs.py add --wrong "..." --correct "..." --note "한국어 설명"`
+으로 추가하며, 참고할 영어 설명은 `--note-en "English explanation"`으로 저장합니다.
+정답 문장·카드 ID·복습 단계와 일정은 설명 언어와 별도로 유지됩니다.
 
 개인화 코칭과 주간 복습에 사용되는 근거를 직접 확인할 수 있습니다.
 
@@ -1033,6 +1037,14 @@ Use the existing workbench refresh button after background preparation, or run:
 python3 ~/.hermes/scripts/leetcode_review.py prepare
 python3 ~/.hermes/scripts/leetcode_review.py list
 ```
+
+Rina's workbench displays the saved caption sentences directly: long-sentence
+practice and up to four additional short sentence/expression prompts, with
+source timestamps and listening links. Before today's source is prepared, the
+latest saved practice remains visible under **최신 저장 문장 연습** with its actual
+date. It also displays the sentences in weekend review sources. The dashboard
+reads existing caption records; the 18:00 schedule and source selection remain
+in the existing podcast workflow.
 
 ### LeetCode account history (optional, read-only)
 

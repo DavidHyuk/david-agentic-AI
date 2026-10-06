@@ -89,3 +89,22 @@ def test_weakness_cards_prioritize_low_boxes_and_repeated_errors():
     ranked = srs.weakness_cards(deck, limit=2)
     assert [card["wrong"] for card in ranked] == ["weak", "new"]
     assert srs.weakness_cards(deck, limit=0) == []
+
+
+def test_bilingual_note_survives_cli_save_and_review_without_changing_the_pair(tmp_path, capsys):
+    path = tmp_path / 'deck.json'
+    srs.main(['--deck', str(path), '--date', '2026-10-06', 'add',
+              '--wrong', 'I go yesterday.', '--correct', 'I went yesterday.',
+              '--note', '과거 일이므로 went를 씁니다.', '--note-en', 'Use past tense for a past event.'])
+    deck = srs.load_deck(str(path))
+    card = next(iter(deck['cards'].values()))
+    assert card['note'] == '과거 일이므로 went를 씁니다.'
+    assert card['note_en'] == 'Use past tense for a past event.'
+    drill = srs.format_drill([card])
+    assert drill.index(card['note']) < drill.index('영어 참고: ' + card['note_en'])
+    srs.main(['--deck', str(path), '--date', '2026-10-06', 'review',
+              '--id', card['id'], '--result', 'correct'])
+    updated = srs.load_deck(str(path))['cards'][card['id']]
+    assert updated['box'] == 2
+    assert all(updated[key] == card[key] for key in ('id', 'wrong', 'correct', 'note', 'note_en'))
+    capsys.readouterr()

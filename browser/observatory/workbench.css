@@ -677,3 +677,7 @@
 .interview-phrases { padding-left: 20px; margin-bottom: 0; }
 .interview-phrases li { margin: 12px 0; line-height: 1.7; overflow-wrap: anywhere; }
 .interview-phrases small { display: block; color: #707768; }
+
+.srs-explanation, .srs-reference { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.75; }
+.srs-reference { border-left: 2px solid #c6c5b5; padding-left: 12px; }
+.podcast-quote { font-size: 15px; line-height: 1.8; overflow-wrap: anywhere; }

@@ -3,6 +3,26 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.46.0 — 2026-10-06 (minor: Korean review notes and persistent podcast exercises)
+
+- Show Ellie's SRS explanations in Korean first, retaining English explanations
+  as labeled reference text. Add optional `--note-en` storage and drill output;
+  instruct future intake to write Korean notes with English references. Backfill
+  182 English or English-heavy notes while preserving the original text, all
+  correction pairs, IDs, review counters, boxes and due dates.
+- Rina's workbench previously hid yesterday's prepared sentences before today's
+  18:00 source was available. Keep the latest valid saved practice visible with
+  its actual date, separately from today's matched source. Show short caption
+  candidates and weekend review sentences alongside long-sentence practice,
+  source timestamps and listening links. Skip malformed, future-dated, unrelated
+  URL and misdated archive records, and expose only useful public source fields.
+- Reuse the existing English profile, Ellie and Rina rooms, shared SRS deck and
+  podcast source archives. No bot, profile, service or recurring schedule is added.
+- Validation: 777 tests pass, including bilingual note persistence and grading,
+  safe archive fallback, current-source matching, short-quote deduplication and
+  weekend rendering. Verify all 30 visible Ellie cards and Rina's six saved
+  source sentences on desktop and mobile; no page errors or horizontal overflow.
+
 ## v1.45.0 — 2026-10-06 (minor: rehearse accepted solutions in interview English)
 
 - Add a visible English interview script to every expanded Jun solution review:

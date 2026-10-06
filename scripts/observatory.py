@@ -11,7 +11,7 @@ request dumps, auth files and private reasoning are excluded.
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 import ipaddress
 import fcntl
 import json
@@ -205,6 +205,49 @@ def date_range(start='', end=''):
 def page(items, offset=0, limit=40):
     return {'items': items[offset:offset + limit], 'total': len(items),
             'offset': offset, 'limit': limit}
+
+
+def podcast_practice_view(record):
+    """Expose saved caption exercises without internal download or auth fields."""
+    view = {key: record.get(key) for key in
+            ('lesson_date', 'video_id', 'title', 'url', 'status', 'reason', 'caption_kind')}
+    for field, limit in (('sentences', 2), ('weakness_candidates', 12)):
+        view[field] = []
+        for item in record.get(field, [])[:limit]:
+            if not isinstance(item, dict) or not item.get('source_quote'):
+                continue
+            sentence = {key: item.get(key) for key in ('source_quote', 'word_count', 'timestamp', 'url')}
+            sentence['patterns'] = [{key: pattern.get(key) for key in ('marker', 'meaning')}
+                                    for pattern in (item.get('patterns') or []) if isinstance(pattern, dict)]
+            view[field].append(sentence)
+    view['weakness_candidate_count'] = len(view['weakness_candidates'])
+    return view
+
+
+def latest_saved_podcast_practice(root, today):
+    """Keep prior dated practice available while the next daily source is pending."""
+    candidates = [root / 'practice.json'] + sorted((root / 'practice').glob('*.json'), reverse=True)[:30]
+    latest = None
+    for path in candidates:
+        try:
+            record = read_json(path, {})
+            lesson_date = record.get('lesson_date', '')
+            date.fromisoformat(lesson_date)
+            if path.parent.name == 'practice' and path.stem != lesson_date:
+                continue
+            video_id = str(record.get('video_id', ''))
+            if (lesson_date > today or record.get('status') != 'ready'
+                    or not re.fullmatch(r'[A-Za-z0-9_-]{11}', video_id)
+                    or record.get('url') != 'https://www.youtube.com/watch?v=' + video_id):
+                continue
+            view = podcast_practice_view(record)
+            if not view['sentences'] and not view['weakness_candidates']:
+                continue
+            if latest is None or lesson_date > latest['lesson_date']:
+                latest = view
+        except (OSError, ValueError, TypeError, AttributeError):
+            continue
+    return latest
 
 
 class Observatory:
@@ -506,16 +549,15 @@ class Observatory:
             current_practice = (history.get('date') == today and len(selected) == 1
                                 and practice.get('lesson_date') == today
                                 and practice.get('video_id') == selected[0].get('video_id'))
-            data['long_sentence_practice'] = {
-                **{key: practice.get(key) for key in ('lesson_date', 'video_id', 'status', 'reason', 'caption_kind')},
-                'sentences': [{key: item.get(key) for key in ('source_quote', 'word_count', 'timestamp', 'url', 'patterns')}
-                              for item in practice.get('sentences', [])[:2]],
-                'weakness_candidate_count': len(practice.get('weakness_candidates', [])),
-            } if current_practice else None
+            data['long_sentence_practice'] = podcast_practice_view(practice) if current_practice else None
+            data['saved_sentence_practice'] = (latest_saved_podcast_practice(root / 'watched', today)
+                                              if not current_practice or practice.get('status') != 'ready' else None)
             review = read_json(root / 'watched/review.json', {})
             data['podcast_review'] = {
                 **{key: review.get(key) for key in ('lesson_date', 'week_start', 'week_end', 'status', 'reason')},
-                'episodes': [{key: item.get(key) for key in ('title', 'url', 'source_dates')}
+                'episodes': [{**{key: item.get(key) for key in ('title', 'url', 'source_dates')},
+                              **{key: podcast_practice_view(item)[key]
+                                 for key in ('sentences', 'weakness_candidates')}}
                              for item in review.get('episodes', [])[:5]],
             } if review.get('lesson_date') == today else None
             data.update(episodes=episodes[:30], episode_count=len(episodes),

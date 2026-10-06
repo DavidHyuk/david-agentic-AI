@@ -76,6 +76,7 @@ def add_card(
     correct: str,
     note: str = "",
     today: str | None = None,
+    note_en: str = "",
 ) -> tuple[dict, bool]:
     """Add a correction card. Returns (deck, added) — added is False if duplicate."""
     cid = make_card_id(wrong, correct)
@@ -91,6 +92,8 @@ def add_card(
         "created": _today(today).isoformat(),
         "reviews": 0,
     }
+    if note_en.strip():
+        deck['cards'][cid]['note_en'] = note_en.strip()
     return deck, True
 
 
@@ -159,6 +162,8 @@ def format_drill(cards: Sequence[dict]) -> str:
     for i, c in enumerate(cards, 1):
         extra = f" — {c['note']}" if c.get("note") else ""
         lines.append(f"{i}. {c['correct']}{extra}")
+        if c.get('note_en'):
+            lines.append(f"   영어 참고: {c['note_en']}")
     return "\n".join(lines)
 
 
@@ -172,6 +177,7 @@ def _parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     p_add.add_argument("--wrong", required=True)
     p_add.add_argument("--correct", required=True)
     p_add.add_argument("--note", default="")
+    p_add.add_argument('--note-en', default='', help='Optional English explanation retained as reference')
 
     sub.add_parser("due", help="print today's drill")
 
@@ -202,7 +208,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             if not isinstance(deck, dict) or not isinstance(deck.get('cards'), dict):
                 raise ValueError('Invalid SRS deck; existing data preserved.')
             if args.cmd == 'add':
-                deck, added = add_card(deck, args.wrong, args.correct, args.note, args.date)
+                deck, added = add_card(deck, args.wrong, args.correct, args.note, args.date, args.note_en)
                 output = 'added' if added else 'duplicate (skipped)'
             else:
                 card = deck['cards'][args.id]

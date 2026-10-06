@@ -398,7 +398,7 @@ history/search·알림 제어의 이점이 있으면 같은 bot을 별도 Telegr
 | `leetcode_browser_login.py` | 기존 임시 desktop runtime과 Jun 재연결 버튼을 사용. bounded transient user unit으로 실행하고 대시보드가 loopback noVNC :18782 화면·WebSocket을 중계. 15분 로그인 제한·별도 임시 profile·계정 검증 후 세션 저장, desktop 종료 후 실제 코드·요약 갱신 |
 | `interview_trends.py` | HN·GitHub·논문 DB에서 실시간 인터뷰 트렌드 수집·캐시 |
 | `english_intake.py` | 새 레슨 탐지, Telegram 파일 저장, 이번 주 세션 조회, 처리 상태 관리 |
-| `english_srs.py` | Leitner SRS 덱 (카드 추가/리뷰/통계/취약 카드 랭킹) |
+| `english_srs.py` | Leitner SRS 덱 (카드 추가/리뷰/통계/취약 카드 랭킹). note는 한국어 부연설명, 선택 note_en은 영어 참고이며 add --note-en으로 저장 |
 | `english_podcast.py` | 시청 영상의 대본 긴 문장 추출과 요청 시 채널 대본 준비 |
 | `youtube_history.py` | SSH stdin 쿠키 연결, GUI 없는 headless 시청 기록 수집, 18시 링크 메시지 |
 | `youtube_browser_login.py` | DGX Chromium 직접 로그인, 임시 localhost noVNC, 연결과 재실행 검증 |
@@ -765,6 +765,8 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
 ### 스페이스드 리피티션(Leitner SRS)
 - `english_srs.py`의 Leitner 박스 알고리즘 → 맞힌 카드는 나중에, 틀린 카드는 다음날 재등장
 - 영어 교정 데이터를 단순 저장이 아닌 **점진적 장기 학습**으로 전환
+- Ellie의 오늘의 영어 복습에서 한국어 부연설명을 먼저, 기존 영어 설명을 `영어 참고`로
+  함께 표시합니다. 설명을 보충해도 정답·카드 ID·박스·복습 횟수·다음 일정은 보존합니다.
 
 ### YouTube 시청 기록 기반 Podcast English
 - David이 유튜브 앱에서 직접 고른 영상 중 가장 최근에 본 팟캐스트를 월~금 18:00 America/Los_Angeles에 기존 English bot과 podcast 그룹으로
@@ -911,6 +913,11 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   근거·계정 변경 시 요약을 갱신합니다. 클릭은 cache 조회이며, 기존 06:35
   유지보수 cron과 작업실 background refresh가 요약을 미리 준비합니다. 새 profile,
   bot, room 또는 일정은 만들지 않습니다.
+  Rina 작업실에는 긴 문장 원문 및 중복을 제외한 짧은 문장·표현 후보 최대 4개를
+  타임스탬프·듣기 링크와 함께 표시합니다. 오늘 준비 전에는 최신 저장 자료를 실제
+  날짜와 함께 보여주고, 현재 자료와 별도 필드로 구분합니다. 준비 실패 시에도 유효한
+  최신 보관 자료를 읽습니다. 주말 복습 영상의 원문 문장도 작업실에 표시합니다.
+  화면 조회는 기존 자료만 읽으며 새 영상·대본 다운로드나 일정 변경을 유발하지 않습니다.
 - `import-coding-history --file PRIVATE_JSON`은 선택 프로젝트에 속한 ChatGPT
   cache의 질문·힌트와 LeetCode의 실제 Accepted 시각을 검증해 `external_coding`에
   배운 점·원문·출처를 저장합니다. 알려진 커리큘럼 문제는 완료 처리하고 다음 신규
@@ -1058,7 +1065,7 @@ ZIP 경로 격리·credential 오류 출력 방지 및 HQ source 상태 검증�
 Jun 사전 풀이 요약의 근거 변경·Accepted 코드 freshness·실패 보존·동시 실행
 잠금·background provider 경계 및 재인증 상태·실제 코드 필수 조건을 포함한
 원격 계정 재연결·CSRF 전달·동일 계정의 서버 cookie 갱신 검증까지 포함한
-현재 전체 테스트는 766 passed입니다.
+현재 전체 테스트는 777 passed입니다.
 서버 해제 시각·자정 넘김·기존 예약 migration과
 David·English 자동 tracing의 도구 인자 제외,
 session 묶음과 visible TTFT 처리 검증을 포함합니다.
