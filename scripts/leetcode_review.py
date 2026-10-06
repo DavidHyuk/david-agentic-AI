@@ -20,9 +20,18 @@ import tempfile
 from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
-REVIEW_VERSION = 1
+REVIEW_VERSION = 2
 TEXT_FIELDS = ('approach', 'answer', 'complexity')
 LIST_FIELDS = ('hints', 'pitfalls')
+SCRIPT_FIELDS = ('restatement', 'approach', 'walkthrough', 'correctness', 'complexity', 'follow_up')
+
+
+def spoken_english(value, limit):
+    """Require bounded English prose for text intended to be spoken verbatim."""
+    if (not isinstance(value, str) or not value.strip() or len(value) > limit
+            or not re.search(r'[A-Za-z]', value) or re.search(r'[가-힣]', value)):
+        raise ValueError('Invalid interview English.')
+    return value.strip()
 
 
 def read_json(path, default):
@@ -102,6 +111,22 @@ def validate_review(value):
                 or any(not isinstance(row, str) or not row.strip() or len(row) > 2000 for row in rows)):
             raise ValueError('Invalid review list.')
         result[key] = [row.strip() for row in rows]
+    script = value.get('interview_script')
+    if not isinstance(script, dict):
+        raise ValueError('Interview script must be an object.')
+    result['interview_script'] = {key: spoken_english(script.get(key), 3000) for key in SCRIPT_FIELDS}
+    phrases = value.get('interview_phrases')
+    if not isinstance(phrases, list) or not 3 <= len(phrases) <= 8:
+        raise ValueError('Invalid interview phrases.')
+    result['interview_phrases'] = []
+    for phrase in phrases:
+        if not isinstance(phrase, dict):
+            raise ValueError('Invalid interview phrase.')
+        meaning = phrase.get('korean')
+        if not isinstance(meaning, str) or not meaning.strip() or len(meaning) > 500:
+            raise ValueError('Invalid phrase meaning.')
+        english = spoken_english(phrase.get('english'), 500)
+        result['interview_phrases'].append({'english': english, 'korean': meaning.strip()})
     return result
 
 
@@ -123,7 +148,25 @@ def summarize(source, home):
     system = (
         'You are Jun, preparing a private review of a problem David already completed. '
         'Return only JSON with approach, answer, complexity (nonempty strings), hints and pitfalls '
-        '(arrays of short strings). Write concise Korean prose with technical identifiers preserved. '
+        '(arrays of short strings), interview_script (object), and interview_phrases (array). '
+        'Write approach, answer, complexity, hints and pitfalls in concise Korean with technical identifiers preserved. '
+        'interview_script must have six nonempty English-only strings: restatement, approach, walkthrough, '
+        'correctness, complexity, follow_up. Write natural first-person spoken English David can memorize '
+        'and say VERBATIM to an interviewer, not notes, instructions or a translated summary. '
+        'Aim for 250-400 words across the first five sections. restatement clarifies the task and relevant '
+        'assumptions; approach explains the chosen data structure and why it fits; walkthrough narrates '
+        'the actual variables, operations and a small fully worked example; correctness explains the '
+        'invariant and termination with boundary cases; complexity defines variables and explains both '
+        'time and auxiliary space INCLUDING actual allocations and library calls. follow_up gives a '
+        'ready-to-say answer to a likely interviewer question about a tradeoff or improvement. '
+        'Clearly distinguish a proposed improvement from the submitted implementation. Do not claim '
+        'an optimized algorithm, early exit, space bound or operation the actual code does not use. '
+        'Hash-table time bounds are expected/average. In-place library sorting does not guarantee '
+        'constant auxiliary space: Python list.sort can use O(n) temporary memory. Include debug '
+        'printing costs when present, and distinguish the core algorithm from the submitted debug output. '
+        'Use short speakable sentences, natural transitions and no markdown or bullet-point fragments. '
+        'interview_phrases contains 3-6 objects with english (a reusable expression appearing verbatim '
+        'in the script) and korean (a short Korean meaning). '
         'Explain the actual Accepted implementation provided, never substitute a canonical solution. '
         'Recorded learning is supplementary context, not a substitute for the supplied code. '
         'Do not invent an answer, personal mistakes, '
@@ -135,7 +178,7 @@ def summarize(source, home):
     payload = {'model': provider.get('model') or model_config.get('default'),
                'messages': [{'role': 'system', 'content': system},
                             {'role': 'user', 'content': json.dumps(source, ensure_ascii=False)}],
-               'temperature': 0.2, 'max_tokens': 1800,
+               'temperature': 0.2, 'max_tokens': 4200,
                'response_format': {'type': 'json_object'},
                'chat_template_kwargs': {'enable_thinking': False}}
     request = Request(endpoint + '/chat/completions', data=json.dumps(payload).encode(),

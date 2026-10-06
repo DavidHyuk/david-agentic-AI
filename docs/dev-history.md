@@ -3,6 +3,25 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.45.0 — 2026-10-06 (minor: rehearse accepted solutions in interview English)
+
+- Add a visible English interview script to every expanded Jun solution review:
+  task confirmation, approach and rationale, a worked example, correctness and
+  edge cases, time/space analysis, and a ready-to-say follow-up about tradeoffs.
+  Use first-person spoken sentences for memorization and pair expressions from
+  the script with Korean meanings. Ground explanations in the actual Accepted
+  code, including allocations, heap operations and proposed improvements.
+- Require bounded English script sections and phrases in review schema v2;
+  versioned fingerprints rebuild prior reviews through the existing preparation
+  flow. Retain owner-only atomic caching, background model admission and
+  source-based invalidation. Backfill the ten current code-backed reviews.
+- Reuse Jun's existing coding room, profile, state, credentials and schedules;
+  this extends the existing review UI and needs no additional room or service.
+- Validation: 766 tests pass, covering version migration, English-field bounds,
+  failed-generation retention and escaped visible scripts. Verify all ten live
+  problem expansions, unchanged-source preparation, desktop/mobile rendering
+  and no browser errors.
+
 ## v1.44.3 — 2026-10-05 (patch: move Jun account settings below study content)
 
 - Move Jun's account/connection card below solution reviews and learning

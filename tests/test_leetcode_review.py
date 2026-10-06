@@ -10,7 +10,18 @@ import leetcode_review as review
 
 
 SUMMARY = {'approach': '빈도표를 비교한다.', 'answer': '저장된 구현 설명',
-           'complexity': 'O(n)', 'hints': ['같은 문자의 횟수는?'], 'pitfalls': ['빈 입력']}
+           'complexity': 'O(n)', 'hints': ['같은 문자의 횟수는?'], 'pitfalls': ['빈 입력'],
+           'interview_script': {
+               'restatement': 'Let me confirm the task. We need to compare character counts.',
+               'approach': 'I will use Counter to count the characters in each string.',
+               'walkthrough': 'For ab and ba, both counters contain one a and one b.',
+               'correctness': 'Equal counters mean every character occurs equally often.',
+               'complexity': 'The time is linear. The space depends on the distinct characters.',
+               'follow_up': 'If we can only use lowercase English letters, I could use fixed arrays.'},
+           'interview_phrases': [
+               {'english': 'Let me confirm the task.', 'korean': '문제를 확인하겠습니다.'},
+               {'english': 'I will use Counter', 'korean': 'Counter를 사용하겠습니다.'},
+               {'english': 'The time is linear.', 'korean': '시간 복잡도는 선형입니다.'}]}
 
 
 @pytest.fixture
@@ -155,6 +166,11 @@ def test_local_model_request_marks_background_and_omits_credentials(home, monkey
     assert review.summarize(review.load_sources(home)[1][0], home) == SUMMARY
     assert requests[0].get_header('X-local-workload') == 'background'
     assert 'NEVER INCLUDE' not in requests[0].data.decode()
+    payload = json.loads(requests[0].data)
+    prompt = payload['messages'][0]['content']
+    assert 'VERBATIM' in prompt and 'actual allocations' in prompt
+    assert all(field in prompt for field in review.SCRIPT_FIELDS)
+    assert payload['max_tokens'] >= 4000
     config = home / 'config.yaml'
     config.write_text(config.read_text().replace('http://localhost:8003', 'https://external.example'))
     with pytest.raises(ValueError, match='local model'):
@@ -163,7 +179,31 @@ def test_local_model_request_marks_background_and_omits_credentials(home, monkey
 
 
 @pytest.mark.parametrize('value', [None, SUMMARY | {'answer': ''}, SUMMARY | {'hints': ['a'] * 9},
-                                 SUMMARY | {'pitfalls': [3]}])
+                                 SUMMARY | {'pitfalls': [3]},
+                                 SUMMARY | {'interview_script': {}},
+                                 SUMMARY | {'interview_script': SUMMARY['interview_script'] | {'approach': '한국어 설명'}},
+                                 SUMMARY | {'interview_script': SUMMARY['interview_script'] | {'walkthrough': 'x' * 3001}},
+                                 SUMMARY | {'interview_phrases': []},
+                                 SUMMARY | {'interview_phrases': [None] * 3},
+                                 SUMMARY | {'interview_phrases': [{'english': 'I will count.', 'korean': ''}] * 3}])
 def test_invalid_model_output_is_not_persisted(home, value):
     assert review.prepare(home, generator=lambda *_: value)['failed'] == 1
     assert not review.paths(home)[2].exists()
+
+
+def test_previous_review_version_is_rebuilt_with_english_without_changing_progress(home, monkeypatch):
+    history, state, cache = review.paths(home)
+    before = history.read_bytes(), state.read_bytes()
+    with monkeypatch.context() as old:
+        old.setattr(review, 'REVIEW_VERSION', 1)
+        username, sources = review.load_sources(home)
+        old_summary = {key: SUMMARY[key] for key in review.TEXT_FIELDS + review.LIST_FIELDS}
+        review.save_json(cache, {'version': 1, 'reviews': {'valid-anagram': {
+            'fingerprint': review.fingerprint(sources[0], username), 'summary': old_summary}}})
+    assert review.list_reviews(home)['ready_count'] == 0
+    assert review.prepare(home, generator=lambda *_: SUMMARY)['prepared'] == 1
+    updated = review.list_reviews(home)['items'][0]['summary']
+    assert updated['interview_script'] == SUMMARY['interview_script']
+    assert updated['interview_phrases'] == SUMMARY['interview_phrases']
+    assert (history.read_bytes(), state.read_bytes()) == before
+    assert json.loads(cache.read_text())['version'] == 2

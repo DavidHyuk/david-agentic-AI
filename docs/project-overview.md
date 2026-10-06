@@ -392,7 +392,7 @@ history/search·알림 제어의 이점이 있으면 같은 bot을 별도 Telegr
 | `papers_digest.py` | SQLite 카탈로그 읽기 전용 조회 → 추천/최신/인기 digest |
 | `interview_progress.py` | 코딩 커리큘럼 + 적응형 설계 인터뷰 선택/단계 gate/답변·평가 저장/주간 통계 |
 | `leetcode_sync.py` | 로컬 headless Chromium 로그인 또는 숨김 세션 입력·검증, owner-only 저장, LeetCode solved/최근 정답·최근 문제별 실제 Accepted 코드 snapshot 갱신 |
-| `leetcode_review.py` | Accepted 코드와 기록된 배움으로 접근법·정답·복잡도·복습 힌트·경계 조건을 사전 요약. loopback 모델 background admission 사용, 근거 fingerprint로 변경 감지, owner-only 원자 저장, `list`는 cache만 조회 |
+| `leetcode_review.py` | Accepted 코드와 기록된 배움으로 접근법·정답·복잡도·복습 힌트·경계 조건 및 그대로 말할 영어 면접 스크립트·한글 뜻을 붙인 암기 표현을 사전 요약. loopback 모델 background admission 사용, 근거 fingerprint로 변경 감지, owner-only 원자 저장, `list`는 cache만 조회 |
 | `leetcode_refresh.sh` | 기존 06:35 LeetCode 유지보수 cron에서 증분 source sync 후 요약 준비. outer agent·Telegram 전달 없이 기존 coding room·소유 profile 유지 |
 | `account_login.py` | Jun/HQ ChatGPT·Rina Google/YouTube 계정 재연결을 기존 helper와 bounded transient unit으로 시작·재사용·종료. 서비스별 준비 상태만 노출하고 Ellie의 카카오 스킬 URL은 명시적 복사 요청에만 반환 |
 | `leetcode_browser_login.py` | 기존 임시 desktop runtime과 Jun 재연결 버튼을 사용. bounded transient user unit으로 실행하고 대시보드가 loopback noVNC :18782 화면·WebSocket을 중계. 15분 로그인 제한·별도 임시 profile·계정 검증 후 세션 저장, desktop 종료 후 실제 코드·요약 갱신 |
@@ -856,6 +856,12 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   노트 활동 카드를 제거하고 기존 웹 대화와 학습 완료 기록을 유지합니다.
   풀이 기록은 최신 문제 순의 클릭 가능한 목록으로, 항목을 열면 사전 저장된
   정답·접근법·복잡도·복습 힌트·경계 조건 및 실제 Accepted 코드를 확인합니다.
+  각 문제의 **영어 면접 스크립트 · 그대로 말하기**에는 문제 확인·접근법과 선택 이유·
+  코드와 예제 설명·정당성과 경계 조건·시간/공간 복잡도의 1인칭 영어 대본과
+  개선점/트레이드오프 후속 답변을 표시합니다. 1~5를 순서대로 읽고 외우며,
+  대본에서 가져온 표현에는 한글 뜻을 붙입니다. 실제 코드의 자료구조·메모리
+  할당·라이브러리 비용을 설명하고 제안하는 개선은 현재 구현과 구분합니다.
+  review schema v2 fingerprint로 기존 풀이도 같은 prepare 경로에서 대본을 보충합니다.
   요약 보기를 열면 정답과 풀이에 LeetCode에서 가져온 실제 Accepted 원본 코드가
   바로 표시됩니다. 요약 준비 중에도 원본 코드는 볼 수 있습니다. Python 소스는
   언어 표시·고정폭 글꼴·들여쓰기·줄바꿈·가로 스크롤·문법 색상을 적용합니다.
@@ -1052,7 +1058,7 @@ ZIP 경로 격리·credential 오류 출력 방지 및 HQ source 상태 검증�
 Jun 사전 풀이 요약의 근거 변경·Accepted 코드 freshness·실패 보존·동시 실행
 잠금·background provider 경계 및 재인증 상태·실제 코드 필수 조건을 포함한
 원격 계정 재연결·CSRF 전달·동일 계정의 서버 cookie 갱신 검증까지 포함한
-현재 전체 테스트는 758 passed입니다.
+현재 전체 테스트는 766 passed입니다.
 서버 해제 시각·자정 넘김·기존 예약 migration과
 David·English 자동 tracing의 도구 인자 제외,
 session 묶음과 visible TTFT 처리 검증을 포함합니다.

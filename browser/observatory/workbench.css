@@ -670,3 +670,10 @@
   #bench-companion .cast-art[data-character="english"] { width: 50px; height: 78px; }
   #bench-summary .bench-progress { gap: 8px 14px; }
 }
+
+.interview-script { margin-top: 20px; padding: 18px; border: 1px solid #bccbb4; border-radius: 8px; background: #fffef8; }
+.interview-script h4 { margin: 20px 0 8px; font-size: 12px; color: #577347; }
+.interview-speech { margin: 0; font-size: 15px; line-height: 1.85; white-space: pre-wrap; overflow-wrap: anywhere; }
+.interview-phrases { padding-left: 20px; margin-bottom: 0; }
+.interview-phrases li { margin: 12px 0; line-height: 1.7; overflow-wrap: anywhere; }
+.interview-phrases small { display: block; color: #707768; }

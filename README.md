@@ -1004,6 +1004,14 @@ the additional Dashboard ↔ Telegram composer, workbench notes and recent-sessi
 cards. **풀이 기록** lists completed problems in newest-first order. Click a
 problem to expand Jun's prepared approach, answer, complexity, review hints and
 edge cases, with the actual Accepted code and recorded learning alongside it.
+Each expanded review also includes **영어 면접 스크립트 · 그대로 말하기**:
+ready-to-say first-person English for confirming the task, explaining the approach,
+walking through a concrete example, justifying correctness, and explaining time
+and space costs. Read sections 1–5 aloud in order and memorize them. Section 6
+is a spoken response for follow-up questions about improvements or tradeoffs;
+**외워 쓸 표현** pairs expressions from the script with Korean meanings.
+Scripts describe your actual implementation, including allocations and library
+calls; proposed optimizations are identified as follow-ups.
 Historical hints retain their source; generated review hints are labeled
 separately. A solution review requires the actual Accepted code: notes never
 substitute for the implementation. Problems without downloaded code stay pending,
@@ -1013,7 +1021,9 @@ including any formerly cached notes-only reviews. Recorded learning remains in
 `leetcode_review.py` caches reviews privately in
 `~/.hermes/data/interview/leetcode_reviews.json`, using the configured loopback
 model through its background admission queue. Changed code, notes or account
-invalidate the relevant summary. Clicking a review reads the cache. The existing
+invalidate the relevant summary. The English script schema also invalidates older
+reviews, so existing solved problems are rebuilt with scripts by the same
+`prepare` command. Clicking a review reads the cache. The existing
 06:35 `leetcode-history-sync` cron runs `leetcode_refresh.sh` without an outer
 agent or Telegram delivery; workbench background refresh also prepares up to
 three missing reviews per run. No new profile, room, bot or schedule is needed.

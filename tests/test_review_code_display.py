@@ -101,3 +101,29 @@ process.stdout.write(JSON.stringify(location));'''
     result = subprocess.run(['node', '-e', script, str(source)], capture_output=True,
                             text=True, check=True, timeout=10)
     assert json.loads(result.stdout) == {'hash': '#workbench?room=coding', 'reloaded': True}
+
+
+def test_interview_script_is_visible_in_problem_expansion_and_escapes_all_text():
+    from test_leetcode_review import SUMMARY
+    source = Path(__file__).resolve().parents[1] / 'browser/observatory/workbench.js'
+    summary = SUMMARY | {'interview_script': SUMMARY['interview_script'] | {
+        'walkthrough': 'I compare a < b. <img onerror=bad()> Then I move left.'},
+        'interview_phrases': [{'english': 'Let me confirm <script>bad()</script>', 'korean': '<img>문제 확인'}]}
+    row = {'code': 'return Counter(s) == Counter(t)', 'language': 'Python3', 'summary': summary}
+    script = '''const fs=require('fs'), vm=require('vm');
+const row=JSON.parse(fs.readFileSync(0,'utf8'));
+const context={$:()=>({}),window:{},setInterval:()=>0,
+esc:value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))};
+vm.runInNewContext(fs.readFileSync(process.argv[1],'utf8'),context);
+process.stdout.write(context.codingReviewBody(row,false));'''
+    result = subprocess.run(['node', '-e', script, str(source)], input=json.dumps(row),
+                            capture_output=True, text=True, check=True, timeout=10)
+    parsed = CodeContent()
+    parsed.feed(result.stdout)
+    assert '영어 면접 스크립트 · 그대로 말하기' in result.stdout
+    assert result.stdout.count('class="interview-speech"') == 6
+    assert result.stdout.count('lang="en"') == 7
+    assert '외워 쓸 표현' in result.stdout and '후속 질문 답변' in result.stdout
+    assert 'img' not in parsed.tags and 'script' not in parsed.tags and 'details' not in parsed.tags
+    assert 'a &lt; b' in result.stdout and '&lt;img&gt;문제 확인' in result.stdout
+    assert summary['interview_script']['approach'] in result.stdout
