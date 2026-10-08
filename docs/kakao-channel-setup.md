@@ -28,17 +28,21 @@ bash bootstrap/install_kakao_services.sh
 
 The installer stages only the Kakao/English runtime files, generates
 `KAKAO_WEBHOOK_PATH` in `~/.hermes/.env`, installs the matching ARM64 or AMD64
-`cloudflared` binary, and starts two user services:
+`cloudflared` binary when temporary transport is needed, and starts the collector:
 
 - `kakao-webhook.service`: local feedback collector on `127.0.0.1:8787`
-- `kakao-tunnel.service`: temporary public HTTPS tunnel
+- `kakao-tunnel.service`: optional temporary public HTTPS tunnel when no fixed
+  origin is configured; disabled on the current DGX after Funnel verification
 
 The random path is the webhook's shared secret; never commit or send it in a
 screenshot. Runtime logs redact both that path and raw Kakao user IDs.
 
 ## 3. Publish an HTTPS URL
 
-Kakao's servers must reach the collector through HTTPS. Read the Quick Tunnel URL:
+Kakao's servers must reach the collector through HTTPS. The current DGX uses a
+verified fixed Tailscale Funnel on HTTPS port 10000. Copy the complete private
+skill URL through Ellie or the file below, then save and deploy it in Open Builder.
+For temporary Quick Tunnel setups, read the origin:
 
 ```bash
 journalctl --user -u kakao-tunnel.service --no-pager | grep trycloudflare.com
@@ -87,6 +91,14 @@ Funnel may require the tailnet owner to enable it at the authorization link
 printed by Tailscale. `--bg` persists the route across DGX reboot; see the
 [Tailscale Funnel CLI documentation](https://tailscale.com/docs/reference/tailscale-cli/funnel).
 The route is public, but sender enrollment and the secret endpoint stay enforced.
+Public DNS can take up to ten minutes to appear after first enabling Funnel.
+The verifier resolves `*.ts.net` through public DNS-over-HTTPS and connects to
+that public ingress IP with the hostname's TLS certificate. Local MagicDNS
+access alone is not accepted as proof that Kakao can reach the endpoint.
+Fresh DNS queries also avoid retaining an HTTP-cached NXDOMAIN response after
+the new record appears. Both public Funnel ingress IPs on the current DGX were
+verified with valid Kakao responses in approximately 160 ms; the Quick Tunnel
+is now disabled. Real Kakao deployment and sender delivery still need testing.
 Test the fixed URL in Open Builder and from the real Kakao app before declaring
 delivery restored, including whether Kakao accepts that explicit HTTPS port.
 If the port is rejected, use a named Cloudflare Tunnel on standard HTTPS 443.

@@ -3,6 +3,27 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.46.2 — 2026-10-07 (patch: verify Funnel through public ingress)
+
+- Enable the owning tailnet's authorized Funnel route on HTTPS port 10000 to
+  the existing loopback Kakao collector, retaining private Serve routes on
+  ports 443 and 8443. First activation can need up to ten minutes for public DNS.
+- Discover that local MagicDNS can reach the collector while public DNS still
+  returns NXDOMAIN. Require public DNS-over-HTTPS resolution, a globally routed
+  ingress IP and hostname-verified TLS for `*.ts.net` skill probes; prevent the
+  stable-origin setup from accepting private-only connectivity. Probes retain
+  empty bodies and do not register senders or queue synthetic tutor feedback.
+- Bypass cached HTTP DNS responses during readiness checks. After public DNS
+  appears, verify both public ingress IPs with valid Kakao schema 2.0 responses
+  in 162–167 ms, persist the stable origin and private URL, and disable the old
+  Quick Tunnel. Confirm the collector and tailscaled remain enabled for boot;
+  Kakao-side URL save, deployment and a real sender test remain pending.
+- Reuse the English profile, bot, Ellie's room and shared sender/SRS state.
+  No new user-facing workflow, room, schedule or Hermes gateway is needed.
+- Validation: 795 tests pass, including missing public DNS, private-IP rejection,
+  public ingress and TLS hostname selection, empty-body probes, DNS failure and
+  fresh DNS-query behavior after a cached NXDOMAIN response.
+
 ## v1.46.1 — 2026-10-07 (patch: repair stale Kakao skill URLs after DGX reboot)
 
 - Diagnose a live collector and connected Quick Tunnel with different current

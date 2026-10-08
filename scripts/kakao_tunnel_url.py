@@ -9,10 +9,15 @@ This updates the local URL file, not Kakao's deployed skill configuration.
 from __future__ import annotations
 
 import argparse
+import http.client
+import ipaddress
 import json
 import os
 from pathlib import Path
 import re
+import secrets
+import socket
+import ssl
 import subprocess
 import sys
 import tempfile
@@ -41,6 +46,9 @@ def endpoint_path(env_file: Path) -> str:
 
 def endpoint_ready(url: str) -> bool:
     """An empty skill body must return Kakao JSON 400 without touching intake."""
+    parsed = urlsplit(url)
+    if parsed.hostname and parsed.hostname.endswith('.ts.net'):
+        return funnel_endpoint_ready(parsed)
     request = Request(url, data=b'{}', headers={'Content-Type': 'application/json'})
     try:
         with urlopen(request, timeout=4):
@@ -56,6 +64,45 @@ def endpoint_ready(url: str) -> bool:
                 return False
     except (URLError, OSError):
         return False
+
+
+def public_addresses(host: str) -> list[str]:
+    """Resolve Funnel through public DNS, bypassing local MagicDNS routing."""
+    request = Request('https://dns.google/resolve?name=' + host
+                      + '&type=A&random_padding=' + secrets.token_hex(8),
+                      headers={'Cache-Control': 'no-cache'})
+    with urlopen(request, timeout=4) as response:
+        payload = json.loads(response.read(8192))
+    return [row['data'] for row in payload.get('Answer', [])
+            if row.get('type') == 1 and ipaddress.ip_address(row['data']).is_global]
+
+
+def funnel_endpoint_ready(parsed) -> bool:
+    """Verify public Funnel ingress rather than the same machine's private IP."""
+    connection = None
+    try:
+        addresses = public_addresses(parsed.hostname)
+        if not addresses:
+            return False
+        port = parsed.port or 443
+        connection = http.client.HTTPSConnection(parsed.hostname, port, timeout=4)
+        raw = socket.create_connection((addresses[0], port), timeout=4)
+        try:
+            connection.sock = ssl.create_default_context().wrap_socket(raw, server_hostname=parsed.hostname)
+        except Exception:
+            raw.close()
+            raise
+        connection.request('POST', parsed.path, body=b'{}', headers={'Content-Type': 'application/json'})
+        response = connection.getresponse()
+        if response.status != 400:
+            return False
+        body = json.loads(response.read(8192))
+        return body.get('version') == '2.0' and bool(body.get('template', {}).get('outputs'))
+    except (OSError, ValueError, AttributeError, KeyError, http.client.HTTPException):
+        return False
+    finally:
+        if connection is not None:
+            connection.close()
 
 
 def save_url(path: Path, url: str) -> bool:

@@ -693,6 +693,9 @@ python3 ~/.hermes/scripts/english_intake.py --week
 
 Cloudflare Quick Tunnel 주소는 DGX 재부팅이나 터널 재시작 때 바뀔 수 있습니다.
 로컬 URL 파일은 자동 갱신하지만 카카오 관리자센터의 URL은 자동 변경되지 않습니다.
+현재 DGX는 고정 Tailscale Funnel의 HTTPS 포트 10000으로 전환했고, 외부 ingress의
+실제 수신을 검증한 뒤 기존 임시 터널을 비활성화했습니다. 이 주소는 일반 재부팅 후에도
+유지됩니다. Ellie의 **스킬 URL 복사**로 카카오 관리자센터에 한 번 저장·배포하세요.
 지속 운영에는 [고정 주소 설정 가이드](docs/kakao-channel-setup.md#stable-public-address)의
 Tailscale Funnel 또는 named Cloudflare Tunnel을 사용하세요. 이미 연결된 고정
 HTTPS 주소는 다음처럼 검증·등록할 수 있습니다.
@@ -704,6 +707,8 @@ bash bootstrap/install_kakao_services.sh --public-origin https://your-fixed-host
 고정 주소의 실제 수신을 확인한 후 임시 터널을 비활성화하고, 이후 설치·비밀 경로
 회전도 같은 주소를 사용합니다. 카카오에는 갱신된 전체 스킬 URL을 한 번 저장·배포해야
 하며, 그 뒤 일반 재부팅에는 URL 교체가 필요 없습니다.
+Tailscale 주소는 내부 MagicDNS 접속과 구별해서 공개 DNS·외부 ingress·TLS까지
+검증합니다. Funnel 최초 활성화 후 공개 DNS 반영에는 최대 10분이 걸릴 수 있습니다.
 
 비밀 URL이 로그나 화면에 노출됐다면 즉시 회전하고 새 URL을 Open Builder에
 다시 입력합니다.

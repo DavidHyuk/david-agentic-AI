@@ -5,6 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from urllib.error import HTTPError, URLError
 import io
+from urllib.parse import urlsplit
 
 import pytest
 
@@ -116,3 +117,66 @@ def test_fixed_origin_preserves_url_if_unreachable_and_survives_next_run(tmp_pat
     # Future setup does not consult the temporary tunnel when fixed routing exists.
     monkeypatch.setattr(tunnel, 'refresh', lambda *args: pytest.fail('Quick Tunnel must not be used'))
     assert tunnel.main(['--home', str(tmp_path)]) == 0
+
+
+def test_funnel_requires_public_dns_even_when_private_magicdns_is_reachable(monkeypatch):
+    monkeypatch.setattr(tunnel, 'public_addresses', lambda host: [])
+    monkeypatch.setattr(tunnel.socket, 'create_connection', lambda *a, **k: pytest.fail('No public DNS; do not connect'))
+    assert not tunnel.endpoint_ready('https://spark.tail-example.ts.net:10000/kakao/private-path')
+
+
+def test_public_dns_rejects_private_addresses_and_never_receives_secret(monkeypatch):
+    class Response(io.BytesIO):
+        def __enter__(self): return self
+        def __exit__(self, *args): self.close()
+    def resolve(request, timeout):
+        assert 'private-path' not in request.full_url
+        assert 'type=A' in request.full_url
+        return Response(json.dumps({'Answer': [
+            {'type': 1, 'data': '100.94.7.102'}, {'type': 1, 'data': '127.0.0.1'},
+            {'type': 1, 'data': '8.8.8.8'}, {'type': 5, 'data': 'relay.example'},
+        ]}).encode())
+    monkeypatch.setattr(tunnel, 'urlopen', resolve)
+    assert tunnel.public_addresses('spark.tail-example.ts.net') == ['8.8.8.8']
+
+
+def test_funnel_public_probe_uses_public_ip_with_hostname_tls_and_empty_body(monkeypatch):
+    calls = []
+    class Connection:
+        def __init__(self, host, port, timeout): calls.append(('host', host, port))
+        def request(self, method, path, body, headers): calls.append(('request', method, path, body))
+        def getresponse(self):
+            return SimpleNamespace(status=400, read=lambda limit: json.dumps(
+                {'version': '2.0', 'template': {'outputs': [{}]}}).encode())
+        def close(self): calls.append(('closed',))
+    monkeypatch.setattr(tunnel, 'public_addresses', lambda host: ['8.8.8.8'])
+    monkeypatch.setattr(tunnel.http.client, 'HTTPSConnection', Connection)
+    monkeypatch.setattr(tunnel.socket, 'create_connection', lambda address, timeout: calls.append(('address', address)))
+    monkeypatch.setattr(tunnel.ssl, 'create_default_context', lambda: SimpleNamespace(
+        wrap_socket=lambda raw, server_hostname: calls.append(('tls', server_hostname))))
+    assert tunnel.endpoint_ready('https://spark.tail-example.ts.net:10000/kakao/private-path')
+    assert ('address', ('8.8.8.8', 10000)) in calls
+    assert ('tls', 'spark.tail-example.ts.net') in calls
+    assert ('request', 'POST', '/kakao/private-path', b'{}') in calls
+    assert calls[-1] == ('closed',)
+
+
+def test_funnel_public_probe_handles_dns_failure_without_secret(monkeypatch):
+    def failure(host): raise URLError('DNS unavailable')
+    monkeypatch.setattr(tunnel, 'public_addresses', failure)
+    assert not tunnel.endpoint_ready('https://spark.tail-example.ts.net:10000/kakao/private-path')
+
+
+def test_public_dns_rechecks_bypass_cached_http_nxdomain(monkeypatch):
+    requests = []
+    class Response(io.BytesIO):
+        def __enter__(self): return self
+        def __exit__(self, *args): self.close()
+    def resolve(request, timeout):
+        requests.append(request)
+        return Response(b'{"Answer": []}')
+    monkeypatch.setattr(tunnel, 'urlopen', resolve)
+    tunnel.public_addresses('spark.tail-example.ts.net')
+    tunnel.public_addresses('spark.tail-example.ts.net')
+    assert requests[0].full_url != requests[1].full_url
+    assert all(r.get_header('Cache-control') == 'no-cache' for r in requests)
