@@ -98,7 +98,9 @@ access alone is not accepted as proof that Kakao can reach the endpoint.
 Fresh DNS queries also avoid retaining an HTTP-cached NXDOMAIN response after
 the new record appears. Both public Funnel ingress IPs on the current DGX were
 verified with valid Kakao responses in approximately 160 ms; the Quick Tunnel
-is now disabled. Real Kakao deployment and sender delivery still need testing.
+is now disabled. After the Kakao URL update and deployment, two real messages
+at 23:06:36 and 23:06:53 PDT on October 7 returned HTTP 200 and were saved as
+separate lesson files, confirming the deployed Kakao-to-collector route.
 Test the fixed URL in Open Builder and from the real Kakao app before declaring
 delivery restored, including whether Kakao accepts that explicit HTTPS port.
 If the port is rejected, use a named Cloudflare Tunnel on standard HTTPS 443.

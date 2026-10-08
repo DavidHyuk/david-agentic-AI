@@ -1074,7 +1074,9 @@ Jun 사전 풀이 요약의 근거 변경·Accepted 코드 freshness·실패 보
 현재 DGX의 영어 피드백 공개 수신은 고정 Tailscale Funnel HTTPS :10000을 사용하며,
 두 공개 ingress IP에서 약 160ms의 실제 Kakao schema 응답을 확인했습니다.
 기존 Quick Tunnel은 비활성화됐고 서버·Funnel은 재부팅 후에도 자동으로 재개합니다.
-카카오 관리자센터에 최신 비밀 URL을 저장·배포한 뒤 실제 발신자 수신을 확인해야 합니다.
+카카오 관리자센터의 URL 교체·배포 후 10월 7일 23:06:36·23:06:53 PDT에
+실제 피드백 두 건의 HTTP 200 응답과 개별 원문 파일 저장을 확인했습니다.
+이 검증은 카카오 수집 경로 복구를 확인하며, SRS 분석 완료를 의미하지 않습니다.
 서버 해제 시각·자정 넘김·기존 예약 migration과
 David·English 자동 tracing의 도구 인자 제외,
 session 묶음과 visible TTFT 처리 검증을 포함합니다.

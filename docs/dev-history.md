@@ -17,7 +17,10 @@ semantic versioning (major.minor.patch).
   appears, verify both public ingress IPs with valid Kakao schema 2.0 responses
   in 162–167 ms, persist the stable origin and private URL, and disable the old
   Quick Tunnel. Confirm the collector and tailscaled remain enabled for boot;
-  Kakao-side URL save, deployment and a real sender test remain pending.
+  after David updates Kakao's URL and deploys, verify two real feedback messages
+  at 23:06:36 and 23:06:53 PDT. Both return HTTP 200 and produce separate raw
+  lesson files for “A Dream House” and “Life, Work, and Everything in Between”.
+  This completes Kakao-to-collector verification; it does not claim SRS analysis.
 - Reuse the English profile, bot, Ellie's room and shared sender/SRS state.
   No new user-facing workflow, room, schedule or Hermes gateway is needed.
 - Validation: 795 tests pass, including missing public DNS, private-IP rejection,
