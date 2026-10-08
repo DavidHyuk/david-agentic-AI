@@ -67,6 +67,16 @@ def test_unknown_service_cannot_launch_arbitrary_commands(tmp_path):
         login.start_login(tmp_path, 'untrusted; command', lambda *a, **k: pytest.fail('command ran'))
 
 
+def test_kakao_fixed_origin_status_does_not_expose_endpoint_or_claim_tunnel_running(tmp_path):
+    root = tmp_path / 'data/english'
+    root.mkdir(parents=True)
+    (root / 'kakao-public-origin.txt').write_text('https://private-host.example')
+    state = login.connection(tmp_path, 'kakao', inactive)
+    assert state['fixed_origin_configured']
+    assert not state['tunnel_running']
+    assert 'private-host' not in json.dumps(state)
+
+
 def test_failed_start_restores_prior_verified_status(tmp_path):
     runtime = tmp_path / 'venvs/youtube-history/bin/python'
     runtime.parent.mkdir(parents=True)

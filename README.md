@@ -585,9 +585,11 @@ bash bootstrap/install_kakao_services.sh
 - Kakao/English 스크립트와 스킬을 `~/.hermes`에 배치
 - `~/.hermes/.env`에 비밀 `KAKAO_WEBHOOK_PATH` 생성
 - 현재 CPU에 맞는 `cloudflared` 설치
-- `kakao-webhook.service`와 `kakao-tunnel.service` 등록 및 시작
+- `kakao-webhook.service` 등록 및 시작; 임시 주소 모드는 `kakao-tunnel.service`도 시작
+- 터널 재시작·DGX 재부팅 시 현재 연결을 검증하고 비밀 URL 파일을 자동 갱신
 
-서비스 상태는 다음과 같이 확인합니다. 두 줄 모두 `active`여야 합니다.
+임시 주소 모드의 서비스 상태는 다음과 같이 확인합니다. 두 줄 모두 `active`여야 합니다.
+단, 이 상태만으로 카카오에 등록한 URL의 유효성을 확인할 수는 없습니다.
 
 ```bash
 systemctl --user is-active kakao-webhook.service kakao-tunnel.service
@@ -689,10 +691,19 @@ python3 ~/.hermes/scripts/english_srs.py weaknesses --limit 5
 python3 ~/.hermes/scripts/english_intake.py --week
 ```
 
-> 현재 설치 스크립트가 사용하는 Cloudflare Quick Tunnel 주소는 터널
-> 서비스가 재시작되면 변경됩니다. 지속 운영 전에는
-> [상세 설정 가이드](docs/kakao-channel-setup.md)에 따라 고정 hostname의
-> named tunnel로 전환해야 합니다.
+Cloudflare Quick Tunnel 주소는 DGX 재부팅이나 터널 재시작 때 바뀔 수 있습니다.
+로컬 URL 파일은 자동 갱신하지만 카카오 관리자센터의 URL은 자동 변경되지 않습니다.
+지속 운영에는 [고정 주소 설정 가이드](docs/kakao-channel-setup.md#stable-public-address)의
+Tailscale Funnel 또는 named Cloudflare Tunnel을 사용하세요. 이미 연결된 고정
+HTTPS 주소는 다음처럼 검증·등록할 수 있습니다.
+
+```bash
+bash bootstrap/install_kakao_services.sh --public-origin https://your-fixed-hostname
+```
+
+고정 주소의 실제 수신을 확인한 후 임시 터널을 비활성화하고, 이후 설치·비밀 경로
+회전도 같은 주소를 사용합니다. 카카오에는 갱신된 전체 스킬 URL을 한 번 저장·배포해야
+하며, 그 뒤 일반 재부팅에는 URL 교체가 필요 없습니다.
 
 비밀 URL이 로그나 화면에 노출됐다면 즉시 회전하고 새 URL을 Open Builder에
 다시 입력합니다.

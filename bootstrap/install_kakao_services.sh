@@ -6,12 +6,21 @@
 set -euo pipefail
 
 KAKAO_ROTATE_PATH=false
-if [ "${1:-}" = "--rotate-path" ]; then
-  KAKAO_ROTATE_PATH=true
-elif [ "$#" -gt 0 ]; then
-  echo "Usage: $0 [--rotate-path]" >&2
-  exit 2
-fi
+KAKAO_PUBLIC_ORIGIN=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --rotate-path) KAKAO_ROTATE_PATH=true; shift ;;
+    --public-origin)
+      if [ "$#" -lt 2 ]; then
+        echo "--public-origin requires an HTTPS origin." >&2
+        exit 2
+      fi
+      KAKAO_PUBLIC_ORIGIN="$2"
+      shift 2
+      ;;
+    *) echo "Usage: $0 [--rotate-path] [--public-origin https://hostname[:port]]" >&2; exit 2 ;;
+  esac
+done
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 KAKAO_HERMES_HOME="${HERMES_HOME:-$HOME/.hermes}"
@@ -28,6 +37,8 @@ install -d -m 0700 \
 
 install -m 0755 "$REPO_ROOT/scripts/kakao_webhook.py" \
   "$KAKAO_HERMES_HOME/scripts/kakao_webhook.py"
+install -m 0755 "$REPO_ROOT/scripts/kakao_tunnel_url.py" \
+  "$KAKAO_HERMES_HOME/scripts/kakao_tunnel_url.py"
 install -m 0755 "$REPO_ROOT/scripts/english_intake.py" \
   "$KAKAO_HERMES_HOME/scripts/english_intake.py"
 install -m 0755 "$REPO_ROOT/scripts/english_srs.py" \
@@ -51,7 +62,12 @@ if "$KAKAO_ROTATE_PATH"; then
     --rotate-path --env-file "$KAKAO_ENV_FILE"
 fi
 
-if ! command -v cloudflared >/dev/null 2>&1 && \
+KAKAO_ORIGIN_FILE="$KAKAO_HERMES_HOME/data/english/kakao-public-origin.txt"
+if [ -z "$KAKAO_PUBLIC_ORIGIN" ] && [ -f "$KAKAO_ORIGIN_FILE" ]; then
+  KAKAO_PUBLIC_ORIGIN="$(cat "$KAKAO_ORIGIN_FILE")"
+fi
+
+if [ -z "$KAKAO_PUBLIC_ORIGIN" ] && ! command -v cloudflared >/dev/null 2>&1 && \
    [ ! -x "$KAKAO_USER_BIN/cloudflared" ]; then
   case "$(uname -m)" in
     x86_64) KAKAO_CLOUDFLARED_ARCH="amd64" ;;
@@ -75,49 +91,17 @@ install -m 0644 "$REPO_ROOT/bootstrap/kakao-tunnel.service" \
   "$KAKAO_USER_UNITS/kakao-tunnel.service"
 
 systemctl --user daemon-reload
-systemctl --user enable --now kakao-webhook.service kakao-tunnel.service
+systemctl --user enable --now kakao-webhook.service
 systemctl --user restart kakao-webhook.service
-if [ "$(systemctl --user is-active kakao-tunnel.service)" != "active" ]; then
-  systemctl --user restart kakao-tunnel.service
-fi
-
-KAKAO_TUNNEL_ORIGIN=""
-for _attempt in $(seq 1 30); do
-  KAKAO_TUNNEL_PID="$(
-    systemctl --user show kakao-tunnel.service --property MainPID --value
-  )"
-  KAKAO_TUNNEL_LOGS=""
-  if [ -n "$KAKAO_TUNNEL_PID" ] && [ "$KAKAO_TUNNEL_PID" != "0" ]; then
-    KAKAO_TUNNEL_LOGS="$(
-      journalctl --user "_PID=$KAKAO_TUNNEL_PID" --no-pager 2>/dev/null || true
-    )"
-  fi
-  KAKAO_TUNNEL_ORIGIN="$(
-    printf '%s\n' "$KAKAO_TUNNEL_LOGS" |
-      grep -Eo 'https://[a-z0-9-]+\.trycloudflare\.com' |
-      tail -n 1 || true
-  )"
-  if [ -n "$KAKAO_TUNNEL_ORIGIN" ] && \
-     printf '%s\n' "$KAKAO_TUNNEL_LOGS" |
-       grep -q 'Registered tunnel connection'; then
-    break
-  fi
-  sleep 1
-done
-
-if [ -n "$KAKAO_TUNNEL_ORIGIN" ]; then
-  KAKAO_SECRET_PATH="$(
-    sed -n 's/^KAKAO_WEBHOOK_PATH=//p' "$KAKAO_ENV_FILE" | tail -n 1
-  )"
-  KAKAO_SKILL_URL_FILE="$KAKAO_HERMES_HOME/data/english/kakao-skill-url.txt"
-  printf '%s%s\n' "$KAKAO_TUNNEL_ORIGIN" "$KAKAO_SECRET_PATH" \
-    > "$KAKAO_SKILL_URL_FILE"
-  chmod 600 "$KAKAO_SKILL_URL_FILE"
+if [ -n "$KAKAO_PUBLIC_ORIGIN" ]; then
+  python3 "$KAKAO_HERMES_HOME/scripts/kakao_tunnel_url.py" \
+    --home "$KAKAO_HERMES_HOME" --origin "$KAKAO_PUBLIC_ORIGIN"
+  systemctl --user disable --now kakao-tunnel.service
+  echo "Kakao webhook is running through the verified fixed HTTPS origin."
 else
-  echo "Tunnel started but its public origin was not found in 30 seconds." >&2
-  exit 1
+  systemctl --user enable --now kakao-tunnel.service
+  python3 "$KAKAO_HERMES_HOME/scripts/kakao_tunnel_url.py" --home "$KAKAO_HERMES_HOME"
+  echo "Kakao webhook and temporary HTTPS tunnel services are running."
 fi
-
-echo "Kakao webhook and temporary HTTPS tunnel services are running."
 echo "The private Open Builder skill URL was refreshed at:"
 echo "  $KAKAO_HERMES_HOME/data/english/kakao-skill-url.txt"

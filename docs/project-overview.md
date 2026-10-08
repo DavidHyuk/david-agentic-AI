@@ -241,6 +241,7 @@ David-Agent/
 │   ├── leetcode_browser_login.py # Jun 버튼으로 원격 로그인·실제 제출 코드 자동 갱신
 │   ├── interview_trends.py    # HN·GitHub·논문 실시간 인터뷰 트렌드 수집
 │   ├── kakao_webhook.py       # Kakao 채널 피드백 수신·발신자 allowlist·로컬 큐
+│   ├── kakao_tunnel_url.py    # 현재 터널·고정 HTTPS 주소 검증과 비밀 스킬 URL 원자 갱신
 │   ├── english_intake.py      # 새 레슨 탐지 + 이번 주 세션 조회 + 처리 상태 관리
 │   ├── english_srs.py         # Leitner SRS 덱 (추가/리뷰/통계/취약 카드)
 │   ├── export_youtube_cookies.py # MacBook에서 YouTube 쿠키만 내보내기
@@ -398,6 +399,7 @@ history/search·알림 제어의 이점이 있으면 같은 bot을 별도 Telegr
 | `leetcode_browser_login.py` | 기존 임시 desktop runtime과 Jun 재연결 버튼을 사용. bounded transient user unit으로 실행하고 대시보드가 loopback noVNC :18782 화면·WebSocket을 중계. 15분 로그인 제한·별도 임시 profile·계정 검증 후 세션 저장, desktop 종료 후 실제 코드·요약 갱신 |
 | `interview_trends.py` | HN·GitHub·논문 DB에서 실시간 인터뷰 트렌드 수집·캐시 |
 | `english_intake.py` | 새 레슨 탐지, Telegram 파일 저장, 이번 주 세션 조회, 처리 상태 관리 |
+| `kakao_tunnel_url.py` | 재부팅·자동 복구 시 현재 systemd invocation의 임시 주소만 검증하고 비밀 URL을 갱신. --public-origin 설치는 고정 HTTPS 주소를 검증·기억하고 임시 터널 비활성화. 카카오 등록·배포는 관리자센터에서 별도 확인 |
 | `english_srs.py` | Leitner SRS 덱 (카드 추가/리뷰/통계/취약 카드 랭킹). note는 한국어 부연설명, 선택 note_en은 영어 참고이며 add --note-en으로 저장 |
 | `english_podcast.py` | 시청 영상의 대본 긴 문장 추출과 요청 시 채널 대본 준비 |
 | `youtube_history.py` | SSH stdin 쿠키 연결, GUI 없는 headless 시청 기록 수집, 18시 링크 메시지 |
@@ -1065,7 +1067,9 @@ ZIP 경로 격리·credential 오류 출력 방지 및 HQ source 상태 검증�
 Jun 사전 풀이 요약의 근거 변경·Accepted 코드 freshness·실패 보존·동시 실행
 잠금·background provider 경계 및 재인증 상태·실제 코드 필수 조건을 포함한
 원격 계정 재연결·CSRF 전달·동일 계정의 서버 cookie 갱신 검증까지 포함한
-현재 전체 테스트는 777 passed입니다.
+현재 전체 테스트는 790 passed입니다. 카카오 터널의 현재 invocation 식별,
+피드백을 저장하지 않는 공개 연결 검증, 비밀 URL 원자 저장·실패 보존 및
+고정 주소 재사용·Ellie 상태 표시 검증을 포함합니다.
 서버 해제 시각·자정 넘김·기존 예약 migration과
 David·English 자동 tracing의 도구 인자 제외,
 session 묶음과 visible TTFT 처리 검증을 포함합니다.

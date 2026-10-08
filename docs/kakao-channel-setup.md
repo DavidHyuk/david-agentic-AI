@@ -44,6 +44,15 @@ Kakao's servers must reach the collector through HTTPS. Read the Quick Tunnel UR
 journalctl --user -u kakao-tunnel.service --no-pager | grep trycloudflare.com
 ```
 
+After every Quick Tunnel startup, including DGX reboot and automatic recovery,
+`kakao_tunnel_url.py` reads only the current systemd invocation's journal and
+checks the actual public skill endpoint with an empty JSON body. That probe
+does not register a sender or queue feedback. A reachable endpoint atomically
+refreshes the private mode-0600 URL file; failure preserves the previous file
+and is reported in the service journal. This refresh does **not** update Kakao's
+deployed skill URL: change it in Open Builder and deploy again when the origin
+changes. An `active` process alone does not prove the registered URL is reachable.
+
 The installer combines the current origin and secret path in a private mode-0600
 file. In the private Observatory, Ellie → **계정·연결 설정** provides **챗봇 관리자센터
 열기** and **스킬 URL 복사**. Copy directly into Open Builder's skill URL field;
@@ -58,8 +67,38 @@ cat ~/.hermes/data/english/kakao-skill-url.txt
 Do not paste or share that combined URL anywhere else.
 
 This Quick Tunnel is for initial testing. Its hostname changes if the tunnel
-service restarts. For ongoing use, replace it with a named Cloudflare Tunnel and a
-stable hostname.
+service restarts. For ongoing use, configure a stable public HTTPS origin.
+
+### Stable public address
+
+An existing named Cloudflare Tunnel or Tailscale Funnel can provide the fixed
+origin. Start that transport before configuring it here. On this DGX, Tailscale
+ports 443 and 8443 belong to other applications; do not replace those routes or
+publish their private dashboards. A separate Funnel on port 10000 exposes only
+the existing loopback feedback collector:
+
+```bash
+sudo tailscale funnel --bg --https=10000 http://127.0.0.1:8787
+bash bootstrap/install_kakao_services.sh \
+  --public-origin https://spark-df6d.tail63b0d1.ts.net:10000
+```
+
+Funnel may require the tailnet owner to enable it at the authorization link
+printed by Tailscale. `--bg` persists the route across DGX reboot; see the
+[Tailscale Funnel CLI documentation](https://tailscale.com/docs/reference/tailscale-cli/funnel).
+The route is public, but sender enrollment and the secret endpoint stay enforced.
+Test the fixed URL in Open Builder and from the real Kakao app before declaring
+delivery restored, including whether Kakao accepts that explicit HTTPS port.
+If the port is rejected, use a named Cloudflare Tunnel on standard HTTPS 443.
+
+`--public-origin` verifies the endpoint before replacing the private skill URL
+and records the origin in `~/.hermes/data/english/kakao-public-origin.txt`.
+It then disables the old Quick Tunnel. Later installer runs and secret rotations
+reuse this fixed origin. Copy the resulting private URL into Open Builder and
+deploy once; ordinary reboots no longer require changing its hostname.
+The installer does not create the external fixed transport or configure Kakao
+on your behalf. Ellie shows fixed-address configuration separately from Quick
+Tunnel process status; neither proves Kakao deployment or live delivery.
 
 ## 4. Test, lock down, and deploy
 
@@ -126,8 +165,8 @@ successfully processes the feedback.
 
 ## 5. Rotate a leaked or stale URL
 
-Rotation invalidates the old secret, restarts both services, and refreshes the
-private URL file:
+Rotation invalidates the old secret, restarts the collector, and refreshes the
+private URL file using the configured fixed origin or current Quick Tunnel:
 
 ```bash
 bash bootstrap/install_kakao_services.sh --rotate-path

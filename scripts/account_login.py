@@ -68,6 +68,7 @@ def connection(home, service, runner=subprocess.run):
         return {'service': service, 'status': 'setup',
                 'webhook_running': unit_active('kakao-webhook.service', runner),
                 'tunnel_running': unit_active('kakao-tunnel.service', runner),
+                'fixed_origin_configured': (home / 'data/english/kakao-public-origin.txt').is_file(),
                 'skill_url_available': (home / 'data/english/kakao-skill-url.txt').is_file(),
                 'manager_url': 'https://i.kakao.com/', 'channel_url': 'https://center-pf.kakao.com/'}
     state = read_json(status_path(home, service))

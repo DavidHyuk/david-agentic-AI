@@ -3,6 +3,28 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.46.1 — 2026-10-07 (patch: repair stale Kakao skill URLs after DGX reboot)
+
+- Diagnose a live collector and connected Quick Tunnel with different current
+  and saved hostnames after the October 4 reboot. The saved hostname no longer
+  resolves; the current private endpoint returns valid Kakao JSON in 120 ms.
+  Refresh the local URL without queuing synthetic feedback or changing senders.
+  Kakao's registered URL and real delivery still require manager-side checking.
+- Refresh the owner-only URL atomically after every Quick Tunnel start using
+  the current systemd invocation's journal and a public empty-body probe. Keep
+  the previous URL on failure and report errors without revealing its secret.
+- Add `--public-origin` for an existing stable HTTPS transport, verify before
+  switching, remember the origin for reinstalls and secret rotation, and disable
+  the old Quick Tunnel only after verification. Document a separate Tailscale
+  Funnel on port 10000, preserving existing private 443/8443 routes; activation
+  requires host/tailnet authorization and Kakao acceptance still needs testing.
+  Fixed transport activation is not claimed as completed by this source change.
+- Reuse the English profile, bot, sender state and Ellie's existing room; expose
+  fixed-origin configuration without claiming live Kakao delivery. The internal
+  URL helper needs no room, schedule, gateway or separate agent identity.
+- Validation: 790 tests pass; verify local/current-public skill responses with
+  an empty payload, preserving lesson and sender state, and check shell syntax.
+
 ## v1.46.0 — 2026-10-06 (minor: Korean review notes and persistent podcast exercises)
 
 - Show Ellie's SRS explanations in Korean first, retaining English explanations

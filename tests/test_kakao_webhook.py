@@ -162,7 +162,7 @@ def test_installer_supports_secret_rotation_and_private_url_file():
     text = (REPO / "bootstrap" / "install_kakao_services.sh").read_text()
     assert "--rotate-path" in text
     assert "kakao-skill-url.txt" in text
-    assert 'chmod 600 "$KAKAO_SKILL_URL_FILE"' in text
+    assert 'kakao_tunnel_url.py" --home "$KAKAO_HERMES_HOME"' in text
     assert '"$REPO_ROOT/profiles/english/skills/learning/english-practice/SKILL.md"' in text
     assert '"$KAKAO_HERMES_HOME/profiles/english/skills/learning/english-practice/SKILL.md"' in text
 
