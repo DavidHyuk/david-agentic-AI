@@ -22,6 +22,15 @@ install -m 0644 \
 install -m 0644 \
   "$WATCHDOG_SCRIPT_DIR/hermes-gateway-cron-recovery.conf" \
   "$WATCHDOG_GATEWAY_DROPIN_DIR/30-cron-recovery.conf"
+install -m 0644 \
+  "$WATCHDOG_SCRIPT_DIR/hermes-gateway-restart-notices.conf" \
+  "$WATCHDOG_GATEWAY_DROPIN_DIR/50-restart-notices.conf"
+if systemctl --user cat hermes-gateway-english.service >/dev/null 2>&1; then
+  mkdir -p "$WATCHDOG_USER_UNIT_DIR/hermes-gateway-english.service.d"
+  install -m 0644 \
+    "$WATCHDOG_SCRIPT_DIR/hermes-gateway-english-restart-notices.conf" \
+    "$WATCHDOG_USER_UNIT_DIR/hermes-gateway-english.service.d/50-restart-notices.conf"
+fi
 
 systemctl --user daemon-reload
 systemctl --user enable --now hermes-cron-watchdog.timer

@@ -7,6 +7,27 @@ import pytest
 import youtube_history as yh
 
 
+def test_sync_health_retains_success_and_excludes_raw_error_data(tmp_path):
+    yh.save_sync_status(tmp_path, 'ok')
+    path = tmp_path / 'sync-status.json'
+    success = json.loads(path.read_text())['last_success_at']
+    yh.save_sync_status(tmp_path, 'error', 'reauth_required')
+    document = json.loads(path.read_text())
+    assert document['last_success_at'] == success
+    assert document['error_code'] == 'reauth_required'
+    assert 'error' not in document
+    yh.save_sync_status(tmp_path, 'ok')
+    assert 'error_code' not in json.loads(path.read_text())
+
+
+def test_notify_records_lost_authentication_for_existing_connection(tmp_path, monkeypatch, capsys):
+    (tmp_path / 'session.json').write_text('{}')
+    monkeypatch.setattr(yh, 'is_authenticated', lambda *args: False)
+    assert yh.main(['--data-dir', str(tmp_path), '--browser-dir', str(tmp_path / 'browser'), 'notify']) == 0
+    assert capsys.readouterr().out.strip() == '[SILENT]'
+    assert json.loads((tmp_path / 'sync-status.json').read_text())['error_code'] == 'reauth_required'
+
+
 def video(video_id='abcdefghijk', channel='English Goal Podcast', **changes):
     return {'title': 'A real watched episode', 'channel': channel,
             'url': 'https://www.youtube.com/watch?v=' + video_id, **changes}

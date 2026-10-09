@@ -3,6 +3,42 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.47.0 — 2026-10-08 (minor: explain gateway restarts through Telegram)
+
+- Report observed restart reasons, recovery actions, verified health and
+  practical remedies through the existing owning-profile Telegram home. Failed
+  restarts and unverified recovery remain explicit; raw subprocess errors and
+  credentials are excluded. Notifications work independently of gateway health.
+- Add fail-open David/English systemd stop/start hooks for OOM, timeout,
+  abnormal exit and clean-stop restarts. Do not infer a requester from a clean
+  exit or send notices on first startup. Let watchdog-owned restarts send one
+  detailed message instead of duplicating lifecycle reports.
+- Store the latest incident and delivery status per profile and retry failed
+  notification delivery on later watchdog ticks without restarting a gateway.
+  Reuse existing profile/bot/home and Observatory rooms; this operational alert
+  adds no new agent, workflow schedule or room. Leave ClawGram deployment isolated.
+- Validation: 818 tests pass; systemd unit validation and shell syntax pass.
+  Apply the script, watchdog unit and lifecycle drop-ins with daemon-reload,
+  retaining running gateway PIDs. Deliver one explanation of the earlier
+  restart incident to David's existing Telegram home and confirm CLI success.
+
+## v1.46.3 — 2026-10-08 (patch: stop cron failure gateway restart loops)
+
+- Trace repeated “Gateway shutting down” notifications to the five-minute
+  cron watchdog restarting a healthy David gateway after `chatgpt-project-sync`
+  failed to refresh some project chats. API health and scheduler timestamps
+  remained current; each failed retry produced a new timestamp and renewed the
+  previous per-execution retry allowance.
+- Queue failed-job retries without restarting a healthy gateway. Consume one
+  retry across consecutive failures until the watchdog observes an `ok` run,
+  recognizing existing retry-state keys. Preserve critical lock, overdue-job
+  and API recovery plus inference admission deferral. Persistent job failures
+  remain visible as warnings.
+- Add regression coverage for changed retry timestamps, migration of existing
+  retry state, success resetting the allowance and busy inference deferral.
+- Validation: 798 tests pass. Deploy only the changed watchdog script and
+  restore the existing timer; retain gateway processes and normal schedules.
+
 ## v1.46.2 — 2026-10-07 (patch: verify Funnel through public ingress)
 
 - Enable the owning tailnet's authorized Funnel route on HTTPS port 10000 to

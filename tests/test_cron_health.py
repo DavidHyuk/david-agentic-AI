@@ -286,6 +286,56 @@ def test_run_cron_job_uses_the_target_profile(monkeypatch):
     ]
 
 
+def test_failed_retry_does_not_restart_or_repeat_until_success(hermes_home, monkeypatch):
+    jobs_path = hermes_home / "cron" / "jobs.json"
+    calls = []
+    monkeypatch.setattr(ch, "lock_holder_pid", lambda _path: None)
+    monkeypatch.setattr(ch, "restart_gateway", lambda **_k: pytest.fail("healthy gateway restarted"))
+    monkeypatch.setattr(ch, "run_cron_job", lambda job_id, **_k: (calls.append(job_id) is None, "queued"))
+    args = ["--hermes-home", str(hermes_home), "--restart", "--retry-failed-once"]
+    now = ch._now()
+
+    def write_run(status, run_at):
+        jobs_path.write_text(json.dumps({"jobs": [{
+            "id": "bad-job", "name": "sync", "last_status": status,
+            "last_run_at": run_at.isoformat(),
+            "next_run_at": (now + timedelta(days=1)).isoformat(),
+        }]}))
+
+    write_run("error", now - timedelta(minutes=10))
+    assert ch.main(args) == 0
+    write_run("error", now - timedelta(minutes=5))
+    assert ch.main(args) == 1
+    assert ch.main(args) == 1
+    assert calls == ["bad-job"]
+    write_run("ok", now)
+    assert ch.main(args) == 0
+    write_run("error", now + timedelta(minutes=1))
+    assert ch.main(args) == 0
+    assert calls == ["bad-job", "bad-job"]
+
+
+def test_existing_retry_state_blocks_changed_failure_timestamp(hermes_home, monkeypatch):
+    ch.save_retry_state(hermes_home / "cron" / "retry-state.json", {
+        "bad-job:2026-10-08T10:00:00-07:00",
+    })
+    failure = {"id": "bad-job", "name": "sync", "last_run_at": "2026-10-08T10:10:00-07:00"}
+    monkeypatch.setattr(ch, "run_cron_job", lambda *_a, **_k: pytest.fail("retry loop continued"))
+    assert ch.retryable_failed_jobs(hermes_home, [failure]) == []
+    assert ch.retry_failed_jobs_once(hermes_home, [failure]) == []
+
+
+def test_busy_inference_defers_retry_without_restarting_healthy_gateway(hermes_home, monkeypatch):
+    monkeypatch.setattr(ch, "assess_health", lambda *_a, **_k: {
+        "critical": False, "jobs": {"failed_jobs": [{"id": "bad-job", "name": "sync"}]},
+    })
+    monkeypatch.setattr(ch, "inference_recovery_deferred", lambda _url: True)
+    monkeypatch.setattr(ch, "restart_gateway", lambda **_k: pytest.fail("healthy gateway restarted"))
+    monkeypatch.setattr(ch, "run_cron_job", lambda *_a, **_k: pytest.fail("busy inference retried"))
+    assert ch.main(["--hermes-home", str(hermes_home), "--json", "--restart", "--retry-failed-once",
+                    "--inference-admission-url", "http://127.0.0.1:8003/admission"]) == 1
+
+
 def test_assess_health_critical_when_lock_stale(hermes_home, monkeypatch):
     lock = hermes_home / "cron" / ".tick.lock"
     lock.parent.mkdir(parents=True, exist_ok=True)
@@ -414,6 +464,164 @@ def test_main_restarts_requested_profile_gateway(hermes_home, monkeypatch, capsy
     ]) == 0
     assert calls == [{"service": "hermes-gateway-english.service"}]
     assert "gateway restart: ok" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("restarted,verified,expected", [
+    (True, True, "건강 검사를 통과했습니다"),
+    (True, False, "추가 점검이 필요합니다"),
+    (False, False, "복구 완료로 처리하지 않습니다"),
+])
+def test_restart_notice_explains_fault_remedy_and_actual_result(restarted, verified, expected):
+    report = {"lock": {"stale": True, "age_minutes": 25},
+              "jobs": {"exists": True, "stale_jobs": []},
+              "api": {"healthy": False, "status": None, "error": "secret-token-value"}}
+    text = ch.restart_notice(report, service="hermes-gateway-english.service", profile="english",
+                             restarted=restarted, verified=verified)
+    assert "25분" in text
+    assert "Observatory API" in text
+    assert "내부 원인은 아직 확정되지 않음" in text
+    assert "타임아웃을 점검" in text
+    assert "hermes-gateway-english.service" in text
+    assert expected in text
+    assert "secret-token-value" not in text
+
+
+def test_restart_notice_identifies_delayed_jobs_and_missing_config():
+    reasons, remedies = ch.restart_explanation({
+        "jobs": {"exists": False, "stale_jobs": [{"name": "morning-brief"}]},
+    })
+    assert any("jobs.json" in item for item in reasons)
+    assert any("morning-brief" in item for item in reasons)
+    assert any("백업에서 복구" in item for item in remedies)
+
+
+def test_restart_notice_uses_profile_home_and_hides_cli_errors(hermes_home, monkeypatch):
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "other-profile-token")
+    monkeypatch.setenv("TELEGRAM_HOME_CHANNEL", "9999")
+    monkeypatch.setenv("HERMES_CRON_JOB_ID", "unrelated-cron")
+    calls = []
+    def fake_run(command, **kwargs):
+        calls.append((command, kwargs))
+        return SimpleNamespace(returncode=1, stderr="secret-token-value", stdout="")
+    monkeypatch.setattr(ch.subprocess, "run", fake_run)
+    ok, detail = ch.send_restart_notice(hermes_home, "incident", profile="english")
+    assert not ok
+    assert "secret-token-value" not in detail
+    command, kwargs = calls[0]
+    assert command == ["hermes", "--profile", "english", "send", "--to", "telegram", "--quiet"]
+    assert kwargs["input"] == "incident"
+    assert kwargs["env"]["HERMES_HOME"] == str(hermes_home)
+    assert "TELEGRAM_BOT_TOKEN" not in kwargs["env"]
+    assert "TELEGRAM_HOME_CHANNEL" not in kwargs["env"]
+    assert "HERMES_CRON_JOB_ID" not in kwargs["env"]
+
+
+def test_restart_notice_records_failed_delivery_without_failing_recovery(hermes_home, monkeypatch):
+    args = ch._parse_args(["--hermes-home", str(hermes_home), "--notify-restarts"])
+    report = {"critical": True, "jobs": {"exists": False}}
+    monkeypatch.setattr(ch, "verify_restart", lambda *_a: (False, report))
+    monkeypatch.setattr(ch, "send_restart_notice", lambda *_a, **_k: (False, "unavailable"))
+    ch.report_restart(hermes_home, report, args, restarted=True)
+    stored = json.loads((hermes_home / "cron" / "last-restart-notice.json").read_text())
+    assert stored["restarted"] is True
+    assert stored["verified"] is False
+    assert stored["delivered"] is False
+    assert "추가 점검이 필요합니다" in stored["message"]
+
+
+@pytest.mark.parametrize("restart_ok,exit_code", [(True, 0), (False, 2)])
+def test_watchdog_notifies_successful_and_failed_restart(hermes_home, monkeypatch, restart_ok, exit_code):
+    monkeypatch.setattr(ch, "assess_health", lambda *_a, **_k: {"critical": True, "jobs": {}})
+    monkeypatch.setattr(ch, "restart_gateway", lambda **_k: (restart_ok, "result"))
+    calls = []
+    monkeypatch.setattr(ch, "report_restart", lambda *_a, **kwargs: calls.append(kwargs))
+    assert ch.main(["--hermes-home", str(hermes_home), "--json", "--restart", "--notify-restarts"]) == exit_code
+    assert calls == [{"restarted": restart_ok}]
+
+
+def test_healthy_gateway_does_not_send_restart_notice(hermes_home, monkeypatch):
+    monkeypatch.setattr(ch, "assess_health", lambda *_a, **_k: {"critical": False, "jobs": {}})
+    monkeypatch.setattr(ch, "report_restart", lambda *_a, **_k: pytest.fail("spurious restart notice"))
+    assert ch.main(["--hermes-home", str(hermes_home), "--json", "--restart", "--notify-restarts"]) == 0
+
+
+def test_verify_restart_waits_for_service_and_api_health(hermes_home, monkeypatch):
+    args = ch._parse_args(["--check-api"])
+    states = iter([SimpleNamespace(returncode=0, stdout="active"), SimpleNamespace(returncode=0, stdout="active")])
+    reports = iter([{"critical": True}, {"critical": False}])
+    monkeypatch.setattr(ch.subprocess, "run", lambda *_a, **_k: next(states))
+    monkeypatch.setattr(ch, "assess_health", lambda *_a, **_k: next(reports))
+    monkeypatch.setattr(ch.time, "sleep", lambda _seconds: None)
+    assert ch.verify_restart(args, hermes_home) == (True, {"critical": False})
+
+
+@pytest.mark.parametrize("result,expected", [
+    ("oom-kill", "메모리 부족"), ("timeout", "대기 시간이 초과"),
+    ("success", "요청자는 종료 상태만으로 확인할 수 없음"),
+    ("exit-code", "내부 원인은 로그 확인 필요"),
+])
+def test_service_restart_notice_distinguishes_exit_causes(result, expected):
+    message = ch.restart_notice({"service_exit": {"result": result, "status": "1"}},
+        service="hermes-gateway.service", profile=None, restarted=True, verified=True)
+    assert expected in message
+    assert "systemd가 종료된" in message
+    assert "해결 방법:" in message
+
+
+def test_service_exit_is_reported_on_next_start_only(hermes_home, monkeypatch):
+    monkeypatch.setenv("SERVICE_RESULT", "oom-kill")
+    monkeypatch.setenv("EXIT_STATUS", "KILL")
+    calls = []
+    monkeypatch.setattr(ch, "report_restart", lambda home, report, args, **kwargs: calls.append(report))
+    base = ["--hermes-home", str(hermes_home)]
+    assert ch.main(base + ["--service-event", "start"]) == 0
+    assert calls == []
+    assert ch.main(base + ["--service-event", "stop"]) == 0
+    assert calls == []
+    assert ch.main(base + ["--service-event", "start"]) == 0
+    assert calls[0]["service_exit"]["result"] == "oom-kill"
+    assert calls[0]["service_exit"]["status"] == "KILL"
+    assert ch.main(base + ["--service-event", "start"]) == 0
+    assert len(calls) == 1
+
+
+def test_watchdog_owned_restart_suppresses_duplicate_start_notice(hermes_home, monkeypatch):
+    ch.save_service_event(hermes_home / "cron" / "watchdog-restart.json", {"time": ch._now().isoformat()})
+    monkeypatch.setattr(ch, "report_restart", lambda *_a, **_k: pytest.fail("duplicate restart notice"))
+    base = ["--hermes-home", str(hermes_home)]
+    assert ch.main(base + ["--service-event", "stop"]) == 0
+    assert ch.main(base + ["--service-event", "start"]) == 0
+
+
+def test_stale_watchdog_marker_does_not_hide_service_restart(hermes_home, monkeypatch):
+    ch.save_service_event(hermes_home / "cron" / "watchdog-restart.json", {
+        "time": (ch._now() - timedelta(minutes=11)).isoformat(),
+    })
+    calls = []
+    monkeypatch.setattr(ch, "report_restart", lambda *_a, **_k: calls.append(True))
+    base = ["--hermes-home", str(hermes_home)]
+    ch.main(base + ["--service-event", "stop"])
+    ch.main(base + ["--service-event", "start"])
+    assert calls == [True]
+
+
+def test_start_hook_verifies_during_systemd_activation(hermes_home, monkeypatch):
+    args = ch._parse_args(["--service-event", "start"])
+    monkeypatch.setattr(ch.subprocess, "run", lambda *_a, **_k: SimpleNamespace(returncode=3, stdout="activating"))
+    monkeypatch.setattr(ch, "assess_health", lambda *_a, **_k: {"critical": False})
+    assert ch.verify_restart(args, hermes_home) == (True, {"critical": False})
+
+
+def test_pending_notice_retries_delivery_once_without_restart(hermes_home, monkeypatch):
+    path = hermes_home / "cron" / "last-restart-notice.json"
+    ch.save_service_event(path, {"message": "restart incident", "delivered": False})
+    calls = []
+    monkeypatch.setattr(ch, "send_restart_notice", lambda *_a, **_k: (calls.append(True) is None, "sent"))
+    monkeypatch.setattr(ch, "restart_gateway", lambda **_k: pytest.fail("notification triggered restart"))
+    ch.deliver_pending_restart_notice(hermes_home, profile="english")
+    ch.deliver_pending_restart_notice(hermes_home, profile="english")
+    assert calls == [True]
+    assert json.loads(path.read_text())["delivered"] is True
 
 
 def test_main_can_skip_an_uninstalled_profile(tmp_path, monkeypatch, capsys):

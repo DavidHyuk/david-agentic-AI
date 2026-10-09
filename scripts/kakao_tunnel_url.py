@@ -164,8 +164,19 @@ def main(argv=None) -> int:
     parser.add_argument('--home', type=Path, default=Path.home() / '.hermes')
     parser.add_argument('--invocation', default=os.environ.get('INVOCATION_ID'))
     parser.add_argument('--origin', help='Verified stable public HTTPS origin, without the secret path')
+    parser.add_argument('--probe-only', action='store_true',
+                        help='check the saved public skill URL without changing URL files or intake')
     args = parser.parse_args(argv)
     try:
+        if args.probe_only:
+            url = (args.home / 'data/english/kakao-skill-url.txt').read_text().strip()
+            parsed = urlsplit(url)
+            if (parsed.scheme != 'https' or not parsed.hostname or parsed.username or parsed.password
+                    or parsed.query or parsed.fragment or
+                    not re.fullmatch(r'/kakao/[A-Za-z0-9_-]+', parsed.path) or not endpoint_ready(url)):
+                raise ValueError('Saved public collector probe failed.')
+            print('Kakao public collector probe passed; no feedback was saved.')
+            return 0
         origin_file = args.home / 'data/english/kakao-public-origin.txt'
         origin = args.origin or (origin_file.read_text().strip() if origin_file.exists() else None)
         if origin:

@@ -345,6 +345,23 @@ def render_digest(snapshot: dict, *, today: str | None = None) -> str:
                       'YouTube 시청 기록 기준입니다.'])
 
 
+def save_sync_status(data_dir: Path, status: str, error_code: str | None = None) -> None:
+    """Retain fixed health evidence for HQ without account data or raw errors."""
+    path = data_dir / 'sync-status.json'
+    try:
+        previous = json.loads(path.read_text()) if path.exists() else {}
+        if not isinstance(previous, dict):
+            raise ValueError('Invalid connection status.')
+        timestamp = datetime.now(TZ).isoformat()
+        document = {'status': status, 'last_attempt_at': timestamp,
+                    'last_success_at': timestamp if status == 'ok' else previous.get('last_success_at')}
+        if error_code:
+            document['error_code'] = error_code
+        save_json(path, document)
+    except (OSError, ValueError, TypeError):
+        print('YouTube connection health status could not be saved.', file=sys.stderr)
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--data-dir', type=Path, default=Path(os.environ.get('YOUTUBE_HISTORY_DATA_DIR', str(DEFAULT_DATA_DIR))))
@@ -359,6 +376,7 @@ def main(argv=None) -> int:
     source.add_argument('--saved-cookies', action='store_true', help='retry connecting with the owner-only saved session')
     source.add_argument('--cookies-stdin', action='store_true', help='read a YouTube cookie export through an SSH stdin pipe')
     args = parser.parse_args(argv)
+    sync_attempted = False
     try:
         channels = channel_names(args.channel if args.channel is not None else DEFAULT_CHANNELS)
         if args.command != 'connect' and (args.cookies_file or args.cookies_stdin or args.saved_cookies):
@@ -374,9 +392,13 @@ def main(argv=None) -> int:
                               'video_count': len(snapshot.get('videos', []))}, ensure_ascii=False))
             return 0
         if args.command == 'notify' and not is_authenticated(args.data_dir, args.browser_dir):
+            if (args.data_dir / 'session.json').exists() or (args.data_dir / 'snapshot.json').exists():
+                save_sync_status(args.data_dir, 'error', 'reauth_required')
             print('[SILENT]')
             return 0
         if args.command == 'sync' and not is_authenticated(args.data_dir, args.browser_dir):
+            if (args.data_dir / 'session.json').exists() or (args.data_dir / 'snapshot.json').exists():
+                save_sync_status(args.data_dir, 'error', 'reauth_required')
             raise HistoryError('개인 컴퓨터에서 내보낸 쿠키로 connect --cookies-stdin 또는 --cookies-file을 먼저 실행해 주세요.')
         cookies = None
         if args.command == 'connect':
@@ -397,21 +419,30 @@ def main(argv=None) -> int:
                 (args.data_dir / 'connection.json').unlink(missing_ok=True)
                 (args.data_dir / 'authentication.json').unlink(missing_ok=True)
                 save_json(args.data_dir / 'session.json', {'version': 1, 'cookies': cookies})
+            sync_attempted = True
+            save_sync_status(args.data_dir, 'running')
             snapshot = refresh(args.data_dir, args.browser_dir, args.browser_executable,
                                channels, cookies=cookies)
             save_json(args.data_dir / 'connection.json', {
                 'version': 1, 'verified_at': snapshot['synced_at'],
                 'browser_dir': str(args.browser_dir.resolve()),
             })
+            save_sync_status(args.data_dir, 'ok')
         if args.command == 'notify':
             print(render_digest(snapshot))
         else:
             print(json.dumps(snapshot, ensure_ascii=False))
         return 0
     except HistoryError as exc:
+        if sync_attempted:
+            error_code = ('reauth_required' if any(word in str(exc).lower()
+                          for word in ('로그인', 'login', '쿠키')) else 'sync_failed')
+            save_sync_status(args.data_dir, 'error', error_code)
         print(str(exc), file=sys.stderr)
         return 1
     except (OSError, ValueError, EOFError):
+        if sync_attempted:
+            save_sync_status(args.data_dir, 'error', 'sync_failed')
         # Raw Playwright/OS exceptions may contain page/account data or paths.
         print('YouTube 기록 처리 중 오류가 발생했습니다. 저장된 세션은 유지됩니다. 서버에서 connect --saved-cookies로 확인해 주세요.', file=sys.stderr)
         return 1

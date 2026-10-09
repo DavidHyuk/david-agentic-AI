@@ -1,4 +1,62 @@
 /* Author: David Choi. Purpose: focused, responsive study workbenches. */
+.coding-topics {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+.coding-topic,
+.coding-skip-history {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  min-width: 0;
+}
+.coding-topic summary,
+.coding-skip-history summary {
+  cursor: pointer;
+  font-size: 13px;
+}
+.coding-topic summary span,
+.coding-skip-history summary span {
+  display: inline-block;
+  margin-left: 10px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.coding-topic[open] {
+  border-color: #8da47e;
+}
+.coding-topic-body {
+  margin-top: 12px;
+}
+.coding-problems {
+  padding-left: 20px;
+  margin-bottom: 0;
+}
+.coding-problem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+}
+.coding-problem:last-child {
+  border-bottom: 0;
+}
+.coding-problem small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+}
+.coding-problem.active {
+  font-weight: 650;
+}
+.coding-skip-history {
+  margin-top: 16px;
+}
 .bench-toolbar {
   display: flex;
   align-items: center;

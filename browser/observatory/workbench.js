@@ -92,6 +92,11 @@ async function deskAction(body, success = "저장했습니다.") {
     if (body.action === "plan")
       bench.focusAssignment = body.mode === "review" ? result.result?.id : null;
     if (body.action === "feedback") bench.focusAssignment = null;
+    if (["coding_skip", "coding_resume", "coding_topic"].includes(body.action)) {
+      bench.focusAssignment = null;
+      if (!result.result?.assignment)
+        success += " 이어갈 새 문제가 없습니다. 주제 목록이나 스킵 기록에서 선택하세요.";
+    }
     if (result.reward?.earned)
       success = `Career Cash +$${result.reward.earned} · 잔액 $${result.reward.balance}`;
     if (room === bench.room) {
@@ -267,20 +272,33 @@ function codingReviewCard(d) {
   }).join("");
   return `<article class="desk-card coding-reviews"><span class="tag">JUN · 풀이 복습</span><h2>풀이 기록${reviews.items.length ? ` ${reviews.items.length}문제` : ""}</h2><p class="muted">최근 푼 문제를 선택하면 실제 Accepted 코드로 미리 정리한 정답·접근법·복습용 힌트와 면접관에게 그대로 말할 영어 스크립트·암기 표현을 볼 수 있습니다. 요약 ${Number(reviews.ready_count)}개 준비됨.</p>${lc ? `<p class="muted">${esc(lc.username)} · ${esc(d.leetcode_refresh?.message || "LeetCode 계정 기준")} · ${esc(lc.synced_at || "")}</p>${needsLogin ? `<div class="review-connection" role="status"><b>LeetCode 재로그인 필요</b><p>공개 완료 기록은 조회되지만 저장된 로그인 세션이 인정되지 않아 제출 코드 조회가 막혔습니다. 계정을 재연결하면 실제 Accepted 코드와 요약이 갱신됩니다.</p><p>위의 계정·연결 설정에서 LeetCode를 다시 연결하세요.</p><details class="desk-help"><summary>계정 재연결 방법</summary><p>로그인 창 준비하기 버튼을 누른 뒤 나타나는 링크를 개인 PC의 Chrome 또는 Chromium에서 여세요. 모니터 연결이나 SSH 포트 전달 없이 사용할 수 있습니다. 대시보드와 같은 주소로 접속하며, 로그인 후 제출 코드와 요약은 자동 갱신됩니다.</p><p>DGX 데스크톱을 직접 쓰는 경우에는 <code>python3 ~/.hermes/scripts/leetcode_sync.py login --headed --username &lt;LeetCode 아이디&gt;</code>로 로그인한 뒤, <code>bash ~/.hermes/scripts/leetcode_refresh.sh</code>를 실행하고 이 화면을 새로고침하세요. 개인 PC의 브라우저에서 로그인한 경우에는 DGX 터미널에서 <code>python3 ~/.hermes/scripts/leetcode_sync.py connect --username &lt;LeetCode 아이디&gt;</code>의 숨김 입력에 새 LEETCODE_SESSION 쿠키를 연결하세요.</p></details></div>` : lc.solution_sync_error ? '<p class="muted">제출 코드 갱신 실패 · 계정 연결을 확인해 주세요. 저장된 코드는 보관됩니다.</p>' : ""}` : '<p class="muted">LeetCode 계정을 연결하면 실제 Accepted 코드도 함께 모입니다.</p>'}${reviews.unavailable ? '<p class="muted">풀이 요약을 불러오지 못했습니다. 새로고침해 주세요.</p>' : list || '<p class="muted">최근 푼 문제의 코드나 학습 기록이 모이면 이곳에 표시됩니다.</p>'}</article>`;
 }
+function codingNavigationCard(d) {
+  const navigation = d.coding_navigation;
+  if (!navigation?.topics?.length) return "";
+  const labels = {completed: "완료", skipped: "스킵", paused: "이어풀기", active: "현재 문제", upcoming: "미시작"};
+  const topics = navigation.topics.map(topic => {
+    const selected = topic.name === navigation.selected_topic;
+    const saved = topic.problems.some(problem => ["active", "paused"].includes(problem.status));
+    return `<details class="coding-topic" ${selected ? "open" : ""}><summary><b>${esc(topic.name)}</b><span>${Number(topic.completed_count)} / ${topic.problems.length} 완료${selected ? " · 현재 주제" : ""}</span></summary><div class="coding-topic-body"><div class="desk-actions"><button class="${selected ? "outline" : "primary"}" data-coding-topic="${esc(topic.name)}">${saved ? "이 주제 이어가기" : "이 주제 시작하기"}</button></div><ol class="coding-problems">${topic.problems.map(problem => `<li class="coding-problem ${esc(problem.status)}"><div>${safeLink(`https://leetcode.com/problems/${encodeURIComponent(problem.item_id)}/`, problem.name)}<small>${esc(problem.difficulty)} · ${labels[problem.status]}</small></div>${["skipped", "paused"].includes(problem.status) && problem.assignment ? `<button class="outline" data-coding-resume="${esc(problem.assignment)}">다시 풀기</button>` : ""}</li>`).join("")}</ol></div></details>`;
+  }).join("");
+  const history = navigation.skip_history || [];
+  return `<article class="desk-card coding-navigation"><span class="tag">YOUR LEARNING PATH</span><h2>주제별 문제 목록</h2><p class="muted">원하는 주제로 시작하거나 이어갈 수 있습니다. 주제를 바꿔도 풀던 문제와 힌트 기록은 보관됩니다.</p>${navigation.previous_topic && navigation.previous_topic !== navigation.selected_topic ? `<div class="desk-actions"><button class="outline" data-coding-topic="${esc(navigation.previous_topic)}">이전 주제 · ${esc(navigation.previous_topic)}로 돌아가기</button></div>` : ""}<div class="coding-topics">${topics}</div><details class="coding-skip-history" ${!d.pending?.length && history.some(row => row.status === "skipped") ? "open" : ""}><summary><b>스킵 기록 · ${history.length}문제</b><span>나중에 다시 풀기</span></summary><p class="muted">스킵은 학습 완료로 계산되지 않습니다. 다시 풀 때도 기존 힌트와 해설 열람 기록을 이어갑니다.</p>${history.map(row => `<div class="coding-problem"><div><b>${esc(row.name)}</b><small>${esc(row.topic || "")} · ${esc(row.difficulty)} · ${labels[row.status]}<br>최근 스킵 ${esc(row.skip_dates.at(-1))} · ${row.skip_dates.length}회</small></div>${["skipped", "paused"].includes(row.status) ? `<button class="outline" data-coding-resume="${esc(row.assignment)}">다시 풀기</button>` : ""}</div>`).join("") || '<p class="muted">스킵한 문제가 아직 없습니다.</p>'}</details></article>`;
+}
 function coachDesk(d) {
   const a = activeCoachAssignment(d);
   const lcSummary = d.room !== "coding" ? "" : codingReviewCard(d);
   if (!a) {
     const design = d.track === "system_design";
-    return `<article class="desk-card"><span class="tag">TODAY</span><h2>${d.today_assignment?.completed ? "이번 주 인터뷰를 완료했습니다" : "이어갈 미완료 과제가 없습니다"}</h2><p>${design ? "새 인터뷰는 ISO 주당 하나만 열립니다. 추가 연습은 채팅의 /review로 짧게 진행하세요." : "<b>작업 이어가기</b>는 항상 다음 미해결 커리큘럼의 새 문제를 배정합니다. 이전 문제는 <b>복습하기</b>로만 다시 배정합니다."} 과제 배정은 학습 완료로 기록되지 않습니다.</p><div class="desk-actions"><button id="desk-plan" class="primary" ${!d.catalog_available ? "disabled" : ""}>${design ? "주간 인터뷰 열기" : "작업 이어가기 · 새 문제"}</button>${!design && d.completed?.length ? `<button id="desk-review" class="outline" ${!d.catalog_available ? "disabled" : ""}>복습하기</button>` : ""}</div>${!d.catalog_available ? "<p>커리큘럼 카탈로그가 아직 설치되지 않았습니다.</p>" : ""}</article>` + lcSummary;
+    return `<article class="desk-card"><span class="tag">TODAY</span><h2>${design && d.today_assignment?.completed ? "이번 주 인터뷰를 완료했습니다" : "이어갈 미완료 과제가 없습니다"}</h2><p>${design ? "새 인터뷰는 ISO 주당 하나만 열립니다. 추가 연습은 채팅의 /review로 짧게 진행하세요." : "<b>작업 이어가기</b>로 다음 새 문제를 열거나, 주제 목록과 스킵 기록에서 이어갈 문제를 선택하세요. 완료한 문제는 <b>복습하기</b>로 다시 연습할 수 있습니다."} 과제 배정은 학습 완료로 기록되지 않습니다.</p><div class="desk-actions"><button id="desk-plan" class="primary" ${!d.catalog_available ? "disabled" : ""}>${design ? "주간 인터뷰 열기" : "작업 이어가기 · 새 문제"}</button>${!design && d.completed?.length ? `<button id="desk-review" class="outline" ${!d.catalog_available ? "disabled" : ""}>복습하기</button>` : ""}</div>${!d.catalog_available ? "<p>커리큘럼 카탈로그가 아직 설치되지 않았습니다.</p>" : ""}</article>` + (design ? "" : codingNavigationCard(d)) + lcSummary;
   }
   const item = a.item,
     coding = d.track === "coding";
   return `<article class="desk-card mission"><span class="tag">이어하기 · ${esc(a.date)} 배정 · ${coding ? (a.session_type === "review" ? "복습" : "새 과제") : esc(a.phase || "problem")}</span><h2>${esc(item.name || a.item_id)}</h2><p>${esc(coding ? item.goal : item.prompt)}</p><div class="desk-tags"><span>${esc(item.pattern || item.track || "System design")}</span><span>목표 ${coding ? 35 : item.target_minutes}분</span><span>결과 미입력</span>${coding ? `<span>기록된 힌트 ${a.hint_level} / 3</span>` : `<span>난이도 ${Number(a.difficulty_level || 2)} / 4</span>`}</div>
-    <div class="desk-actions">${coding ? safeLink(item.leetcode_url, "LeetCode 문제") + safeLink(item.neetcode_url, "NeetCode 문제") : ""}${coding && a.session_type === "review" ? '<button id="desk-current" class="primary">최신 문제로 돌아가기</button>' : coding && d.completed?.length ? '<button id="desk-review" class="outline">복습하기</button>' : ""}</div>
+    <div class="desk-actions">${coding ? safeLink(item.leetcode_url, "LeetCode 문제") + safeLink(item.neetcode_url, "NeetCode 문제") : ""}${coding && a.session_type !== "review" ? '<button id="desk-skip" class="outline">잠시 스킵 · 다음 문제</button>' : ""}${coding && a.session_type === "review" ? '<button id="desk-current" class="primary">최신 문제로 돌아가기</button>' : coding && d.completed?.length ? '<button id="desk-review" class="outline">복습하기</button>' : ""}</div>
     ${coding ? '<p class="muted">먼저 20분 동안 스스로 시도하고, 경계 조건과 시간·공간 복잡도를 설명해 보세요.</p>' : `<h3>먼저 생각할 명확화 질문</h3><ul class="desk-focus">${(item.clarification_questions || []).map((q) => `<li>${esc(q)}</li>`).join("")}</ul><p class="muted">솔루션은 피드백 저장 후에만 열립니다.</p>`}
     <div class="study-timer"><span id="study-time">00:00</span><div><button class="outline" id="timer-toggle">타이머 시작</button><button class="text-button" id="timer-reset">초기화</button></div><small>이 브라우저에서 이어집니다 · 타이머 종료는 완료 처리되지 않습니다</small></div>
   </article>${d.room === "coding" ? "" : telegramComposer(d, `현재 ${item.name || a.item_id} 과제를 공부 중이야. 과제 ID는 ${a.id}야. ${coding ? "내 접근 방법을 먼저 물어보고, 요청하면 현재 힌트 단계 다음의 힌트 하나만 줘. 정답부터 보여주지 마." : "명확화 질문부터 시작할게. 내 설계를 /answer로 보내면 면접관 추가 질문을 하나씩 줘. /feedback 전에는 솔루션을 보여주지 마."}`)}
+  ${coding ? codingNavigationCard(d) : ""}
   ${coding ? `<article class="desk-card"><h2>실제 학습 결과 남기기</h2><p class="muted">본인이 보고한 결과만 저장합니다. 저장하면 다음 복습과 주간 리뷰에 반영됩니다.</p><form id="coach-feedback"><div class="feedback-grid">
     ${field("공부한 시간 (분)", "duration", "number", 'min="1" max="1440"')}${selectField(
       "자신감",
@@ -346,6 +364,11 @@ function missionCard(task) {
   const status = missionStatuses[task.status] || [task.status, ""];
   return `<button class="mission-card" data-mission="${esc(task.id)}"><span class="mission-agent">${esc(roomIcon(task.room))} ${esc(deskTitles[task.room] || task.assignee || "HQ")}</span><strong>${esc(task.title)}</strong><small>${esc(task.id)} · ${when(task.created_at)}</small><span class="mission-state state-${esc(task.status)}">${esc(status[0])}</span>${task.result ? `<p>${esc(task.result.slice(0, 130))}</p>` : ""}</button>`;
 }
+function connectionHealthCard(health) {
+  const labels = {chatgpt_sync: "ChatGPT 채팅룸 동기화", chatgpt_account: "ChatGPT 계정 연결", youtube: "YouTube 계정·시청 기록", leetcode: "LeetCode 계정·제출 코드", kakao: "카카오톡 영어 피드백 수신"};
+  const reasons = {sync_failed: "자료 갱신 실패", reauth_required: "재인증 필요", login_failed: "로그인 검증 실패", collector_down: "수신 서비스 중단", public_unreachable: "공개 수신 경로 확인 실패", probe_failed: "공개 연결 검사 실패", state_unreadable: "상태 조회 실패", sync_stalled: "갱신 지연"};
+  return `<article class="desk-card connection-health"><span class="tag">HERMES · CONNECTIONS</span><h2>외부 연결 상태와 알림</h2><p class="muted">5분마다 확인해 장애와 복구를 Hermes Telegram 채팅룸으로 알립니다. 같은 장애는 반복 알리지 않습니다.</p>${health?.checked_at ? `<small>최근 확인 ${esc(health.checked_at)}</small>` : '<p class="muted">첫 연결 검사 대기 중입니다.</p>'}${health?.last_delivery_ok === false || health?.pending_count ? '<p role="status">전송 대기 알림이 있습니다. 다음 검사에서 다시 전송합니다.</p>' : ""}${(health?.services || []).map(row => `<div class="reading-row"><div><strong>${esc(row.label || labels[row.service] || "외부 연동 작업")}</strong><small>${row.status === "healthy" ? "✅ 최근 검사 정상" : row.status === "failed" ? "⚠️ " + esc(reasons[row.reason] || "연결 확인 필요") : row.incident_open ? "기존 장애 · 복구 미확인" : "확인된 연결 근거 없음"}</small></div></div>`).join("")}<details class="desk-help"><summary>최근 장애·복구 기록 ${(health?.events || []).length}건</summary>${(health?.events || []).map(event => `<p><b>${event.kind === "recovered" ? "✅ 복구" : "⚠️ 장애"} · ${esc(event.label || labels[event.service] || "외부 연동 작업")}</b><br><small>${esc(event.time)}${event.reason ? " · " + esc(reasons[event.reason] || "연결 확인 필요") : ""}</small></p>`).join("") || '<p class="muted">감지된 장애 기록이 없습니다.</p>'}</details><p class="muted">카카오는 공개 수신 경로 기준입니다. 관리자센터 배포와 실제 메시지 전달 상태는 별도 확인이 필요합니다.</p></article>`;
+}
 function hqDesk(d) {
   const o = d.orchestration;
   const archive = d.chatgpt_archive || {};
@@ -362,7 +385,7 @@ function hqDesk(d) {
     ? '<article class="desk-card reward-card"><span class="tag">CAREER CASH</span><h2>보상 기록을 준비하지 못했습니다</h2></article>'
     : `<article class="desk-card reward-card"><div><span class="tag">CAREER CASH · GAME REWARD</span><h2>$${Number(rewards.balance || 0).toLocaleString()}</h2><p>🔥 연속 ${Number(rewards.streak || 0)}일 · ${rewards.today?.cleared ? "오늘 미션 완료" : "오늘 첫 미션 대기"}</p></div><div class="reward-week"><b>이번 주 미션</b>${Object.entries(weekly.goals).map(([key, goal]) => `<span>${esc({coding:"코딩",design:"설계",english:"영어",paper:"논문"}[key] || key)} <strong>${Math.min(Number(weekly.counts[key] || 0), goal)}/${goal}</strong></span>`).join("")}</div><div class="reward-next">${rewards.unlocks?.length ? `<small>최근 해금한 가상 오퍼</small><b>🏆 ${esc(rewards.unlocks.at(-1).label)}</b>` : rewards.next_offer ? `<small>다음 가상 오퍼</small><b>🔒 ${esc(rewards.next_offer.label)}</b>` : ""}${rewards.next_offer ? `<span>$${Number(rewards.next_offer.remaining)} 남음</span>` : ""}</div><small class="reward-disclaimer">실제 현금이나 채용 제안이 아닌 동기부여용 게임 보상입니다.</small></article>`;
   if (!o.available)
-    return archiveCard + rewardCard + `<article class="desk-card mission-command"><span class="tag">COMMAND CENTER</span><h2>오케스트레이션을 준비할 수 없습니다</h2><p>${esc(o.error)}</p></article>`;
+    return connectionHealthCard(d.connection_health) + archiveCard + rewardCard + `<article class="desk-card mission-command"><span class="tag">COMMAND CENTER</span><h2>오케스트레이션을 준비할 수 없습니다</h2><p>${esc(o.error)}</p></article>`;
   const columns = [
     ["triage", "접수"],
     ["todo,ready,scheduled", "계획 · 대기"],
@@ -371,7 +394,7 @@ function hqDesk(d) {
     ["done", "완료"],
   ];
   const draft = localRead("hermes-mission-draft", {});
-  return archiveCard + rewardCard + `<article class="desk-card mission-command"><span class="tag">COMMAND CENTER · ${esc(o.board)}</span><h2>HQ에 목표 맡기기</h2><p>목표를 접수하면 HQ가 전문 에이전트별 작업과 의존관계로 나누고 결과를 다시 종합합니다. 제출 즉시 실제 에이전트 실행 대기열에 들어갑니다.</p><form id="mission-form"><label class="desk-field">달성할 목표<input name="goal" maxlength="200" required placeholder="예: 이번 주 Anthropic MLE 면접 준비 계획과 연습 자료를 만들어줘" value="${esc(draft.goal || "")}"></label><label class="desk-field">배경·제약·원하는 결과<textarea name="context" maxlength="4000" rows="5" placeholder="마감, 지원 회사, 산출물 형태, 이미 시도한 내용 등을 적어주세요.">${esc(draft.context || "")}</textarea></label><label class="desk-field compact-field">우선순위<select name="priority"><option value="80" ${draft.priority === "80" ? "selected" : ""}>높음</option><option value="50" ${!draft.priority || draft.priority === "50" ? "selected" : ""}>보통</option><option value="20" ${draft.priority === "20" ? "selected" : ""}>낮음</option></select></label><button class="primary">계획 · 실행 시작</button></form></article>
+  return connectionHealthCard(d.connection_health) + archiveCard + rewardCard + `<article class="desk-card mission-command"><span class="tag">COMMAND CENTER · ${esc(o.board)}</span><h2>HQ에 목표 맡기기</h2><p>목표를 접수하면 HQ가 전문 에이전트별 작업과 의존관계로 나누고 결과를 다시 종합합니다. 제출 즉시 실제 에이전트 실행 대기열에 들어갑니다.</p><form id="mission-form"><label class="desk-field">달성할 목표<input name="goal" maxlength="200" required placeholder="예: 이번 주 Anthropic MLE 면접 준비 계획과 연습 자료를 만들어줘" value="${esc(draft.goal || "")}"></label><label class="desk-field">배경·제약·원하는 결과<textarea name="context" maxlength="4000" rows="5" placeholder="마감, 지원 회사, 산출물 형태, 이미 시도한 내용 등을 적어주세요.">${esc(draft.context || "")}</textarea></label><label class="desk-field compact-field">우선순위<select name="priority"><option value="80" ${draft.priority === "80" ? "selected" : ""}>높음</option><option value="50" ${!draft.priority || draft.priority === "50" ? "selected" : ""}>보통</option><option value="20" ${draft.priority === "20" ? "selected" : ""}>낮음</option></select></label><button class="primary">계획 · 실행 시작</button></form></article>
     <article class="desk-card"><div class="mission-heading"><div><span class="tag">LIVE MISSION BOARD</span><h2>에이전트 작업 흐름</h2></div><span class="dispatcher ${o.dispatcher_alive ? "on" : ""}">● ${o.dispatcher_alive ? "Dispatcher online" : "Dispatcher offline"}</span></div><div class="agent-roster">${o.assignees.map((a) => `<span>${esc(roomIcon(a.room))} ${esc(a.name)} <small>${Object.values(a.counts || {}).reduce((sum, n) => sum + n, 0)}</small></span>`).join("")}</div><div class="mission-board">${columns
       .map(([keys, title]) => {
         const statuses = keys.split(","),
@@ -516,6 +539,16 @@ function renderWorkbench(d) {
       renderWorkbench(bench.data);
       $("bench-status").textContent = "최신 미완료 문제로 돌아왔습니다.";
     };
+  const navigateCoding = (action, fields, message) => deskAction({
+    action, room: "coding", expected_assignment: d.coding_navigation?.active_assignment ?? null,
+    ...fields,
+  }, message);
+  if ($("desk-skip")) $("desk-skip").onclick = () => navigateCoding(
+    "coding_skip", {assignment: activeCoachAssignment(d).id}, "스킵 기록에 저장하고 다음 문제를 열었습니다.");
+  document.querySelectorAll("[data-coding-topic]").forEach(button => button.onclick = () => navigateCoding(
+    "coding_topic", {topic: button.dataset.codingTopic}, "선택한 주제의 문제를 열었습니다."));
+  document.querySelectorAll("[data-coding-resume]").forEach(button => button.onclick = () => navigateCoding(
+    "coding_resume", {assignment: button.dataset.codingResume}, "저장된 문제를 다시 열었습니다."));
   if ($("coach-feedback")) wireCoach(d);
   if ($("telegram-chat-form")) wireTelegramChat(d);
 }

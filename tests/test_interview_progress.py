@@ -29,6 +29,141 @@ def feedback(**overrides):
                 solution_viewed=False, lesson='Check boundary cases') | overrides
 
 
+def navigate(state, catalog, action, *, assignment=None, topic=None, today='2026-10-09'):
+    active = ip.active_coding_assignment(state, today)
+    return ip.coding_navigation_action(state, catalog, today, action,
+                                      active['id'] if active else None,
+                                      assignment_id=assignment, topic=topic)['assignment']
+
+
+def test_skip_advances_without_completion_and_survives_daily_cron(catalog):
+    state = ip.empty_state()
+    current = ip.plan(state, catalog, 'coding', '2026-10-09', next_assignment=True)
+    ip.record_hint(state, current['id'])
+    next_problem = navigate(state, catalog, 'skip', assignment=current['id'])
+    assert next_problem['item_id'] == 'valid-anagram'  # A skipped prerequisite cannot block it.
+    assert current['skipped'] and not current['completed']
+    assert state['coding'] == [] and ip.curriculum_cursor(state, 'coding', '2026-10-09') == 0
+    assert ip.plan(state, catalog, 'coding', '2026-10-12', next_assignment=True) == next_problem
+    assert ip.plan(state, catalog, 'coding', '2026-10-12') == next_problem
+    snapshot = ip.coding_navigation_snapshot(state, catalog, '2026-10-12')
+    assert snapshot['skip_history'][0]['skip_dates'] == ['2026-10-09']
+    assert snapshot['topics'][0]['problems'][0]['status'] == 'skipped'
+
+
+def test_resume_preserves_exposure_and_repeated_skip_history(catalog):
+    state = ip.empty_state()
+    first = ip.plan(state, catalog, 'coding', '2026-10-09', next_assignment=True)
+    for _ in range(3):
+        ip.record_hint(state, first['id'])
+    ip.record_hint(state, first['id'], solution=True)
+    following = navigate(state, catalog, 'skip', assignment=first['id'])
+    resumed = navigate(state, catalog, 'resume', assignment=first['id'])
+    assert resumed is first and resumed['hint_level'] == 3 and resumed['solution_viewed']
+    assert following['paused'] and not following['completed']
+    assert ip.plan(state, catalog, 'coding', '2026-10-12', next_assignment=True) is resumed
+    again = navigate(state, catalog, 'skip', assignment=first['id'])
+    assert again is following
+    assert first['skip_dates'] == ['2026-10-09', '2026-10-09']
+    navigate(state, catalog, 'resume', assignment=first['id'])
+    row = ip.record_session(state, catalog, first['id'], '2026-10-09', feedback())
+    assert not row['independent'] and row['solution_viewed'] and row['hint_level'] == 3
+    snapshot = ip.coding_navigation_snapshot(state, catalog, '2026-10-09')
+    assert snapshot['skip_history'][0]['status'] == 'completed'
+    assert snapshot['topics'][0]['completed_count'] == 1
+
+
+def test_topic_switch_resumes_exact_problem_and_bypasses_other_topic_prerequisites(catalog):
+    state = ip.empty_state()
+    original = ip.plan(state, catalog, 'coding', '2026-10-09', next_assignment=True)
+    ip.record_hint(state, original['id'])
+    selected = navigate(state, catalog, 'topic', topic='Two Pointers')
+    assert selected['item_id'] == 'valid-palindrome'
+    assert original['paused'] and not original.get('superseded')
+    ip.record_session(state, catalog, selected['id'], '2026-10-09', feedback())
+    following = ip.plan(state, catalog, 'coding', '2026-10-10', next_assignment=True)
+    assert following['item_id'] == 'two-sum-ii-input-array-is-sorted'
+    returned = navigate(state, catalog, 'topic', topic='HashMap', today='2026-10-10')
+    assert returned is original and original['hint_level'] == 1
+    assert following['paused']
+    assert state['coding_navigation']['previous_topic'] == 'Two Pointers'
+    assert navigate(state, catalog, 'topic', topic='Two Pointers', today='2026-10-10') is following
+
+
+def test_skip_last_hard_problem_advances_to_next_topic(catalog):
+    state = ip.empty_state()
+    current = navigate(state, catalog, 'topic', topic='Two Pointers')
+    for _ in range(5):
+        ip.record_session(state, catalog, current['id'], '2026-10-09', feedback())
+        current = ip.plan(state, catalog, 'coding', '2026-10-09', next_assignment=True)
+    assert current['item_id'] == 'trapping-rain-water'
+    following = navigate(state, catalog, 'skip', assignment=current['id'])
+    assert following['pattern_block'] == 'Sliding Window'
+    assert navigate(state, catalog, 'topic', topic='Two Pointers') is None
+    assert navigate(state, catalog, 'resume', assignment=current['id']) is current
+
+
+@pytest.mark.parametrize('action,kwargs', [
+    ('topic', {'topic': 'unknown'}), ('resume', {'assignment_id': 'system_design:unknown'}),
+    ('skip', {'assignment_id': 'missing'}),
+])
+def test_invalid_navigation_preserves_state(catalog, action, kwargs):
+    state = ip.empty_state()
+    current = ip.plan(state, catalog, 'coding', '2026-10-09', next_assignment=True)
+    before = deepcopy(state)
+    with pytest.raises(ValueError):
+        ip.coding_navigation_action(state, catalog, '2026-10-09', action, current['id'], **kwargs)
+    assert state == before
+
+
+def test_stale_skip_and_paused_feedback_cannot_corrupt_progress(catalog):
+    state = ip.empty_state()
+    first = ip.plan(state, catalog, 'coding', '2026-10-09', next_assignment=True)
+    navigate(state, catalog, 'skip', assignment=first['id'])
+    before = deepcopy(state)
+    with pytest.raises(ValueError, match='현재 문제가 바뀌었습니다'):
+        ip.coding_navigation_action(state, catalog, '2026-10-09', 'skip', first['id'],
+                                    assignment_id=first['id'])
+    with pytest.raises(ValueError, match='다시 연 뒤'):
+        ip.record_session(state, catalog, first['id'], '2026-10-09', feedback())
+    with pytest.raises(ValueError):
+        ip.record_hint(state, first['id'])
+    assert state == before
+
+
+def test_skip_every_problem_keeps_recoverable_history(catalog):
+    state = ip.empty_state()
+    current = ip.plan(state, catalog, 'coding', '2026-10-09', next_assignment=True)
+    first_id = current['id']
+    for _ in range(len(catalog['coding_curriculum'])):
+        if current is None:
+            break
+        current = navigate(state, catalog, 'skip', assignment=current['id'])
+    assert current is None
+    assert state['coding'] == []
+    history = ip.coding_navigation_snapshot(state, catalog, '2026-10-09')['skip_history']
+    assert len(history) == len(catalog['problems'])
+    assert navigate(state, catalog, 'resume', assignment=first_id)['id'] == first_id
+
+
+def test_navigation_cli_persists_and_read_only_snapshot_does_not_rewrite(tmp_path, catalog, capsys):
+    catalog_path, state_path = tmp_path / 'catalog.json', tmp_path / 'state.json'
+    catalog_path.write_text(json.dumps(catalog))
+    args = ['--state', str(state_path), '--catalog', str(catalog_path), '--date', '2026-10-09']
+    assert ip.main(args + ['plan', 'coding', '--next', '--format', 'json']) == 0
+    first = json.loads(capsys.readouterr().out)
+    assert ip.main(args + ['coding-skip', '--assignment', first['id'],
+                          '--expected-assignment', first['id']]) == 0
+    second = json.loads(capsys.readouterr().out)['assignment']
+    before = state_path.read_bytes()
+    assert ip.main(args + ['coding-navigation']) == 0
+    assert json.loads(capsys.readouterr().out)['skip_history'][0]['assignment'] == first['id']
+    assert state_path.read_bytes() == before
+    assert ip.main(args + ['coding-resume', '--assignment', first['id'],
+                          '--expected-assignment', second['id']]) == 0
+    assert json.loads(capsys.readouterr().out)['assignment']['id'] == first['id']
+
+
 def design_feedback(**overrides):
     return dict(duration=50, confidence=5, requirements_score=5, architecture_score=5,
                 trade_off_score=5, failure_mode_score=5,

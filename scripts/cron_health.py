@@ -7,7 +7,7 @@ Purpose
 Detects failure modes that silently stop Telegram cron alerts or Observatory chat:
   1. ``~/.hermes/cron/.tick.lock`` held longer than a threshold (stuck tick).
   2. ``jobs.json`` last_run timestamps older than expected (scheduler idle).
-  3. a cron job with a failed terminal status (one bounded retry per run).
+  3. a cron job with a failed terminal status (one retry until observed success).
   4. the local Observatory HTTP API accepting TCP connections but not responding.
 
 Standalone CLI for manual checks or cron/systemd watchdog use. A caller can
@@ -20,6 +20,7 @@ import argparse
 import json
 import os
 import subprocess
+import time
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 from datetime import datetime, timezone
@@ -35,6 +36,7 @@ DEFAULT_RESTART_TIMEOUT_SECONDS = 75
 DEFAULT_CRON_RUN_TIMEOUT_SECONDS = 20
 DEFAULT_API_HEALTH_URL = "http://127.0.0.1:8642/health"
 DEFAULT_API_HEALTH_TIMEOUT_SECONDS = 5
+DEFAULT_NOTICE_TIMEOUT_SECONDS = 30
 FAILED_STATUSES = frozenset({"failed", "error", "timeout", "cancelled", "canceled"})
 
 SECRET_PATTERNS = (".env", "credentials", "secret", "token", "auth.json")
@@ -182,6 +184,10 @@ def check_jobs_stale(
         "stale_hours": stale_hours,
         "overdue_grace_minutes": overdue_grace_minutes,
         "failed_jobs": _failed_jobs(doc),
+        "successful_job_ids": [
+            str(job["id"]) for job in _enabled_jobs(doc)
+            if job.get("id") and job.get("last_status") == "ok"
+        ],
     }
 
 
@@ -286,6 +292,216 @@ def gateway_service_exists(service: str) -> bool:
     return result.returncode == 0 and result.stdout.strip() not in {"", "not-found"}
 
 
+def restart_explanation(report: dict[str, Any]) -> tuple[list[str], list[str]]:
+    """Explain observed faults and practical remedies without raw error output."""
+    reasons: list[str] = []
+    remedies: list[str] = []
+    exit_info = report.get("service_exit")
+    if exit_info is not None:
+        result = exit_info.get("result", "unknown")
+        status = exit_info.get("status", "unknown")
+        if result == "oom-kill":
+            reasons.append("systemd가 메모리 부족(OOM)에 의한 서비스 종료를 기록함.")
+            remedies.append("메모리 사용량과 동시에 실행된 모델·작업을 확인하고 동시 실행 수를 줄이세요.")
+        elif result == "timeout":
+            reasons.append("서비스 시작 또는 종료 대기 시간이 초과됨. 멈춘 작업이 있었는지는 로그 확인 필요.")
+            remedies.append("직전 게이트웨이 로그에서 시작 지연 또는 종료를 막은 외부 요청·worker를 확인하세요.")
+        elif result == "success":
+            reasons.append("정상 종료 후 서비스가 다시 시작됨. 수동·배포·관리 도구 중 요청자는 종료 상태만으로 확인할 수 없음.")
+            remedies.append("의도한 재시작이면 추가 조치는 필요 없습니다. 예상치 못했다면 systemd와 배포 기록을 확인하세요.")
+        else:
+            reasons.append(f"서비스가 비정상 종료됨 (systemd 결과: {result}, 종료 상태: {status}). 내부 원인은 로그 확인 필요.")
+            remedies.append("직전 오류·예외와 모델 연결 상태를 확인하세요. 종료 코드만으로 내부 원인을 단정하지 않습니다.")
+    lock = report.get("lock", {})
+    if lock.get("stale"):
+        age = lock.get("age_minutes")
+        age_text = f"{age:.0f}분" if age is not None else "기준 시간 이상"
+        reasons.append(f"예약 작업 잠금이 {age_text} 유지됨. 스케줄러 정지 가능성.")
+        remedies.append("반복되면 실행 중인 작업의 외부 요청 대기와 타임아웃을 점검하세요.")
+    jobs = report.get("jobs", {})
+    if jobs.get("exists") is False:
+        reasons.append("예약 작업 목록 jobs.json을 찾을 수 없음.")
+        remedies.append("프로필 경로와 예약 작업 목록을 백업에서 복구하세요. 재시작만으로 파일은 복원되지 않습니다.")
+    stale_jobs = jobs.get("stale_jobs", [])
+    if stale_jobs:
+        names = ", ".join(str(job["name"])[:80] for job in stale_jobs[:5])
+        reasons.append(f"예약 작업이 실행 유예를 넘겨 지연되거나 실행 기록이 오래됨: {names}.")
+        remedies.append("반복되면 예약 시각·시간대와 스케줄러 로그를 확인하세요. 지연된 작업의 재개 여부도 확인하세요.")
+    api = report.get("api")
+    if api is not None and not api.get("healthy"):
+        status = api.get("status")
+        detail = f"HTTP {status}" if status is not None else "시간 초과 또는 연결 실패"
+        reasons.append(f"Observatory API가 응답하지 않음 ({detail}). 내부 원인은 아직 확정되지 않음.")
+        remedies.append("반복되면 게이트웨이 오류 로그, 포트 충돌, 모델 서버 상태를 점검하세요.")
+    return reasons or ["건강 검사에서 복구가 필요한 상태를 감지함."], remedies
+
+
+def restart_notice(
+    report: dict[str, Any], *, service: str, profile: str | None,
+    restarted: bool, verified: bool | None, after: dict[str, Any] | None = None,
+) -> str:
+    """Build a Korean incident message from verified facts and qualified causes."""
+    reasons, remedies = restart_explanation(report)
+    if not restarted:
+        result = "실패: 재시작 명령이 실패하거나 제한 시간을 초과했습니다. 복구 완료로 처리하지 않습니다."
+    elif verified:
+        result = "성공: 서비스 실행과 재시작 후 건강 검사를 통과했습니다."
+    else:
+        result = "재기동 명령은 성공했지만 건강 검사를 통과하지 못했습니다. 추가 점검이 필요합니다."
+    lines = [
+        "🔄 Hermes 재시작 보고",
+        f"시각: {_now().isoformat(timespec='seconds')}",
+        f"대상: {profile or 'David'} ({service})",
+        "", "재시작 이유:", *[f"• {reason}" for reason in reasons],
+        "", "수행한 조치: systemd가 종료된 게이트웨이 서비스를 다시 시작했습니다." if report.get("service_exit")
+        else "수행한 조치: watchdog이 해당 게이트웨이 서비스를 재시작했습니다." if restarted
+        else "수행한 조치: watchdog이 해당 게이트웨이 서비스 재시작을 시도했습니다.",
+        f"복구 결과: {result}",
+    ]
+    if after is not None and after.get("critical"):
+        remaining, _ = restart_explanation(after)
+        lines += ["남은 문제:", *[f"• {reason}" for reason in remaining]]
+    lines += ["", "해결 방법:", *[f"• {remedy}" for remedy in remedies],
+              f"• 상세 로그: journalctl --user -u {service} --since '15 minutes ago'",
+              "• 재시작으로 중단된 대화는 다시 메시지를 보내 이어갈 수 있습니다."]
+    return "\n".join(lines)
+
+
+def verify_restart(args: argparse.Namespace, home: Path) -> tuple[bool, dict[str, Any]]:
+    """Allow startup briefly, then verify service state and the original probes."""
+    deadline = time.monotonic() + 15
+    while True:
+        state = subprocess.run(
+            ["systemctl", "--user", "is-active", args.gateway_service],
+            capture_output=True, text=True, check=False, timeout=5,
+        )
+        after = assess_health(
+            home, lock_stale_minutes=args.lock_stale_minutes,
+            job_stale_hours=args.job_stale_hours,
+            job_overdue_grace_minutes=args.job_overdue_grace_minutes,
+            check_api=args.check_api,
+        )
+        running = state.returncode == 0 and state.stdout.strip() == "active"
+        # ExecStartPost runs while the unit is still 'activating'.
+        if args.service_event == "start" and state.stdout.strip() == "activating":
+            running = True
+        healthy = running and not after["critical"]
+        if healthy or time.monotonic() >= deadline:
+            return healthy, after
+        time.sleep(1)
+
+
+def send_restart_notice(home: Path, message: str, *, profile: str | None = None) -> tuple[bool, str]:
+    """Send via the owning profile's Telegram home, even when its gateway is down."""
+    command = ["hermes"]
+    if profile:
+        command += ["--profile", profile]
+    command += ["send", "--to", "telegram", "--quiet"]
+    # Never inherit another profile's Telegram routing or cron duplicate guard.
+    env = {key: value for key, value in os.environ.items()
+           if not key.startswith(("TELEGRAM_", "HERMES_CRON_"))}
+    env["HERMES_HOME"] = str(home)
+    try:
+        result = subprocess.run(
+            command, input=message, capture_output=True, text=True,
+            check=False, timeout=DEFAULT_NOTICE_TIMEOUT_SECONDS, env=env,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False, "Telegram notification unavailable or timed out"
+    # CLI errors can contain credentials; retain only the exit code.
+    return result.returncode == 0, f"Telegram notification exit {result.returncode}"
+
+
+def report_restart(home: Path, report: dict[str, Any], args: argparse.Namespace, *, restarted: bool) -> None:
+    """Persist the incident and make notification failure independent of recovery."""
+    after = None
+    verified = False
+    if restarted:
+        try:
+            verified, after = verify_restart(args, home)
+        except (OSError, ValueError, subprocess.TimeoutExpired):
+            pass
+    message = restart_notice(
+        report, service=args.gateway_service, profile=args.profile,
+        restarted=restarted, verified=verified, after=after,
+    )
+    ok, detail = send_restart_notice(home, message, profile=args.profile)
+    state_path = home / "cron" / "last-restart-notice.json"
+    try:
+        state_path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = state_path.with_suffix(".tmp")
+        temporary.write_text(json.dumps({
+            "time": _now().isoformat(), "service": args.gateway_service,
+            "restarted": restarted, "verified": verified, "delivered": ok,
+            "message": message,
+        }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        temporary.replace(state_path)
+    except OSError:
+        print("restart incident could not be saved")
+    print(f"restart notification: {'sent' if ok else 'failed'} ({detail})")
+
+
+def save_service_event(path: Path, data: dict[str, Any]) -> None:
+    """Store only structured lifecycle facts, never service credentials or logs."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(".tmp")
+    temporary.write_text(json.dumps(data) + "\n", encoding="utf-8")
+    temporary.replace(path)
+
+
+def deliver_pending_restart_notice(home: Path, *, profile: str | None = None) -> None:
+    """Retry a transient delivery failure on later watchdog ticks without restarting."""
+    path = home / "cron" / "last-restart-notice.json"
+    try:
+        doc = json.loads(path.read_text())
+        if doc.get("delivered") is not False or not doc.get("message"):
+            return
+        ok, detail = send_restart_notice(home, doc["message"], profile=profile)
+        if ok:
+            doc["delivered"] = True
+            doc["delivered_at"] = _now().isoformat()
+            save_service_event(path, doc)
+        print(f"pending restart notification: {'sent' if ok else 'failed'} ({detail})")
+    except (OSError, ValueError, TypeError):
+        return
+
+
+def watchdog_restart_pending(home: Path) -> bool:
+    """Let the initiating watchdog own its detailed restart notification."""
+    try:
+        doc = json.loads((home / "cron" / "watchdog-restart.json").read_text())
+        started = _parse_iso(doc.get("time"))
+        return started is not None and 0 <= (_now() - started).total_seconds() < 600
+    except (OSError, ValueError, TypeError):
+        return False
+
+
+def service_event(args: argparse.Namespace, home: Path) -> int:
+    """Record systemd exits and report on the next start, without forcing one."""
+    path = home / "cron" / "gateway-last-exit.json"
+    try:
+        if args.service_event == "stop":
+            save_service_event(path, {
+                "time": _now().isoformat(), "watchdog": watchdog_restart_pending(home),
+                "result": os.environ.get("SERVICE_RESULT", "unknown")[:80],
+                "code": os.environ.get("EXIT_CODE", "unknown")[:80],
+                "status": os.environ.get("EXIT_STATUS", "unknown")[:80],
+            })
+            return 0
+        if not path.exists():
+            return 0
+        exit_info = json.loads(path.read_text())
+        if exit_info.get("watchdog") and watchdog_restart_pending(home):
+            path.unlink()
+            return 0
+        report = {"service_exit": exit_info, "critical": True}
+        report_restart(home, report, args, restarted=True)
+        path.unlink()
+    except (OSError, ValueError, TypeError):
+        print("service lifecycle notification unavailable; gateway startup continues")
+    return 0
+
+
 def _format_report(report: dict[str, Any]) -> str:
     lines: list[str] = []
     lock = report["lock"]
@@ -340,6 +556,25 @@ def _retry_key(job: dict[str, Any]) -> str:
     return f"{job['id']}:{job.get('last_run_at') or 'unknown'}"
 
 
+def _retry_consumed(job: dict[str, Any], retried: set[str]) -> bool:
+    """Keep a failed retry from becoming a new retry when its timestamp changes."""
+    return any(key.startswith(f"{job['id']}:") for key in retried)
+
+
+def reset_successful_retries(hermes_home: Path, job_ids: list[str]) -> None:
+    """Allow another failure episode only after the watchdog observes success."""
+    if not job_ids:
+        return
+    state_path = hermes_home / "cron" / "retry-state.json"
+    retried = load_retry_state(state_path)
+    remaining = {
+        key for key in retried
+        if not any(key.startswith(f"{job_id}:") for job_id in job_ids)
+    }
+    if remaining != retried:
+        save_retry_state(state_path, remaining)
+
+
 def load_retry_state(path: Path) -> set[str]:
     """Read previously queued retry keys; invalid runtime state is ignored."""
     try:
@@ -392,13 +627,13 @@ def retry_failed_jobs_once(
     profile: str | None = None,
     retry_state_path: Path | None = None,
 ) -> list[dict[str, str]]:
-    """Queue at most one retry for each failed execution and record the attempt."""
+    """Queue at most one retry during a job's consecutive failures."""
     state_path = retry_state_path or hermes_home / "cron" / "retry-state.json"
     retried = load_retry_state(state_path)
     outcomes: list[dict[str, str]] = []
     for job in failed_jobs:
         key = _retry_key(job)
-        if not job["id"] or key in retried:
+        if not job["id"] or _retry_consumed(job, retried):
             continue
         ok, detail = run_cron_job(job["id"], profile=profile)
         outcomes.append({"name": job["name"], "result": "queued" if ok else "failed", "detail": detail})
@@ -409,9 +644,9 @@ def retry_failed_jobs_once(
 
 
 def retryable_failed_jobs(hermes_home: Path, failed_jobs: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Exclude executions that have already consumed their single retry."""
+    """Exclude jobs that consumed a retry without an observed success since."""
     retried = load_retry_state(hermes_home / "cron" / "retry-state.json")
-    return [job for job in failed_jobs if job.get("id") and _retry_key(job) not in retried]
+    return [job for job in failed_jobs if job.get("id") and not _retry_consumed(job, retried)]
 
 
 def inference_recovery_deferred(url: str) -> bool:
@@ -440,7 +675,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--retry-failed-once",
         action="store_true",
-        help="Restart then queue one retry for each newly failed cron execution",
+        help="Queue one retry per job until observed success, without restarting a healthy gateway",
     )
     parser.add_argument(
         "--lock-stale-minutes",
@@ -471,6 +706,14 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Treat an unresponsive local Observatory API as a critical gateway fault",
     )
     parser.add_argument(
+        "--notify-restarts", action="store_true",
+        help="Send restart causes, verified outcome and remedies to the profile's Telegram home",
+    )
+    parser.add_argument(
+        "--service-event", choices=("stop", "start"),
+        help="Record a systemd exit or notify after the next service start",
+    )
+    parser.add_argument(
         "--gateway-service",
         default=DEFAULT_GATEWAY_SERVICE,
         help=f"systemd user service to restart (default: {DEFAULT_GATEWAY_SERVICE})",
@@ -494,12 +737,16 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
     home = Path(args.hermes_home).expanduser()
+    if args.service_event:
+        return service_event(args, home)
     if args.skip_missing_home and not home.exists():
         print(f"Hermes home not installed; skipping: {home}")
         return 0
     if args.skip_missing_gateway and not gateway_service_exists(args.gateway_service):
         print(f"Hermes gateway not installed; skipping: {args.gateway_service}")
         return 0
+    if args.notify_restarts:
+        deliver_pending_restart_notice(home, profile=args.profile)
     report = assess_health(
         home,
         lock_stale_minutes=args.lock_stale_minutes,
@@ -513,35 +760,45 @@ def main(argv: list[str] | None = None) -> int:
         print(_format_report(report))
 
     failures = report["jobs"].get("failed_jobs", [])
+    if args.retry_failed_once:
+        reset_successful_retries(home, report["jobs"].get("successful_job_ids", []))
     retryable_failures = retryable_failed_jobs(home, failures)
-    should_recover = report["critical"] or (
-        args.retry_failed_once and bool(retryable_failures)
-    )
-    if should_recover:
-        if args.restart:
-            if args.inference_admission_url and inference_recovery_deferred(args.inference_admission_url):
-                print("gateway recovery deferred: inference is active, queued, cooling or unverified")
-                return 1
-            ok, msg = restart_gateway(service=args.gateway_service)
-            if ok:
-                print("gateway restart: ok")
-                if msg:
-                    print(msg)
-                if args.retry_failed_once and retryable_failures:
-                    outcomes = retry_failed_jobs_once(
-                        home, retryable_failures, profile=args.profile,
-                    )
-                    for outcome in outcomes:
-                        print(
-                            f"cron retry {outcome['result']}: "
-                            f"{outcome['name']} ({outcome['detail']})"
-                        )
-                    if any(outcome["result"] == "failed" for outcome in outcomes):
-                        return 2
-                return 0
-            print(f"gateway restart failed: {msg}")
-            return 2
+    should_retry = args.retry_failed_once and bool(retryable_failures)
+    if report["critical"] and not args.restart:
         return 2
+    if report["critical"] or should_retry:
+        if args.inference_admission_url and inference_recovery_deferred(args.inference_admission_url):
+            print("gateway recovery deferred: inference is active, queued, cooling or unverified")
+            return 1
+        if report["critical"]:
+            marker = home / "cron" / "watchdog-restart.json"
+            if args.notify_restarts:
+                save_service_event(marker, {"time": _now().isoformat()})
+            try:
+                ok, msg = restart_gateway(service=args.gateway_service)
+                if args.notify_restarts:
+                    report_restart(home, report, args, restarted=ok)
+            finally:
+                if args.notify_restarts:
+                    marker.unlink(missing_ok=True)
+            if not ok:
+                print(f"gateway restart failed: {msg}")
+                return 2
+            print("gateway restart: ok")
+            if msg:
+                print(msg)
+        if should_retry:
+            outcomes = retry_failed_jobs_once(
+                home, retryable_failures, profile=args.profile,
+            )
+            for outcome in outcomes:
+                print(
+                    f"cron retry {outcome['result']}: "
+                    f"{outcome['name']} ({outcome['detail']})"
+                )
+            if any(outcome["result"] == "failed" for outcome in outcomes):
+                return 2
+        return 0
     if failures:
         return 1
     return 0

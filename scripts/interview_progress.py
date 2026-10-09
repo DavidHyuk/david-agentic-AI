@@ -136,6 +136,165 @@ def curriculum_cursor(state: dict, track: str, today: str) -> int:
     return cursor
 
 
+class NoCodingProblems(ValueError):
+    """No unsolved, unskipped problem is available in the selected scope."""
+
+
+def coding_completed_ids(state: dict, today: str) -> set:
+    completed = {row['item_id'] for row in state['coding']
+                 if row['date'] <= today and row.get('item_id')}
+    completed.update(row.get('item_id', item_id)
+                     for item_id, row in state.get('external_coding', {}).items()
+                     if row['date'] <= today)
+    return completed
+
+
+def coding_assignments(state: dict, today: str) -> list:
+    return [row for row in state['assignments'].values()
+            if row['track'] == 'coding' and row['date'] <= today
+            and not row.get('completed') and not row.get('superseded')
+            and row.get('session_type') != 'review']
+
+
+def active_coding_assignment(state: dict, today: str) -> dict | None:
+    rows = [row for row in coding_assignments(state, today)
+            if not row.get('skipped') and not row.get('paused')]
+    return rows[-1] if rows else None
+
+
+def coding_topics(catalog: dict) -> list:
+    return list(dict.fromkeys(slot['pattern_block'] for slot in
+                             catalog.get('coding_curriculum', []) if slot.get('problem')))
+
+
+def coding_navigation_snapshot(state: dict, catalog: dict, today: str) -> dict:
+    """Build a read-only topic inventory and permanent skip history."""
+    completed = coding_completed_ids(state, today)
+    assignments = coding_assignments(state, today)
+    by_item = {row['item_id']: row for row in assignments}
+    active = active_coding_assignment(state, today)
+    if active:
+        by_item[active['item_id']] = active
+    items = {row['id']: row for row in catalog.get('problems', [])}
+    topics = []
+    for topic in coding_topics(catalog):
+        problems = []
+        for index, slot in enumerate(catalog['coding_curriculum']):
+            if slot.get('pattern_block') != topic or not slot.get('problem'):
+                continue
+            item_id = slot['problem']
+            row = by_item.get(item_id, {})
+            status = ('completed' if item_id in completed else 'skipped' if row.get('skipped')
+                      else 'paused' if row.get('paused') else 'active' if row else 'upcoming')
+            problems.append({'item_id': item_id, 'curriculum_slot': index,
+                             'name': items.get(item_id, {}).get('name', item_id),
+                             'difficulty': items.get(item_id, {}).get('difficulty', ''),
+                             'status': status, 'assignment': row.get('id')})
+        topics.append({'name': topic, 'problems': problems,
+                       'completed_count': sum(row['status'] == 'completed' for row in problems)})
+    history = []
+    for row in state['assignments'].values():
+        if row.get('track') != 'coding' or row['date'] > today or not row.get('skip_dates'):
+            continue
+        history.append({'assignment': row['id'], 'item_id': row['item_id'],
+                        'name': items.get(row['item_id'], {}).get('name', row['item_id']),
+                        'difficulty': items.get(row['item_id'], {}).get('difficulty', ''),
+                        'topic': row.get('pattern_block'), 'skip_dates': row['skip_dates'],
+                        'status': ('completed' if row['item_id'] in completed else
+                                   'skipped' if row.get('skipped') else
+                                   'paused' if row.get('paused') else 'active')})
+    navigation = state.get('coding_navigation', {})
+    return {'topics': topics, 'skip_history': sorted(history, key=lambda row: row['skip_dates'][-1],
+                                                   reverse=True),
+            'selected_topic': navigation.get('topic') or (active or {}).get('pattern_block'),
+            'previous_topic': navigation.get('previous_topic'),
+            'active_assignment': (active or {}).get('id')}
+
+
+def select_new_coding(state: dict, catalog: dict, today: str, topic: str | None = None) -> dict:
+    completed = coding_completed_ids(state, today)
+    skipped = {row['item_id'] for row in coding_assignments(state, today) if row.get('skipped')}
+    done_slots = completed_slots(state, 'coding', today)
+    candidate = next(((index, slot) for index, slot in enumerate(catalog['coding_curriculum'])
+                      if slot.get('problem') and index not in done_slots
+                      and slot['problem'] not in completed | skipped
+                      and (topic is None or slot['pattern_block'] == topic)), None)
+    if candidate is None:
+        raise NoCodingProblems('새 문제가 없습니다. 다른 주제나 스킵 기록에서 문제를 선택하세요.')
+    index, slot = candidate
+    item_id = slot['problem']
+    by_id = {row['id']: row for row in catalog['problems']}
+    topic_ids = {row['problem'] for row in catalog['coding_curriculum']
+                 if row.get('problem') and row.get('pattern_block') == topic}
+    missing = [item for item in by_id[item_id]['prerequisites']
+               if item not in completed | skipped and (topic is None or item in topic_ids)]
+    if missing:
+        return {'item_id': missing[0], 'reason': 'prerequisite practice',
+                'curriculum_slot': None, 'session_type': 'new'}
+    return {'item_id': item_id, 'reason': 'next new curriculum item',
+            'curriculum_slot': index, 'session_type': 'new'}
+
+
+def coding_navigation_action(state: dict, catalog: dict, today: str, action: str,
+                             expected_assignment: str | None, *, assignment_id: str | None = None,
+                             topic: str | None = None) -> dict:
+    """Skip/resume/switch under the CLI lock, guarding stale browser actions."""
+    date.fromisoformat(today)
+    active = active_coding_assignment(state, today)
+    if (active or {}).get('id') != expected_assignment:
+        raise ValueError('현재 문제가 바뀌었습니다. 새로고침 후 다시 선택하세요.')
+    if action not in ('skip', 'resume', 'topic'):
+        raise ValueError('Unknown coding navigation action.')
+    target = None
+    if action == 'skip':
+        if not active or assignment_id != active['id']:
+            raise ValueError('현재 미완료 새 문제만 스킵할 수 있습니다.')
+    elif action == 'resume':
+        target = next((row for row in coding_assignments(state, today)
+                       if row['id'] == assignment_id), None)
+        if not target or not (target.get('skipped') or target.get('paused') or target is active):
+            raise ValueError('이어갈 수 있는 미완료 문제를 선택하세요.')
+        topic = target.get('pattern_block')
+    elif topic not in coding_topics(catalog):
+        raise ValueError('알 수 없는 문제 주제입니다.')
+    navigation = state.setdefault('coding_navigation', {})
+    previous_topic = navigation.get('topic') or (active or {}).get('pattern_block')
+    if action == 'skip':
+        navigation['topic'] = previous_topic
+        for row in coding_assignments(state, today):
+            if row['item_id'] == active['item_id']:
+                row['skipped'] = True
+        active.setdefault('skip_dates', []).append(today)
+    else:
+        if previous_topic and previous_topic != topic:
+            navigation['previous_topic'] = previous_topic
+        navigation['topic'] = topic
+        if target is None:
+            matches = [row for row in coding_assignments(state, today)
+                       if row.get('pattern_block') == topic and not row.get('skipped')]
+            target = matches[-1] if matches else None
+    for row in coding_assignments(state, today):
+        if not row.get('skipped'):
+            row['paused'] = True
+    if target:
+        for row in coding_assignments(state, today):
+            if row['item_id'] == target['item_id']:
+                row['skipped'] = False
+                row['paused'] = True
+        target['skipped'] = False
+        target['paused'] = False
+        return {'assignment': target}
+    try:
+        # A topic click stays in that topic even if all its problems are skipped.
+        selection = (select_new_coding(state, catalog, today, topic)
+                     if action == 'topic' else None)
+        result = plan(state, catalog, 'coding', today, next_assignment=True,
+                      coding_selection=selection)
+    except NoCodingProblems:
+        result = None
+    return {'assignment': result}
+
+
 def import_coding_history(state: dict, catalog: dict, today: str, payload: dict,
                           snapshot: dict, chat: dict, project: dict) -> dict:
     """Import owner-selected learning with cached chat and actual Accepted proof.
@@ -499,19 +658,27 @@ def select_item(state: dict, catalog: dict, track: str, today: str,
         {'problem': p['id']} for p in items]
     slot = curriculum[cursor] if cursor < len(curriculum) else None
     if prefer_new:
-        done_slots = completed_slots(state, track, today)
-        next_new = next(((index, candidate) for index, candidate in enumerate(curriculum)
-                         if candidate.get('problem') and index not in done_slots), None)
-        if next_new:
-            slot_index, candidate = next_new
-            item_id = candidate['problem']
-            missing = [p for p in by_id[item_id]['prerequisites'] if p not in completed_ids]
-            if missing:
-                item_id, reason, slot_index = missing[0], 'prerequisite practice', None
-            else:
-                reason = 'next new curriculum item'
-            return {'item_id': item_id, 'reason': reason, 'curriculum_slot': slot_index,
-                    'session_type': 'review' if item_id in completed_ids else 'new'}
+        topic = state.get('coding_navigation', {}).get('topic')
+        if topic:
+            try:
+                return select_new_coding(state, catalog, today, topic)
+            except NoCodingProblems:
+                topics = coding_topics(catalog)
+                if topic in topics:
+                    position = topics.index(topic)
+                    for following in topics[position + 1:] + topics[:position]:
+                        try:
+                            selection = select_new_coding(state, catalog, today, following)
+                        except NoCodingProblems:
+                            continue
+                        state['coding_navigation'].update(topic=following, previous_topic=topic)
+                        return selection
+                raise
+        try:
+            return select_new_coding(state, catalog, today)
+        except NoCodingProblems:
+            if state.get('coding_navigation') is not None:
+                raise
     ranked = sorted(latest.values(), key=lambda s: (
         weakness(s, track), s['next_review_date'], by_id[s['item_id']].get('recommended_order', 0)))
     due = [s for s in ranked if s['next_review_date'] <= today]
@@ -555,7 +722,8 @@ def select_review_item(state: dict, catalog: dict, track: str, today: str) -> di
 
 
 def plan(state: dict, catalog: dict, track: str, today: str,
-         next_assignment: bool = False, review_assignment: bool = False) -> dict:
+         next_assignment: bool = False, review_assignment: bool = False,
+         coding_selection: dict | None = None) -> dict:
     """Return the daily assignment or an explicit new/review follow-up.
 
     Normal scheduled planning stays idempotent for the whole day.  An explicit
@@ -567,6 +735,12 @@ def plan(state: dict, catalog: dict, track: str, today: str,
     if track == 'system_design' and not review_assignment:
         return plan_design(state, catalog, today)
     date.fromisoformat(today)
+    navigation_active = track == 'coding' and 'coding_navigation' in state
+    if navigation_active and not review_assignment:
+        active = active_coding_assignment(state, today)
+        if active:
+            return active
+        next_assignment = True
     daily_id = f'{track}:{today}'
     if not next_assignment and not review_assignment and daily_id in state['assignments']:
         return state['assignments'][daily_id]
@@ -578,6 +752,7 @@ def plan(state: dict, catalog: dict, track: str, today: str,
         unfinished = [assignment for assignment in track_assignments
                       if not assignment['completed'] and
                       not assignment.get('superseded') and
+                      not assignment.get('skipped') and not assignment.get('paused') and
                       (assignment.get('session_type') == 'review') == review_assignment]
         if unfinished:
             if not next_assignment:
@@ -597,8 +772,16 @@ def plan(state: dict, catalog: dict, track: str, today: str,
     while assignment_id in state['assignments']:
         assignment_id = f'{daily_id}:{sequence}'
         sequence += 1
-    selection = (select_review_item(state, catalog, track, today) if review_assignment
+    selection = (coding_selection if coding_selection is not None else
+                 select_review_item(state, catalog, track, today) if review_assignment
                  else select_item(state, catalog, track, today, prefer_new=next_assignment))
+    if navigation_active and not review_assignment:
+        # Resume a saved topic problem rather than duplicate it after a topic ends.
+        saved = [row for row in coding_assignments(state, today)
+                 if row['item_id'] == selection['item_id'] and not row.get('skipped')]
+        if saved:
+            saved[-1]['paused'] = False
+            return saved[-1]
     if track == 'coding' and selection['curriculum_slot'] is not None:
         slot = catalog['coding_curriculum'][selection['curriculum_slot']]
         selection.update(pattern_block=slot['pattern_block'],
@@ -650,7 +833,8 @@ def render_message(assignment: dict, catalog: dict) -> str:
 
 def record_hint(state: dict, assignment_id: str, solution: bool = False) -> dict:
     assignment = state['assignments'][assignment_id]
-    if assignment['track'] != 'coding' or assignment['completed']:
+    if (assignment['track'] != 'coding' or assignment['completed']
+            or assignment.get('skipped') or assignment.get('paused')):
         raise ValueError('Hints require an unfinished coding assignment.')
     related = [a for a in state['assignments'].values()
                if a['track'] == 'coding' and a['item_id'] == assignment['item_id']
@@ -678,6 +862,8 @@ def record_session(state: dict, catalog: dict, assignment_id: str,
     date.fromisoformat(today)
     assignment = state['assignments'][assignment_id]
     track = assignment['track']
+    if not assignment.get('completed') and (assignment.get('skipped') or assignment.get('paused')):
+        raise ValueError('이 문제를 다시 연 뒤 학습 결과를 저장하세요.')
     if today < assignment['date']:
         raise ValueError('Completion cannot precede the assignment date.')
     _integer(feedback['duration'], 'duration in minutes', 1, 1440)
@@ -793,6 +979,15 @@ def parse_args(argv=None) -> argparse.Namespace:
     follow_up.add_argument('--review', action='store_true', dest='review_assignment',
                            help='open the highest-value completed problem for review')
     select.add_argument('--format', choices=('text', 'json'), default='text')
+    sub.add_parser('coding-navigation')
+    for command in ('coding-skip', 'coding-resume', 'coding-topic'):
+        navigation = sub.add_parser(command)
+        navigation.add_argument('--expected-assignment', required=True,
+                                help='current assignment ID, or an empty string when none is active')
+        if command == 'coding-topic':
+            navigation.add_argument('--topic', required=True)
+        else:
+            navigation.add_argument('--assignment', required=True)
     for command in ('hint', 'solution'):
         assistance = sub.add_parser(command)
         assistance.add_argument('--assignment', required=True)
@@ -859,6 +1054,16 @@ def main(argv=None) -> int:
                 result = plan(state, catalog, args.track, args.date, args.next_assignment,
                               args.review_assignment)
                 output = render_message(result, catalog) if args.format == 'text' else json.dumps(result, indent=2)
+            elif args.command == 'coding-navigation':
+                output = json.dumps(coding_navigation_snapshot(state, catalog, args.date),
+                                    indent=2, ensure_ascii=False)
+            elif args.command in ('coding-skip', 'coding-resume', 'coding-topic'):
+                result = coding_navigation_action(
+                    state, catalog, args.date, args.command.removeprefix('coding-'),
+                    args.expected_assignment or None,
+                    assignment_id=getattr(args, 'assignment', None),
+                    topic=getattr(args, 'topic', None))
+                output = json.dumps(result, indent=2, ensure_ascii=False)
             elif args.command in ('hint', 'solution'):
                 result = record_hint(state, args.assignment, args.command == 'solution')
                 output = json.dumps(result, indent=2)

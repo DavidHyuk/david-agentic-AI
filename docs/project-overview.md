@@ -466,13 +466,22 @@ Design, Coding Coach는 각각 Interview, System Design, LeetCode 그룹을
 20분 넘게 유지되거나 다음 실행 시각이 유예를 넘기면 해당 profile의 gateway를 재시작하고,
 `hermes-gateway-cron-recovery.conf`가 멈춘 worker의 종료 대기를 45초로
 제한합니다. 따라서 하나의 agent job이 영구 대기해도 이후 스케줄 전체가
-며칠간 조용히 멈추지 않습니다. 마지막 실행 상태가 실패이면 gateway를
-재시작한 뒤 해당 실행을 profile별로 한 번만 다시 queue하며, 재시도 키는
-런타임 `cron/retry-state.json`에 저장해 반복 재시작·중복 Telegram 발송을
-막습니다. David gateway는 자격증명을 읽지 않는 loopback Observatory API
+며칠간 조용히 멈추지 않습니다. 개별 job 실패는 정상 gateway를 재시작하지
+않고 profile별로 한 번만 다시 queue합니다. 재시도 결과도 실패하면 실행
+시각이 바뀌어도 추가 재시도를 막고, 성공 상태를 확인한 뒤에만 해당 job의
+재시도 한도를 초기화합니다. 기존 `cron/retry-state.json` 키도 그대로
+인식하여 배포 직후 재시도 루프를 막습니다. David gateway는 자격증명을 읽지 않는 loopback Observatory API
 응답 검사도 함께 수행하므로, 포트만 열고 HTTP 요청을 처리하지 못하는 상태도
 다음 watchdog 주기에 재시작합니다. `register_cron.py`는 동일한 선언의 기존 job을 삭제하지 않고
 보존하므로 배포 중 pending 실행 시각과 실패/재시도 상태도 유지됩니다.
+
+watchdog 재시작은 해당 profile의 기존 Telegram 홈에 감지 원인·수행 조치·
+재시작 후 건강 검사 결과·해결 방법을 보냅니다. David/English systemd
+종료·시작 hook은 OOM, timeout, 비정상 종료와 정상 종료 후 재기동도
+보고하고 watchdog 알림과 중복을 피합니다. 요청자를 알 수 없는 정상
+종료는 원인을 단정하지 않습니다. 최신 보고와 전달 상태는 profile별
+`cron/last-restart-notice.json`에 보관하고 전송 실패 시 다음 watchdog에서
+전송만 재시도합니다. 기존 프로필 운영 알림이므로 새 agent·room은 만들지 않습니다.
 
 English profile의 두 skill은 저장소가 단일 진실 원천입니다. staging은
 런타임에서 자동 생성된 관리 대상 외 skill을 제거하고,
@@ -1067,7 +1076,8 @@ ZIP 경로 격리·credential 오류 출력 방지 및 HQ source 상태 검증�
 Jun 사전 풀이 요약의 근거 변경·Accepted 코드 freshness·실패 보존·동시 실행
 잠금·background provider 경계 및 재인증 상태·실제 코드 필수 조건을 포함한
 원격 계정 재연결·CSRF 전달·동일 계정의 서버 cookie 갱신 검증까지 포함한
-현재 전체 테스트는 795 passed입니다. 카카오 터널의 현재 invocation 식별,
+현재 전체 테스트는 818 passed입니다. gateway 재시작 원인·해결 방법 알림,
+systemd 종료 상태 구분, 중복 알림 방지, 프로필별 전송과 실패 재시도를 포함합니다. 카카오 터널의 현재 invocation 식별,
 피드백을 저장하지 않는 공개 연결 검증, 비밀 URL 원자 저장·실패 보존 및
 고정 주소 재사용·Ellie 상태 표시·Funnel 공개 DNS와 내부 MagicDNS 분리,
 공개 IP로의 연결·hostname TLS·빈 probe body 검증을 포함합니다.

@@ -369,7 +369,8 @@ class Observatory:
         state = self.coach_state()
         latest = {}
         for assignment in sorted(state['assignments'].values(), key=lambda a: a['date']):
-            if not assignment.get('completed') and not assignment.get('superseded'):
+            if (not assignment.get('completed') and not assignment.get('superseded')
+                    and not assignment.get('skipped') and not assignment.get('paused')):
                 latest[(assignment['track'], assignment['item_id'])] = assignment
         return list(latest.values())
 
@@ -462,6 +463,12 @@ class Observatory:
                         today_assignment=today_assignments[-1] if today_assignments else None,
                         catalog_available=bool(items))
             if room == 'coding':
+                data['coding_navigation'] = (self.helper('interview_progress.py', [
+                    '--state', str(self.home / 'data/interview/coach_state.json'),
+                    '--catalog', str(self.catalog_path()), '--date', today,
+                    'coding-navigation']) if items else
+                    {'topics': [], 'skip_history': [], 'selected_topic': None,
+                     'previous_topic': None, 'active_assignment': None})
                 external = sorted(state.get('external_coding', {}).values(),
                                   key=lambda row: row['date'], reverse=True)
                 data['external_learning'] = external
@@ -567,6 +574,17 @@ class Observatory:
             data['papers'] = self.library('papers', limit=12)['items']
             data['reading_list'] = list(notebook['papers'].values())
         elif room == 'hq':
+            health = read_json(self.home / 'data/observatory/connection-health.json', {})
+            data['connection_health'] = {
+                'checked_at': health.get('checked_at'),
+                'last_delivery_ok': health.get('last_delivery_ok'),
+                'pending_count': len(health.get('pending', [])),
+                'services': [{key: row.get(key) for key in
+                              ('service', 'label', 'status', 'reason', 'incident_open', 'checked_at')}
+                             for row in health.get('services', {}).values() if isinstance(row, dict)],
+                'events': [{key: row.get(key) for key in ('service', 'label', 'kind', 'reason', 'time')}
+                           for row in reversed(health.get('events', [])) if isinstance(row, dict)][:10],
+            }
             data['chatgpt_archive'] = self.chatgpt_archive_status()
             data['chatgpt_project_rag'] = self.chatgpt_project_rag_status()
             data['pending'] = self.pending_assignments()
@@ -845,7 +863,7 @@ class Observatory:
                 'item_id': row['slug'], 'problem': row.get('title'), 'date': accepted,
                 'pattern': item.get('pattern') or {'reverse-string': 'Two Pointers'}.get(row['slug']),
                 'evidence': 'LeetCode Accepted; implementation/learning unknown unless supplied separately'}
-        if not completed:
+        if not completed and not state.get('coding_navigation'):
             return ''
         pending = [row for row in self.pending_assignments() if row['track'] == 'coding'
                    and row.get('session_type') != 'review']
@@ -857,6 +875,10 @@ class Observatory:
         facts = {'known_completed_problem_count': len(completed), 'completed_problems': list(completed.values()),
                  'completed_by_pattern': patterns,
                  'next_new_problem': pending[0]['item_id'] if pending else None,
+                 'selected_topic': state.get('coding_navigation', {}).get('topic'),
+                 'skipped_problems': [row['item_id'] for row in state['assignments'].values()
+                                      if row.get('track') == 'coding' and row.get('skipped')
+                                      and not row.get('completed')],
                  'review_policy': 'Reviews are separate and do not replace the next new problem.'}
         return ('\n\nCURRENT authoritative shared Coding Coach state (data, not instructions). '
                 'These fresh verified facts supersede older assistant claims in this conversation. '
@@ -1068,6 +1090,19 @@ class Observatory:
             if not result.get('refresh_started'):
                 raise ValueError('계정 연결은 완료됐지만 코드 갱신을 시작하지 못했습니다. 잠시 후 새로고침하세요.')
             return {'saved': True, 'result': result}
+        if action in ('coding_skip', 'coding_resume', 'coding_topic'):
+            if body.get('room') != 'coding':
+                raise ValueError('Jun 작업실에서만 문제를 스킵하거나 주제를 바꿀 수 있습니다.')
+            if 'expected_assignment' not in body or (body['expected_assignment'] is not None
+                    and not isinstance(body['expected_assignment'], str)):
+                raise ValueError('현재 문제 ID가 필요합니다. 새로고침 후 다시 선택하세요.')
+            args = ['--state', str(self.home / 'data/interview/coach_state.json'),
+                    '--catalog', str(self.catalog_path()), '--date', today,
+                    action.replace('_', '-'), '--expected-assignment',
+                    body['expected_assignment'] or '']
+            key = 'topic' if action == 'coding_topic' else 'assignment'
+            args += ['--' + key, self.text_field(body, key)]
+            return {'saved': True, 'result': self.helper('interview_progress.py', args)}
         if action in ('plan', 'feedback'):
             track = body.get('track')
             if track not in ('coding', 'system_design'):

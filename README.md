@@ -1436,8 +1436,20 @@ only a next-run timestamp beyond that grace or a cron tick lock held longer than
 20 minutes triggers a restart of the matching gateway. The installed
 gateway drop-ins cap shutdown at 45 seconds, so a permanently blocked worker
 cannot prevent recovery indefinitely. A job whose latest run is marked failed is
-also restarted and queued once again; the retry state is stored per profile, so a
-persistently bad run does not create duplicate Telegram posts or restart loops.
+queued once again without restarting a healthy gateway. The profile-local retry
+state limits retries across consecutive failures, including a failed retry with
+a new execution timestamp. An observed successful run resets that job's retry
+allowance; persistent job errors remain visible without creating restart loops.
+Automatic recovery reports the observed restart reason, action, verified result
+and practical remedies to the owning profile's Telegram home. `--notify-restarts`
+enables these messages for manual `cron_health.py --restart` checks as well.
+Systemd lifecycle hooks also report David/English restarts after recorded exits,
+including OOM, timeout, abnormal exit or clean stop followed by startup. Clean
+stops cannot identify the requester; the message says so. No alert is sent on a
+first start without an exit record. Notifications do not require a working
+gateway and never restart it on delivery failure. The latest report and delivery
+status are saved in `cron/last-restart-notice.json`; failed delivery is retried
+on later watchdog checks. Watchdog and lifecycle hooks deduplicate one restart.
 Unchanged `register_cron.py` jobs are kept in place to preserve their pending run
 time and this runtime state. An English profile or Telegram gateway that has not
 yet been installed is skipped cleanly.

@@ -12,6 +12,20 @@ import pytest
 import kakao_tunnel_url as tunnel
 
 
+@pytest.mark.parametrize('ready', [True, False])
+def test_probe_only_preserves_private_url_and_never_prints_it(tmp_path, monkeypatch, capsys, ready):
+    path = tmp_path / 'data/english/kakao-skill-url.txt'
+    path.parent.mkdir(parents=True)
+    url = 'https://public.example/kakao/SECRET_PATH'
+    path.write_text(url)
+    monkeypatch.setattr(tunnel, 'endpoint_ready', lambda value: value == url and ready)
+    assert tunnel.main(['--home', str(tmp_path), '--probe-only']) == (0 if ready else 1)
+    output = capsys.readouterr()
+    assert 'SECRET_PATH' not in output.out + output.err
+    assert path.read_text() == url
+    assert sorted(p.name for p in path.parent.iterdir()) == ['kakao-skill-url.txt']
+
+
 def test_origin_requires_connected_current_invocation():
     origin = 'https://current-tunnel.trycloudflare.com'
     assert tunnel.tunnel_origin(origin) is None

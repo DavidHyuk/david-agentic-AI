@@ -648,6 +648,58 @@ def test_workbench_get_never_assigns_or_completes(study_store):
     assert not (study_store.home / 'data/observatory/workspace.json').exists()
 
 
+def test_hq_exposes_connection_incidents_without_source_errors_or_private_fields(study_store):
+    path = study_store.home / 'data/observatory/connection-health.json'
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps({'checked_at': '2026-10-09', 'last_delivery_ok': False,
+        'pending': [{'service': 'chatgpt_sync'}], 'services': {'chatgpt_sync': {
+            'service': 'chatgpt_sync', 'status': 'failed', 'reason': 'sync_failed', 'raw_error': 'SECRET'}},
+        'events': [{'service': 'chatgpt_sync', 'kind': 'failed', 'time': '2026-10-09', 'token': 'SECRET'}]}))
+    original = path.read_bytes()
+    result = study_store.workbench('hq')['connection_health']
+    assert result['last_delivery_ok'] is False and result['pending_count'] == 1
+    assert result['services'][0]['reason'] == 'sync_failed'
+    assert 'SECRET' not in json.dumps(result)
+    assert path.read_bytes() == original
+
+
+def test_coding_navigation_api_and_workbench_share_saved_state(study_store):
+    first = study_store.study_action({'action': 'plan', 'track': 'coding'})['result']
+    skipped = study_store.study_action({'action': 'coding_skip', 'room': 'coding',
+        'assignment': first['id'], 'expected_assignment': first['id']})['result']['assignment']
+    assert skipped['item_id'] == 'valid-anagram'
+    data = study_store.workbench('coding')
+    assert [row['id'] for row in data['pending']] == [skipped['id']]
+    assert data['coding_navigation']['skip_history'][0]['status'] == 'skipped'
+    assert len(data['coding_navigation']['topics']) == 8
+    selected = study_store.study_action({'action': 'coding_topic', 'room': 'coding',
+        'topic': 'Two Pointers', 'expected_assignment': skipped['id']})['result']['assignment']
+    assert selected['item_id'] == 'valid-palindrome'
+    resumed = study_store.study_action({'action': 'coding_resume', 'room': 'coding',
+        'assignment': first['id'], 'expected_assignment': selected['id']})['result']['assignment']
+    assert resumed['id'] == first['id']
+    data = study_store.workbench('coding')
+    assert data['coding_navigation']['active_assignment'] == first['id']
+    assert data['coding_navigation']['skip_history'][0]['status'] == 'active'
+    assert [row['id'] for row in data['pending']] == [first['id']]
+    assert 'skipped_problems' in study_store.coding_progress_context()
+    state_path = study_store.home / 'data/interview/coach_state.json'
+    original = state_path.read_bytes()
+    study_store.workbench('coding')
+    assert state_path.read_bytes() == original
+
+
+@pytest.mark.parametrize('body', [
+    {'action': 'coding_skip', 'room': 'design', 'assignment': 'unknown', 'expected_assignment': None},
+    {'action': 'coding_topic', 'room': 'coding', 'topic': 'HashMap'},
+    {'action': 'coding_resume', 'room': 'coding', 'assignment': 'unknown', 'expected_assignment': []},
+])
+def test_coding_navigation_rejects_other_rooms_and_invalid_expectations(study_store, body):
+    with pytest.raises(ValueError):
+        study_store.study_action(body)
+    assert not (study_store.home / 'data/interview/coach_state.json').exists()
+
+
 def test_coding_workbench_shows_imported_learning_and_actual_practice_gap(study_store):
     today = observatory_module.datetime.now(observatory_module.TZ).date()
     accepted_date = (today - observatory_module.timedelta(days=4)).isoformat()
