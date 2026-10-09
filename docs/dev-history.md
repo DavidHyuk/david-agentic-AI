@@ -3,6 +3,24 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.48.2 — 2026-10-09 (patch: apply GitHub Dark colors across the Observatory)
+
+- Replace the warm green/beige UI with shared charcoal surface, light text,
+  blue action/link and semantic status tokens. Apply the palette to the sidebar,
+  office furniture and character labels, conversations, every study workbench,
+  mission board, rewards, history, schedules, library and record dialogs. Align
+  saved-code syntax colors with the dark palette and retain the existing cast.
+- Declare the native dark color scheme in HTML/CSS, update browser theme color,
+  version stylesheet URLs and add matching input/summary focus and button hover
+  states. Dark mode stays the default even when the OS prefers light mode.
+  Stage only the four static UI files into the existing Observatory installation.
+- Validation: **118 directly relevant tests pass**. Inspect desktop/mobile office
+  and Jun screenshots; browse all seven main workbenches, history, schedule,
+  library, a record dialog and an expanded saved-code review with no JavaScript
+  errors or bright panels. Verify all eight coding topics and 48 problem entries
+  still render. Check native inputs, keyboard focus, light/dark browser preferences
+  and representative text/status/action contrast ratios (minimum **4.60:1**).
+
 ## v1.48.1 — 2026-10-09 (patch: repair ChatGPT sync and consolidate duplicate notices)
 
 - Reproduce the daily sync failure with the authenticated browser: a shorter

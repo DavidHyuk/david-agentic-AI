@@ -670,6 +670,11 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   (`app.js`, `workbench.js`, `office.js`, `style.css`, `workbench.css`, `office.css`):
   Python 표준 라이브러리 HTTP 서버와 로컬 HTML/CSS/JavaScript. CDN 없이
   애니메이션 에이전트 오피스, 세션 날짜별 리플레이, 검색·페이지네이션 제공.
+- 모든 화면은 GitHub Dark 계열의 차콜 배경과 파란 액션 색상을 기본으로
+  사용합니다. 오피스 가구·이름표·대화, 작업실 카드·입력창·코드, 기록·스케줄을
+  공통 CSS 색상 토큰으로 통일하고 정상/장애는 녹색/붉은색으로 구분합니다.
+  HTML과 CSS에 dark color scheme을 선언하여 Chrome 다크 환경의 네이티브
+  폼 컨트롤도 어울리게 표시합니다. 업데이트 후 페이지 새로고침으로 적용됩니다.
 - 메인 오피스는 여성 4명, 남성 2명, 중성적인 Hermes 1명의 통일된 SD
   애니메이션 캐스트를 사용합니다. 투명 캐릭터 시트는
   `browser/observatory/assets/hermes-agent-cast.png`와 여성 English tutor

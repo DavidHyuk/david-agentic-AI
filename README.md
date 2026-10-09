@@ -1796,6 +1796,11 @@ Review the [MiniMax-M2.7 license](https://github.com/MiniMax-AI/MiniMax-M2.7/blo
 
 Hermes HQ is a web app for watching your agents, browsing saved records, and
 continuing study tasks from room workbenches.
+The UI defaults to a GitHub Dark inspired palette: charcoal surfaces, blue
+actions, readable code colors and distinct green/red connection states. The
+office, workbenches, history and schedule share the same palette. Native inputs
+and browser chrome use the declared dark color scheme, including in dark Chrome;
+refresh the page after updating the staged UI assets.
 The campus has separate paper, MLE, coding, system-design, English, Morning Echo,
 and HQ rooms; other installed Hermes profiles also appear as independent rooms.
 Morning Echo is a separate podcast workspace owned by the existing English
