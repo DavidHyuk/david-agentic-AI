@@ -93,6 +93,12 @@ async function deskAction(body, success = "저장했습니다.") {
       bench.focusAssignment = body.mode === "review" ? result.result?.id : null;
     if (body.action === "feedback") bench.focusAssignment = null;
     if (["coding_skip", "coding_resume", "coding_topic"].includes(body.action)) {
+      const previous = activeCoachAssignment(bench.data);
+      if (previous) {
+        const key = "hermes-timer:" + previous.id;
+        const timer = localRead(key, {elapsed: 0, started: null});
+        if (timer.started) localWrite(key, {elapsed: timer.elapsed + Date.now() - timer.started, started: null});
+      }
       bench.focusAssignment = null;
       if (!result.result?.assignment)
         success += " 이어갈 새 문제가 없습니다. 주제 목록이나 스킵 기록에서 선택하세요.";

@@ -3,6 +3,45 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.48.0 — 2026-10-09 (minor: navigate coding practice and report external outages)
+
+- Add Jun's **잠시 스킵 · 다음 문제**, permanent skip history with **다시 풀기**,
+  and all eight topic/problem inventories with difficulty and progress. Topic
+  selection preserves unfinished assignments; returning resumes the original
+  problem, hints and solution exposure. Navigation pauses the browser timer,
+  never awards completion/mastery, guards stale-tab actions under the existing
+  file lock, and remains authoritative for later scheduled coaching. Skipping
+  the last Hard problem can continue to the next topic without blocking practice.
+- Add a standalone external-connection monitor to the existing five-minute
+  watchdog before gateway recovery. Report observed ChatGPT sync/login,
+  YouTube account/history, LeetCode private-code and Kakao public-intake failures,
+  plus failed external-data scheduled tasks, to David's existing Hermes Telegram
+  home. Deduplicate open incidents, report evidence-backed recovery, retry failed
+  deliveries and require two consecutive Kakao public-network failures.
+  Preserve unknown states without asserting recovery and omit private source
+  errors, credentials, chat contents and webhook URLs from reports.
+- Persist fixed YouTube sync evidence and add a read-only saved Kakao URL probe
+  using an empty body/public ingress. The probe does not save tutor feedback or
+  certify Kakao administrator deployment/actual message delivery. HQ's existing
+  workbench shows safe connection observations, recent incidents and pending
+  notices. The current ChatGPT automatic sync failure is observable.
+- Routing: Jun retains the existing coding Observatory room, shared coach state
+  and David profile/bot. Operational connection incidents belong to the existing
+  HQ room with separate `data/observatory/connection-health.json` state; no new
+  agent, room, profile, bot, gateway or schedule is needed. Existing cron/session
+  ownership remains intact; this internal helper does not create empty rooms.
+- Validation: `pytest -q` passes **859 tests**, covering skip/resume/topic
+  progression, last-Hard transitions, hint preservation, stale actions, readonly
+  workbenches, outage/recovery deduplication, failed-delivery retry, private-data
+  exclusion, empty-body probes, routing and rendered controls. JavaScript syntax,
+  systemd unit validation and shell syntax pass. Stage only the changed runtime
+  assets/helpers/skill, reload the watchdog and restart Observatory while
+  retaining both gateway PIDs. The live browser shows 8 topics/48 problems and
+  the skip controls without JavaScript errors; mobile topic controls render
+  correctly. Preserve the active Trapping Rain Water assignment and coach state.
+  Deliver the existing ChatGPT sync outage to Hermes Telegram home, confirm
+  delivery success/no pending notice, and verify a repeated check sends nothing.
+
 ## v1.47.0 — 2026-10-08 (minor: explain gateway restarts through Telegram)
 
 - Report observed restart reasons, recovery actions, verified health and

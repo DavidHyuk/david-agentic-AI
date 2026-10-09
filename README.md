@@ -813,8 +813,35 @@ not active until its catalog, progress tracking, and cron job are implemented.
 Coding follows eight six-problem blocks: **HashMap (including the Two Sum
 foundation) → Two Pointers → Sliding Window → Stack → Binary Search → Tree /
 BFS / DFS → Heap → Graph**. At three sessions per week, each block normally lasts
-two weeks. Every push shows progress such as `HashMap · 5/6`; the next family
-stays locked until all six new problems in the current block are completed.
+two weeks. Every push shows progress such as `HashMap · 5/6`. The default path
+stays in that block; you can explicitly skip a problem or choose another topic.
+
+In **Jun → LeetCode Gym**, **잠시 스킵 · 다음 문제** records the current unfinished
+problem and opens the next available one, continuing to the next topic when
+needed. **스킵 기록 → 다시 풀기** reopens the original assignment with its hints
+and solution exposure intact. Skips never count as completion or mastery; the
+history remains after eventual completion and records repeat skips.
+**주제별 문제 목록** shows all eight topics, problem names, difficulty and status.
+Choose **이 주제 시작하기 / 이어가기** to switch, and **이전 주제 …로 돌아가기**
+or another topic's button to resume saved work. Topic switches pause the old
+assignment and its browser timer. Scheduled coaching respects the selected
+problem/topic across dates. Completed problems still use **복습하기**.
+
+The same state is available through the standalone CLI (get the current ID first):
+
+```bash
+python3 ~/.hermes/scripts/interview_progress.py coding-navigation
+python3 ~/.hermes/scripts/interview_progress.py coding-skip \
+  --assignment coding:2026-10-09 --expected-assignment coding:2026-10-09
+python3 ~/.hermes/scripts/interview_progress.py coding-topic \
+  --topic 'Two Pointers' --expected-assignment coding:2026-10-09:2
+python3 ~/.hermes/scripts/interview_progress.py coding-resume \
+  --assignment coding:2026-10-09 --expected-assignment coding:2026-10-09:3
+```
+
+`--expected-assignment ''` represents no current assignment. A stale tab/action
+is rejected before changing progress. All navigation uses the existing coding
+room, David profile/bot and `data/interview/coach_state.json`.
 
 Start as a coding beginner. Each coding push includes a goal, both problem links,
 a 35-minute budget, and “try 20 minutes without AI first.” Ask for a hint when
@@ -835,7 +862,7 @@ of creating duplicate assignments.
 Solution viewed or confidence ≤2 schedules a review in 2 days; hint 2/3 or
 confidence 3 in 7 days; independent work with confidence ≥4 in 21 days. Other
 assisted attempts use 7 days. Scheduled Jun and **작업 이어가기 · 새 문제** always
-keep the latest uncompleted new curriculum problem. Jun may suggest a due weak
+keep the active uncompleted, unskipped new problem in the selected topic. Jun may suggest a due weak
 review without assigning it; use **복습하기** to request a prior problem. A review
 due date means eligibility when that explicit review path is used.
 
@@ -1454,6 +1481,28 @@ Unchanged `register_cron.py` jobs are kept in place to preserve their pending ru
 time and this runtime state. An English profile or Telegram gateway that has not
 yet been installed is skipped cleanly.
 
+The same timer runs `connection_health.py --notify` before gateway recovery.
+It reports ChatGPT chat sync/login, YouTube login/history, LeetCode private-code
+access, Kakao public intake and failed external-data scheduled jobs to David's
+existing **Hermes Telegram home**, including a recovery notice after positive
+evidence. Existing failures are reported on the first check; repeated failures
+within the same incident are silent. Failed deliveries retry on later ticks.
+Unconfigured or unverified services do not produce a false recovery. Kakao
+public-network failures require two consecutive checks (about 5–10 minutes);
+other recorded failures normally notify within five minutes.
+The Kakao probe sends an empty body and verifies public ingress without saving
+feedback; it cannot verify Open Builder deployment or real message delivery.
+
+**Hermes HQ → 외부 연결 상태와 알림** displays current observations, ten recent
+incident/recovery events and pending delivery. Safe monitor state lives in
+`data/observatory/connection-health.json`; notices omit credentials, private
+webhook URLs, chat contents and raw source errors. YouTube sync persists fixed
+failure/success evidence in `data/youtube-history/sync-status.json`. This is an
+operational helper in the existing HQ room, with no new profile, bot or schedule.
+Run `python3 scripts/connection_health.py` for a read-only check; add `--notify`
+to deliver detected incidents through the configured Hermes home. Reinstall
+`bootstrap/install_cron_watchdog.sh` after staging updates to enable the monitor.
+
 Inspect it without changing state:
 
 ```bash
@@ -1848,8 +1897,10 @@ hanging indefinitely; an active local-model turn may run for up to ten minutes.
 - **LeetCode / System Design**: resume unfinished assignments or prepare today's
   assignment. System Design allows only one new interview per ISO week. In the
   LeetCode room, **작업 이어가기 · 새 문제** always selects the next uncompleted
-  curriculum problem; **복습하기** is the separate action that selects a prior
-  weak or due problem. Scheduled sessions still prioritize weak due reviews.
+  unskipped curriculum problem; **잠시 스킵 · 다음 문제**, **스킵 기록**, and
+  **주제별 문제 목록** preserve unfinished work while changing problems/topics.
+  **복습하기** is the separate action that selects a prior weak or due problem.
+  Scheduled sessions keep the selected new problem and may suggest a weak review.
   The new-problem path follows the 35-minute Tue/Thu/Sat progression from Two
   Sum/HashMap through Two Pointers, Sliding Window, Stack, Binary Search,
   Tree/BFS/DFS, Heap, and Graph. Use a

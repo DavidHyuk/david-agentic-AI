@@ -142,7 +142,7 @@ until its catalog, progress tracking, and job have actually been added.
 1. Scheduled Coding Coach runs, the workbench's **작업 이어가기** action, and
    any explicit request for a new problem use `python3
    ~/.hermes/scripts/interview_progress.py plan coding --next`.
-   It always selects the next uncompleted curriculum problem inside the active
+   It keeps the active uncompleted, unskipped problem in the selected
    six-problem pattern block; never substitute
    an already attempted review. Jun may add one short suggestion when a weak
    review is due, but must not assign it. **복습하기** is the separate explicit path:
@@ -152,6 +152,14 @@ until its catalog, progress tracking, and job have actually been added.
    retry; an unfinished active-block problem is also resumed across later dates
    rather than duplicated by the next cron run. Never propose an untracked replacement problem from memory or the
    catalog alone.
+   For an explicit skip or topic-change request, first run `coding-navigation`
+   to inspect the active ID, topics, and skip history. Use `coding-skip
+   --assignment ID --expected-assignment CURRENT_ID`, `coding-topic --topic
+   'TOPIC' --expected-assignment CURRENT_ID`, or `coding-resume --assignment ID
+   --expected-assignment CURRENT_ID`. Pass an empty expected ID if no problem is
+   active. Never infer completion from skip/topic switching. Resume the saved
+   assignment, retaining hint and solution exposure. If the returned assignment
+   is null, offer a topic or saved skipped problem; do not invent a replacement.
 2. Send the returned study message as the scheduled Telegram response, preserving
    the concrete problem, pattern, goal, 35-minute target, **both canonical URLs**,
    20-minute no-AI rule, and invitation to ask for a hint. It is actual study
@@ -185,12 +193,15 @@ Nominal progression (three completed study slots per week, two weeks per block):
 | 15–16 | Graph | recognize components, traversal, and dependency graphs |
 
 The scheduled helper and **작업 이어가기** both advance only to a new,
-uncompleted problem in the current six-item block while enforcing attempted
-prerequisites. The next block remains locked until all six new problems in the
-current block are completed. A due
+uncompleted, unskipped problem in the current six-item block while enforcing
+prerequisites that have not been explicitly skipped. A topic selected by David
+starts in that topic without forcing him back to other topics' prerequisites.
+An explicit skip advances to another available problem, including the next block
+when needed; a topic switch preserves the previous unfinished assignment.
+Neither action establishes mastery or completion. A due
 weak review can be suggested by Jun, but only an explicit **복습하기** request
 creates that assignment. Missed sessions do not advance slots and can extend the
-nominal five weeks. **복습하기** chooses the weakest/due previously attempted problem.
+nominal sixteen weeks. **복습하기** chooses the weakest/due previously attempted problem.
 After the seed curriculum, continue concrete consolidation reviews; extend the
 curated catalog in source before introducing a new curriculum. Do not silently
 jump to advanced problems.

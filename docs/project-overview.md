@@ -253,6 +253,7 @@ David-Agent/
 │   ├── english_podcast.py     # 선택한 영상 대본·긴 문장 연습 / 요청 시 채널 대본
 │   ├── agenda.py              # 캘린더 이벤트 포맷팅 + 충돌 감지
 │   ├── cron_health.py         # cron tick lock / jobs.json 건강 검사 (+ 선택적 gateway restart)
+│   ├── connection_health.py   # 외부 연결 장애·복구 → Hermes Telegram 홈 알림, HQ 상태
 │   ├── reward_system.py       # 실제 완료 증거 → Career Cash·연속 달성·가상 오퍼
 │   ├── observatory.py         # 기록·학습·Kanban orchestration API + 관제실
 │   └── wait_for_vllm.py       # gateway 시작 전 /v1/models readiness gate
@@ -410,6 +411,7 @@ history/search·알림 제어의 이점이 있으면 같은 bot을 별도 Telegr
 | `export_youtube_cookies.py` | MacBook 브라우저에서 live YouTube 쿠키만 private 파일로 내보내기 |
 | `agenda.py` | 캘린더 이벤트 포맷팅 + 충돌·여유 슬롯 감지 |
 | `cron_health.py` | cron tick lock·stale·마지막 실행 실패와 David Observatory API 응답 정지 감지, profile별 단발 재시도와 gateway 복구 |
+| `connection_health.py` | ChatGPT 동기화/계정·YouTube 계정/기록·LeetCode private code·카카오 공개 수신·외부 자료 cron 장애/복구 감지. 기존 Hermes Telegram 홈 알림, 장애 중복 방지·전송 재시도, HQ 안전 상태·최근 기록 |
 | `reward_system.py` | 코딩·설계·영어 SRS·논문 완료 증거를 멱등 Career Cash ledger와 일일/주간 미션으로 변환 |
 | `wait_for_vllm.py` | 지정한 served model이 `/v1/models`에 나타날 때까지 gateway 시작 대기 |
 
@@ -482,6 +484,20 @@ watchdog 재시작은 해당 profile의 기존 Telegram 홈에 감지 원인·�
 종료는 원인을 단정하지 않습니다. 최신 보고와 전달 상태는 profile별
 `cron/last-restart-notice.json`에 보관하고 전송 실패 시 다음 watchdog에서
 전송만 재시도합니다. 기존 프로필 운영 알림이므로 새 agent·room은 만들지 않습니다.
+
+같은 5분 watchdog의 첫 단계는 `connection_health.py --notify`입니다. 외부
+연결 장애와 확인된 복구는 David의 기존 Hermes Telegram 홈으로 모아 보내고,
+같은 미해결 장애는 반복하지 않습니다. 카카오 공개 네트워크 오류는 연속 두 번
+확인한 뒤 알리며, 로컬 수신 중단·계정/동기화 실패 기록은 첫 검사에서 알립니다.
+확인되지 않은 연결은 복구로 처리하지 않고, 알림 전송 실패는 다음 검사에서
+재시도합니다. 개인 대화·쿠키·비밀 URL·원본 오류는 알림에 포함하지 않습니다.
+`data/observatory/connection-health.json`에 안전한 관측·최근 100개 사건·전송
+대기 상태를 저장하고 HQ의 **외부 연결 상태와 알림** 카드에서 최신 10개 사건을
+보여줍니다. 기존 HQ room·profile·bot을 사용하며 독립 agent·gateway·cron을
+추가하지 않습니다. `python3 scripts/connection_health.py`는 읽기 전용 검사입니다.
+카카오 `--probe-only`는 저장된 URL에 빈 body를 보내 공개 ingress 응답만 확인하며,
+피드백 저장·URL 변경·관리자센터 배포 검증은 수행하지 않습니다. YouTube는
+`data/youtube-history/sync-status.json`에 고정된 성공/실패 근거를 저장합니다.
 
 English profile의 두 skill은 저장소가 단일 진실 원천입니다. staging은
 런타임에서 자동 생성된 관리 대상 외 skill을 제거하고,
@@ -954,8 +970,19 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   Qwen3.8 Flash-Next 4비트 llama.cpp 64K 설정을 공유합니다.
 - 48문제 경로는 HashMap(Two Sum 기초 포함) → Two Pointers → Sliding Window →
   Stack → Binary Search → Tree/BFS/DFS → Heap → Graph 순서의 8개 블록입니다.
-  각 블록에서 신규 문제 6개를 연속 완료한 뒤에만 다음 유형으로 이동하며, cron과
-  작업실은 `HashMap 5/6`처럼 현재 진척을 표시합니다. 주 3회 35분 페이스에서
+  기본은 각 블록의 순서대로 풀며, cron과 작업실은 `HashMap 5/6`처럼 실제 완료
+  진척을 표시합니다. **잠시 스킵 · 다음 문제**는 미완료 문제를 스킵 기록에 보관하고
+  다음 미해결 문제로 이동하며, 블록 끝에서는 다음 주제도 열 수 있습니다.
+  **스킵 기록 → 다시 풀기**는 원래 assignment와 힌트·해설 열람 기록을 되살립니다.
+  반복 스킵 날짜와 이후 완료 상태도 보존하며 스킵은 완료·mastery에 포함하지 않습니다.
+  **주제별 문제 목록**은 8개 주제/48문제의 난이도·완료/미시작/스킵/이어풀기 상태를
+  보여주고 주제를 선택하면 해당 주제의 새 문제 또는 보관된 문제를 엽니다.
+  이전 주제 돌아가기와 주제 버튼으로 기존 문제를 다시 이어가며, 전환 시 타이머도
+  일시정지합니다. 날짜가 바뀌어도 정기 코칭은 선택된 문제와 주제를 따릅니다.
+  기존 coding room·David profile·bot·coach_state를 사용하며 CLI의
+  `coding-navigation`, `coding-skip`, `coding-resume`, `coding-topic`으로도 같은
+  기능을 제공합니다. stale tab은 파일 잠금 안의 현재 assignment 검증으로 거부합니다.
+  주 3회 35분 페이스에서
   완료·힌트·자신감·선행 패턴을 반영하고 각 문제의 canonical URL을 저장합니다.
 - 설계 코치는 General 40% / ML 25% / LLM·Agent 35%를 초기 목표로 하며,
   완료 이력·점수·반복 실수와 취약 주제를 반영해 다음 시나리오를
@@ -975,8 +1002,9 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   Agent 8개 추가 rubric·강점·취약점·실수·review topic을 1–5 근거 점수와 함께 기록합니다.
 - 해설 열람/자신감 ≤2 → 2일, 힌트 2/3 또는 자신감 3 → 7일, 독립 해결/자신감 ≥4 →
   21일. 정기 코칭과 Coding 작업실의 **작업 이어가기 · 새 문제**는 항상 최신
-  미완료 새 문제를 유지합니다. Jun은 취약 due 복습을 제안만 할 수 있고, 이전
-  문제 배정은 사용자가 누른 별도 **복습하기**에서만 생성합니다. 설계는 최저 차원 점수/자신감으로 같은 간격을
+  활성 미완료·미스킵 새 문제를 유지합니다. Jun은 취약 due 복습을 제안만 할 수 있고,
+  완료 문제의 재배정은 별도 **복습하기**에서 생성합니다. 미완료 스킵/보관 문제는
+  **다시 풀기** 또는 주제 선택으로 원래 assignment를 이어갑니다. 설계는 최저 차원 점수/자신감으로 같은 간격을
   적용하고 일요일에 전달합니다.
 - 힌트는 관찰 → 알고리즘/자료구조 → 의사코드 순서로 요청당 하나씩 제공합니다.
   전체 해설은 3단계 이후 다시 명시적으로 요청해야 합니다.
@@ -1076,7 +1104,10 @@ ZIP 경로 격리·credential 오류 출력 방지 및 HQ source 상태 검증�
 Jun 사전 풀이 요약의 근거 변경·Accepted 코드 freshness·실패 보존·동시 실행
 잠금·background provider 경계 및 재인증 상태·실제 코드 필수 조건을 포함한
 원격 계정 재연결·CSRF 전달·동일 계정의 서버 cookie 갱신 검증까지 포함한
-현재 전체 테스트는 818 passed입니다. gateway 재시작 원인·해결 방법 알림,
+현재 전체 테스트는 859 passed입니다. Jun 스킵/재개·주제 왕복·Hard 끝 전환·
+힌트 노출 보존·stale 요청·목록 렌더링과 외부 연결 장애/복구·알림 중복 방지·
+전송 실패 재시도·개인 자료 제외·기존 홈 라우팅·카카오 probe를 포함합니다.
+gateway 재시작 원인·해결 방법 알림,
 systemd 종료 상태 구분, 중복 알림 방지, 프로필별 전송과 실패 재시도를 포함합니다. 카카오 터널의 현재 invocation 식별,
 피드백을 저장하지 않는 공개 연결 검증, 비밀 URL 원자 저장·실패 보존 및
 고정 주소 재사용·Ellie 상태 표시·Funnel 공개 DNS와 내부 MagicDNS 분리,
