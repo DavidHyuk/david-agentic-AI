@@ -3,6 +3,37 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.48.1 — 2026-10-09 (patch: repair ChatGPT sync and consolidate duplicate notices)
+
+- Reproduce the daily sync failure with the authenticated browser: a shorter
+  capture matches prior messages except that rendered user bubbles add empty
+  lines. The old exact-text overlap check aborts the entire project refresh.
+  Compare repeated empty lines as a presentation variation while preserving
+  published original text, code indentation, horizontal whitespace and literal
+  spaces. Continue rejecting unverified content/code changes and preserve the
+  existing atomic publication/rollback boundary.
+- Treat ChatGPT source sync and its automatic cron outcome as one connection
+  incident. Compare success/failure evidence timestamps so a stale cron error
+  cannot override a newer successful sync. Migrate the earlier duplicate open
+  incident keys and queued notices without another failure report or duplicate
+  recovery; retain historical events and distinct later incidents.
+- Reuse the existing David profile, Hermes Telegram home, HQ room, saved browser
+  and daily cron job. This repair adds no agent, room, profile, bot or schedule.
+  Preserve a private backup of published sources/index before the live retry.
+- Validation: **870 tests pass**, including safe empty-line overlap, rejection
+  of code spacing changes, append preservation, canonical incident routing,
+  timestamp precedence and existing-key migration. Recapture all nine project
+  chats privately and verify every merge before triggering the real cron retry.
+- Live recovery: the original `chatgpt-project-sync` job finishes successfully
+  at **2026-10-09 11:16:33 PDT**, publishing **9 chats / 140 messages / 310 search
+  chunks**. `daily-sync.json` and cron both report `ok`, clear their errors and
+  retain the next **2026-10-10 03:17 PDT** schedule. The affected partial chat
+  retains all 22 original messages byte-for-byte in its message text. Deploy only
+  the two repaired helpers and preserve existing gateway processes and routes.
+  Confirm one delivered recovery notice, zero pending notices and no repeated
+  notification on the following healthy check. Remove temporary diagnostic
+  captures while retaining the private pre-repair backup.
+
 ## v1.48.0 — 2026-10-09 (minor: navigate coding practice and report external outages)
 
 - Add Jun's **잠시 스킵 · 다음 문제**, permanent skip history with **다시 풀기**,

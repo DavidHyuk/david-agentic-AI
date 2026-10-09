@@ -604,7 +604,10 @@ def merge_partial_capture(previous: dict, current: dict) -> dict:
     old, new = previous.get('messages', []), current.get('messages', [])
     if len(new) >= len(old):
         return current
-    pairs = lambda rows: [(row['role'], row['text']) for row in rows]
+    # ChatGPT's rendered user bubbles can add empty lines between unchanged
+    # lines. Compare that presentation variation only; retain original text,
+    # horizontal whitespace, indentation, and literal spaces in the saved source.
+    pairs = lambda rows: [(row['role'], re.sub(r'\n{2,}', '\n', row['text'])) for row in rows]
     old_pairs, new_pairs = pairs(old), pairs(new)
     if not new_pairs:
         raise ArchiveError('An empty project capture was rejected; prior sources retained.')

@@ -100,6 +100,41 @@ def test_partial_capture_merges_only_proven_ordered_overlap():
         archive.merge_partial_capture(old, {'messages': [new_message]})
 
 
+def test_partial_capture_accepts_rendered_empty_lines_without_rewriting_source():
+    code = 'Before\n\n```python\nif ready:\n    result = "a  b"\n```'
+    rows = [{'role': 'user', 'text': 'Earlier question'},
+            {'role': 'assistant', 'text': 'Earlier answer'},
+            {'role': 'user', 'text': code},
+            {'role': 'assistant', 'text': 'Original explanation'}]
+    observed = [{'role': 'user', 'text': code.replace('\n', '\n\n\n\n')}, rows[3]]
+    result = archive.merge_partial_capture({'messages': rows}, {'messages': observed})
+    assert result['messages'] == rows
+    assert result['messages'][2]['text'] == code
+    assert result['retained_message_count'] == 2 and result['observed_message_count'] == 2
+
+
+@pytest.mark.parametrize('replacement', ['result = "a b"', 'result = "a  b"', 'result  = "a  b"'])
+def test_partial_capture_rejects_horizontal_code_changes(replacement):
+    rows = [{'role': 'user', 'text': 'Earlier question'},
+            {'role': 'assistant', 'text': 'Earlier answer'},
+            {'role': 'user', 'text': 'if ready:\n    result = "a  b"'},
+            {'role': 'assistant', 'text': 'Explanation'}]
+    current = {'messages': [{'role': 'user', 'text': 'if ready:\n' + replacement}, rows[3]]}
+    with pytest.raises(archive.ArchiveError, match='overlap'):
+        archive.merge_partial_capture({'messages': rows}, current)
+
+
+def test_partial_capture_appends_new_turn_after_blank_line_overlap():
+    rows = [{'role': 'user', 'text': 'Old question'},
+            {'role': 'assistant', 'text': 'Old answer'},
+            {'role': 'user', 'text': 'Recent\nquestion'},
+            {'role': 'assistant', 'text': 'Recent answer'}]
+    question = {'role': 'user', 'text': 'Next actual question'}
+    current = {'messages': [{'role': 'user', 'text': 'Recent\n\n\n\nquestion'}, rows[3], question]}
+    result = archive.merge_partial_capture({'messages': rows}, current)
+    assert result['messages'] == rows + [question]
+
+
 def message(role, text, **extra):
     return {'author': {'role': role}, 'content': {'content_type': 'text', 'parts': [text]}, **extra}
 

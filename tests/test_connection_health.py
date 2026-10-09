@@ -184,6 +184,50 @@ def test_running_sync_reports_stall_after_two_hours():
     assert health.sync_observation('chatgpt_sync', document, NOW - timedelta(hours=2))['status'] == 'unknown'
 
 
+def test_chatgpt_source_and_job_failure_form_one_incident():
+    rows = health.combine_observations([observed()], [{'service': 'job:david:chatgpt-project-sync',
+        'label': 'ChatGPT automatic sync', 'status': 'failed', 'reason': 'sync_failed'}])
+    assert len(rows) == 1 and rows[0]['service'] == 'chatgpt_sync'
+    state = {}
+    assert len(health.update_incidents(state, rows, NOW)) == 1
+    assert health.notice_message(state['pending']).count('장애 감지') == 1
+
+
+@pytest.mark.parametrize('source_age,job_status,expected', [
+    (0, 'failed', 'healthy'), (2, 'failed', 'failed'), (0, 'ok', 'healthy'),
+])
+def test_recovery_uses_newest_source_or_job_evidence(tmp_path, source_age, job_status, expected):
+    write(tmp_path, 'data/chatgpt/daily-sync.json', {'status': 'ok',
+        'last_success_at': (NOW - timedelta(hours=source_age)).isoformat()})
+    write(tmp_path, 'cron/jobs.json', {'jobs': [{'name': 'chatgpt-project-sync',
+        'last_status': job_status, 'last_run_at': (NOW - timedelta(hours=1)).isoformat()}]})
+    rows = health.combine_observations(health.collect_connections(tmp_path, now=NOW), health.collect_external_jobs(tmp_path))
+    syncs = [row for row in rows if row['service'] == 'chatgpt_sync']
+    assert len(syncs) == 1 and syncs[0]['status'] == expected
+
+
+def test_old_duplicate_incidents_migrate_without_a_second_failure_or_recovery():
+    state = {'services': {name: {'incident_open': True, 'failure_count': 3}
+                         for name in ('chatgpt_sync', 'job:david:chatgpt-project-sync')},
+             'events': [], 'pending': []}
+    health.update_incidents(state, [observed()], NOW)
+    assert 'job:david:chatgpt-project-sync' not in state['services']
+    assert state['events'] == []
+    health.update_incidents(state, [observed(status='healthy')], NOW)
+    assert len(state['events']) == 1 and state['events'][0]['kind'] == 'recovered'
+
+
+def test_pending_alias_notices_deduplicate_without_dropping_later_incidents():
+    event = {'service': 'chatgpt_sync', 'label': 'ChatGPT', 'kind': 'failed',
+             'reason': 'sync_failed', 'time': NOW.isoformat()}
+    state = {'pending': [event, {**event, 'service': 'job:david:chatgpt-project-sync'},
+                         {**event, 'kind': 'recovered', 'reason': None,
+                          'time': (NOW + timedelta(minutes=5)).isoformat()}]}
+    health.migrate_incident_aliases(state)
+    assert len(state['pending']) == 2
+    assert [event['kind'] for event in state['pending']] == ['failed', 'recovered']
+
+
 def test_read_only_cli_and_notification_failure_are_fail_open(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(health, 'collect_connections', lambda home: [observed()])
     assert health.main(['--home', str(tmp_path)]) == 0

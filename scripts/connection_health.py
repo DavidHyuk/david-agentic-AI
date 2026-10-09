@@ -36,6 +36,7 @@ REASONS = {
     'state_unreadable': '저장된 연결 상태를 읽을 수 없습니다.',
     'sync_stalled': '자료 갱신이 2시간 이상 실행 중인 상태로 남아 있습니다.',
 }
+SERVICE_ALIASES = {'job:david:chatgpt-project-sync': 'chatgpt_sync'}
 
 
 def read_json(path: Path) -> dict:
@@ -63,10 +64,11 @@ def observation(service: str, status: str, reason: str | None = None) -> dict:
 def sync_observation(service: str, document: dict, now: datetime) -> dict:
     status = document.get('status')
     if status in ('error', 'failed'):
-        return observation(service, 'failed', 'reauth_required' if
-                           document.get('error_code') == 'reauth_required' else 'sync_failed')
+        return {**observation(service, 'failed', 'reauth_required' if
+                            document.get('error_code') == 'reauth_required' else 'sync_failed'),
+                'evidence_at': stamp(document.get('last_attempt_at'))}
     if status == 'ok':
-        return observation(service, 'healthy')
+        return {**observation(service, 'healthy'), 'evidence_at': stamp(document.get('last_success_at'))}
     if status == 'running' and stamp(document.get('last_attempt_at')):
         if now.timestamp() - stamp(document['last_attempt_at']) > 7200:
             return observation(service, 'failed', 'sync_stalled')
@@ -172,11 +174,62 @@ def collect_external_jobs(home: Path) -> list:
                 result.append({'service': 'job:' + profile + ':' + name, 'label': labels[name],
                                'status': 'failed' if status in ('error', 'failed', 'failure') else
                                'healthy' if status == 'ok' else 'unknown',
-                               'reason': 'sync_failed' if status in ('error', 'failed', 'failure') else None})
+                               'reason': 'sync_failed' if status in ('error', 'failed', 'failure') else None,
+                               'evidence_at': stamp(job.get('last_run_at'))})
         except (OSError, ValueError, TypeError):
             result.append({'service': 'job-state:' + ('english' if profile_home != home else 'david'),
                            'label': '외부 연동 예약 작업 상태', 'status': 'failed', 'reason': 'state_unreadable'})
     return result
+
+
+def combine_observations(connections: list, jobs: list) -> list:
+    """Treat a source sync and its scheduler outcome as one dated incident."""
+    combined = {}
+    for row in connections + jobs:
+        service = SERVICE_ALIASES.get(row['service'], row['service'])
+        candidate = {**row, 'service': service}
+        if service in SERVICES:
+            candidate['label'] = SERVICES[service][0]
+        previous = combined.get(service)
+        if previous is None:
+            combined[service] = candidate
+            continue
+        # Unknown and corrupt source state cannot provide verified recovery.
+        if previous.get('reason') == 'state_unreadable' or candidate['status'] == 'unknown':
+            continue
+        if previous['status'] == 'unknown' or (
+                candidate.get('evidence_at', 0), candidate['status'] == 'failed') > (
+                previous.get('evidence_at', 0), previous['status'] == 'failed'):
+            combined[service] = candidate
+    return list(combined.values())
+
+
+def migrate_incident_aliases(state: dict) -> None:
+    """Keep existing open incidents and queued delivery while merging duplicate keys."""
+    services = state.setdefault('services', {})
+    for alias, canonical in SERVICE_ALIASES.items():
+        legacy = services.pop(alias, None)
+        if legacy is None:
+            continue
+        record = services.setdefault(canonical, {**legacy, 'service': canonical,
+                                                 'label': SERVICES[canonical][0]})
+        if legacy.get('incident_open'):
+            record['incident_open'] = True
+            record['failure_count'] = max(record.get('failure_count', 0), legacy.get('failure_count', 0))
+    pending = []
+    seen = {}
+    for event in state.get('pending', []):
+        original_service = event['service']
+        service = SERVICE_ALIASES.get(original_service, original_service)
+        event = {**event, 'service': service}
+        if service in SERVICES:
+            event['label'] = SERVICES[service][0]
+        key = (service, event['kind'], event['time'])
+        if key in seen and (original_service in SERVICE_ALIASES or seen[key] in SERVICE_ALIASES):
+            continue
+        seen[key] = original_service
+        pending.append(event)
+    state['pending'] = pending
 
 
 def update_incidents(state: dict, observations: list, now: datetime) -> list:
@@ -184,6 +237,7 @@ def update_incidents(state: dict, observations: list, now: datetime) -> list:
     state.setdefault('services', {})
     state.setdefault('events', [])
     state.setdefault('pending', [])
+    migrate_incident_aliases(state)
     timestamp = now.isoformat(timespec='seconds')
     for observed in observations:
         service = observed['service']
@@ -285,7 +339,7 @@ def main(argv=None) -> int:
     args = parser.parse_args(argv)
     try:
         home = args.home.expanduser()
-        observations = collect_connections(home) + collect_external_jobs(home)
+        observations = combine_observations(collect_connections(home), collect_external_jobs(home))
         if args.notify:
             check_and_notify(home, observations)
         print(json.dumps({'connections': observations}, ensure_ascii=False))

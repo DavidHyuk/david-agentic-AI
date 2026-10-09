@@ -1487,6 +1487,10 @@ access, Kakao public intake and failed external-data scheduled jobs to David's
 existing **Hermes Telegram home**, including a recovery notice after positive
 evidence. Existing failures are reported on the first check; repeated failures
 within the same incident are silent. Failed deliveries retry on later ticks.
+ChatGPT's source-sync status and its scheduled-job outcome form one incident.
+Their evidence timestamps decide the current state, so an older failed cron
+result cannot reopen an incident after a newer verified sync. Existing duplicate
+incident keys are merged while retaining queued delivery and historical events.
 Unconfigured or unverified services do not produce a false recovery. Kakao
 public-network failures require two consecutive checks (about 5–10 minutes);
 other recorded failures normally notify within five minutes.
@@ -1706,6 +1710,10 @@ private staging directory and published together, restoring old files on write
 failure. Shorter observations retain earlier messages only when ordered overlap
 proves continuity; unverified overlap, login failures or partial chat failures
 preserve the last published sources/index. Browser captures remain partial.
+Continuity comparisons tolerate extra empty lines added by ChatGPT's rendered
+message bubbles. Saved original text, indentation, horizontal whitespace and
+literal spaces remain unchanged; content or code changes still fail the overlap
+check. This prevents harmless display spacing from aborting the entire daily sync.
 HQ shows the daily schedule, latest attempt and last successful refresh from
 `data/chatgpt/daily-sync.json`; the job is routed to the existing HQ room.
 This is internal source maintenance, so it does not create a separate room.
