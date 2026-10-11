@@ -3,6 +3,20 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.49.1 — 2026-10-10 (patch: record the verified Spark update and evaluation gate)
+
+- Record the operator-completed 6.17.0-1021/580.159.03 installation, reboot and
+  saved GRUB target. Read-only checks confirm the existing model alias/API,
+  all 20 target package versions and four unchanged original photo hashes.
+  Firmware, model settings and GPU clock limits are not changed here.
+- Keep boot verification separate from Vision and sustained-load evidence:
+  a one-photo/0.3MP admission check is refused before inference because about
+  35.7 GiB available memory is below the unchanged 40 GiB floor. Preserve the
+  incomplete benchmark and pending completed-result Langfuse request.
+- Update the usage, overview and incident record. This is documentation-only;
+  check the actual package/API/boot/image evidence and admission refusal rather
+  than rerunning code tests. No new agent, service or Observatory room is added.
+
 ## v1.49.0 — 2026-10-10 (minor: add a standalone Pokemon-card Vision benchmark)
 
 - Reuse the running Flash-Next IQ4_XS Vision API at localhost:8004 directly

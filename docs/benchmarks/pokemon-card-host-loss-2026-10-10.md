@@ -72,3 +72,25 @@ can kill a service; they do not ensure this service survives.
 Do not resume live evaluation until the operator has resolved the stack/budget
 question. Preparation, label editing and reports remain available without Vision
 inference. No server-level containment or kernel fix is claimed.
+
+## After the operator's update and reboot
+
+The operator installs the exact prepared Ubuntu kernel/driver bundle and runs
+the privileged verification command on 2026-10-10. Subsequent read-only checks
+confirm kernel **6.17.0-1021-nvidia**, running driver **580.159.03**, all 20 target
+package versions, 20 package holds, the saved GRUB target and the unchanged
+Flash-Next alias on localhost:8004. The previous 6.14 kernel also has a matching
+580.159.03 signed GPU module for boot fallback. Firmware and GPU clock settings
+were not updated by this procedure.
+
+MemAvailable is approximately **35.7 GiB** and MemFree **31.3 GiB**, with memory
+full PSI avg10 zero. A one-photo/0.3MP admission check refuses before any Vision
+request because the existing 40 GiB available-memory floor is unmet. Do not
+equate boot/model-API verification with Vision or sustained-load stability.
+Four original photo hashes still match the interrupted run. Runtime evidence:
+`~/pokemon-card-benchmark/validation/post-upgrade-2026-10-10.json`.
+
+Review the memory budget before further inference. The benchmark remains
+incomplete, accuracies remain unlabeled, and the user's request to publish the
+completed results to Langfuse remains pending in the workspace. The completed
+stack update does not establish the earlier reboot's cause.

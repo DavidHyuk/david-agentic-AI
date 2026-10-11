@@ -367,6 +367,11 @@ N/A. Per-run CSV/JSON/Markdown, raw API evidence, failure details and PNG/SVG
 charts support camera decisions and controlled before/after fine-tuning
 comparisons. `watch` is an optional foreground input watcher; it installs no
 service or schedule. This manual evaluation helper adds no Observatory room.
+After the October 10 kernel/driver update, the existing model API and saved boot
+target are verified on 6.17.0-1021/580.159.03. Available memory is about 35.7 GiB,
+below the benchmark's 40 GiB admission floor, so Vision and full evaluation
+remain deferred pending memory-budget review; see the
+[host-loss and recovery record](docs/benchmarks/pokemon-card-host-loss-2026-10-10.md).
 
 The version-controlled [120-case synthetic benchmark](local-model/eval/README.md)
 uses four balanced buckets: short tasks, scripted multi-tool calls, multi-turn
