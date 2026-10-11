@@ -165,3 +165,43 @@ Diagnostic/RMA route](https://docs.nvidia.com/dgx/dgx-spark/support.html).
 Field diagnostics require disruptive setup, including temporarily disabling
 Secure Boot and switching console mode; they are not run as part of this
 read-only investigation. No new kernel version is proposed as a proven fix.
+
+## Authorized repeat after a 300–2200 MHz clock range
+
+The operator applies `sudo nvidia-smi -lgc 300,2200` and authorizes one further
+batch. Keep the same model/API, image handling, prompt, inference parameters,
+resolution order and per-run memory-floor overrides. Do not change firmware,
+services, context or network settings, or restore the operator's clock setting.
+
+The run `20261011T061522.491305Z-gpu2200-baseline` completes **28/28 requests**
+with no API/parse/image errors. Boot ID stays unchanged, post-run `/health` is
+`ok`, all four source hashes match and no captured OOM/Xid/panic is found.
+The 511 saved samples have no sampling errors, maximum observed graphics/SM
+clock **2190 MHz**, maximum GPU power **73.47 W**, maximum GPU temperature
+**79 C**, maximum board sensor **93.1 C**, minimum MemAvailable **27.099 GiB**
+and minimum MemFree **21.660 GiB**. All sampled memory PSI avg10 values are zero.
+The monitor is `validation/monitored-20261011T061522.400639Z-gpu2200-full/`.
+
+This supports a power/thermal mitigation hypothesis; it does not establish
+whether the underlying fault is clocks, power delivery, thermal/EC behavior,
+firmware or hardware. One successful batch is not an endurance test or OOM
+containment demonstration. Other traffic, initial thermal state and server
+Vision/cache behavior are not controlled between the interrupted and complete
+runs. Do not infer a measured speed penalty from the requested clock ratio.
+
+The local driver reports maximum clocks 3003 MHz and default Applications
+Clocks 2418 MHz. A 2200 MHz ceiling is 26.7% below the former and 9.0% below
+the latter; 3003 MHz is not a recorded sustained clock for the failed run.
+These are frequency comparisons, not VLM throughput/latency measurements.
+
+Completed HTTP latency means are 2.417/6.263/15.580/19.234/21.597/21.614/21.624
+seconds for 0.3/2/3/5/8/12MP/Original. Unknown rate is zero, but card-number
+and type predictions differ in some conditions. Human labels remain absent:
+all accuracies are N/A and no camera recommendation is established.
+
+Seven resolution experiments, 28 items and 196 numeric measured scores are
+uploaded to the existing `david-agent-performance` Langfuse project and read
+back through its Experiments API. No accuracy scores, photos, filenames,
+prediction strings or raw responses are exported. Store verification and
+private receipt in `verification.json` and `langfuse-receipt.json` in the run.
+The user's pending completed-result publication request is fulfilled.

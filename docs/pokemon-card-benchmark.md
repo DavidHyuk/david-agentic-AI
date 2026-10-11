@@ -37,7 +37,20 @@ GPU 메모리 보장이나 드라이버 장애 격리를 뜻하지 않습니다.
 가용 메모리 최솟값 33.18GiB, GPU 전력 최댓값 90.53W, 보드 센서 최댓값
 93.8°C는 저장 샘플의 관측값이며 순간 피크나 장애 원인을 확정하지 않습니다.
 자세한 기록은 [장애 조사](benchmarks/pokemon-card-host-loss-2026-10-10.md)를 보세요.
-실제 확인 기록은 `validation/post-upgrade-2026-10-10.json`에 보관합니다.
+이후 사용자가 `sudo nvidia-smi -lgc 300,2200`을 적용하고 재실행을 요청해,
+같은 요청 설정·순서·메모리 floor=0 조건으로 **28/28건을 완료**했습니다.
+API/파싱 오류, 재부팅 및 기록된 OOM/Xid/panic은 없었고 원본 4장 해시도
+그대로입니다. GPU 최대 79°C·73.47W, 보드 센서 최대 93.1°C, 가용 메모리
+최소 27.10GiB가 기록됐습니다. 이는 이번 한 번의 성공이며 장기 안정성이나
+OOM 격리·근본 원인을 확정하지 않습니다. 기존 모델·서비스·펌웨어는 그대로입니다.
+정답은 미입력이므로 정확도는 N/A이며, 해상도별 Langfuse 실험 7개·28개 항목·
+측정 점수 196개를 업로드하고 API 재조회로 확인했습니다. 완료 run은
+`runs/20261011T061522.491305Z-gpu2200-baseline/`이며 `verification.json`과
+`langfuse-receipt.json`이 검증·업로드 증거입니다. `wall_s` 평균은 0.3MP 2.417초,
+2MP 6.263초, 3MP 15.580초, 5MP 19.234초, 8MP 21.597초,
+12MP 21.614초, Original 21.624초입니다. 모든 조건 unknown 비율은 0%이나,
+일부 카드 번호·타입 예측이 달라 정답 여부는 확인해야 합니다.
+초기 확인 기록은 `validation/post-upgrade-2026-10-10.json`에 보관합니다.
 `--min-available-gib`/`--min-free-gib`로 기준을 지정할 수 있습니다.
 서버가 이미 처리 중인 GPU 요청을 이 클라이언트가 안전하게 취소하지는 못합니다.
 기본 요청 간격은 2초입니다. 각 요청 전 `/slots`를 읽어 모든 슬롯이 비어 있을
@@ -78,6 +91,15 @@ ln -s /home/david/workspace/David-Agent/scripts/pokemon_card_benchmark.py \
 ```
 
 ## 이미지와 추론 조건
+
+완료된 결과를 Langfuse에 기록하려면 기존 `experiment_tracker.py import-pokemon`
+및 `publish-langfuse`를 사용하세요. [명령 예시](../local-model/eval/README.md#optional-tracker-export)에
+따라 해상도별 실험을 만들고 같은 사진 항목의 지연·unknown·사람 정답 점수를
+비교할 수 있습니다. 중단된 run은 완료된 실험으로 가져오지 못하며, 정답이
+없으면 정확도 점수도 올리지 않습니다. 사진·원본 파일명·예측 문자열·원문 API
+응답은 로컬에만 보관합니다. 개별 요청 시각과 streaming TTFT가 없어 Langfuse
+span은 가져오기 시각의 duration=0으로 표시하고 실측 지연은 `wall_s` 점수로
+기록합니다. 클럭 제한 실험은 해당 설정을 metadata로 함께 남기세요.
 
 |조건|목표 픽셀 수|검토 대상|
 |---|---:|---|

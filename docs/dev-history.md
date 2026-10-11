@@ -3,6 +3,34 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.50.0 — 2026-10-10 (minor: export completed Pokemon resolution experiments)
+
+- Add `import-pokemon` to the existing standalone experiment tracker, grouping
+  completed card records into one experiment per resolution with stable shared
+  dataset/item identifiers. Reject interrupted runs and incomplete, duplicate or
+  source-mismatched records before any remote publication.
+- Export measured HTTP latency, eligible unknown/error indicators and accuracy
+  only for fields with human label snapshots. Keep photos, filenames, prediction
+  strings and raw model/API outputs local. Preserve missing metrics and use
+  zero-duration import spans instead of inventing request timestamps or TTFT.
+  Include optional run-wide sampled host extrema and reported GPU clock limits.
+- Document reusable dry-run/publishing commands for the existing private
+  Langfuse project. Reuse the existing internal manual evaluation helper; no
+  new agent, profile, service, schedule, Telegram destination or Observatory
+  room is added. Validation: **919 tests pass**, including 12 new importer/export
+  checks for privacy, complete coverage, source hashes, stable IDs, missing-label
+  accuracy, invalid-response unknown rates and honest historical timing.
+- The operator applies `nvidia-smi -lgc 300,2200` and authorizes one further
+  sequential batch with the same client-floor override. All **28/28** requests
+  complete with zero API/parse errors, unchanged boot ID and original hashes.
+  The 511 saved samples show GPU peaks 79 C/73.47 W/2190 MHz, board peak 93.1 C,
+  and minimum available memory 27.10 GiB. This is one successful batch, not a
+  proven root cause, sustained-load guarantee or OOM containment demonstration.
+- Upload seven completed resolution experiments and **196 measured scores**
+  to the existing `david-agent-performance` Langfuse project, then read back all
+  28 items and score IDs. Preserve the private runtime receipt and fulfill the
+  pending publication request. No accuracy scores are sent without human labels.
+
 ## v1.49.2 — 2026-10-10 (patch: preserve the repeated post-update host loss)
 
 - Record the operator-authorized exploratory execution with the two client

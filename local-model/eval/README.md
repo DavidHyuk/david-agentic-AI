@@ -69,6 +69,30 @@ helper with no new Observatory room, profile, schedule or messaging workflow.
 
 ### Optional tracker export
 
+Completed Pokemon-card runs can use the same exporter. Import one experiment
+per resolution with the same hashed photo items across all conditions:
+
+```bash
+python local-model/eval/experiment_tracker.py import-pokemon \
+  --source ~/pokemon-card-benchmark/runs/<RUN_ID> \
+  --output ~/pokemon-card-benchmark/runs/<RUN_ID>/experiments.json \
+  --telemetry ~/pokemon-card-benchmark/validation/<MONITOR_ID>/summary.json \
+  --gpu-clock-min-mhz 300 --gpu-clock-max-mhz 2200
+python local-model/eval/experiment_tracker.py publish-langfuse \
+  --input ~/pokemon-card-benchmark/runs/<RUN_ID>/experiments.json \
+  --credentials ~/.config/david-agent/langfuse.env \
+  --dry-run ~/pokemon-card-benchmark/runs/<RUN_ID>/langfuse-otlp.json
+```
+
+Omit `--dry-run` to publish the prepared complete run. The importer rejects
+interrupted, missing, duplicate or source-mismatched photo/resolution records.
+Accuracy scores require both a human label snapshot and a scored correctness
+flag; missing labels stay absent. Unknown scores exclude invalid responses.
+Photos, filenames, predictions and raw model/API responses stay local. Host
+extrema are labeled run-wide, and reported clock settings are metadata. Card
+requests lack individual wall-clock timestamps and streaming TTFT, so imported
+spans have zero duration and the measured HTTP latency is the `wall_s` score.
+
 **Langfuse is recommended for these cross-framework model/agent experiments.**
 Its [OpenTelemetry experiment ingestion](https://langfuse.com/integrations/native/opentelemetry/experiments)
 accepts stable local dataset identifiers and per-item traces. This standard-library
@@ -84,8 +108,10 @@ python local-model/eval/experiment_tracker.py publish-langfuse \
 To upload, configure `LANGFUSE_BASE_URL`, `LANGFUSE_PUBLIC_KEY` and
 `LANGFUSE_SECRET_KEY` privately, then omit `--dry-run`. The exporter targets
 `/api/public/otel/v1/traces` with the v4 ingestion header and rejects reported
-partial ingestion failures. Live ingestion is untested until a project is
-configured. Local dry runs require no credentials and perform no network calls.
+partial ingestion failures. The October 10 completed Pokemon run is published
+to the configured project, and all 28 items/196 measured scores are read back
+via the Experiments API. Local dry runs require no credentials and perform no
+network calls.
 New measurements use actual request timestamps and first-token times.
 Historical records without request starts become zero-duration import spans;
 their measured timings remain metadata and numeric performance scores rather

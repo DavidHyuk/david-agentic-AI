@@ -371,8 +371,19 @@ After the October 10 kernel/driver update, the existing model API and saved boot
 target are verified on 6.17.0-1021/580.159.03. An operator-authorized exploratory
 run overrides the unvalidated client memory floors: the 0.3MP probe succeeds,
 but the full run loses the host after two of 28 records, during the next 8MP
-request. Further inference is stopped; the cause remains undetermined. See the
+request. That run is stopped; the cause remains undetermined. See the
 [host-loss and recovery record](docs/benchmarks/pokemon-card-host-loss-2026-10-10.md).
+After the operator applies a 300–2200 MHz GPU clock range, the next authorized
+batch completes **28/28** requests with no API errors or host reset. Sampled GPU
+power peaks at 73.47 W, GPU temperature at 79 C, and available memory bottoms at
+27.10 GiB. This is one successful batch, not an established root cause or
+long-term stability guarantee. Human-label accuracies remain N/A. Seven
+Langfuse resolution experiments and 196 measured scores are uploaded and
+read back successfully; runtime receipts and full reports remain outside Git.
+Completed runs can be imported with `experiment_tracker.py import-pokemon` and
+published to the configured Langfuse project as seven resolution experiments.
+Missing human labels produce no accuracy scores; photos and raw responses stay
+local. See the [export commands](local-model/eval/README.md#optional-tracker-export).
 
 The version-controlled [120-case synthetic benchmark](local-model/eval/README.md)
 uses four balanced buckets: short tasks, scripted multi-tool calls, multi-turn

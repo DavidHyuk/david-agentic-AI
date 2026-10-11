@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # __author__ = 'David Choi (bestshoot21@gmail.com)'
-"""Import latency experiments, render an offline dashboard, and export metrics.
+"""Import latency/card experiments, render an offline dashboard, and export metrics.
 
 Post-run Langfuse OTLP and LangSmith publishing are optional. No prompts,
 completions, learner identifiers, photos, credentials, or raw logs are exported.
@@ -19,22 +19,28 @@ import re
 import sqlite3
 import subprocess
 import urllib.request
+import unicodedata
 from uuid import uuid5, NAMESPACE_URL
 from urllib.parse import urlsplit
 
 
-METRIC_KEYS = {"ttft_s", "wall_s", "server_total_s", "prefill_s", "decode_s",
+POKEMON_FIELDS = ("pokemon_name", "pokemon_type", "hp", "card_number")
+POKEMON_SCORE_KEYS = {*(field + "_accuracy" for field in POKEMON_FIELDS),
+    "unknown_response_rate", "unknown_field_rate", "api_error_rate", "parse_error_rate", "image_error_rate"}
+IMAGE_ROW_KEYS = {"resolution", "width", "height", "pixels", "actual_mp", "capped_by_original"}
+METRIC_KEYS = POKEMON_SCORE_KEYS | {"ttft_s", "wall_s", "server_total_s", "prefill_s", "decode_s",
     "full_input_tokens", "processed_input_tokens", "cached_input_tokens", "output_tokens",
     "prefill_tps", "decode_tps", "client_decode_tps", "draft_tokens", "accepted_draft_tokens", "queue_wait_s"}
 ROW_KEYS = {"id", "case", "workflow", "phase", "repeat", "concurrency", "output_limit",
-    "started_at", "completed_at", "prompt_sha256", "output_sha256", "pair_wall_s", "pair_output_wall_tps"}
+    "started_at", "completed_at", "prompt_sha256", "output_sha256", "pair_wall_s", "pair_output_wall_tps"} | IMAGE_ROW_KEYS
 TELEMETRY_KEYS = {"available", "sample_interval_s", "samples", "min_available_gib", "min_free_gib",
     "max_gpu_reported_used_gib", "max_gpu_c", "max_board_c", "min_gpu_margin_c", "hw_thermal_observed", "sw_thermal_observed",
     "max_requests_processing", "max_requests_deferred", "sampling_errors", "accounting"}
 RUN_KEYS = {"schema_version", "run_id", "label", "source", "started_at", "completed_at", "model", "build",
     "dataset_digest", "context_per_request", "slots", "mtp", "scope", "sampling", "cold_definition",
     "failure_class", "completed_records", "limitations", "session_usage", "kernel_audit", "batch", "ubatch", "input_budget_tokens", "recorded_at",
-    "host_prompt_cache_mib", "minimum_available_gib", "minimum_free_gib", "admission_policy"}
+    "host_prompt_cache_mib", "minimum_available_gib", "minimum_free_gib", "admission_policy",
+    "resolution", "preprocessing", "parameters_sha256", "gpu_clock_min_mhz_reported", "gpu_clock_max_mhz_reported"}
 
 
 def utcnow():
@@ -110,6 +116,87 @@ def import_mtp(directory):
                         "draft_tokens": t.get("draft_n", 0), "accepted_draft_tokens": t.get("draft_n_accepted", 0)},
                     "pair_wall_s": result["wall_s"] if result["concurrency"] == 2 else None,
                     "output_sha256": response.get("output_sha256"), "telemetry": telemetry})
+        runs.append(sanitize(run))
+    return runs
+
+
+def import_pokemon(directory, telemetry_path=None, gpu_clock_min=None, gpu_clock_max=None):
+    """Import a complete scored card run as one experiment per resolution.
+
+    Export only hashes, dimensions, measured metrics and human-label scores.
+    Missing labels and invalid-response unknown rates remain absent scores.
+    Request timestamps are unavailable in this harness: use import spans.
+    """
+    metadata = json.loads((directory / "metadata.json").read_text())
+    rows = json.loads((directory / "results.json").read_text())
+    if metadata.get("status") != "completed" or metadata.get("input_errors"):
+        raise ValueError("Pokemon import requires a completed run without input errors")
+    inputs = {entry["filename"]: entry["source_sha256"] for entry in metadata["inputs"]}
+    resolutions = metadata["resolutions"]
+    if not inputs or not resolutions or len(set(resolutions)) != len(resolutions):
+        raise ValueError("Pokemon dataset and resolution list must be nonempty and unique")
+    expected = {(filename, resolution) for filename in inputs for resolution in resolutions}
+    actual = [(row["filename"], row["resolution"]) for row in rows]
+    if len(actual) != len(set(actual)) or set(actual) != expected:
+        raise ValueError("Pokemon run has duplicate, missing or unexpected photo/resolution records")
+    if any(row.get("source_sha256") != inputs[row["filename"]] for row in rows):
+        raise ValueError("Pokemon record source hash does not match the input manifest")
+    digest = lambda value: hashlib.sha256(json.dumps(value, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+    truth = json.loads((directory / "ground_truth.snapshot.json").read_text())
+    prompt_hash = hashlib.sha256(metadata["prompt"].encode()).hexdigest()
+    dataset = digest({"inputs": inputs, "prompt_sha256": prompt_hash,
+        "preprocessing": metadata["preprocessing"], "ground_truth": truth})
+    telemetry = {}
+    if telemetry_path is not None:
+        host = json.loads(telemetry_path.read_text())
+        telemetry = {"samples": host.get("samples"),
+            "min_available_gib": host.get("minimum_available_gib"),
+            "min_free_gib": host.get("minimum_free_gib"),
+            "max_gpu_c": host.get("maximum_gpu_temperature_c"),
+            "max_board_c": host.get("maximum_board_temperature_c"),
+            "sampling_errors": host.get("sampling_errors"),
+            "accounting": "run-wide sampled extrema, not per-request measurements; unified memory"}
+    runs = []
+    for resolution in resolutions:
+        run = {"schema_version": 1, "run_id": stable_id("pokemon:" + directory.name + ":" + resolution + ":" + dataset),
+            "label": "Pokemon cards · " + resolution + " · " + directory.name,
+            "source": "pokemon_card_benchmark", "model": metadata["model"],
+            "recorded_at": metadata["finished_utc"], "started_at": metadata["created_utc"],
+            "completed_at": metadata["finished_utc"], "resolution": resolution,
+            "dataset_digest": dataset, "parameters_sha256": digest(metadata["parameters"]),
+            "preprocessing": metadata["preprocessing"], "gpu_clock_min_mhz_reported": gpu_clock_min,
+            "gpu_clock_max_mhz_reported": gpu_clock_max,
+            "build": metadata.get("server", {}).get("props", {}).get("build_info"),
+            "scope": "Full-photo resolution experiment; human-label accuracy only when supplied",
+            "limitations": ["No request wall-clock timestamps or measured TTFT; zero-duration import spans",
+                "One completed batch does not establish sustained-load stability or OOM containment",
+                "Smartphone resampling does not establish physical camera performance"], "records": []}
+        for row in rows:
+            if row["resolution"] != resolution:
+                continue
+            valid = row.get("http_status") == 200 and not any(row.get(k) for k in ("api_error", "parse_error", "image_error"))
+            valid = valid and all(isinstance(row.get(f), str) and row[f].strip() for f in POKEMON_FIELDS)
+            unknown = sum(unicodedata.normalize("NFKC", row[f]).strip().casefold() == "unknown"
+                          for f in POKEMON_FIELDS) if valid else None
+            labels = truth.get(row["filename"], {})
+            label_present = {field: bool(str(labels.get(field, "")).strip())
+                and str(labels.get(field, "")).strip().casefold() != "unknown" for field in POKEMON_FIELDS}
+            metrics = {"wall_s": row.get("latency_seconds") if row.get("http_status") == 200 else None,
+                "unknown_response_rate": float(unknown > 0) if valid else None,
+                "unknown_field_rate": unknown / len(POKEMON_FIELDS) if valid else None,
+                **{field + "_accuracy": float(row[field + "_correct"])
+                   if label_present[field] and isinstance(row.get(field + "_correct"), bool)
+                   else None for field in POKEMON_FIELDS},
+                **{key + "_rate": float(bool(row.get(key))) for key in ("api_error", "parse_error", "image_error")}}
+            item_id = digest({"filename": row["filename"], "source_sha256": row["source_sha256"]})[:24]
+            run["records"].append({"id": item_id, "case": "card-" + item_id,
+                "workflow": "pokemon_card", "phase": resolution, "concurrency": 1,
+                "output_limit": metadata["parameters"].get("max_tokens"),
+                "prompt_sha256": prompt_hash,
+                "output_sha256": hashlib.sha256(row.get("raw_model_response", "").encode()).hexdigest(),
+                **{k: row[k] for k in IMAGE_ROW_KEYS if k in row},
+                "metrics": metrics, "telemetry": telemetry})
+        run["completed_records"] = len(run["records"])
         runs.append(sanitize(run))
     return runs
 
@@ -293,6 +380,13 @@ def langfuse_payload(runs):
                 "langfuse.observation.output": json.dumps({"metrics": m, "quality": row.get("quality", {})}),
                 "langfuse.observation.metadata.telemetry": row.get("telemetry", {})}
             attrs.update({"langfuse.observation.metadata." + key: value for key, value in m.items()})
+            attrs.update({"langfuse.observation.metadata." + key: row.get(key) for key in IMAGE_ROW_KEYS})
+            attrs.update({"langfuse.observation.metadata." + key: run.get(key) for key in
+                ("resolution", "preprocessing", "parameters_sha256", "gpu_clock_min_mhz_reported", "gpu_clock_max_mhz_reported")})
+            attrs.update({"langfuse.experiment.metadata." + key: run.get(key) for key in
+                ("resolution", "model", "build", "parameters_sha256", "gpu_clock_min_mhz_reported",
+                 "gpu_clock_max_mhz_reported", "limitations")})
+            attrs["langfuse.observation.metadata.model"] = run.get("model")
             if not historical:
                 attrs["langfuse.observation.model.name"] = run["model"]
                 attrs["langfuse.observation.usage_details"] = json.dumps({
@@ -341,13 +435,14 @@ def status_langfuse(args):
 
 
 def langfuse_scores(runs, payload):
-    """Attach numeric performance measurements to each experiment-item root."""
+    """Attach measured performance and optional human-label scores to each item."""
     spans = payload["resourceSpans"][0]["scopeSpans"][0]["spans"]
     rows = [row for run in runs for row in run["records"]]
     events = []
     for row, span in zip(rows, spans):
         values = {k: row["metrics"].get(k) for k in ("ttft_s", "wall_s", "prefill_s", "decode_tps")}
         values.update({k: row.get("telemetry", {}).get(k) for k in ("min_available_gib", "min_gpu_margin_c")})
+        values.update({k: row["metrics"].get(k) for k in sorted(POKEMON_SCORE_KEYS)})
         timestamp = datetime.fromtimestamp(int(span["endTimeUnixNano"]) / 1e9, timezone.utc).isoformat()
         for name, value in values.items():
             if not isinstance(value, (int, float)) or isinstance(value, bool) or not math.isfinite(value):
@@ -357,7 +452,9 @@ def langfuse_scores(runs, payload):
                 "type": "score-create", "body": {"id": stable_id(identity), "traceId": span["traceId"],
                     "observationId": span["spanId"], "name": name, "value": float(value),
                     "dataType": "NUMERIC", "environment": "experiment",
-                    "comment": "Measured performance; not a semantic correctness score."}})
+                    "comment": ("Human ground-truth field correctness; missing labels excluded."
+                        if name.endswith("_accuracy") else "Measured response indicator; average over eligible records."
+                        if name in POKEMON_SCORE_KEYS else "Measured performance; not a semantic correctness score.")}})
     return {"batch": events}
 
 
@@ -436,6 +533,12 @@ def main():
     imp = sub.add_parser("import-mtp")
     imp.add_argument("--source", type=Path, required=True)
     imp.add_argument("--output", type=Path, required=True)
+    pokemon = sub.add_parser("import-pokemon", help="Import completed card metrics; no photos or raw responses")
+    pokemon.add_argument("--source", type=Path, required=True)
+    pokemon.add_argument("--output", type=Path, required=True)
+    pokemon.add_argument("--telemetry", type=Path)
+    pokemon.add_argument("--gpu-clock-min-mhz", type=int)
+    pokemon.add_argument("--gpu-clock-max-mhz", type=int)
     aud = sub.add_parser("audit-production")
     aud.add_argument("--since", required=True)
     aud.add_argument("--until", required=True)
@@ -458,6 +561,10 @@ def main():
         runs = import_mtp(args.source)
         if not runs:
             parser.error("no completed matched MTP artifacts found")
+        save(args.output, runs)
+        print(json.dumps({"imported_experiments": len(runs), "output": str(args.output)}))
+    elif args.command == "import-pokemon":
+        runs = import_pokemon(args.source, args.telemetry, args.gpu_clock_min_mhz, args.gpu_clock_max_mhz)
         save(args.output, runs)
         print(json.dumps({"imported_experiments": len(runs), "output": str(args.output)}))
     elif args.command == "audit-production":
