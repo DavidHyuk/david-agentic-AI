@@ -94,3 +94,74 @@ Review the memory budget before further inference. The benchmark remains
 incomplete, accuracies remain unlabeled, and the user's request to publish the
 completed results to Langfuse remains pending in the workspace. The completed
 stack update does not establish the earlier reboot's cause.
+
+## Repeated host loss on the updated stack
+
+The operator explicitly permits exploratory evaluation despite possible another
+shutdown. Override the two unvalidated client memory floors to zero for these
+executions only, retaining sequential requests, idle-slot checks and the PSI
+guard. The 40/24 GiB defaults were selected by the agent; they are not NVIDIA
+recommendations or measured request-allocation budgets.
+
+- One 0.3MP request completes in 4.504 seconds on the updated stack.
+- The full run completes first-photo 2MP (5.470 s) and 5MP (21.915 s), then
+  loses the host during the next 8MP request. Only **2/28** records are complete.
+- Previous boot ID `2b1f4679-eabe-4cea-a069-03fac220f95b` changes to
+  `25db06fc-9c64-4328-abdc-8d3ee726ba9d`. The user reports a hard shutdown.
+  Accessible prior-boot logs end mid-request without orderly shutdown,
+  OOM/Xid/panic markers. `/sys/fs/pstore` is permission-restricted; do not
+  describe it as inspected or empty. `/var/lib/systemd/pstore` is empty.
+- **75 saved samples** from 06:00:50 to 06:02:06 UTC show minimum available
+  memory **33.177 GiB**, minimum free memory **27.894 GiB**, maximum GPU
+  temperature **81 C**, GPU-only power **90.53 W**, and thermal-zone maximum
+  **93.8 C**. All sampled memory PSI avg10 values are zero. The seven zones
+  expose only `acpitz`, so CPU/SoC mapping is not established. Sampling cannot
+  rule out unobserved allocation/power spikes or establish root cause.
+- All four source hashes match. Preserve JSONL and mark metadata
+  `interrupted_host_reboot`; regenerate partial reports without inference.
+  Human labels remain absent. Further inference and completed-result Langfuse
+  publication are deferred; no clock or firmware changes are applied.
+
+Runtime evidence: `~/pokemon-card-benchmark/validation/host-loss-20261011T0602Z/`
+and `validation/monitored-20261011T060050.070827Z-full/`. Partial report:
+`runs/20261011T060050.158682Z-post-upgrade-baseline/report.md`.
+
+## Community experience and NVIDIA guidance checked after this failure
+
+The [same-stack NVIDIA_DGX_Spark report](https://forums.developer.nvidia.com/t/hard-power-off-under-sustained-gpu-load-at-90w-persists-after-full-platform-firmware-update/378315)
+uses exactly 6.17.0-1021 and 580.159.03. A user reports hard power-off near
+90 W GPU draw despite updated platform firmware, with successful larger
+workloads after `sudo nvidia-smi -lgc 300,2200`. NVIDIA's July 27 reply calls
+the symptoms a known issue, recommends lowering the GPU clock maximum as
+the current workaround and links Spark Fieldiag. This is a relevant temporary
+diagnostic mitigation, not proof that this host has the same cause or that
+2200 MHz will always prevent shutdown. Other [firsthand users](https://forums.developer.nvidia.com/t/dgxspark-temperature-too-high-automatic-shutdown/363370?page=2)
+report improved uptime with clock limits, failures even at 2300 MHz and device
+variation on the same software. A diagnostic PASS does not reproduce every
+workload failure.
+
+In a separate [OOM/hang thread](https://forums.developer.nvidia.com/t/device-hangs-under-load/375016),
+NVIDIA identifies recorded NV_ERR_NO_MEMORY and recommends at least 580.159.03
+and a workload memory budget, expecting exhaustion to kill the process instead
+of hanging the host. The user says that driver is already installed; further
+diagnostic collection is requested. This does not promise a surviving
+llama-server or a clean HTTP allocation-error response.
+
+Read-only fwupd evidence identifies installed **EC 0x02004b03 (2.75.3)**,
+**SoC 0x02009009 (2.144.9)** and **USB-PD 0x00000500 (0.5.0)**. The cached
+release names map the two generic UEFI firmware devices to SoC and USB-PD.
+These precede the Founders Edition release-note values EC 3.5.8, SoC 2.155.11,
+USB-PD 0.5.22. The kernel/driver operation deliberately left firmware unchanged.
+NVIDIA recommends the [DGX Dashboard update path](https://docs.nvidia.com/dgx/dgx-spark/os-and-component-update.html)
+for compatible OS, driver and firmware updates. Firmware freshness is another
+unresolved variable, not an established cause or guaranteed remedy.
+
+For a reversible operator-run clock test, use `sudo nvidia-smi -lgc 300,2200`;
+restore defaults with `sudo nvidia-smi -rgc`. The [nvidia-smi reference](https://docs.nvidia.com/deploy/nvidia-smi/index.html)
+documents both commands. Keep clock state recorded alongside subsequent
+benchmarks because latency changes and this setting affects all GPU clients.
+For persistent faults, collect support evidence and use the [official Field
+Diagnostic/RMA route](https://docs.nvidia.com/dgx/dgx-spark/support.html).
+Field diagnostics require disruptive setup, including temporarily disabling
+Secure Boot and switching console mode; they are not run as part of this
+read-only investigation. No new kernel version is proposed as a proven fix.

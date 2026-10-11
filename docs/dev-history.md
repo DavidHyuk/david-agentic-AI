@@ -3,6 +3,23 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.49.2 — 2026-10-10 (patch: preserve the repeated post-update host loss)
+
+- Record the operator-authorized exploratory execution with the two client
+  memory floors overridden for this run only. The single 0.3MP probe completes;
+  the full run loses the host after 2/28 responses, during the next 8MP request.
+  Preserve raw JSONL/telemetry, save prior-boot evidence, verify all four source
+  hashes and regenerate explicitly incomplete reports without inference.
+- Clarify that the 40/24 GiB defaults are agent-selected, unvalidated thresholds,
+  not NVIDIA recommendations. Sampled available memory remains above 33 GiB,
+  memory PSI avg10 is zero, GPU power reaches 90.53 W and a board sensor reaches
+  93.8 C. No captured OOM/Xid/panic establishes a diagnosis.
+- Record NVIDIA's same-stack hard-power-off clock-cap workaround and Fieldiag
+  guidance, plus older local EC/SoC/USB-PD firmware. Make no clock, firmware,
+  model, service or network change; defer further inference and completed-result
+  Langfuse publication. Documentation/evidence-only validation checks report
+  status/counts and unchanged inputs; no new agent or Observatory room is added.
+
 ## v1.49.1 — 2026-10-10 (patch: record the verified Spark update and evaluation gate)
 
 - Record the operator-completed 6.17.0-1021/580.159.03 installation, reboot and
