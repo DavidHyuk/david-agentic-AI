@@ -136,3 +136,21 @@ def test_missing_labels_cannot_become_scores_from_stale_correctness_flags(tmp_pa
     rewrite(tmp_path, "results.json", rows)
     runs = tracker.import_pokemon(tmp_path)
     assert runs[0]["records"][0]["metrics"]["pokemon_name_accuracy"] is None
+
+
+def test_prompt_variants_share_dataset_and_export_a_distinct_tcg_type_score(tmp_path):
+    metadata, rows = fixture_run(tmp_path)
+    rows[0].update(pokemon_type='Metal', pokemon_type_correct=True)
+    rewrite(tmp_path, 'results.json', rows)
+    rewrite(tmp_path, 'ground_truth.snapshot.json', {rows[0]['filename']: {'pokemon_type': 'Metal'}})
+    before = tracker.import_pokemon(tmp_path)
+    metadata.update(prompt='new icon-only instruction', prompt_version='tcg-symbol-v2')
+    rewrite(tmp_path, 'metadata.json', metadata)
+    after = tracker.import_pokemon(tmp_path)
+    assert before[0]['dataset_digest'] == after[0]['dataset_digest']
+    assert before[0]['records'][0]['prompt_sha256'] != after[0]['records'][0]['prompt_sha256']
+    assert after[0]['prompt_version'] == 'tcg-symbol-v2'
+    assert after[0]['records'][0]['metrics']['tcg_type_accuracy'] == 1
+    events = tracker.langfuse_scores(after, tracker.langfuse_payload(after))['batch']
+    assert sum(e['body']['name'] == 'tcg_type_accuracy' for e in events) == 1
+    assert not any(e['body']['name'] == 'pokemon_type_accuracy' for e in events)

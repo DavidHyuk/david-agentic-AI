@@ -7,13 +7,13 @@ Python에서 직접 호출합니다. 모델 다운로드, 서버 실행/재시�
 
 ## 설치와 실행
 
-이 호스트에는 `~/pokemon-card-benchmark/`와 전용 `.venv`가 준비되어 있습니다.
+이 호스트에는 `~/workspace/David-Agent/pokemon-card-benchmark/`와 전용 `.venv`가 준비되어 있습니다.
 `benchmark.py`는 버전 관리되는 `scripts/pokemon_card_benchmark.py`를 가리키는
-심볼릭 링크입니다. 사용자 사진, 이미지 파생본, 정답, 응답 및 그래프는 Git 밖에
-저장합니다. 사진 한 장에 카드 한 장이 보이게 촬영하세요.
+심볼릭 링크입니다. 사용자가 옮긴 작업 폴더는 저장소 안에 있지만 `.gitignore`로
+사용자 사진, 이미지 파생본, 정답, 응답 및 그래프를 버전 관리에서 제외합니다. 사진 한 장에 카드 한 장이 보이게 촬영하세요.
 
 ```bash
-cd ~/pokemon-card-benchmark
+cd ~/workspace/David-Agent/pokemon-card-benchmark
 # JPG/JPEG/PNG/HEIC/HEIF를 input/에 복사. 하위 폴더도 검색합니다.
 .venv/bin/python benchmark.py init
 # 먼저 소규모 확인: 사진 1장 × 7조건
@@ -43,13 +43,16 @@ API/파싱 오류, 재부팅 및 기록된 OOM/Xid/panic은 없었고 원본 4�
 그대로입니다. GPU 최대 79°C·73.47W, 보드 센서 최대 93.1°C, 가용 메모리
 최소 27.10GiB가 기록됐습니다. 이는 이번 한 번의 성공이며 장기 안정성이나
 OOM 격리·근본 원인을 확정하지 않습니다. 기존 모델·서비스·펌웨어는 그대로입니다.
-정답은 미입력이므로 정확도는 N/A이며, 해상도별 Langfuse 실험 7개·28개 항목·
+당시 정답은 미입력이라 정확도 N/A였으며, 해상도별 Langfuse 실험 7개·28개 항목·
 측정 점수 196개를 업로드하고 API 재조회로 확인했습니다. 완료 run은
 `runs/20261011T061522.491305Z-gpu2200-baseline/`이며 `verification.json`과
 `langfuse-receipt.json`이 검증·업로드 증거입니다. `wall_s` 평균은 0.3MP 2.417초,
 2MP 6.263초, 3MP 15.580초, 5MP 19.234초, 8MP 21.597초,
 12MP 21.614초, Original 21.624초입니다. 모든 조건 unknown 비율은 0%이나,
-일부 카드 번호·타입 예측이 달라 정답 여부는 확인해야 합니다.
+이후 사람이 입력한 정답으로 재채점한 결과 이름·HP는 전 조건 4/4, TCG 타입은
+0.3MP 3/4 및 나머지 2/4, 카드 번호는 0.3MP·2MP 1/4 및 나머지 2/4입니다.
+원문 JSONL과 구 프롬프트 metadata는 유지하며 미라벨 보고서는
+`report-versions/unlabeled-v1/`에 보관했습니다. 표본 네 장의 탐색 결과입니다.
 초기 확인 기록은 `validation/post-upgrade-2026-10-10.json`에 보관합니다.
 `--min-available-gib`/`--min-free-gib`로 기준을 지정할 수 있습니다.
 서버가 이미 처리 중인 GPU 요청을 이 클라이언트가 안전하게 취소하지는 못합니다.
@@ -82,12 +85,12 @@ API 호출 없이 해상도 이미지와 정답 템플릿만 준비할 수도 �
 재설치가 필요한 경우 프로젝트의 독립 환경만 만드세요:
 
 ```bash
-mkdir -p ~/pokemon-card-benchmark
-python3 -m venv ~/pokemon-card-benchmark/.venv
-~/pokemon-card-benchmark/.venv/bin/python -m pip install \
+mkdir -p ~/workspace/David-Agent/pokemon-card-benchmark
+python3 -m venv ~/workspace/David-Agent/pokemon-card-benchmark/.venv
+~/workspace/David-Agent/pokemon-card-benchmark/.venv/bin/python -m pip install \
   -r /home/david/workspace/David-Agent/local-model/eval/requirements-pokemon.txt
 ln -s /home/david/workspace/David-Agent/scripts/pokemon_card_benchmark.py \
-  ~/pokemon-card-benchmark/benchmark.py
+  ~/workspace/David-Agent/pokemon-card-benchmark/benchmark.py
 ```
 
 ## 이미지와 추론 조건
@@ -130,13 +133,24 @@ repeat_penalty=1, presence/frequency_penalty=0, prompt cache 요청 비활성화
 이름은 카드에 **인쇄된 언어와 접미사 그대로** 추출합니다. 예를 들어 한글 카드의
 정답에 영어 번역 이름을 쓰면 오답입니다. 타입은 명확한 카드 에너지 심볼을 표준
 영어로 기록하며 약점, 저항력, 공격 에너지나 종 분류를 타입으로 사용하지 않습니다.
+`tcg-symbol-v2`는 사진의 방향이 아닌 **카드 방향 기준 오른쪽 상단 HP 옆 타입
+아이콘**을 보도록 지시합니다. Grass, Fire, Water, Lightning, Psychic, Fighting,
+Darkness, Metal, Dragon, Colorless, Fairy 중 식별하거나 `unknown`을 반환합니다.
+이름·그림·도감 지식에서 타입을 추론하지 않도록 명시하지만, 지시만으로 실제
+모델의 판단 근거가 아이콘에만 한정됐다고 입증하지는 않습니다.
+보고서·실패 상세·정확도 그래프는 **TCG Type Accuracy**를 별도 지표로 표시하며,
+JSON의 기존 `pokemon_type_*` 키와 `tcg_type_*` 별칭을 함께 저장합니다.
+새 run만 새 프롬프트를 사용하며 기존 결과 재채점은 새 추론이 아닙니다.
 이름·타입·HP·카드 번호를 읽을 수 없으면 `unknown`을 요청합니다. JSON 외 텍스트나
 빠진/잘못된 필드는 파싱 오류로 기록하며 규칙으로 값을 추측해서 보정하지 않습니다.
 
 ## 정답 입력과 재채점
 
-`init`, `prepare`, `run`은 `ground_truth.csv`에 새 파일 행을 추가하면서 기존 정답을
-보존합니다. 추론 출력을 정답으로 자동 복사하지 않습니다. 헤더:
+`init`, `prepare`, `run`은 `pokebot_ground_truth.csv`가 있으면 우선 사용하고,
+없으면 `ground_truth.csv`에 새 파일 행을 추가하면서 기존 정답을 보존합니다.
+현재 사용자가 작성한 정답은 `pokebot_ground_truth.csv`입니다. `run --truth PATH`로
+다른 파일을 지정할 수 있습니다. 실행 위치나 스크립트 저장소에서 작업 폴더를
+자동 검색하며 `--root PATH`로 명시할 수도 있습니다. 추론 출력을 정답으로 자동 복사하지 않습니다. 헤더:
 
 ```csv
 filename,pokemon_name,pokemon_type,hp,card_number
@@ -149,12 +163,15 @@ example.jpg,Pikachu,Lightning,60,025/100
 입력 후 기존 결과를 API 재호출 없이 재채점합니다:
 
 ```bash
-.venv/bin/python benchmark.py report runs/<RUN_ID>
+.venv/bin/python benchmark.py report runs/<RUN_ID> --truth pokebot_ground_truth.csv
 ```
 
 정확도는 정답이 있는 필드의 완료 행 중 정규화 후 정확히 일치하는 비율입니다.
 Unicode NFKC, 대소문자, 연속 공백을 정규화하며 HP의 `HP` 단위와 카드 번호의
 공백만 허용합니다. 카드 번호의 leading zero와 이름의 접미사는 유지합니다.
+예를 들어 정답 `069/062`와 응답 `069/062 AR`는 엄격한 일치 평가에서 다릅니다.
+RR/AR/확장팩 정보를 임의로 제거하지 않으며 실제 숫자 오독과 함께 실패 상세에서
+확인하세요. 카드 번호 형식을 바꾸는 실험은 별도로 구분해야 합니다.
 API/파싱/이미지 오류는 정답이 있으면 오답입니다. 미완료 요청은 분모에 포함하지
 않으며 완료/계획 건수 및 run 상태로 구분합니다. 정답이 없으면 정확도는 `N/A`입니다.
 
@@ -168,14 +185,15 @@ Unknown Response Rate는 **유효 JSON 응답** 중 필드 하나 이상이 `unk
 ## 파일 위치
 
 ```text
-~/pokemon-card-benchmark/
+~/workspace/David-Agent/pokemon-card-benchmark/
 ├── benchmark.py                # 저장소 standalone script로의 링크
 ├── .venv/                      # 별도 Python 환경
 ├── README.md                   # 이 사용 안내
 ├── requirements.txt
 ├── requirements.lock.txt       # 설치된 격리 환경의 패키지 버전
 ├── input/                      # 원본 사진: 수정하지 않음
-├── ground_truth.csv            # 사람이 입력하는 정답
+├── pokebot_ground_truth.csv    # 현재 사람이 입력한 정답 (우선 선택)
+├── ground_truth.csv            # 기본 템플릿/기존 파일 (있는 경우)
 ├── images/<PREPARATION_ID>/     # prepare 전용 해상도 폴더/manifest
 ├── validation/                 # 연결/실제 Vision smoke 증거; 평가 제외
 └── runs/<RUN_ID>/
@@ -238,3 +256,105 @@ JSONL 행마다 flush/fsync하여 완료 결과를 보관합니다. 비정상 �
 서버 build/hardware/cache/concurrency 차이는 metadata를 따로 확인하세요.
 이 기능은 수동 로컬 평가 도구이며 Hermes skill, agent, Telegram feed, cron이나
 Observatory 대화 workflow를 추가하지 않습니다.
+
+## 도감 놀이 목표와 다음 실험
+
+카메라·마이크·스피커가 있는 로봇은 사진/음성을 전달하고 표정과 음성으로 반응하며,
+답변은 기존 DGX Spark의 Hermes/Qwen이 생성하는 구조를 목표로 합니다. 최초 MVP는
+이름 인식 → 짧은 소개/질문 응답 → 발견 저장입니다. 정확한 카드 ID와 기술·공격력·
+레어리티 읽기는 후속 기능이며 현재 네 필드 평가로 검증됐다고 보지 않습니다.
+도감 번호/종의 타입과 TCG 카드 번호/카드 타입은 별도로 표시해야 합니다.
+모르는 카드 정보를 종의 일반 지식으로 채우지 않으며, 카드 DB를 도입하면 확장팩·
+언어·번호·이름 등으로 식별하고 충돌하는 항목은 확인을 요청해야 합니다.
+
+구매 판단에서는 이름 인식뿐 아니라 실제 촬영 거리·초점·조명·움직임, 사진 전송,
+음성 인식/생성까지 포함한 응답 시간을 검증해야 합니다. 지금 지연은 VLM HTTP
+요청 시간이며 마이크/스피커를 포함한 놀이 전체 응답 시간은 아닙니다.
+
+타입 오류는 작은 아이콘의 식별, 위치 찾기, 아이콘과 영어 라벨의 연결 중 어디서
+발생했는지 현재 결과만으로 구분할 수 없습니다. 특정 Qwen 모델이 포켓몬 심볼을
+학습하지 않았다고 단정하지 않습니다. 다음 진단은 별도 실험으로 진행합니다:
+
+1. 동일한 전체 이미지에서 아이콘 설명/범례 또는 별도의 예시를 제공해 비교합니다.
+2. **0.3MP로 축소한 파생 이미지에서** HP 옆 아이콘을 Crop해 전체 이미지와 비교합니다.
+   원본 고해상도에서 Crop하면 저해상도 카메라 조건을 유지하지 못합니다. 카드 방향과
+   위치를 검증한 crop 좌표를 저장하고, 확대했다면 보간/크기/추론 설정도 기록합니다.
+   사람이 지정한 영역의 결과는 로봇의 자동 영역 검출 성능을 검증하지 않습니다.
+3. 예시/Crop으로도 반복 실패하면 별도 학습 자료로 파인튜닝을 검토합니다. 현재 평가
+   네 장을 학습 예시로 쓰고 같은 네 장으로 성능 향상을 주장하지 않습니다. 카드
+   단위로 분리한 holdout과 동일 프롬프트/이미지/설정으로 전후를 비교합니다.
+
+현재 실행은 전체 이미지에 아이콘 지시를 강화한 실험이며 Crop/범례/파인튜닝은
+추가하지 않았습니다. 프롬프트 버전이 다르면 `compare`의 파인튜닝 비교가 거부되는
+것이 정상입니다. Langfuse에서는 같은 인간 정답 dataset의 별도 프롬프트 실험으로
+비교하며 프롬프트 해시/버전을 확인하세요.
+
+새 run `runs/20261011T065900.425833Z-tcg-symbol-v2-gpu2200/`은 28/28건을
+API/파싱 오류·재부팅 없이 완료했습니다. TCG 타입은 전 조건 3/4, HP는 전 조건
+4/4입니다. 0.3MP 이름은 엄격한 규칙에서 2/4이며 두 이름의 `ex` 앞 공백만
+정답과 다릅니다. 다른 조건의 이름은 4/4입니다. 카드 번호는 0.3MP·3MP·12MP·
+Original 1/4, 2MP·5MP·8MP 2/4이고, unknown은 전 조건 0%입니다.
+프롬프트만 바꾼 비교표/그래프는
+`comparisons/legacy-v1-vs-tcg-symbol-v2-gpu2200/`에 저장했습니다.
+두 프롬프트의 사람 정답 점수 포함 Langfuse 14개 실험·56개 항목·616개 점수를
+ID/값 재조회로 검증했으며 구 run `langfuse-labeled-receipt.json`과 새 run
+`langfuse-receipt.json`에 기록했습니다. 기존 미라벨 업로드 증거도 보존합니다.
+
+이번 새 run은 최소 가용 메모리 19.43GiB, GPU 최대 78°C·73.36W·2190MHz를
+기록했습니다. 메모리 여유는 GPU 연산 속도와 동일하지 않습니다. API timings의
+고해상도 평균 prompt 처리 약 17.6초, 출력 생성 약 1.2초가 관측됐으며 이것만으로
+Vision encoder와 텍스트 prefill 비용을 분리하지는 못합니다. 실제 실행 프로세스의
+설정은 batch 4096, ubatch 1024, GPU layers auto, fit target 8192MiB, 슬롯 2개,
+총 context 262144(슬롯당 131072), draft-MTP입니다. 적재 레이어 수와 변경 후
+효과는 별도 확인이 필요하며 이 작업에서 서버 설정을 변경하지 않았습니다.
+
+2300MHz 시험은 아직 실행하지 않았습니다. 사용자가 클럭을 변경한 후 다른 Hermes
+추론이 없는 별도 터미널에서 먼저 한 장×7조건을 확인할 수 있습니다. 같은 네 장은
+이름/형식 차이와 표본 크기 한계가 있어 지연과 안정성만 함께 비교하세요.
+
+```bash
+sudo nvidia-smi -lgc 300,2300
+cd ~/workspace/David-Agent/pokemon-card-benchmark
+.venv/bin/python benchmark.py run --truth pokebot_ground_truth.csv \
+  --limit 1 --label tcg-symbol-v2-gpu2300-smoke \
+  --min-available-gib 0 --min-free-gib 0
+# 기존 사용자 지정 범위로 복원할 때
+sudo nvidia-smi -lgc 300,2200
+```
+
+0/0은 사용자가 허용한 탐색 실험의 미검증 메모리 floor override입니다. PSI/idle
+검사는 유지하지만 실행 중 전원 꺼짐이나 GPU 장애를 방지하는 장치는 아닙니다.
+2200→2300은 상한 +4.5%이며 완전히 비례하는 경우에도 시간 감소는 약 4.3%입니다.
+
+## 후보 로봇 비교 (2026-10-11 공식 문서 확인)
+
+|항목|StackChan K151|Reachy Mini Wireless|
+|---|---|---|
+|표시 가격|M5Stack $99|Pollen 소개 $499, 링크한 지역 스토어 €435|
+|카메라|GC0308 640×480, 약 0.3MP|Camera Module 3 Wide, 12MP, 자동초점, 120°|
+|오디오|마이크 2개, 1W 스피커|마이크 4개, 5W 스피커|
+|상호작용|2인치 화면의 표정, 고개 회전, LED|고개 6자유도, 몸통/안테나 움직임|
+|개발|ESP32-S3, Arduino/ESP-IDF/UiFlow2|Raspberry Pi CM4, Python/JS SDK|
+
+공식 출처: [StackChan 제품](https://shop.m5stack.com/products/stackchan-kawaii-co-created-open-source-ai-desktop-robot),
+[StackChan 개발 문서](https://docs.m5stack.com/en/StackChan),
+[Reachy 가격/키트 안내](https://pollen-robotics.com/reachy-mini/),
+[Reachy 하드웨어](https://huggingface.co/docs/reachy_mini/en/platforms/reachy_mini/hardware),
+[Reachy Python 카메라/오디오 API](https://huggingface.co/docs/reachy_mini/en/SDK/python-sdk).
+가격은 지역·배송·세금에 따라 달라지며, Reachy 공식 구매 페이지는 DIY 키트와
+최대 90일 lead time을 안내합니다.
+
+도감 놀이를 적은 비용으로 먼저 검증하는 선택은 StackChan입니다. Python으로
+수집/퀴즈/카드 기술 조회와 로봇 움직임을 지속 확장하는 개발 편의성을 우선하면
+Reachy가 적합합니다. 이는 사양과 SDK를 근거로 한 판단이며 실제 기기를 비교
+측정한 결과는 아닙니다. StackChan 공장 AI는 XiaoZhi 기반이므로 Hermes와 연결하려면
+기기 펌웨어/중계 연결을 검토해야 합니다. Reachy도 SDK로 사진·음성을 연결하는 앱이
+필요하며 기존 Hermes와 자동으로 호환된다고 확인한 것은 아닙니다.
+
+센서 12MP가 SDK/스트림에서 항상 12MP 프레임을 제공한다는 뜻은 아닙니다.
+Reachy는 선명하게 촬영한 뒤 요청 크기를 낮추는 방식을 고려할 수 있습니다.
+StackChan도 실제 펌웨어의 촬영 크기를 확인해야 합니다. 예를 들어 공식 ESPHome
+예제는 320×240로 설정돼 있어 이번 약 0.3MP 축소 조건보다 작습니다.
+[공식 ESPHome 카메라 설정](https://docs.m5stack.com/en/homeassistant/devices/stackchan).
+기존 chat-completions 벤치마크는 이미지/텍스트만 검증했으며 한국어 음성 인식·
+음성 합성은 선택한 음성 경로에서 별도 검증해야 합니다.

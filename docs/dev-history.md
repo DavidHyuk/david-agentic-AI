@@ -3,6 +3,37 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.51.0 — 2026-10-11 (minor: evaluate TCG symbols with human labels)
+
+- Discover the card workspace after its move into the repository, ignore its
+  private runtime assets, prefer the operator's `pokebot_ground_truth.csv`, and
+  add explicit `run --truth` support. Preserve existing labels while appending
+  newly discovered inputs. Repair relocated image links in derived reports only
+  after checking image hashes; retain historical raw responses and metadata.
+- Version the English prompt as `tcg-symbol-v2`: classify the card's HP-adjacent
+  top-right symbol, excluding species knowledge, artwork and attack/weakness/
+  resistance symbols. Add distinct TCG Type Accuracy to reports, all four
+  accuracy plots and failure details while keeping legacy JSON type fields.
+- Export `tcg_type_accuracy` and prompt versions to Langfuse. Keep dataset IDs
+  independent of prompt variants so the same human-labeled photo items can be
+  compared; retain strict identical-prompt checks for fine-tuning comparisons.
+  Rescore the completed legacy run using the four operator labels, preserving
+  its original unlabeled reports. Card-number matching remains strict.
+- This remains an internal manual evaluation helper with local mutable state,
+  not a new agent workflow; no profile, service, schedule or Observatory room
+  is added. Existing model/server/clock settings remain operator-controlled.
+  Validation: **927 tests pass**, including eight new relocation, label,
+  symbol-score and shared-dataset checks.
+- Complete the new symbol-prompt batch **28/28**, with no API/parse errors,
+  unchanged boot ID and all original/submitted image hashes verified. Sampled
+  GPU peaks are 78 C/73.36 W/2190 MHz; minimum available memory is 19.43 GiB.
+  All resolutions score 3/4 for TCG type. The 0.3MP strict name score falls to
+  2/4 solely from spaces before `ex`; preserve that score and explain the
+  formatting difference rather than claiming species confusion.
+- Publish both human-labeled prompt variants to the existing Langfuse project,
+  then read back **14 experiments, 56 items and 616 score IDs/values**. Preserve
+  each run's receipt and a separate CSV/JSON/Markdown/PNG/SVG prompt comparison.
+
 ## v1.50.0 — 2026-10-10 (minor: export completed Pokemon resolution experiments)
 
 - Add `import-pokemon` to the existing standalone experiment tracker, grouping

@@ -540,7 +540,7 @@ systemd는 이 특정 종료 코드에 대해 자동 재시작하지 않습니�
 모델 가중치는 이 설정 repo 밖의 `/home/david/workspace/models/`에 보관합니다.
 새 논문 메타데이터 수집에는 LLM이 필요 없습니다.
 
-`scripts/pokemon_card_benchmark.py`는 `~/pokemon-card-benchmark/`에서 실행하는
+`scripts/pokemon_card_benchmark.py`는 `~/workspace/David-Agent/pokemon-card-benchmark/`에서 실행하는
 독립 카드 Vision 평가 도구입니다. 기존 `127.0.0.1:8004/v1`의 Flash-Next를
 직접 호출하며 `/v1/models` 검사와 read-only `/slots` idle 대기 후 순차 요청합니다.
 각 추론 전 MemAvailable 40GiB/MemFree 24GiB 및 memory full PSI < 0.1의
@@ -558,7 +558,7 @@ CUDA/driver/firmware 장애에서 서버 생존이 보장되지는 않습니다.
 정상 완료했습니다. 재부팅 없이 기존 API가 살아 있고 원본 해시가 보존됐습니다.
 511개 저장 샘플의 GPU 최대값은 79°C·73.47W·2190MHz, 보드 최대 93.1°C,
 가용 메모리 최소 27.10GiB입니다. 한 번의 성공으로 원인이나 장기 안정성을
-확정하지 않습니다. 정답 미입력으로 정확도는 N/A이고, Langfuse 실험 7개·항목
+확정하지 않습니다. 최초 실행은 정답 미입력으로 정확도 N/A였고, Langfuse 실험 7개·항목
 28개·측정 점수 196개를 업로드한 뒤 API 재조회했습니다. 영수증은 완료 run의
 `langfuse-receipt.json`에 보관합니다.
 `local-model/eval/experiment_tracker.py import-pokemon`은 완료된 카드 run의
@@ -570,10 +570,26 @@ span duration을 만들지 않으며 `wall_s`를 실측 지연 점수로 사용�
 JPG/PNG/HEIC, EXIF, 전체 사진 Lanczos 축소, 업스케일 없는
 0.3/2/3/5/8/12MP·Original을 지원합니다. 원본/제출 이미지 해시, 원문 API 응답,
 같은 프롬프트/JSON schema/temperature=0 설정을 실행별 보관합니다.
-사람이 입력하는 `ground_truth.csv`가 없으면 정확도는 N/A이며,
+현재 작업 폴더는 저장소 내부로 이동했으며 `.gitignore`로 사진·정답·실행 결과를
+제외합니다. 현재 폴더 및 스크립트의 저장소 위치에서 작업 폴더를 찾고, 없으면
+기존 홈 경로를 사용합니다. `pokebot_ground_truth.csv`를 우선 선택하며 `--truth`로
+정답 경로를 명시할 수 있습니다. 사람이 입력하는 정답이 없으면 정확도는 N/A이며,
 정답 입력 후 API 재호출 없이 재채점할 수 있습니다. CSV/JSON/한국어 Markdown,
 오답·unknown·오류 상세와 PNG/SVG 정확도/지연 그래프를 생성하고,
 고정 입력/정답/추론 설정을 검증하는 Fine-tuning 전후 비교를 지원합니다.
+`tcg-symbol-v2`는 카드 방향을 기준으로 HP 옆 오른쪽 상단 타입 아이콘을 분류하고,
+포켓몬 이름·도감 타입·그림·공격/약점/저항력 아이콘에서 추론하지 않도록 지시합니다.
+TCG Type Accuracy를 이름·HP·카드 번호와 별도로 표·실패 상세·그래프에 표시하며,
+기존 JSON `pokemon_type_*` 키도 유지합니다. Langfuse 점수는 `tcg_type_accuracy`입니다.
+프롬프트 버전/해시는 dataset ID와 별도로 기록해 같은 사진의 프롬프트 실험을
+비교할 수 있습니다. 구 프롬프트 결과를 재채점해도 원문/metadata를 바꾸지 않으며,
+이동한 이미지 경로는 해시 확인 후 파생 결과에서만 갱신합니다. 아이콘 Crop 실험은
+현재 전체 이미지 실험과 별도이며 아직 추가하지 않았습니다.
+새 프롬프트 run도 28/28건·API/파싱 오류 없이 완료했습니다. TCG 타입은 전 조건
+3/4이며 0.3MP의 엄격한 이름 점수 2/4는 두 이름의 `ex` 앞 공백 차이입니다.
+457개 저장 샘플의 GPU 최대 78°C·73.36W, 가용 메모리 최소 19.43GiB였고
+재부팅·원본 변경이 없습니다. 사람 정답을 반영한 두 프롬프트 실험 14개·항목
+56개·점수 616개를 Langfuse에 업로드하고 ID/값을 재조회했습니다.
 선택적 foreground `watch`는 안정된 입력 변경을 감지해 전체 snapshot을 평가합니다.
 프로필·봇·cron·서비스·Tailscale·모델 프로세스를 변경하지 않는 수동 내부 평가
 도구이므로 새 Observatory agent/room은 추가하지 않습니다.
@@ -1166,8 +1182,11 @@ ZIP 경로 격리·credential 오류 출력 방지 및 HQ source 상태 검증�
 Jun 사전 풀이 요약의 근거 변경·Accepted 코드 freshness·실패 보존·동시 실행
 잠금·background provider 경계 및 재인증 상태·실제 코드 필수 조건을 포함한
 원격 계정 재연결·CSRF 전달·동일 계정의 서버 cookie 갱신 검증까지 포함한
-현재 전체 테스트는 919 passed입니다. 추가 카드 실험 export 12개 테스트는
+현재 전체 테스트는 927 passed입니다. 기존 카드 실험 export 12개 테스트는
 완료 조합·해시·개인 정보·정답 분모·unknown·시각·안정적 ID를 검증합니다.
+추가 8개는 이동한 폴더 검색, 사용자 정답 CSV 보존/새 행 추가, 도감 타입과 TCG
+타입의 분리 채점, 원문을 보존하는 이미지 경로 복구, 프롬프트 간 dataset ID 공유를
+검증합니다.
 카드 Vision 평가의 원본 보존·EXIF·HEIC,
 픽셀 예산/업스케일 금지, 정답 분모, 오류/unknown 구분, API 원문/재시도 금지,
 idle/memory guard, 손상된 JSONL 마지막 행 복구, 중복 크기 쌍 제외,

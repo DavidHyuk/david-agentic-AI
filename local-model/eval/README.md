@@ -74,20 +74,26 @@ per resolution with the same hashed photo items across all conditions:
 
 ```bash
 python local-model/eval/experiment_tracker.py import-pokemon \
-  --source ~/pokemon-card-benchmark/runs/<RUN_ID> \
-  --output ~/pokemon-card-benchmark/runs/<RUN_ID>/experiments.json \
-  --telemetry ~/pokemon-card-benchmark/validation/<MONITOR_ID>/summary.json \
+  --source ~/workspace/David-Agent/pokemon-card-benchmark/runs/<RUN_ID> \
+  --output ~/workspace/David-Agent/pokemon-card-benchmark/runs/<RUN_ID>/experiments.json \
+  --telemetry ~/workspace/David-Agent/pokemon-card-benchmark/validation/<MONITOR_ID>/summary.json \
   --gpu-clock-min-mhz 300 --gpu-clock-max-mhz 2200
 python local-model/eval/experiment_tracker.py publish-langfuse \
-  --input ~/pokemon-card-benchmark/runs/<RUN_ID>/experiments.json \
+  --input ~/workspace/David-Agent/pokemon-card-benchmark/runs/<RUN_ID>/experiments.json \
   --credentials ~/.config/david-agent/langfuse.env \
-  --dry-run ~/pokemon-card-benchmark/runs/<RUN_ID>/langfuse-otlp.json
+  --dry-run ~/workspace/David-Agent/pokemon-card-benchmark/runs/<RUN_ID>/langfuse-otlp.json
 ```
 
 Omit `--dry-run` to publish the prepared complete run. The importer rejects
 interrupted, missing, duplicate or source-mismatched photo/resolution records.
 Accuracy scores require both a human label snapshot and a scored correctness
 flag; missing labels stay absent. Unknown scores exclude invalid responses.
+The type score is `tcg_type_accuracy`, alongside name, HP and card-number
+accuracy. Dataset identity includes source images, preprocessing and human
+labels; prompt version/hash are recorded separately so prompt variants share
+photo items. Rescore a historical run before importing updated labels; its
+stored prompt remains the historical version. Fine-tuning comparisons still
+require identical prompts.
 Photos, filenames, predictions and raw model/API responses stay local. Host
 extrema are labeled run-wide, and reported clock settings are metadata. Card
 requests lack individual wall-clock timestamps and streaming TTFT, so imported

@@ -35,16 +35,26 @@ RESOLUTIONS = {"0.3MP": 300_000, "2MP": 2_000_000, "3MP": 3_000_000,
 EXTENSIONS = {".jpg", ".jpeg", ".png", ".heic", ".heif"}
 DEFAULT_MODEL = "Qwen3.8-Flash-Next-UD-IQ4_XS"
 DEFAULT_URL = "http://127.0.0.1:8004/v1"
+PROMPT_VERSION = "tcg-symbol-v2"
 PROMPT = ('Read only the visible Pokemon trading card in this full photograph. '
-          'Extract the printed Pokemon name, the card Pokemon energy type (not its '
-          'species category, weakness, resistance, or attack cost), HP, and collector '
+          'Extract the printed Pokemon name, HP, and collector '
           'card number including the set total or prefix if visible. Never identify '
           'a field from artwork, memory, or guesses. If a field is unreadable or '
           'absent, return "unknown". Preserve the printed name language and suffixes '
-          '(such as ex, GX, or V). Return only a JSON object with exactly four string '
+          '(such as ex, GX, or V). '
+          'For pokemon_type, identify the Pokemon TCG card type by visually examining '
+          'the TYPE SYMBOL at the TOP-RIGHT corner OF THE CARD, next to its HP value. '
+          'The type is represented by an icon, not a printed English type name. '
+          'Use the card orientation even if the card is rotated in the photograph. '
+          'Do NOT infer the type from the Pokemon name, artwork, appearance, known '
+          'Pokedex type, species category, or memory. Do NOT use energy symbols next '
+          'to attacks, weakness, resistance, or retreat cost. Allowed English labels '
+          'are Grass, Fire, Water, Lightning, Psychic, Fighting, Darkness, Metal, '
+          'Dragon, Colorless, Fairy. If the HP-adjacent type symbol is not clearly '
+          'recognizable, return "unknown" for pokemon_type. '
+          'Return only a JSON object with exactly four string '
           'keys: "pokemon_name", "pokemon_type", "hp", "card_number". HP must be '
-          'digits without HP; use standard English energy type names if the type '
-          'symbol is unambiguous.')
+          'digits without HP.')
 SCHEMA = {"type": "object", "properties": {k: {"type": "string"} for k in FIELDS},
           "required": list(FIELDS), "additionalProperties": False}
 PARAMETERS = {"temperature": 0, "seed": 42, "top_p": 1, "top_k": 0, "min_p": 0,
@@ -106,15 +116,38 @@ def read_truth(path):
     return truth
 
 
-def initialize(root):
+def default_root(cwd=None, script_path=None, home=None):
+    """Find the existing workspace after a move; retain the original home fallback."""
+    cwd = Path.cwd() if cwd is None else Path(cwd)
+    script = Path(__file__).resolve() if script_path is None else Path(script_path)
+    candidates = [cwd / "pokemon-card-benchmark", script.parent.parent / "pokemon-card-benchmark"]
+    if cwd.name == "pokemon-card-benchmark":
+        candidates.insert(0, cwd)
+    for candidate in candidates:
+        if (candidate / "input").is_dir():
+            return candidate.resolve()
+    return (Path.home() if home is None else Path(home)) / "pokemon-card-benchmark"
+
+
+def default_truth_path(root):
+    custom = Path(root) / "pokebot_ground_truth.csv"
+    return custom if custom.exists() else Path(root) / "ground_truth.csv"
+
+
+def initialize(root, truth_path=None):
     for name in ("input", "images", "runs", "validation"):
         (root / name).mkdir(parents=True, exist_ok=True)
-    truth_path = root / "ground_truth.csv"
+    truth_path = default_truth_path(root) if truth_path is None else Path(truth_path).expanduser().resolve()
     truth = read_truth(truth_path)
+    changed = not truth_path.exists()
     for path in discover(root / "input"):
-        truth.setdefault(path.relative_to(root / "input").as_posix(), dict.fromkeys(FIELDS, ""))
-    write_csv(truth_path, [{"filename": name, **values} for name, values in truth.items()],
-              ("filename", *FIELDS))
+        name = path.relative_to(root / "input").as_posix()
+        if name not in truth:
+            truth[name] = dict.fromkeys(FIELDS, "")
+            changed = True
+    if changed:
+        write_csv(truth_path, [{"filename": name, **values} for name, values in truth.items()],
+                  ("filename", *FIELDS))
     return truth_path
 
 
@@ -377,6 +410,8 @@ def summarize(rows, resolutions):
             item[field + "_correct"] = sum(values)
             item[field + "_accuracy"] = sum(values) / len(values) if values else None
             item[field + "_ci95"] = wilson(sum(values), len(values))
+        for suffix in ("accuracy", "labeled", "correct", "ci95"):
+            item["tcg_type_" + suffix] = item["pokemon_type_" + suffix]
         result.append(item)
     return result
 
@@ -451,7 +486,8 @@ def make_plots(run_dir, summary):
     x = list(range(len(labels)))
     fig, ax = plt.subplots(figsize=(10, 5))
     any_labels = False
-    for field in ("pokemon_name", "hp", "card_number"):
+    field_labels = {"pokemon_name": "Pokemon Name", "pokemon_type": "TCG Type", "hp": "HP", "card_number": "Card Number"}
+    for field in FIELDS:
         points = [(i, s[field + "_accuracy"], s[field + "_ci95"]) for i, s in enumerate(summary)
                   if s[field + "_accuracy"] is not None]
         if points:
@@ -459,7 +495,7 @@ def make_plots(run_dir, summary):
             ax.errorbar([p[0] for p in points], [100*p[1] for p in points],
                         yerr=[[100*(p[1]-p[2][0]) for p in points],
                               [100*(p[2][1]-p[1]) for p in points]],
-                        marker="o", capsize=3, label=field)
+                        marker="o", capsize=3, label=field_labels[field])
     if not any_labels:
         ax.text(.5, .5, "No ground truth: accuracy unavailable", ha="center", transform=ax.transAxes)
     else:
@@ -500,6 +536,14 @@ def generate_report(run_dir, truth_path, threshold=.95):
     truth = read_truth(truth_path)
     write_json(run_dir / "ground_truth.snapshot.json", truth)
     scored = score_rows(rows, truth)
+    # Preserve raw JSONL paths while exposing valid local paths after workspace moves.
+    for row in scored:
+        recorded = row.get("image_path")
+        if recorded and not Path(recorded).exists():
+            relocated = run_dir / "images" / row["resolution"] / (row["filename"] + ".png")
+            if relocated.exists() and row.get("image_sha256") == sha256(relocated):
+                row["image_path_recorded"] = recorded
+                row["image_path"] = str(relocated)
     summary = summarize(scored, metadata["resolutions"])
     analysis = analyze(scored, summary, threshold)
     write_json(run_dir / "results.json", scored)
@@ -507,7 +551,7 @@ def generate_report(run_dir, truth_path, threshold=.95):
     columns = ("filename", "resolution", "width", "height", "pixels", "actual_mp",
                "capped_by_original", *FIELDS, "latency_seconds", "api_error", "parse_error",
                "image_error", "http_status", "error", "raw_model_response", "raw_api_response",
-               "image_path", "source_sha256", "image_sha256", "finish_reason", "usage", "timings",
+               "image_path", "image_path_recorded", "source_sha256", "image_sha256", "finish_reason", "usage", "timings",
                *("expected_" + f for f in FIELDS), *(f + "_correct" for f in FIELDS))
     write_csv(run_dir / "results.csv", scored, columns)
     summary_columns = [k for k in summary[0] if not k.endswith("_ci95")] if summary else ["resolution"]
@@ -521,10 +565,11 @@ def generate_report(run_dir, truth_path, threshold=.95):
     lines = ["# 포켓몬 카드 해상도 벤치마크", "", f"Run: `{run_dir.name}`; 상태: {metadata.get('status')}",
              "", metadata.get('recovery_warning', ''),
              "", "전체 사진, EXIF 회전, Lanczos, 업스케일 없음. 실제 픽셀 크기는 results.csv 참고.",
-             "", "|조건|응답/계획|Name Accuracy (n)|HP Accuracy (n)|Card Number Accuracy (n)|평균 초|Unknown|크기 제한|",
-             "|---|---:|---:|---:|---:|---:|---:|---:|"]
+             "", f"Prompt version: {metadata.get('prompt_version', 'legacy-v1')} (실행 당시 metadata.json 보존)",
+             "", "|조건|응답/계획|Name Accuracy (n)|TCG Type Accuracy (n)|HP Accuracy (n)|Card Number Accuracy (n)|평균 초|Unknown|크기 제한|",
+             "|---|---:|---:|---:|---:|---:|---:|---:|---:|"]
     for s in summary:
-        values = [f"{pct(s[f+'_accuracy'])} ({s[f+'_labeled']})" for f in ("pokemon_name", "hp", "card_number")]
+        values = [f"{pct(s[f+'_accuracy'])} ({s[f+'_labeled']})" for f in FIELDS]
         latency = "N/A" if s["average_latency_seconds"] is None else f"{s['average_latency_seconds']:.3f}"
         planned = (len(metadata["inputs"]) + len(metadata["input_errors"]))
         lines.append(f"|{s['resolution']}|{s['rows']}/{planned}|{'|'.join(values)}|{latency}|"
@@ -541,9 +586,10 @@ def generate_report(run_dir, truth_path, threshold=.95):
               "", "![Accuracy](accuracy.png)", "", "![Latency and unknown](latency_unknown.png)",
               "", "## 실패 / unknown 상세", "", "전체 원문은 results.json/CSV, 실패 목록은 failures.csv/JSON 참고.",
               "정답이 없는 일반 응답은 성공/실패로 단정하지 않습니다.", "",
-              "|파일|조건|Name 예측 → 정답|HP 예측 → 정답|번호 예측 → 정답|오류|", "|---|---|---|---|---|---|"]
+              "TCG Type은 카드 HP 옆 아이콘의 종류이며 도감 타입과 별개입니다. 프롬프트만으로 모델의 판단 근거를 증명하지는 못합니다.",
+              "", "|파일|조건|Name 예측 → 정답|TCG Type 예측 → 정답|HP 예측 → 정답|번호 예측 → 정답|오류|", "|---|---|---|---|---|---|---|"]
     for r in failures:
-        details = [f"{r[f]} → {r['expected_'+f] or '(미입력)'}" for f in ("pokemon_name", "hp", "card_number")]
+        details = [f"{r[f]} → {r['expected_'+f] or '(미입력)'}" for f in FIELDS]
         lines.append("|" + "|".join(markdown_cell(v) for v in
                      (r["filename"], r["resolution"], *details, r.get("error", ""))) + "|")
     (run_dir / "report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -560,7 +606,7 @@ def new_directory(parent, label):
 
 def run_benchmark(args):
     root = args.root
-    initialize(root)
+    truth_path = initialize(root, getattr(args, "truth", None))
     check_memory(args.min_available_gib, args.min_free_gib)
     with requests.Session() as session:
         # Loopback requests must not inherit proxy routing.
@@ -571,7 +617,7 @@ def run_benchmark(args):
         from PIL import __version__ as pillow_version
         metadata = {"schema_version": 1, "created_utc": datetime.now(timezone.utc).isoformat(),
                     "status": "running", "base_url": args.base_url, "model": args.model,
-                    "server": server, "prompt": PROMPT, "parameters": PARAMETERS,
+                    "server": server, "prompt": PROMPT, "prompt_version": PROMPT_VERSION, "parameters": PARAMETERS,
                     "resolutions": args.resolutions, "inputs": entries, "input_errors": errors,
                     "preprocessing": "EXIF transpose; full RGB image; Lanczos; PNG; no upscale",
                     "python": sys.version, "platform": platform.platform(),
@@ -589,7 +635,7 @@ def run_benchmark(args):
         if not entries and not errors:
             metadata["status"] = "no_images"
             write_json(run_dir / "metadata.json", metadata)
-            generate_report(run_dir, root / "ground_truth.csv", args.name_target)
+            generate_report(run_dir, truth_path, args.name_target)
             print("No input photos. No Vision evaluation requests sent.", flush=True)
             return run_dir
         rng = random.Random(args.order_seed)
@@ -632,7 +678,7 @@ def run_benchmark(args):
         finally:
             metadata["finished_utc"] = datetime.now(timezone.utc).isoformat()
             write_json(run_dir / "metadata.json", metadata)
-            generate_report(run_dir, root / "ground_truth.csv", args.name_target)
+            generate_report(run_dir, truth_path, args.name_target)
         return run_dir
 
 
@@ -698,7 +744,7 @@ def compare_runs(before, after, output):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--root", type=Path, default=Path.home() / "pokemon-card-benchmark")
+    parser.add_argument("--root", type=Path, default=default_root())
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("init", help="Create folders and add missing ground truth rows; no inference")
     prepare = sub.add_parser("prepare", help="Resize every input without any API calls")
@@ -707,6 +753,7 @@ def main(argv=None):
     run.add_argument("--base-url", default=DEFAULT_URL)
     run.add_argument("--model", default=DEFAULT_MODEL)
     run.add_argument("--label", default="baseline")
+    run.add_argument("--truth", type=Path, help="Human labels CSV; default prefers pokebot_ground_truth.csv")
     run.add_argument("--limit", type=int, help="Maximum number of photos (all seven sizes per photo)")
     run.add_argument("--resolutions", nargs="+", choices=RESOLUTIONS, default=list(RESOLUTIONS))
     run.add_argument("--timeout", type=float, default=300)
@@ -764,7 +811,7 @@ def main(argv=None):
             elif args.command == "watch":
                 watch_inputs(args)
             elif args.command == "report":
-                generate_report(args.run_dir.resolve(), args.truth or args.root / "ground_truth.csv", args.name_target)
+                generate_report(args.run_dir.resolve(), args.truth or default_truth_path(args.root), args.name_target)
                 print(args.run_dir / "report.md")
             elif args.command == "compare":
                 compare_runs(args.before.resolve(), args.after.resolve(), args.output.resolve())

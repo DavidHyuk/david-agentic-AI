@@ -359,10 +359,11 @@ profile ownership or add a new Observatory room.
 The standalone [Pokemon-card resolution benchmark](docs/pokemon-card-benchmark.md)
 uses the existing Vision API at `127.0.0.1:8004` directly, with no model download,
 server lifecycle or Hermes configuration changes. Put JPG/PNG/HEIC photos in
-`~/pokemon-card-benchmark/input/`, then run `.venv/bin/python benchmark.py run`
+`~/workspace/David-Agent/pokemon-card-benchmark/input/`, then run `.venv/bin/python benchmark.py run`
 from that workspace after finishing Hermes conversations. Seven full-image
 conditions (0.3/2/3/5/8/12MP and Original) use EXIF rotation, Lanczos and no
-upscaling. Human `ground_truth.csv` labels enable accuracy; absent labels remain
+upscaling. Human `pokebot_ground_truth.csv` labels are preferred when present
+(otherwise `ground_truth.csv` is used); absent labels remain
 N/A. Per-run CSV/JSON/Markdown, raw API evidence, failure details and PNG/SVG
 charts support camera decisions and controlled before/after fine-tuning
 comparisons. `watch` is an optional foreground input watcher; it installs no
@@ -377,9 +378,16 @@ After the operator applies a 300–2200 MHz GPU clock range, the next authorized
 batch completes **28/28** requests with no API errors or host reset. Sampled GPU
 power peaks at 73.47 W, GPU temperature at 79 C, and available memory bottoms at
 27.10 GiB. This is one successful batch, not an established root cause or
-long-term stability guarantee. Human-label accuracies remain N/A. Seven
+long-term stability guarantee. The initial unlabeled run left accuracies N/A. Seven
 Langfuse resolution experiments and 196 measured scores are uploaded and
-read back successfully; runtime receipts and full reports remain outside Git.
+read back successfully. The relocated workspace is ignored by Git. Human
+labels now enable rescoring without inference; historical prompts and raw
+responses remain intact. The `tcg-symbol-v2` prompt explicitly classifies the
+type symbol beside HP, excluding species knowledge and attack symbols.
+Reports, failure details and accuracy charts include **TCG Type Accuracy**;
+Langfuse uses `tcg_type_accuracy` and records prompt versions separately from
+the shared dataset ID. Prompt changes are separate experiments, not controlled
+fine-tuning comparisons. See the benchmark guide for relocated run commands.
 Completed runs can be imported with `experiment_tracker.py import-pokemon` and
 published to the configured Langfuse project as seven resolution experiments.
 Missing human labels produce no accuracy scores; photos and raw responses stay

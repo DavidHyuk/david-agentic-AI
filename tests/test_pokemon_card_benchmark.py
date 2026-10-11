@@ -285,3 +285,71 @@ def test_memory_admission(tmp_path, available, free, pressure, accept):
     else:
         with pytest.raises(RuntimeError, match='No evaluation request sent'):
             b.check_memory(40, 24, meminfo, psi)
+
+
+@pytest.mark.parametrize('location', ['repo', 'workspace', 'script', 'fallback'])
+def test_workspace_discovery_after_move(tmp_path, location):
+    repo = tmp_path / 'repo'
+    root = repo / 'pokemon-card-benchmark'
+    script = repo / 'scripts/benchmark.py'
+    cwd = repo
+    if location != 'fallback':
+        (root / 'input').mkdir(parents=True)
+    if location == 'workspace':
+        cwd = root
+    elif location in {'script', 'fallback'}:
+        cwd = tmp_path
+    expected = root if location != 'fallback' else tmp_path / 'home/pokemon-card-benchmark'
+    assert b.default_root(cwd, script, tmp_path / 'home') == expected
+
+
+def test_custom_truth_is_preferred_and_not_rewritten(tmp_path):
+    (tmp_path / 'input').mkdir()
+    Image.new('RGB', (20, 10)).save(tmp_path / 'input/card.jpg')
+    custom = tmp_path / 'pokebot_ground_truth.csv'
+    data = 'filename,pokemon_name,pokemon_type,hp,card_number\ncard.jpg,Pikachu,Lightning,60,025/100\n'
+    custom.write_text(data)
+    assert b.initialize(tmp_path) == custom
+    assert custom.read_text() == data
+    assert not (tmp_path / 'ground_truth.csv').exists()
+    Image.new('RGB', (20, 10)).save(tmp_path / 'input/new.jpg')
+    b.initialize(tmp_path)
+    assert b.read_truth(custom)['card.jpg']['pokemon_type'] == 'Lightning'
+    assert b.read_truth(custom)['new.jpg']['hp'] == ''
+
+
+def test_tcg_type_is_scored_separately_from_species_knowledge():
+    rows = b.score_rows([prediction(pokemon_name='Groudon', pokemon_type='Ground'),
+                        prediction(filename='correct.jpg', pokemon_name='Groudon', pokemon_type='Fighting')],
+                       {'card.jpg': {'pokemon_type': 'Fighting'}, 'correct.jpg': {'pokemon_type': 'Fighting'}})
+    summary = b.summarize(rows, ['2MP'])[0]
+    assert rows[0]['pokemon_type_correct'] is False
+    assert rows[1]['pokemon_type_correct'] is True
+    assert summary['tcg_type_accuracy'] == .5
+    assert summary['tcg_type_labeled'] == 2
+    assert summary['pokemon_name_accuracy'] is None
+
+
+def test_rescore_after_move_preserves_recorded_prompt_and_raw_paths(tmp_path, monkeypatch):
+    run = tmp_path / 'run'
+    image = run / 'images/2MP/card.jpg.png'
+    image.parent.mkdir(parents=True)
+    Image.new('RGB', (20, 10)).save(image)
+    row = prediction(image_path='/old/moved/card.jpg.png', image_sha256=b.sha256(image), pokemon_type='Metal')
+    raw = json.dumps(row) + '\n'
+    (run / 'results.jsonl').write_text(raw)
+    metadata = {'status': 'completed', 'resolutions': ['2MP'], 'inputs': [{}],
+                'input_errors': [], 'prompt': 'recorded old prompt'}
+    b.write_json(run / 'metadata.json', metadata)
+    truth = tmp_path / 'truth.csv'
+    b.write_csv(truth, [{'filename': 'card.jpg', 'pokemon_type': 'Metal'}], ['filename', *b.FIELDS])
+    monkeypatch.setattr(b, 'make_plots', lambda *args: None)
+    b.generate_report(run, truth)
+    assert json.loads((run / 'metadata.json').read_text()) == metadata
+    assert (run / 'results.jsonl').read_text() == raw
+    scored = json.loads((run / 'results.json').read_text())[0]
+    assert scored['image_path'] == str(image)
+    assert scored['image_path_recorded'] == row['image_path']
+    report = (run / 'report.md').read_text()
+    assert 'TCG Type Accuracy' in report and 'legacy-v1' in report
+    assert 'Metal → Metal' not in report  # Correct rows are not listed as failures.

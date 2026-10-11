@@ -25,7 +25,9 @@ from urllib.parse import urlsplit
 
 
 POKEMON_FIELDS = ("pokemon_name", "pokemon_type", "hp", "card_number")
-POKEMON_SCORE_KEYS = {*(field + "_accuracy" for field in POKEMON_FIELDS),
+POKEMON_SCORE_NAMES = {field: field + "_accuracy" for field in POKEMON_FIELDS}
+POKEMON_SCORE_NAMES["pokemon_type"] = "tcg_type_accuracy"
+POKEMON_SCORE_KEYS = {*POKEMON_SCORE_NAMES.values(), "pokemon_type_accuracy",
     "unknown_response_rate", "unknown_field_rate", "api_error_rate", "parse_error_rate", "image_error_rate"}
 IMAGE_ROW_KEYS = {"resolution", "width", "height", "pixels", "actual_mp", "capped_by_original"}
 METRIC_KEYS = POKEMON_SCORE_KEYS | {"ttft_s", "wall_s", "server_total_s", "prefill_s", "decode_s",
@@ -40,7 +42,7 @@ RUN_KEYS = {"schema_version", "run_id", "label", "source", "started_at", "comple
     "dataset_digest", "context_per_request", "slots", "mtp", "scope", "sampling", "cold_definition",
     "failure_class", "completed_records", "limitations", "session_usage", "kernel_audit", "batch", "ubatch", "input_budget_tokens", "recorded_at",
     "host_prompt_cache_mib", "minimum_available_gib", "minimum_free_gib", "admission_policy",
-    "resolution", "preprocessing", "parameters_sha256", "gpu_clock_min_mhz_reported", "gpu_clock_max_mhz_reported"}
+    "resolution", "preprocessing", "parameters_sha256", "prompt_version", "gpu_clock_min_mhz_reported", "gpu_clock_max_mhz_reported"}
 
 
 def utcnow():
@@ -144,7 +146,7 @@ def import_pokemon(directory, telemetry_path=None, gpu_clock_min=None, gpu_clock
     digest = lambda value: hashlib.sha256(json.dumps(value, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
     truth = json.loads((directory / "ground_truth.snapshot.json").read_text())
     prompt_hash = hashlib.sha256(metadata["prompt"].encode()).hexdigest()
-    dataset = digest({"inputs": inputs, "prompt_sha256": prompt_hash,
+    dataset = digest({"inputs": inputs,
         "preprocessing": metadata["preprocessing"], "ground_truth": truth})
     telemetry = {}
     if telemetry_path is not None:
@@ -163,6 +165,7 @@ def import_pokemon(directory, telemetry_path=None, gpu_clock_min=None, gpu_clock
             "source": "pokemon_card_benchmark", "model": metadata["model"],
             "recorded_at": metadata["finished_utc"], "started_at": metadata["created_utc"],
             "completed_at": metadata["finished_utc"], "resolution": resolution,
+            "prompt_version": metadata.get("prompt_version", "legacy-v1"),
             "dataset_digest": dataset, "parameters_sha256": digest(metadata["parameters"]),
             "preprocessing": metadata["preprocessing"], "gpu_clock_min_mhz_reported": gpu_clock_min,
             "gpu_clock_max_mhz_reported": gpu_clock_max,
@@ -184,7 +187,7 @@ def import_pokemon(directory, telemetry_path=None, gpu_clock_min=None, gpu_clock
             metrics = {"wall_s": row.get("latency_seconds") if row.get("http_status") == 200 else None,
                 "unknown_response_rate": float(unknown > 0) if valid else None,
                 "unknown_field_rate": unknown / len(POKEMON_FIELDS) if valid else None,
-                **{field + "_accuracy": float(row[field + "_correct"])
+                **{POKEMON_SCORE_NAMES[field]: float(row[field + "_correct"])
                    if label_present[field] and isinstance(row.get(field + "_correct"), bool)
                    else None for field in POKEMON_FIELDS},
                 **{key + "_rate": float(bool(row.get(key))) for key in ("api_error", "parse_error", "image_error")}}
@@ -382,9 +385,9 @@ def langfuse_payload(runs):
             attrs.update({"langfuse.observation.metadata." + key: value for key, value in m.items()})
             attrs.update({"langfuse.observation.metadata." + key: row.get(key) for key in IMAGE_ROW_KEYS})
             attrs.update({"langfuse.observation.metadata." + key: run.get(key) for key in
-                ("resolution", "preprocessing", "parameters_sha256", "gpu_clock_min_mhz_reported", "gpu_clock_max_mhz_reported")})
+                ("resolution", "preprocessing", "parameters_sha256", "prompt_version", "gpu_clock_min_mhz_reported", "gpu_clock_max_mhz_reported")})
             attrs.update({"langfuse.experiment.metadata." + key: run.get(key) for key in
-                ("resolution", "model", "build", "parameters_sha256", "gpu_clock_min_mhz_reported",
+                ("resolution", "model", "build", "parameters_sha256", "prompt_version", "gpu_clock_min_mhz_reported",
                  "gpu_clock_max_mhz_reported", "limitations")})
             attrs["langfuse.observation.metadata.model"] = run.get("model")
             if not historical:
