@@ -3,6 +3,45 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.49.0 — 2026-10-10 (minor: add a standalone Pokemon-card Vision benchmark)
+
+- Reuse the running Flash-Next IQ4_XS Vision API at localhost:8004 directly
+  from Python. Check model identity, read server properties and wait for idle
+  slots before strictly sequential requests; preserve Hermes, server, service,
+  network and Tailscale settings. A real public Charizard card Vision request
+  returns HTTP 200 and the visible name/type/HP/card number; keep that connection
+  evidence outside the benchmark dataset.
+- Create `~/pokemon-card-benchmark/` with read-only JPG/PNG/HEIC inputs,
+  EXIF-aware full-image Lanczos variants at seven resolutions, no upscaling,
+  source/derived hashes and per-run snapshots. Add fixed English extraction,
+  schema-constrained JSON, temperature=0, raw API outputs, errors and latency.
+- Human labels enable per-field accuracy and confidence intervals; missing
+  labels remain N/A. Generate CSV/JSON/Korean Markdown, PNG/SVG graphs and
+  failure details; re-score without API calls and validate fixed datasets,
+  ground truth and inference settings for before/after fine-tuning comparisons.
+  Camera guidance remains evidence-limited, using paired comparisons and
+  conservative confidence criteria without claiming sensor performance.
+- Routing: this is a manually operated internal evaluation helper, with an
+  optional foreground input watcher and isolated local state. It adds no
+  Hermes agent, profile, skill, Telegram feed, user-facing schedule or
+  Observatory interaction workflow; therefore no empty room is registered.
+  Runtime photos, labels, responses and binary charts stay outside Git.
+
+- Live evaluation is interrupted by a host reboot: preserve 12 valid of 28
+  planned responses and a corrupt trailing JSONL record, then recover partial
+  reports without retrying inference. No incident-window OOM/Xid/panic evidence
+  establishes the cause. Add conservative MemAvailable/MemFree/PSI admission,
+  per-row fsync and explicit torn-tail recovery. Record current kernel/driver
+  mismatch, Founders Edition official update guidance and its stability limits
+  in `docs/benchmarks/pokemon-card-host-loss-2026-10-10.md`. Change no system
+  packages, kernel selection, server settings or services.
+- Validation: **907 tests pass**, including 37 new image/scoring/API/idle,
+  memory-admission and crash-tail tests. Isolated benchmark dependencies pass
+  `pip check`; HEIC decoding is also checked in that environment. The original
+  live evaluation remains incomplete and unlabeled; no accuracy or minimum
+  camera recommendation is invented. Memory admission does not guarantee
+  containment against GPU driver or firmware failures.
+
 ## v1.48.2 — 2026-10-09 (patch: apply GitHub Dark colors across the Observatory)
 
 - Replace the warm green/beige UI with shared charcoal surface, light text,

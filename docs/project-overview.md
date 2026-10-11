@@ -236,6 +236,7 @@ David-Agent/
 ├── scripts/                   # 스킬이 호출하는 Python 헬퍼 (→ ~/.hermes/scripts/)
 │   ├── papers_ingest.py       # arXiv/HF 메타데이터 수집·중복 병합·실행 이력
 │   ├── papers_digest.py       # 새 논문 카탈로그 읽기 전용 조회
+│   ├── pokemon_card_benchmark.py # 기존 Vision API의 해상도별 수동 평가
 │   ├── interview_progress.py  # 학습 자료 렌더링·힌트·진도·적응형 복습·주간 통계
 │   ├── leetcode_sync.py       # owner-only 세션 연결 + 읽기 전용 풀이 이력 snapshot
 │   ├── leetcode_review.py     # 실제 코드·학습 근거 기반 Jun 풀이 요약 cache
@@ -291,6 +292,7 @@ David-Agent/
 │
 ├── local-model/               # 로컬 LLM 서버 관리
 │   ├── eval/                  # 합성 에이전트 과제·블라인드 평가·속도 측정
+│   │   └── requirements-pokemon.txt # 격리된 카드 Vision 평가 의존성
 │   ├── setup_vllm.sh          # 격리된 CUDA 호환 vLLM 환경 생성
 │   ├── model_preflight.py     # 체크포인트 양자화·컨텍스트 사전검사
 │   ├── run_flash_next.sh      # 현재 4비트 GGUF llama.cpp 서버 실행
@@ -538,6 +540,25 @@ systemd는 이 특정 종료 코드에 대해 자동 재시작하지 않습니�
 모델 가중치는 이 설정 repo 밖의 `/home/david/workspace/models/`에 보관합니다.
 새 논문 메타데이터 수집에는 LLM이 필요 없습니다.
 
+`scripts/pokemon_card_benchmark.py`는 `~/pokemon-card-benchmark/`에서 실행하는
+독립 카드 Vision 평가 도구입니다. 기존 `127.0.0.1:8004/v1`의 Flash-Next를
+직접 호출하며 `/v1/models` 검사와 read-only `/slots` idle 대기 후 순차 요청합니다.
+각 추론 전 MemAvailable 40GiB/MemFree 24GiB 및 memory full PSI < 0.1의
+보수적 admission 조건을 검사합니다. JSONL 행마다 fsync하며 비정상 재부팅으로
+손상된 마지막 행은 원문을 보존하고 부분 보고서에서 제외합니다. 이 검사만으로
+CUDA/driver/firmware 장애에서 서버 생존이 보장되지는 않습니다.
+JPG/PNG/HEIC, EXIF, 전체 사진 Lanczos 축소, 업스케일 없는
+0.3/2/3/5/8/12MP·Original을 지원합니다. 원본/제출 이미지 해시, 원문 API 응답,
+같은 프롬프트/JSON schema/temperature=0 설정을 실행별 보관합니다.
+사람이 입력하는 `ground_truth.csv`가 없으면 정확도는 N/A이며,
+정답 입력 후 API 재호출 없이 재채점할 수 있습니다. CSV/JSON/한국어 Markdown,
+오답·unknown·오류 상세와 PNG/SVG 정확도/지연 그래프를 생성하고,
+고정 입력/정답/추론 설정을 검증하는 Fine-tuning 전후 비교를 지원합니다.
+선택적 foreground `watch`는 안정된 입력 변경을 감지해 전체 snapshot을 평가합니다.
+프로필·봇·cron·서비스·Tailscale·모델 프로세스를 변경하지 않는 수동 내부 평가
+도구이므로 새 Observatory agent/room은 추가하지 않습니다.
+[사용법과 판단 기준](pokemon-card-benchmark.md)을 참고하세요.
+
 `local-model/eval/`은 120개 합성 사례로 모델 서빙 계층을 비교하는 내부 평가
 도구입니다. 30개씩 `short_task`, `multi_tool`, `long_horizon`, `context_heavy`
 네 버킷으로 구성합니다. 도구 결과는 고정된 합성 스크립트만 사용하고, 응답의
@@ -655,6 +676,15 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
 ---
 
 ## 발전을 이끄는 핵심 기술
+
+### 기존 VLM의 카드 해상도 평가
+- Requests는 기존 llama.cpp OpenAI 호환 API를 직접 호출하고, Pillow의
+  EXIF transpose/Lanczos와 pillow-heif가 원본을 보존한 JPG/PNG/HEIC 처리를
+  담당합니다. Matplotlib Agg는 화면 서버 없이 PNG/SVG 그래프를 생성합니다.
+- JSON schema, 고정 파라미터, JSONL 즉시 저장, SHA-256 입력 snapshot,
+  ground truth 재채점 및 표준 라이브러리 Wilson/exact McNemar 분석으로
+  해상도 및 Fine-tuning 전후 비교를 재현합니다. 별도 로컬 venv만 사용하며
+  서버·gateway·서비스·cron·Telegram/Observatory 라우팅은 추가하지 않습니다.
 
 ### 프로젝트 범위의 Agentic Vector RAG
 - Hermes가 검색어 재작성·근거 확인을 제어하고, 별도 standalone Python helper가
@@ -1116,7 +1146,11 @@ ZIP 경로 격리·credential 오류 출력 방지 및 HQ source 상태 검증�
 Jun 사전 풀이 요약의 근거 변경·Accepted 코드 freshness·실패 보존·동시 실행
 잠금·background provider 경계 및 재인증 상태·실제 코드 필수 조건을 포함한
 원격 계정 재연결·CSRF 전달·동일 계정의 서버 cookie 갱신 검증까지 포함한
-현재 전체 테스트는 870 passed입니다. ChatGPT 화면 빈 줄 변화의 안전한 부분 병합,
+현재 전체 테스트는 907 passed입니다. 카드 Vision 평가의 원본 보존·EXIF·HEIC,
+픽셀 예산/업스케일 금지, 정답 분모, 오류/unknown 구분, API 원문/재시도 금지,
+idle/memory guard, 손상된 JSONL 마지막 행 복구, 중복 크기 쌍 제외,
+재채점과 비교 거부를 포함한 37개 테스트가
+추가됐습니다. ChatGPT 화면 빈 줄 변화의 안전한 부분 병합,
 코드 공백 변경 거부·중복 장애 키 이전·최신 성공 근거 우선순위도 검증합니다.
 Jun 스킵/재개·주제 왕복·Hard 끝 전환·
 힌트 노출 보존·stale 요청·목록 렌더링과 외부 연결 장애/복구·알림 중복 방지·

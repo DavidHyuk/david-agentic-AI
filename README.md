@@ -356,6 +356,18 @@ concurrency, memory, thermal and quality limits. Experiment metadata includes
 the cache and memory guard budgets. Provider changes do not change agent
 profile ownership or add a new Observatory room.
 
+The standalone [Pokemon-card resolution benchmark](docs/pokemon-card-benchmark.md)
+uses the existing Vision API at `127.0.0.1:8004` directly, with no model download,
+server lifecycle or Hermes configuration changes. Put JPG/PNG/HEIC photos in
+`~/pokemon-card-benchmark/input/`, then run `.venv/bin/python benchmark.py run`
+from that workspace after finishing Hermes conversations. Seven full-image
+conditions (0.3/2/3/5/8/12MP and Original) use EXIF rotation, Lanczos and no
+upscaling. Human `ground_truth.csv` labels enable accuracy; absent labels remain
+N/A. Per-run CSV/JSON/Markdown, raw API evidence, failure details and PNG/SVG
+charts support camera decisions and controlled before/after fine-tuning
+comparisons. `watch` is an optional foreground input watcher; it installs no
+service or schedule. This manual evaluation helper adds no Observatory room.
+
 The version-controlled [120-case synthetic benchmark](local-model/eval/README.md)
 uses four balanced buckets: short tasks, scripted multi-tool calls, multi-turn
 long-horizon state, and context-heavy retrieval. Validate the fixture, then run
