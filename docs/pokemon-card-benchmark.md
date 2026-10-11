@@ -252,6 +252,10 @@ JSONL 행마다 flush/fsync하여 완료 결과를 보관합니다. 비정상 �
 
 `compare`는 입력/제출 이미지 해시, 프롬프트, 추론 파라미터, 해상도,
 전처리, 완료 상태, 정답 snapshot이 일치하는지 확인하며 불일치하면 비교를 거부합니다.
+합성 카메라 실험도 같은 명령으로 비교할 수 있습니다. `simulate`로 전후 run을
+별도로 만들고 같은 manifest·점유율·열화 강도·시드를 사용하세요. 비교 시 합성 설정과
+모든 카드/조건의 제출 이미지 해시 및 결과 누락·중복까지 검사합니다. 모델 ID는
+전후에 달라도 되지만, 프롬프트나 입력 조건을 바꾼 결과는 통제된 비교로 인정하지 않습니다.
 비교 CSV/JSON/Markdown에는 전후 정확도, 평균 지연, unknown 변화가 저장됩니다.
 서버 build/hardware/cache/concurrency 차이는 metadata를 따로 확인하세요.
 이 기능은 수동 로컬 평가 도구이며 Hermes skill, agent, Telegram feed, cron이나
@@ -455,3 +459,165 @@ API/파싱 오류와 호스트 재부팅 없이 완료됐습니다. 설정/클�
 이전 업로드 이력은 `langfuse-upload-request.json`에 보존했습니다.
 실행 방법은 위의 `run`/`refine` 명령을 사용하세요. 새 카드/다른 구도는 Crop 위치를
 먼저 확인해야 합니다.
+
+## 30장과 저가형 카메라 스트레스 테스트
+
+기존 run과 `pokebot_ground_truth.csv`는 보존합니다. 별도 `datasets/tcg30`에
+기존 한국어 스마트폰 카드 사진 4장의 경로·사람 정답과 공개 영문 카드 26장을
+묶습니다. 공개 데이터는 [PokemonTCG 커뮤니티 저장소](https://github.com/PokemonTCG/pokemon-tcg-data)의
+고정 commit JSON과 카드 이미지이며 타입 11종을 포함합니다. 스캔은 실제 카메라
+사진이 아니고, 한국어 OCR 평가를 영문 이미지 26장으로 대체할 수 없습니다.
+
+```bash
+cd ~/workspace/David-Agent
+pokemon-card-benchmark/.venv/bin/python scripts/pokemon_benchmark_dataset.py
+cd pokemon-card-benchmark
+.venv/bin/python benchmark.py simulate --manifest datasets/tcg30/manifest.json \
+  --label camera-stress-30
+```
+
+다운로드와 라벨은 `datasets/tcg30/{images,sources,manifest.json,ground_truth.csv}`에
+저장합니다. 사진 4장은 복사/수정하지 않고 기존 경로와 SHA를 참조합니다. 번호는
+SWSH1의 인쇄 형식(예: 001/202)과 SM12(예: 143/236)에 맞추며 원래 JSON도
+출처와 함께 보존합니다. `label-review.png`에서 인쇄 정보와 라벨을 검토할 수 있습니다.
+캐시 manifest는 고정 snapshot이므로 정답/데이터를 바꾸려면 새로운 `--output` 경로로
+dataset을 만드세요. 기존 정답 CSV를 덮어쓰지 않습니다.
+
+기본 조건은 각 카드에서 다음 **32가지**, 총 **960회**입니다.
+
+- 원본 전체 구도: 0.3MP와 2MP, 무손상 baseline 2개.
+- 합성 구도: 0.3MP/2MP × 카드 면적 30%/50%/80% × clean/blur/noise/jpeg/combined 30개.
+
+카드 면적은 EXIF 회전 후 사람 지정 사각형의 shoelace 면적 / 전체 프레임 면적입니다.
+가로·세로 각각 30%로 줄이는 방식이 아닙니다. 기존 사진의 카드 bounding rectangle을
+잘라 3:4 회색 배경에 배치하며 원근을 펴거나 자동으로 카드를 검출하지 않습니다.
+사진의 카드 모서리 좌표는 사람이 확인한 근사치이고 원근·둥근 모서리의 작은 배경
+부분도 포함합니다. 실제 rounded 면적 비율은 `actual_occupancy`에 기록합니다.
+
+손상은 원본에서 해당 구도의 Lanczos 축소 이미지를 생성한 뒤 **출력 픽셀 공간**에서
+적용합니다. 원본 파일은 변경하지 않습니다. 초점 흐림의 대리 변수인 Gaussian blur
+radius=1.2px, 채널별 독립 Gaussian noise σ=10/255, JPEG quality=35와 4:2:0
+subsampling을 사용합니다. combined는 blur→noise→JPEG 순서입니다. JPEG를 실제
+인코딩/디코딩한 픽셀을 PNG로 저장해 서버에 전달합니다. seed를 기록하고 noise와
+combined의 동일 구도에는 같은 noise seed를 사용합니다. 강도는 카메라에서 측정한
+값이 아니라 실험자가 정한 한 단계 스트레스이며 `--blur-radius`, `--noise-sigma`,
+`--jpeg-quality`로 새 실험을 만들 수 있습니다.
+
+**실제 StackChan 센서, 렌즈, 초점, 노출, 화이트밸런스, 펌웨어 압축, 움직임·조명
+성능을 정확히 재현하는 시뮬레이션이 아닙니다.** 디지털 스캔의 native 해상도는
+734×1024이므로 원본 구도 2MP와 카드 50%/80%의 일부 2MP 목표는 native 크기로
+제한됩니다. 카드 픽셀을 업스케일하지 않으며 프레임 목표/실제 크기/제한 여부를
+모두 기록합니다. 이 조건에서 실제 2MP 카메라의 추가 세부 정보를 검증할 수 없습니다.
+
+```bash
+# API 없이 예시 이미지 준비
+.venv/bin/python benchmark.py simulate --manifest datasets/tcg30/manifest.json \
+  --limit 1 --prepare-only --label inspect-camera-stress
+# 동일 manifest, 범위, 손상 강도, 정답, 프롬프트/추론 설정으로 중단 결과 재개
+.venv/bin/python benchmark.py simulate --manifest datasets/tcg30/manifest.json \
+  --resume-run runs/<INTERRUPTED_RUN_ID>
+```
+
+실행 시 기본 메모리 admission 조건은 기존과 동일합니다. 사용자가 이미 허용한 탐색
+실행에서는 `--min-available-gib 0 --min-free-gib 0`을 붙였습니다. 재개도 원래 옵션을
+동일하게 지정해야 하며 기존 API 오류가 저장된 run은 자동 재시도하지 않습니다.
+외부 Hermes 요청과 겹치지 않도록 매번 `/slots` idle을 확인하고 순차 요청합니다.
+완료 행은 JSONL에 fsync하며 torn 마지막 행은 증거를 별도 백업한 뒤 재개합니다.
+
+결과는 `simulation_report.md`, `simulation_summary.csv/json`,
+`simulation_accuracy_{smartphone_ko,public_scan_en}.png/svg`와 기존 `results`/`failures`
+CSV/JSON에 있습니다. 같은 점유율의 clean 대비 정확도 차이를 포함하고, 스마트폰
+한국어 사진 4장과 영문 스캔 26장을 분리해서 집계합니다. 이름은 기존 엄격 채점이며
+공백만 무시한 보조 점수를 별도 기록합니다. 카드 내용/정답은 모델에 전달하지 않습니다.
+조건별 30장은 같은 카드의 반복 변형이므로 960개의 독립 카드 표본으로 해석하지 않습니다.
+Langfuse 업로드는 전체 완료·검증 후 기존 tracker로 수행합니다.
+
+## 카드 번호 없이 도감 소개가 가능한가?
+
+`runs/20261011T075225.159674Z-pokedex-description-0.3mp-2mp`에서 기존 사진 4장을
+0.3MP와 2MP로 각각 새로 입력해 한국어 종 이름·HP·기본 도감 정보를 요청했습니다.
+카드 번호나 정답을 입력하지 않았습니다. 두 조건 모두 종 이름/카드 HP는 4/4였지만,
+자유 설명의 도감 번호는 각 3/4, 기본 종 타입은 각각 3/4와 2/4였습니다. 개굴닌자의
+등에 개굴반장이 있다는 설명 등 사실 오류도 남았습니다. 미확인 설정은 거짓으로
+단정하지 않았고 설명 전체의 정확도를 임의로 계산하지 않았습니다.
+
+`runs/20261011T080234.768925Z-pokedex-grounded-0.3mp`에서는 실제 0.3MP 인식 종
+이름으로 독립적인 공식 도감 facts를 조회한 뒤 추가 text-only 요청 4개를 보냈습니다.
+이 조회는 공식 자료로 미리 검증한 4종 facts 목록에서 종 이름을 찾은 것이며,
+완성된 범용 도감 DB나 요청마다 공식 사이트를 호출하는 서비스는 아닙니다.
+이름/도감 번호/타입/HP와 관찰된 소개 네 건은 공급한 사실에 부합했습니다.
+추가 HTTP 평균 3.20초, 저장된 Vision HTTP와 합은 8.55초이며 live 전체 파이프라인
+또는 음성 장치 지연 측정은 아닙니다. 두 run의 raw evidence와 검토 내용은 로컬에
+보관합니다. 기본 도감 이야기에는 collector number가 필요 없지만 특정 판본·기술·
+레어리티를 DB에서 조회하려면 카드 ID 정보가 도움이 됩니다. 선명한 네 사진에서
+가능했다는 결과를 실제 저가형 카메라의 모든 촬영 조건에 일반화하지 않습니다.
+
+## 30장 합성 실험 완료 결과
+
+`runs/20261011T080339.510907Z-camera-stress-30`에서 30장×32조건=960회의 직접
+API 평가를 완료했습니다. API/파싱/이미지 오류는 모두 0건이며, 원본 30개와 실제
+입력 PNG 960개의 해시·픽셀 예산·카드 점유율·업스케일 금지를 검증했습니다.
+다운로드한 26장은 영문 디지털 스캔이며 한국어 실물 촬영 26장을 추가한 것은 아닙니다.
+
+다음은 한국어 스마트폰 사진 4장에서 blur+noise+JPEG를 함께 적용한 결과입니다.
+이름은 공백·폼·트레이너명·ex까지 포함한 기존 엄격 채점입니다.
+
+|목표|카드 면적|이름|HP|TCG 타입|번호|Unknown 응답|평균 HTTP 초|
+|---|---:|---:|---:|---:|---:|---:|---:|
+|0.3MP|30%|0/4|3/4|0/4|0/4|75%|2.399|
+|0.3MP|50%|1/4|4/4|3/4|0/4|50%|2.577|
+|0.3MP|80%|3/4|4/4|3/4|0/4|50%|2.510|
+|2MP|30%|4/4|4/4|4/4|3/4|0%|7.981|
+|2MP|50%|4/4|4/4|3/4|4/4|0%|10.268|
+|2MP|80%|3/4|4/4|4/4|4/4|0%|7.894|
+
+0.3MP·30%·combined는 카드 이름 완전 일치가 0/4지만 종 이름은 자시안/레시라무
+2/4가 남았습니다. 선명한 원본 구도에서는 공백 차이를 제외한 이름과 HP가 4/4입니다.
+기본 도감 놀이 가능성과 열화된 실제 촬영의 안정성을 구분해야 합니다.
+
+영문 원본 구도는 두 해상도 모두 이름 23/26(88.5%), HP/번호 26/26입니다.
+이름에서 공백/하이픈만 제외하면 25/26(96.2%)이며 `Cleffa`→`Clefairy` 혼동은
+실제 이름 오류로 남습니다. 0.3MP·30%·combined에서는 이름 17/26,
+타입 18/26, 번호 0/26입니다. 2MP의 같은 조건은 이름 23/26, 타입 25/26,
+번호 26/26입니다. 영문 2MP 원본 구도는 실제 0.752MP, 면적 50%/80%는
+약 1.501MP/0.939MP로 제한됐으며, 업스케일하지 않았습니다.
+
+960개 응답 전체에서 이름 불일치 133건 중 86건은 공백/하이픈 차이, 3건은
+unknown, 44건은 그 밖의 불일치입니다. 카드 번호 오답의 앞자리 0만 다른 경우는
+0건입니다. 타입 혼동은 한국어 Metal→Fighting, 영문 Dragon→Colorless 등이
+많았습니다. 같은 카드의 반복 응답이므로 이 횟수를 독립 카드 수로 해석하지 않습니다.
+
+실행 프로세스가 63회 저장 뒤 사라져 재개한 이력 1회와 원인 미확인을 보존했습니다.
+서버 PID/부팅 ID가 유지됐고 GPU 최고 82°C, 최소 available 9.462GiB를 관측했습니다.
+최종 그래프에서 Wilson 경계 반올림 오류가 발생해 계산을 수정하고 결과 파일로
+재생성했습니다. 추가 추론은 0회이고 원래 monitor exit code=1도 보존했습니다.
+관측 공백이 있으며 장기 안정성이나 OOM 방지를 보장하는 결과는 아닙니다.
+
+Langfuse는 32 experiments/960 items/10,560 scores 업로드 후 모든 점수 ID·값과
+출처 metadata를 readback 검증했습니다. 조회 중 HTTP 429는 간격을 늘려 해결했고
+업로드를 반복하지 않았습니다. 개인정보나 원본 이미지/응답/정답은 내보내지 않았습니다.
+
+결과는 `comparisons/camera-stress-30/analysis.md`, run의 `simulation_report.md`,
+`simulation_summary.csv/json`, `results.csv/json/jsonl`, `failures.csv/json`에 있습니다.
+정확도 그래프는 run의 `simulation_accuracy_smartphone_ko.png/svg`와
+`simulation_accuracy_public_scan_en.png/svg`, 응답 시간과 unknown 그래프는
+comparison의 `latency_by_source.png/svg`, `unknown_by_source.png/svg`입니다.
+`verification.json`, `report-recovery.json`, `telemetry-summary.json`,
+`langfuse-receipt.json`은 실행·재생성·업로드의 확인 근거입니다.
+
+보고서는 추론 없이 다시 만들 수 있습니다. 기본적으로 run의 `simulation_truth.csv`를
+사용합니다. 다운로드한 정답 CSV는 검토용으로 수정할 수 있으며, 수정된 정답으로
+재채점하려면 `--truth datasets/tcg30/ground_truth.csv`를 명시하세요. 새 추론과
+재개는 동결된 manifest의 정답을 사용하므로 CSV 수정이 자동 반영되는 것은 아닙니다.
+
+```bash
+cd /home/david/workspace/David-Agent/pokemon-card-benchmark
+.venv/bin/python benchmark.py report runs/20261011T080339.510907Z-camera-stress-30
+# 검토한 정답으로 재채점하는 경우
+.venv/bin/python benchmark.py report runs/20261011T080339.510907Z-camera-stress-30 \
+  --truth datasets/tcg30/ground_truth.csv
+```
+
+이 신규 실험은 0.3MP/2MP만 평가했으므로 2MP/5MP 차이나 5MP 이상 포화의 새
+근거로 사용하지 않습니다. 파인튜닝 전후에는 같은 동결 manifest와 구도/열화 설정을
+사용하고, 동일 정답으로 보고서를 만든 뒤 `compare`로 제출 픽셀까지 대조하세요.

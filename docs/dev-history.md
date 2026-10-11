@@ -3,6 +3,47 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.53.0 — 2026-10-11 (minor: add labeled camera stress experiments)
+
+- Preserve historical full-photo/Crop runs and the human four-card label file.
+  Add a standalone download helper for a commit-pinned community PokemonTCG
+  dataset: 26 labeled English scans plus the four Korean smartphone photos.
+  Keep photos, metadata snapshots, polygons and source/label hashes private.
+- Add sequential `simulate` for 0.3MP/2MP baseline and 30/50/80% card area,
+  with clean/blur/noise/JPEG/combined variants. Record rounded polygon area,
+  native-source caps and deterministic seeds; never upscale card pixels.
+  Preserve raw responses and fsynced progress with validated resume support.
+- Generate domain-separated accuracy/delta CSV/JSON/Markdown and plots. Record
+  simulation strength and source groups in private Langfuse metadata and dataset
+  identity. Explicitly distinguish synthetic stress from real StackChan sensor,
+  lens or firmware measurements. No new model, profile, service, schedule or
+  Observatory room: this remains an internal manual evaluation helper.
+- Extend controlled before/after comparison to synthetic runs: require identical
+  damage settings and submitted pixels with complete photo/condition coverage.
+  Fix Wilson boundary rounding so 100% accuracy cannot produce negative plot
+  error bars; recover reports offline without repeating inference.
+- Validation: **976 tests pass**, including 31 new selection, number-format,
+  area/pixel preservation, deterministic damage, offline/resume, privacy,
+  controlled-comparison and Wilson-boundary tests.
+- Complete **960 direct API evaluations (30 cards × 32 conditions)** with zero
+  API/parse/image errors. Preserve one unexplained process interruption at 63
+  saved results and resume without host reboot or model-service changes. Recover
+  the final plotting failure offline, preserving the original exit code and raw
+  response hash. Verify all 30 source and 960 submitted-image hashes/constraints.
+  Sampled GPU maximum is 82°C; minimum available unified memory is 9.462GiB.
+- Publish **32 experiments / 960 items / 10,560 scores** to the existing private
+  Langfuse project and read back every score ID/value and source-group metadata.
+  Back off after a read-only HTTP 429 without repeating uploads. Add separate
+  latency/unknown plots and name-format/type-confusion failure analysis.
+- `report` recognizes a synthetic run's own label snapshot and rebuilds all
+  source-group reports offline; explicit `--truth` permits reviewed relabeling.
+- Separately test card-number-free child narration with eight new direct vision
+  requests: species/HP are correct for all four photos at 0.3MP and 2MP, while
+  unguided knowledge/lore contains errors at both sizes. Four further text-only
+  requests use the recognized 0.3MP species to look up official-derived facts;
+  the observed introductions match supplied facts. Keep this grounding step
+  distinct from vision accuracy and from live pipeline/speech latency.
+
 ## v1.52.0 — 2026-10-11 (minor: improve card symbols with labeled references)
 
 - Clarify the bottom-left collector-number prompt, preserving leading zeros

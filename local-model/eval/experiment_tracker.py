@@ -29,7 +29,9 @@ POKEMON_SCORE_NAMES = {field: field + "_accuracy" for field in POKEMON_FIELDS}
 POKEMON_SCORE_NAMES["pokemon_type"] = "tcg_type_accuracy"
 POKEMON_SCORE_KEYS = {*POKEMON_SCORE_NAMES.values(), "pokemon_type_accuracy",
     "unknown_response_rate", "unknown_field_rate", "api_error_rate", "parse_error_rate", "image_error_rate"}
-IMAGE_ROW_KEYS = {"resolution", "width", "height", "pixels", "actual_mp", "capped_by_original"}
+IMAGE_ROW_KEYS = {"resolution", "width", "height", "pixels", "actual_mp", "capped_by_original",
+    "frame_resolution", "requested_occupancy", "actual_occupancy", "corruption",
+    "source_group", "language", "card_scale"}
 METRIC_KEYS = POKEMON_SCORE_KEYS | {"ttft_s", "wall_s", "server_total_s", "prefill_s", "decode_s",
     "full_input_tokens", "processed_input_tokens", "cached_input_tokens", "output_tokens",
     "prefill_tps", "decode_tps", "client_decode_tps", "draft_tokens", "accepted_draft_tokens", "queue_wait_s"}
@@ -43,7 +45,7 @@ RUN_KEYS = {"schema_version", "run_id", "label", "source", "started_at", "comple
     "failure_class", "completed_records", "limitations", "session_usage", "kernel_audit", "batch", "ubatch", "input_budget_tokens", "recorded_at",
     "host_prompt_cache_mib", "minimum_available_gib", "minimum_free_gib", "admission_policy",
     "resolution", "preprocessing", "parameters_sha256", "prompt_version", "gpu_clock_min_mhz_reported", "gpu_clock_max_mhz_reported",
-    "evaluation_mode", "reference_sha256", "parent_prompt_sha256", "latency_scope", "label_scope", "roi_policy"}
+    "evaluation_mode", "reference_sha256", "parent_prompt_sha256", "latency_scope", "label_scope", "roi_policy", "simulation"}
 
 
 def utcnow():
@@ -149,6 +151,8 @@ def import_pokemon(directory, telemetry_path=None, gpu_clock_min=None, gpu_clock
     prompt_hash = hashlib.sha256(metadata["prompt"].encode()).hexdigest()
     dataset = digest({"inputs": inputs,
         "preprocessing": metadata["preprocessing"], "ground_truth": truth,
+        **({"simulation": metadata["simulation"]}
+           if metadata.get("evaluation_mode") == "synthetic_camera_stress" else {}),
         **({"reference_sha256": metadata["reference_sha256"], "roi_policy": metadata["roi_policy"]}
            if metadata.get("evaluation_mode") == "guided_roi_with_reference" else {})})
     telemetry = {}
@@ -175,9 +179,11 @@ def import_pokemon(directory, telemetry_path=None, gpu_clock_min=None, gpu_clock
             "build": metadata.get("server", {}).get("props", {}).get("build_info"),
             "scope": ("Guided ROI/reference development experiment; name/HP reused from parent"
                       if metadata.get("evaluation_mode") == "guided_roi_with_reference" else
+                      "Synthetic camera stress; Korean photos and English scans are distinct source groups"
+                      if metadata.get("evaluation_mode") == "synthetic_camera_stress" else
                       "Full-photo resolution experiment; human-label accuracy only when supplied"),
             **{k: metadata[k] for k in ("evaluation_mode", "reference_sha256", "parent_prompt_sha256",
-                "latency_scope", "label_scope", "roi_policy") if k in metadata},
+                "latency_scope", "label_scope", "roi_policy", "simulation") if k in metadata},
             "limitations": ["No request wall-clock timestamps or measured TTFT; zero-duration import spans",
                 "One completed batch does not establish sustained-load stability or OOM containment",
                 "Smartphone resampling does not establish physical camera performance"], "records": []}
@@ -396,11 +402,11 @@ def langfuse_payload(runs):
             attrs.update({"langfuse.observation.metadata." + key: row.get(key) for key in IMAGE_ROW_KEYS})
             attrs.update({"langfuse.observation.metadata." + key: run.get(key) for key in
                 ("resolution", "preprocessing", "parameters_sha256", "prompt_version", "gpu_clock_min_mhz_reported", "gpu_clock_max_mhz_reported",
-                 "evaluation_mode", "reference_sha256", "parent_prompt_sha256", "latency_scope", "label_scope", "roi_policy")})
+                 "evaluation_mode", "reference_sha256", "parent_prompt_sha256", "latency_scope", "label_scope", "roi_policy", "simulation")})
             attrs.update({"langfuse.experiment.metadata." + key: run.get(key) for key in
                 ("resolution", "model", "build", "parameters_sha256", "prompt_version", "gpu_clock_min_mhz_reported",
                  "gpu_clock_max_mhz_reported", "limitations", "evaluation_mode", "reference_sha256",
-                 "parent_prompt_sha256", "latency_scope", "label_scope", "roi_policy")})
+                 "parent_prompt_sha256", "latency_scope", "label_scope", "roi_policy", "simulation")})
             attrs["langfuse.observation.metadata.model"] = run.get("model")
             if not historical:
                 attrs["langfuse.observation.model.name"] = run["model"]

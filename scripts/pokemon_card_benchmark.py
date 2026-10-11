@@ -12,6 +12,7 @@ import base64
 import csv
 import fcntl
 import hashlib
+import io
 import json
 import math
 import os
@@ -26,7 +27,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
-from PIL import Image, ImageOps
+from PIL import Image, ImageOps, ImageFilter
 
 FIELDS = ("pokemon_name", "pokemon_type", "hp", "card_number")
 RESOLUTIONS = {"0.3MP": 300_000, "2MP": 2_000_000, "3MP": 3_000_000,
@@ -103,6 +104,11 @@ FOCUS_PARAMETERS = {**PARAMETERS, "response_format": {"type": "json_object", "sc
     "required": list(FOCUS_FIELDS), "additionalProperties": False}}}
 TYPE_ROI = (.77, .045, .94, .19)
 NUMBER_ROI = (.055, .825, .46, .955)
+CORRUPTIONS = ('clean', 'blur', 'noise', 'jpeg', 'combined')
+SIMULATION_LIMITATION = ('Synthetic stress test, NOT a calibrated reproduction of the actual '
+    'StackChan sensor, lens, focus, firmware, image processing or exposure. '
+    'Report Korean smartphone photos separately from English digital scans. '
+    'No upscale; requested 2MP may be capped by source resolution.')
 
 
 def write_json(path, value):
@@ -431,7 +437,8 @@ def wilson(successes, count):
     denominator = 1 + z * z / count
     center = (p + z * z / (2 * count)) / denominator
     half = z * math.sqrt(p * (1 - p) / count + z * z / (4 * count * count)) / denominator
-    return [max(0, center - half), min(1, center + half)]
+    # Keep the observed proportion inside its interval at floating-point boundaries.
+    return [max(0, min(p, center - half)), min(1, max(p, center + half))]
 
 
 def summarize(rows, resolutions):
@@ -597,6 +604,8 @@ def generate_report(run_dir, truth_path, threshold=.95):
     write_json(run_dir / "results.json", scored)
     write_json(run_dir / "summary.json", {"resolutions": summary, "analysis": analysis})
     columns = ("filename", "resolution", "width", "height", "pixels", "actual_mp",
+               "frame_resolution", "requested_occupancy", "actual_occupancy", "corruption",
+               "source_group", "language", "card_scale", "card_polygon", "corruption_seed",
                "capped_by_original", *FIELDS, "latency_seconds", "api_error", "parse_error",
                "image_error", "http_status", "error", "raw_model_response", "raw_api_response",
                "image_path", "image_path_recorded", "source_sha256", "image_sha256", "finish_reason", "usage", "timings",
@@ -876,6 +885,312 @@ def run_benchmark(args):
         return run_dir
 
 
+def polygon_area(points):
+    """Shoelace area for the human-annotated card quadrilateral."""
+    if len(points) != 4 or any(len(p) != 2 or not all(math.isfinite(v) and 0 <= v <= 1
+                                                   for v in p) for p in points):
+        raise ValueError('Card polygon requires four normalized finite points')
+    area = abs(sum(points[i][0] * points[(i+1) % 4][1]
+                   - points[(i+1) % 4][0] * points[i][1] for i in range(4))) / 2
+    if area <= 0:
+        raise ValueError('Card polygon has no area')
+    return area
+
+
+def simulation_geometry(size, polygon, target_pixels, occupancy):
+    """Compute frame/card dimensions with area occupancy and no card upscaling."""
+    width, height = size
+    area = polygon_area(polygon) * width * height
+    if occupancy is None:
+        frame = target_size(width, height, target_pixels)
+        scale = frame[0] / width
+        return {'frame': frame, 'box': None, 'card_size': None,
+            'actual_occupancy': area / (width * height), 'capped': width * height < target_pixels,
+            'card_scale': scale}
+    if not math.isfinite(occupancy) or not 0 < occupancy < 1:
+        raise ValueError('Occupancy is an area fraction in (0, 1)')
+    # Fixed portrait 3:4 frame. A 30% area fraction is not 30% of each dimension.
+    budget = min(target_pixels, math.floor(area / occupancy))
+    frame = target_size(30000, 40000, budget)
+    scale = min(1., math.sqrt(occupancy * frame[0] * frame[1] / area))
+    xs, ys = zip(*polygon)
+    box = (math.floor(min(xs)*width), math.floor(min(ys)*height),
+           math.ceil(max(xs)*width), math.ceil(max(ys)*height))
+    card_size = (max(1, math.floor((box[2]-box[0])*scale)),
+                 max(1, math.floor((box[3]-box[1])*scale)))
+    if card_size[0] > frame[0] or card_size[1] > frame[1]:
+        raise ValueError('Requested area cannot fit this card in the frame without clipping')
+    # Rounding changes two axis scales slightly; retain the measured area.
+    sx, sy = card_size[0]/(box[2]-box[0]), card_size[1]/(box[3]-box[1])
+    return {'frame': frame, 'box': box, 'card_size': card_size,
+        'actual_occupancy': area*sx*sy/(frame[0]*frame[1]),
+        'capped': budget < target_pixels, 'card_scale': min(sx, sy)}
+
+
+def corrupt_image(image, condition, seed, blur_radius=1.2, noise_sigma=10., jpeg_quality=35):
+    """Deterministic toy blur/noise/compression in the final sensor-pixel domain."""
+    if condition not in CORRUPTIONS:
+        raise ValueError('Unknown corruption condition')
+    if blur_radius < 0 or noise_sigma < 0 or not 1 <= jpeg_quality <= 95:
+        raise ValueError('Invalid corruption strength')
+    result = image.copy().convert('RGB')
+    if condition in ('blur', 'combined'):
+        result = result.filter(ImageFilter.GaussianBlur(blur_radius))
+    if condition in ('noise', 'combined'):
+        import numpy as np
+        pixels = np.asarray(result, dtype=np.float32)
+        noise = np.random.default_rng(seed).normal(0., noise_sigma, pixels.shape)
+        result = Image.fromarray(np.clip(np.rint(pixels + noise), 0, 255).astype('uint8'))
+    if condition in ('jpeg', 'combined'):
+        buffer = io.BytesIO()
+        result.save(buffer, format='JPEG', quality=jpeg_quality, subsampling=2)
+        buffer.seek(0)
+        with Image.open(buffer) as decoded:
+            result = decoded.convert('RGB').copy()
+    return result
+
+
+def make_simulated_image(source, polygon, target_pixels, occupancy, condition, seed,
+                         blur_radius=1.2, noise_sigma=10., jpeg_quality=35):
+    """Derive a framed photograph without mutating or adding detail to its source."""
+    geometry = simulation_geometry(source.size, polygon, target_pixels, occupancy)
+    if occupancy is None:
+        image = source.resize(geometry['frame'], Image.Resampling.LANCZOS)
+    else:
+        # Use the original pixels within the annotated bounding rectangle. Preserve
+        # perspective and corner background; this is not a card rectification step.
+        card = source.crop(geometry['box']).resize(geometry['card_size'], Image.Resampling.LANCZOS)
+        image = Image.new('RGB', geometry['frame'], (112, 112, 112))
+        image.paste(card, ((image.width-card.width)//2, (image.height-card.height)//2))
+    return corrupt_image(image, condition, seed, blur_radius, noise_sigma, jpeg_quality), geometry
+
+
+def simulation_plan(resolutions, occupancies, conditions):
+    plan = []
+    for resolution in resolutions:
+        plan.append({'resolution': resolution, 'frame_resolution': resolution,
+                     'requested_occupancy': None, 'corruption': 'clean'})
+        for occupancy in occupancies:
+            for condition in conditions:
+                plan.append({'resolution': f'{resolution}__area{round(occupancy*100)}__{condition}',
+                    'frame_resolution': resolution, 'requested_occupancy': occupancy,
+                    'corruption': condition})
+    if len({p['resolution'] for p in plan}) != len(plan):
+        raise ValueError('Duplicate simulation conditions')
+    return plan
+
+
+def generate_simulation_report(run_dir):
+    """Stratify by source domain and compare against matched clean framing."""
+    metadata = json.loads((run_dir/'metadata.json').read_text())
+    rows = json.loads((run_dir/'results.json').read_text())
+    if not rows:
+        return
+    summaries = []
+    for group in ('all', 'smartphone_ko', 'public_scan_en'):
+        subset = [r for r in rows if group == 'all' or r['source_group'] == group]
+        for item in summarize(subset, metadata['resolutions']):
+            if not item['rows']:
+                continue
+            plan = next(p for p in metadata['simulation_plan'] if p['resolution'] == item['resolution'])
+            same = [r for r in subset if r['resolution'] == item['resolution']]
+            item.update(source_group=group, frame_resolution=plan['frame_resolution'],
+                requested_occupancy=plan['requested_occupancy'], corruption=plan['corruption'],
+                mean_actual_occupancy=sum(r['actual_occupancy'] for r in same)/len(same),
+                mean_input_mp=sum(r['actual_mp'] for r in same)/len(same))
+            item['pokemon_name_no_space_accuracy'] = sum(
+                valid_prediction(r) and normalize('pokemon_name', r['pokemon_name']).replace(' ','') ==
+                normalize('pokemon_name', r['expected_pokemon_name']).replace(' ','') for r in same)/len(same)
+            summaries.append(item)
+    for item in summaries:
+        base = next((s for s in summaries if s['source_group'] == item['source_group']
+            and s['frame_resolution'] == item['frame_resolution']
+            and s['requested_occupancy'] == item['requested_occupancy'] and s['corruption'] == 'clean'), None)
+        for field in FIELDS:
+            item[field+'_delta_vs_matched_clean'] = (item[field+'_accuracy']-base[field+'_accuracy']
+                if base and item[field+'_accuracy'] is not None and base[field+'_accuracy'] is not None else None)
+    write_json(run_dir/'simulation_summary.json', summaries)
+    write_csv(run_dir/'simulation_summary.csv', summaries,
+              [k for k in summaries[0] if not k.endswith('_ci95')])
+    lines = ['# 저가형 카메라 합성 스트레스 테스트', '', SIMULATION_LIMITATION,
+        '', '30%/50%/80%는 사람이 지정한 카드 사각형 면적 / 전체 프레임 면적입니다. '
+        '실제 점유율, 입력 크기, 원본 해상도로 제한된 조건을 CSV에 기록했습니다.',
+        '', 'Blur σ=%.2f output pixels; Gaussian RGB noise σ=%.2f/255; '
+        'JPEG quality=%d, chroma subsampling=4:2:0. Combined applies blur→noise→JPEG. '
+        '공통 영어 프롬프트·temperature=0을 사용했습니다.' % (
+            metadata['simulation']['blur_radius'], metadata['simulation']['noise_sigma'],
+            metadata['simulation']['jpeg_quality']),
+        '', '기존 0.3MP/2MP 결과는 보존했습니다. 이 run의 새 baseline은 같은 30장으로 '
+        '원본 전체 이미지를 다시 평가한 값입니다. 디지털 영문 카드와 한국어 스마트폰 '
+        '사진은 서로 다른 데이터이며 합산 값을 실제 로봇 성능으로 해석하지 않습니다.',
+        '', '|출처|입력 목표|점유율|조건|n|이름|HP|TCG 타입|번호|평균 초|실제 MP|크기 제한|',
+        '|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|']
+    for s in summaries:
+        if s['source_group'] == 'all':
+            continue
+        area = '원본 구도' if s['requested_occupancy'] is None else f"{s['requested_occupancy']:.0%}"
+        acc = ['N/A' if s[f+'_accuracy'] is None else f"{s[f+'_accuracy']:.1%}"
+               for f in ('pokemon_name','hp','pokemon_type','card_number')]
+        lines.append(f"|{s['source_group']}|{s['frame_resolution']}|{area}|{s['corruption']}|"
+            f"{s['rows']}|{'|'.join(acc)}|{s['average_latency_seconds']:.3f}|"
+            f"{s['mean_input_mp']:.3f}|{s['capped_images']}|")
+    lines += ['', '이름은 기존 엄격 채점입니다. 공백만 무시하는 보조 점수는 CSV에 별도 '
+        '기록했으며 기존 점수를 교체하지 않았습니다. unknown/오류와 카드별 실패는 '
+        'results.csv, failures.csv/json에 있습니다. incomplete run은 완료된 평가로 '
+        '집계하거나 업로드하지 않습니다.', '', '[정답 CSV](simulation_truth.csv) · '
+        '[요약 CSV](simulation_summary.csv) · [JSON](simulation_summary.json) · '
+        '[모든 상세 결과](report.md)']
+    make_simulation_plots(run_dir, metadata, summaries)
+    for group in ('smartphone_ko','public_scan_en'):
+        lines += ['', f'![{group}](simulation_accuracy_{group}.png)']
+    (run_dir/'simulation_report.md').write_text('\n'.join(lines)+'\n', encoding='utf-8')
+
+
+def make_simulation_plots(run_dir, metadata, summaries):
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    for group in ('smartphone_ko', 'public_scan_en'):
+        fig, axes = plt.subplots(2, 2, figsize=(13, 9), sharey=True)
+        for ax, field in zip(axes.flat, FIELDS):
+            for resolution in metadata['simulation']['resolutions']:
+                for condition in metadata['simulation']['conditions']:
+                    data = sorted([s for s in summaries if s['source_group'] == group
+                        and s['frame_resolution'] == resolution and s['corruption'] == condition
+                        and s['requested_occupancy'] is not None], key=lambda s:s['requested_occupancy'])
+                    if data:
+                        ax.plot([s['requested_occupancy']*100 for s in data],
+                            [s[field+'_accuracy']*100 for s in data], marker='o',
+                            label=resolution+' '+condition)
+            ax.set(title=field, xlabel='Card area occupancy (%)', ylabel='Accuracy (%)', ylim=(0,105))
+            ax.grid(alpha=.2)
+        handles, labels = axes[0,0].get_legend_handles_labels()
+        fig.legend(handles, labels, loc='lower center', ncol=5, fontsize=8)
+        fig.suptitle(group+' — synthetic stress, NOT measured StackChan performance')
+        fig.tight_layout(rect=(0,.07,1,.95))
+        for ext in ('png','svg'):
+            fig.savefig(run_dir/f'simulation_accuracy_{group}.{ext}', dpi=150)
+        plt.close(fig)
+
+
+def run_simulation(args):
+    manifest_path = args.manifest.expanduser().resolve()
+    manifest = json.loads(manifest_path.read_text())
+    cards = manifest['cards'][:args.limit] if args.limit else manifest['cards']
+    if not cards or len({c['filename'] for c in cards}) != len(cards):
+        raise ValueError('Manifest needs unique card filenames')
+    for card in cards:
+        polygon_area(card['card_polygon'])
+        if sha256(card['image_path']) != card['source_sha256']:
+            raise ValueError('Dataset source hash mismatch')
+    config = {'resolutions': list(args.resolutions), 'occupancies': args.occupancies,
+        'conditions': args.corruptions, 'blur_radius': args.blur_radius,
+        'noise_sigma': args.noise_sigma, 'jpeg_quality': args.jpeg_quality,
+        'seed': args.order_seed, 'manifest_sha256': sha256(manifest_path), 'limit': args.limit}
+    plan = simulation_plan(args.resolutions, args.occupancies, args.corruptions)
+    truth = {c['filename']: c['ground_truth'] for c in cards}
+    if args.resume_run:
+        run_dir = args.resume_run.expanduser().resolve()
+        metadata = json.loads((run_dir/'metadata.json').read_text())
+        if (metadata.get('simulation') != config or metadata['prompt'] != PROMPT
+                or metadata['parameters'] != PARAMETERS or metadata['model'] != args.model
+                or metadata['base_url'] != args.base_url
+                or json.loads((run_dir/'ground_truth.snapshot.json').read_text()) != truth):
+            raise ValueError('Resume requires identical sources, labels, prompt, model and simulation')
+        saved, warning = load_saved_results(run_dir/'results.jsonl')
+        if any(r.get('api_error') for r in saved):
+            raise ValueError('Resume refuses recorded API errors; review before choosing a new run')
+        if warning:
+            backup = run_dir/('results.corrupt-tail-'+datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')+'.jsonl')
+            backup.write_bytes((run_dir/'results.jsonl').read_bytes())
+            (run_dir/'results.jsonl').write_text(''.join(json.dumps(r,ensure_ascii=False)+'\n' for r in saved))
+        expected = {(c['filename'],p['resolution']) for c in cards for p in plan}
+        finished = {(r['filename'],r['resolution']) for r in saved}
+        if len(finished) != len(saved) or not finished <= expected:
+            raise ValueError('Duplicate or unexpected saved simulation rows')
+        for row in saved:
+            if sha256(row['image_path']) != row['image_sha256']:
+                raise ValueError('Saved simulated image hash mismatch')
+    else:
+        run_dir = new_directory(args.root/'runs', args.label)
+        finished = set()
+        metadata = {'schema_version':1,'created_utc':datetime.now(timezone.utc).isoformat(),
+            'base_url':args.base_url,'model':args.model,'prompt':PROMPT,'prompt_version':PROMPT_VERSION,
+            'parameters':PARAMETERS,'resolutions':{p['resolution']:RESOLUTIONS[p['frame_resolution']] for p in plan},
+            'inputs':[{'filename':c['filename'],'source_sha256':c['source_sha256']} for c in cards],
+            'input_errors':[],'evaluation_mode':'synthetic_camera_stress','simulation':config,
+            'simulation_plan':plan,'preprocessing':'EXIF transpose; preserve full original baseline; '
+                'human polygon area framing; Lanczos/no upscale; output-pixel blur/noise/JPEG; decoded RGB PNG',
+            'label_scope':'Four known Korean photo cards and 26 independent English digital scans; report domains separately',
+            'limitations':[SIMULATION_LIMITATION], 'script_sha256':sha256(Path(__file__))}
+        (run_dir/'results.jsonl').touch()
+        write_csv(run_dir/'input_errors.csv', [], ('filename','error'))
+    write_json(run_dir/'ground_truth.snapshot.json', truth)
+    write_csv(run_dir/'simulation_truth.csv', [{'filename':name,**values} for name,values in truth.items()],
+        ('filename',*FIELDS))
+    metadata.update(status='prepared' if args.prepare_only else 'running',
+        planned_requests=len(cards)*len(plan), idle_guard=True,
+        memory_admission={'min_available_gib':args.min_available_gib,'min_free_gib':args.min_free_gib})
+    write_json(run_dir/'metadata.json', metadata)
+    print('Run directory:', run_dir, 'planned requests:', metadata['planned_requests'], flush=True)
+    with requests.Session() as session:
+        session.trust_env = False
+        if not args.prepare_only:
+            check_memory(args.min_available_gib,args.min_free_gib)
+            metadata['server'] = inspect_server(session,args.base_url,args.model)
+        try:
+            with (run_dir/'results.jsonl').open('a',encoding='utf-8') as out:
+                for card in cards:
+                    source = load_image(Path(card['image_path']))
+                    variants = plan[:]
+                    random.Random(str(args.order_seed)+card['filename']).shuffle(variants)
+                    for variant in variants:
+                        key = (card['filename'],variant['resolution'])
+                        if key in finished:
+                            continue
+                        seed = int(hashlib.sha256((str(args.order_seed)+card['filename']+
+                            variant['frame_resolution']+str(variant['requested_occupancy'])).encode()).hexdigest()[:16],16)
+                        image, geometry = make_simulated_image(source,card['card_polygon'],
+                            RESOLUTIONS[variant['frame_resolution']],variant['requested_occupancy'],
+                            variant['corruption'],seed,args.blur_radius,args.noise_sigma,args.jpeg_quality)
+                        image_path = run_dir/'images'/variant['resolution']/(card['filename']+'.png')
+                        image_path.parent.mkdir(parents=True,exist_ok=True)
+                        image.save(image_path,format='PNG')
+                        if args.prepare_only:
+                            continue
+                        wait_for_idle(session,args.base_url,args.idle_timeout)
+                        memory = check_memory(args.min_available_gib,args.min_free_gib)
+                        response = infer(session,args.base_url,args.model,image_path,args.timeout)
+                        row = {'filename':card['filename'],'source_sha256':card['source_sha256'],
+                            'source_group':card['source_group'],'language':card['language'],**variant,
+                            'actual_occupancy':geometry['actual_occupancy'],'card_scale':geometry['card_scale'],
+                            'card_polygon':card['card_polygon'],'width':image.width,'height':image.height,
+                            'pixels':image.width*image.height,'actual_mp':image.width*image.height/1e6,
+                            'capped_by_original':geometry['capped'],'image_path':str(image_path),
+                            'image_sha256':sha256(image_path),'corruption_seed':seed,
+                            **response,'memory_before':memory}
+                        out.write(json.dumps(row,ensure_ascii=False)+'\n');out.flush();os.fsync(out.fileno())
+                        finished.add(key)
+                        print(f"{len(finished)}/{metadata['planned_requests']} {card['filename']} "
+                            f"{variant['resolution']} {row['pokemon_name']} {row['latency_seconds']:.3f}s",flush=True)
+                        if row['api_error']:
+                            raise RuntimeError('Simulation API failed; stopped without retry')
+                        time.sleep(args.gap)
+                    if sha256(card['image_path']) != card['source_sha256']:
+                        raise RuntimeError('Source changed during simulation')
+            metadata['status'] = 'prepared' if args.prepare_only else 'completed'
+        except (RuntimeError, ValueError, requests.RequestException, KeyboardInterrupt) as exc:
+            metadata.update(status='interrupted',stop_reason=str(exc) or 'KeyboardInterrupt')
+            raise
+        finally:
+            metadata['finished_utc'] = datetime.now(timezone.utc).isoformat()
+            write_json(run_dir/'metadata.json',metadata)
+            if not args.prepare_only:
+                generate_report(run_dir,run_dir/'simulation_truth.csv',args.name_target)
+                generate_simulation_report(run_dir)
+    return run_dir
+
+
 def watch_inputs(args):
     """Foreground opt-in watcher: settle file sizes, then run a sequential snapshot."""
     initialize(args.root)
@@ -897,10 +1212,20 @@ def watch_inputs(args):
 def compare_runs(before, after, output):
     metas = [json.loads((p / "metadata.json").read_text()) for p in (before, after)]
     reasons = []
-    for key in ("prompt", "parameters", "resolutions", "preprocessing"):
+    for key in ("prompt", "parameters", "resolutions", "preprocessing", "evaluation_mode", "simulation"):
         if metas[0].get(key) != metas[1].get(key):
             reasons.append(f"Different {key}")
     def fingerprints(meta):
+        if meta.get("evaluation_mode") == "synthetic_camera_stress":
+            directory = before if meta is metas[0] else after
+            rows = json.loads((directory / "results.json").read_text())
+            keys = [(r["filename"], r["resolution"]) for r in rows]
+            expected = {(i["filename"], resolution) for i in meta["inputs"]
+                        for resolution in meta["resolutions"]}
+            if len(keys) != len(set(keys)) or set(keys) != expected:
+                reasons.append("Missing, duplicate or unexpected simulation image records")
+            return {(r["filename"], r["resolution"]):
+                    (r["source_sha256"], r["image_sha256"]) for r in rows}
         return {(i["filename"], v["resolution"]): (i["source_sha256"], v["image_sha256"])
                 for i in meta["inputs"] for v in i["variants"]}
     if fingerprints(metas[0]) != fingerprints(metas[1]):
@@ -972,6 +1297,17 @@ def main(argv=None):
         help="Acknowledge upright, tightly framed input requirement")
     refine.add_argument("--type-roi", nargs=4, type=float, default=TYPE_ROI)
     refine.add_argument("--number-roi", nargs=4, type=float, default=NUMBER_ROI)
+    simulate = sub.add_parser('simulate', parents=[run], add_help=False,
+        help='Evaluate labeled camera stress variants; preserve existing runs')
+    simulate.set_defaults(resolutions=['0.3MP','2MP'], label='camera-stress', gap=.5)
+    simulate.add_argument('--manifest', type=Path, required=True)
+    simulate.add_argument('--occupancies', nargs='+', type=float, default=[.3,.5,.8])
+    simulate.add_argument('--corruptions', nargs='+', choices=CORRUPTIONS, default=list(CORRUPTIONS))
+    simulate.add_argument('--blur-radius', type=float, default=1.2)
+    simulate.add_argument('--noise-sigma', type=float, default=10.)
+    simulate.add_argument('--jpeg-quality', type=int, default=35)
+    simulate.add_argument('--prepare-only', action='store_true', help='Save images without any API requests')
+    simulate.add_argument('--resume-run', type=Path, help='Continue identical fsynced records after interruption')
     report = sub.add_parser("report", help="Re-score saved outputs with current labels; no inference")
     report.add_argument("run_dir", type=Path)
     report.add_argument("--truth", type=Path)
@@ -986,7 +1322,7 @@ def main(argv=None):
         parser.error("--name-target must be in (0, 1]")
     if getattr(args, "limit", None) is not None and args.limit <= 0:
         parser.error("--limit must be positive")
-    if args.command in {"run", "watch", "refine"}:
+    if args.command in {"run", "watch", "refine", "simulate"}:
         if not re.fullmatch(r"[A-Za-z0-9._-]+", args.label):
             parser.error("--label must use letters, digits, dots, underscores or hyphens")
         if args.timeout <= 0 or args.gap < 0 or args.idle_timeout < 0:
@@ -996,6 +1332,18 @@ def main(argv=None):
         if len(set(args.resolutions)) != len(args.resolutions):
             parser.error("Duplicate resolutions are not allowed")
         args.base_url = args.base_url.rstrip("/")
+        if args.command == 'simulate':
+            if args.allow_busy:
+                parser.error('Simulation always requires the read-only idle guard')
+            if (any(not math.isfinite(v) or not 0 < v < 1 for v in args.occupancies)
+                    or not math.isfinite(args.blur_radius) or args.blur_radius < 0
+                    or not math.isfinite(args.noise_sigma) or args.noise_sigma < 0
+                    or not 1 <= args.jpeg_quality <= 95):
+                parser.error('Invalid occupancy/corruption strength')
+            try:
+                simulation_plan(args.resolutions,args.occupancies,args.corruptions)
+            except ValueError as exc:
+                parser.error(str(exc))
         if args.command == "watch" and (args.poll <= 0 or args.settle < 0):
             parser.error("--poll must be positive and --settle nonnegative")
         if args.command == "refine":
@@ -1024,8 +1372,15 @@ def main(argv=None):
                 watch_inputs(args)
             elif args.command == "refine":
                 print(refine_benchmark(args))
+            elif args.command == 'simulate':
+                print(run_simulation(args))
             elif args.command == "report":
-                generate_report(args.run_dir.resolve(), args.truth or default_truth_path(args.root), args.name_target)
+                directory = args.run_dir.resolve()
+                simulation = json.loads((directory / 'metadata.json').read_text()).get('evaluation_mode') == 'synthetic_camera_stress'
+                truth = args.truth or (directory / 'simulation_truth.csv' if simulation else default_truth_path(args.root))
+                generate_report(directory, truth, args.name_target)
+                if simulation:
+                    generate_simulation_report(directory)
                 print(args.run_dir / "report.md")
             elif args.command == "compare":
                 compare_runs(args.before.resolve(), args.after.resolve(), args.output.resolve())

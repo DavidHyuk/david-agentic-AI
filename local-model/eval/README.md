@@ -100,6 +100,11 @@ scope, parent prompt digest and latency scope so these runs cannot be mistaken
 for unchanged-input fine-tuning comparisons. Their name/HP scores reuse the
 parent responses; `wall_s` sums saved parent HTTP time and new Crop HTTP time,
 not a measured live pipeline duration. Human Crop-label files remain local.
+Synthetic camera runs include corruption strengths/seed/manifest digest in
+dataset identity and export area, damage, actual frame size, source group and
+language on each item. Filter `smartphone_ko` separately from `public_scan_en`;
+digital scans are not additional real-camera trials. The 30-card stress matrix
+imports as 32 condition experiments. Publish only after all 960 items complete.
 Photos, filenames, predictions and raw model/API responses stay local. Host
 extrema are labeled run-wide, and reported clock settings are metadata. Card
 requests lack individual wall-clock timestamps and streaming TTFT, so imported

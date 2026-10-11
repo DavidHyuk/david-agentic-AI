@@ -609,6 +609,17 @@ schema의 번호 pattern과 타입 enum을 요청마다 적용하며 형식 위�
 새 16개 실험·64개 항목·704개 점수를 Langfuse에 업로드하고 전부 재조회했습니다.
 비교 리포트/그래프와 native Crop 검토 그림은 작업 폴더의
 `comparisons/full-v2-vs-crop-reference-v2-gpu2200/`에 있습니다.
+`scripts/pokemon_benchmark_dataset.py`는 기존 한국어 스마트폰 사진 4장을 보존하고
+커뮤니티 PokemonTCG 저장소의 commit 고정 JSON/영문 카드 이미지 26장과 정답을
+받아 별도 `datasets/tcg30` manifest를 만듭니다. 공개 카드에는 타입 11종이 포함되며,
+이미지 해시·출처·원본 크기·카드 사각형 좌표·라벨 출처를 보존합니다.
+선택적 `simulate`는 0.3MP/2MP 원본 구도 baseline과 카드 면적 점유율 30/50/80%,
+clean/blur/noise/JPEG/combined 조건을 960건 순차 평가합니다. 업스케일 없이 원본
+해상도 제한과 실제 점유율/크기를 기록하고 출처별 정확도·matched clean 대비 차이,
+raw evidence와 CSV/JSON/Markdown/PNG/SVG를 저장합니다. `--prepare-only`와
+같은 manifest/정답/프롬프트/추론 설정의 `--resume-run`을 지원합니다. 이는 실제
+StackChan의 센서/렌즈/펌웨어를 보정한 재현이 아닙니다. Langfuse에는 손상 강도,
+점유율·출처 그룹·실제 크기·범위를 내보내고 사진/라벨은 로컬에 보관합니다.
 선택적 foreground `watch`는 안정된 입력 변경을 감지해 전체 snapshot을 평가합니다.
 프로필·봇·cron·서비스·Tailscale·모델 프로세스를 변경하지 않는 수동 내부 평가
 도구이므로 새 Observatory agent/room은 추가하지 않습니다.
@@ -1201,7 +1212,7 @@ ZIP 경로 격리·credential 오류 출력 방지 및 HQ source 상태 검증�
 Jun 사전 풀이 요약의 근거 변경·Accepted 코드 freshness·실패 보존·동시 실행
 잠금·background provider 경계 및 재인증 상태·실제 코드 필수 조건을 포함한
 원격 계정 재연결·CSRF 전달·동일 계정의 서버 cookie 갱신 검증까지 포함한
-현재 전체 테스트는 945 passed입니다. 기존 카드 실험 export 12개 테스트는
+현재 전체 테스트는 976 passed입니다. 기존 카드 실험 export 12개 테스트는
 완료 조합·해시·개인 정보·정답 분모·unknown·시각·안정적 ID를 검증합니다.
 추가 8개는 이동한 폴더 검색, 사용자 정답 CSV 보존/새 행 추가, 도감 타입과 TCG
 타입의 분리 채점, 원문을 보존하는 이미지 경로 복구, 프롬프트 간 dataset ID 공유를
@@ -1209,6 +1220,14 @@ Jun 사전 풀이 요약의 근거 변경·Accepted 코드 freshness·실패 보
 추가 18개는 ROI 경계/실제 픽셀 보존, 독립 범례 요청의 두 필드 계약, 번호 형식
 거부와 prefix/leading zero 보존, parent 원문/이름/HP, 합산 지연/라벨 출처,
 11개 참조 아이콘 추출과 범례/ROI 실험의 개인정보 제외를 검증합니다.
+추가 19개는 11타입 카드 선택/인쇄 번호 규칙, 면적 기반 구도·업스케일 금지,
+재현 가능한 손상·원본 보존, offline preparation, fsync 결과 재개·정답 비노출,
+손상 강도에 따른 export identity와 출처별 metadata를 검증합니다.
+추가 4개는 합성 실험의 전후 비교에서 이미지 해시·설정·누락된 조합을 검사하며,
+추가 8개는 Wilson 구간의 0%/100% 경계에서 그래프 오차 막대가 음수가 되지 않도록 검증합니다.
+실제 새 합성 평가 30장×32조건=960회는 오류 0건으로 저장·검증됐고,
+Langfuse의 32 experiments/960 items/10,560 scores를 readback까지 확인했습니다.
+합성 run의 `report`는 저장된 30장 정답을 사용해 출처별 표·그래프를 재생성합니다.
 카드 Vision 평가의 원본 보존·EXIF·HEIC,
 픽셀 예산/업스케일 금지, 정답 분모, 오류/unknown 구분, API 원문/재시도 금지,
 idle/memory guard, 손상된 JSONL 마지막 행 복구, 중복 크기 쌍 제외,

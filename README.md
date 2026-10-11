@@ -405,6 +405,26 @@ published to the configured Langfuse project as seven resolution experiments.
 Missing human labels produce no accuracy scores; photos and raw responses stay
 local. See the [export commands](local-model/eval/README.md#optional-tracker-export).
 
+Optional camera stress testing retains the earlier runs and uses a separate
+30-card manifest: four Korean smartphone photos plus 26 labeled English scans
+from the community PokemonTCG repository. Source domains are reported separately.
+
+```bash
+pokemon-card-benchmark/.venv/bin/python scripts/pokemon_benchmark_dataset.py
+cd pokemon-card-benchmark
+.venv/bin/python benchmark.py simulate --manifest datasets/tcg30/manifest.json
+```
+
+The default sequential matrix has 960 requests: 0.3MP/2MP original framing,
+plus 30%/50%/80% card **area** with clean, blur, noise, JPEG and combined damage.
+It preserves source pixels without upscaling, records native-resolution caps,
+saves raw evidence and stratified CSV/JSON/Markdown/plots, and supports
+`--resume-run runs/<RUN_ID>` after interruption with identical inputs/settings.
+Use `--prepare-only` to inspect generated scenes without inference. This is
+a synthetic stress test, **not calibrated StackChan camera performance**.
+See the [benchmark guide](docs/pokemon-card-benchmark.md) for the exact strengths,
+source/label provenance and memory-admission execution options.
+
 The version-controlled [120-case synthetic benchmark](local-model/eval/README.md)
 uses four balanced buckets: short tasks, scripted multi-tool calls, multi-turn
 long-horizon state, and context-heavy retrieval. Validate the fixture, then run

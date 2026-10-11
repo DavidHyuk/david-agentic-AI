@@ -62,6 +62,23 @@ def test_resolution_groups_share_items_and_export_no_card_content(tmp_path):
     assert scores == tracker.langfuse_scores(tracker.import_pokemon(tmp_path), payload)
 
 
+def test_simulation_strength_changes_identity_and_exports_source_scope(tmp_path):
+    metadata, rows = fixture_run(tmp_path)
+    metadata.update(evaluation_mode='synthetic_camera_stress', simulation={'noise_sigma':10.})
+    for row in rows:
+        row.update(source_group='public_scan_en',language='en',requested_occupancy=.3,
+                   actual_occupancy=.299,corruption='noise',frame_resolution='0.3MP')
+    rewrite(tmp_path,'metadata.json',metadata);rewrite(tmp_path,'results.json',rows)
+    before=tracker.import_pokemon(tmp_path)
+    payload=json.dumps(tracker.langfuse_payload(before))
+    assert 'PRIVATE' not in payload
+    assert 'public_scan_en' in payload and 'actual_occupancy' in payload and 'simulation' in payload
+    metadata['simulation']['noise_sigma']=20.
+    rewrite(tmp_path,'metadata.json',metadata)
+    after=tracker.import_pokemon(tmp_path)
+    assert before[0]['dataset_digest'] != after[0]['dataset_digest']
+
+
 def test_labeled_accuracy_and_invalid_unknown_have_distinct_denominators(tmp_path):
     _, rows = fixture_run(tmp_path)
     rows[0].update(pokemon_name_correct=True, hp_correct=False)
