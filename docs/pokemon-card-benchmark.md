@@ -116,7 +116,7 @@ span은 가져오기 시각의 duration=0으로 표시하고 실측 지연은 `w
 
 EXIF 회전을 적용한 전체 이미지를 종횡비를 유지하며 Lanczos로 축소합니다.
 반올림에 따른 목표 초과를 피하기 위해 가로·세로를 내림하므로 목표 MP보다
-약간 작습니다. 업스케일, Crop, 카드 검출, perspective 보정은 하지 않습니다.
+약간 작습니다. 기본 `run`은 업스케일, Crop, 카드 검출, perspective 보정을 하지 않습니다.
 일관된 RGB PNG를 생성하며 Original도 회전/색상 모드 변환만 한 lossless PNG입니다.
 원본 파일은 읽기만 하고, 처리 전후 SHA-256을 검사합니다. 목표보다 작은 원본은
 `capped_by_original`로 표시합니다. 12MP 원본의 12MP/Original은 동일한 이미지입니다.
@@ -133,7 +133,7 @@ repeat_penalty=1, presence/frequency_penalty=0, prompt cache 요청 비활성화
 이름은 카드에 **인쇄된 언어와 접미사 그대로** 추출합니다. 예를 들어 한글 카드의
 정답에 영어 번역 이름을 쓰면 오답입니다. 타입은 명확한 카드 에너지 심볼을 표준
 영어로 기록하며 약점, 저항력, 공격 에너지나 종 분류를 타입으로 사용하지 않습니다.
-`tcg-symbol-v2`는 사진의 방향이 아닌 **카드 방향 기준 오른쪽 상단 HP 옆 타입
+현재 `tcg-symbol-number-v3`는 사진의 방향이 아닌 **카드 방향 기준 오른쪽 상단 HP 옆 타입
 아이콘**을 보도록 지시합니다. Grass, Fire, Water, Lightning, Psychic, Fighting,
 Darkness, Metal, Dragon, Colorless, Fairy 중 식별하거나 `unknown`을 반환합니다.
 이름·그림·도감 지식에서 타입을 추론하지 않도록 명시하지만, 지시만으로 실제
@@ -284,8 +284,9 @@ Observatory 대화 workflow를 추가하지 않습니다.
    네 장을 학습 예시로 쓰고 같은 네 장으로 성능 향상을 주장하지 않습니다. 카드
    단위로 분리한 holdout과 동일 프롬프트/이미지/설정으로 전후를 비교합니다.
 
-현재 실행은 전체 이미지에 아이콘 지시를 강화한 실험이며 Crop/범례/파인튜닝은
-추가하지 않았습니다. 프롬프트 버전이 다르면 `compare`의 파인튜닝 비교가 거부되는
+기존 v2 실행은 전체 이미지의 아이콘 지시만 강화했습니다. 이후 별도 Crop/공식
+범례 실험을 추가했으며 파인튜닝은 수행하지 않았습니다.
+프롬프트 버전이 다르면 `compare`의 파인튜닝 비교가 거부되는
 것이 정상입니다. Langfuse에서는 같은 인간 정답 dataset의 별도 프롬프트 실험으로
 비교하며 프롬프트 해시/버전을 확인하세요.
 
@@ -358,3 +359,99 @@ StackChan도 실제 펌웨어의 촬영 크기를 확인해야 합니다. 예를
 [공식 ESPHome 카메라 설정](https://docs.m5stack.com/en/homeassistant/devices/stackchan).
 기존 chat-completions 벤치마크는 이미지/텍스트만 검증했으며 한국어 음성 인식·
 음성 합성은 선택한 음성 경로에서 별도 검증해야 합니다.
+
+## 공식 타입 정답 예시와 Crop 재인식
+
+공식 [SWSH11 규칙서](https://assets.pokemon.com/assets/cms2/pdf/trading-card-game/rulebook/swsh11_rulebook_en.pdf)
+4페이지의 인접 타입 이름을 근거로 11개 아이콘을 Crop/라벨링합니다. 이 자료는 평가
+사진 네 장과 별개이고 파인튜닝은 수행하지 않습니다. Python 환경의 Pillow와 호스트의
+`pdftoppm`을 사용하며 다른 모델/시스템 설정을 바꾸지 않습니다.
+
+```bash
+cd ~/workspace/David-Agent
+pokemon-card-benchmark/.venv/bin/python scripts/pokemon_type_references.py
+# 이미 받은 공식 PDF로 오프라인 재생성
+pokemon-card-benchmark/.venv/bin/python scripts/pokemon_type_references.py \
+  --pdf pokemon-card-benchmark/references/pokemon-tcg-rulebook-swsh11-en.pdf
+```
+
+`references/icons/{Grass,Fire,...}.png`, `type_labels.csv`, `tcg-type-reference.png`,
+`provenance.json`에 이미지·정답·출처·해시를 저장합니다. 추출 위치는 해당 공식 PDF
+판본의 고정 레이아웃이며 페이지/레이아웃이 달라지면 확인이 필요합니다. 타입마다
+한 예시이므로 실제 촬영 변형을 포괄하는 학습 데이터셋은 아닙니다.
+
+새 전체 이미지 프롬프트는 번호를 카드 방향 기준 왼쪽 아래에서 읽고 collector/set
+전체 수만 반환하도록 지정합니다. JSON schema는 타입 11개/unknown과 번호의
+`문자 prefix+숫자/문자 prefix+숫자` 또는 unknown을 허용합니다. 레어리티를 사후에
+잘라내 채점하지 않습니다. 번호/총수가 인쇄되지 않은 카드 형식은 별도 계약이
+필요하며 현 슬래시 형식에서는 unknown으로 처리합니다.
+
+```bash
+cd ~/workspace/David-Agent/pokemon-card-benchmark
+# 기본 admission 조건을 만족하는 환경에서 새 전체 이미지 run
+.venv/bin/python benchmark.py run --truth pokebot_ground_truth.csv --label number-v3
+# 완료 parent의 이름/HP를 보존하고 타입/번호만 다시 읽기
+.venv/bin/python benchmark.py refine runs/<PARENT_RUN_ID> \
+  --type-reference references/tcg-type-reference.png --guided-card \
+  --truth pokebot_ground_truth.csv --label reference-roi-v2
+```
+
+기존에 사용자가 허용한 탐색 환경에서는 실행에만 `--min-available-gib 0
+--min-free-gib 0`을 붙일 수 있습니다. 기본값은 그대로이며 OOM/호스트 생존을
+보장하지 않습니다. 다른 Hermes 추론이 없는 별도 터미널에서 순차 실행하세요.
+
+`refine`은 모델에 타입 Crop, 번호 Crop, **독립 공식 범례** 3장만 입력합니다. 포켓몬
+이름/그림과 사용자 정답 CSV를 입력에 넣지 않습니다. 부모와 동일한 모델·정답·완료
+조합을 확인하고 해상도별 PNG의 해시를 검증한 뒤 공통 ROI를 Crop합니다.
+업스케일하지 않습니다. 타입/번호는 새 모델 응답으로 대체하고 unknown도 그대로
+보존합니다. 카드 ID/이름을 이용한 DB 조회나 정답 기반 보정은 없습니다. 이름/HP는
+부모 응답을 재사용합니다.
+
+`--guided-card`는 현재처럼 **카드를 세워 프레임에 크게 채워 촬영한 사진**을 뜻합니다.
+기본 type ROI=(.77,.045,.94,.19), number ROI=(.055,.825,.46,.955)는 사진 정규화
+좌표이며 네 장에 공통입니다. 다른 구도/회전/위치는 `--type-roi L T R B` 및
+`--number-roi L T R B`로 명시하거나 별도 카드 검출을 구현해야 합니다. 현재 결과는
+자동 검출/자동 방향 인식 성능을 검증하지 않습니다.
+
+완료 run의 `crops/`, `crop_labels.csv/json`, `focus_regions`에서 실제 Crop·좌표·크기·
+SHA와 사람이 작성한 원본 카드 라벨을 확인할 수 있습니다. 학습 전 Crop에 해당
+기호/숫자가 실제로 보이는지 확인하고 카드 단위 holdout을 분리하세요. 평가 네
+장으로 프롬프트/ROI를 조정했으므로 점수는 개발용입니다.
+
+`focus_latency_seconds`는 새 ROI HTTP 시간, `parent_latency_seconds`는 저장된 전체
+이미지 HTTP 시간입니다. 보고서 평균은 두 값의 합이며 같은 시각에 live pipeline을
+실행한 실제 wall-clock 시간이라고 보지 않습니다. `parent_raw_*`와 `raw_*`는 각각
+전체 이미지/새 ROI 원문입니다. Langfuse에서도 이 범위를 metadata로 명시하고
+사진/라벨/응답 문자열은 로컬에 보관합니다.
+
+## 2026-10-11 Crop 실측 결과
+
+최종 `runs/20261011T073205.000775Z-tcg-reference-roi-v2-gpu2200`은 기존
+전체 이미지 v2 run의 28개 조합을 재인식했습니다. 타입은 모든 해상도 4/4,
+총 **28/28**입니다. 카드 번호는 **2MP 이상 24/24**, 0.3MP **2/4**입니다.
+0.3MP에 메가개굴닌자 `022/083→022/063`, 그란돈 `069/062→068/062`가
+남았습니다. 번호의 RR/AR는 새 JSON schema로 출력 단계에서 제외했으며,
+틀린 숫자는 사후에 정답으로 고치지 않았습니다.
+
+전체 v2의 타입 75%는 Crop+범례 v2에서 100%로 올랐습니다. 위치 지시와
+번호 형식 제한만 적용한 전체 사진 v3 smoke는 0.3MP/2MP 각 네 장에서 타입
+75%/50%, 번호 50%/100%였습니다. 그 smoke의 다른 해상도는 실행하지 않았습니다.
+이름/HP의 새 ROI 추론은 하지 않았고 부모 결과를 보존했습니다.
+
+0.3MP의 추가 Crop HTTP 평균은 약 2.12초, 과거 전체 HTTP와 합은 4.59초입니다.
+2MP는 각각 약 2.36초/8.28초입니다. ROI v1/v2와 전체 v3 smoke 총 64개 요청은
+API/파싱 오류와 호스트 재부팅 없이 완료됐습니다. 설정/클럭을 바꾸지 않았고
+이 값이 장기 안정성이나 OOM 격리를 검증한 것은 아닙니다.
+
+원본 네 장과 입력 PNG의 해시, 업스케일 없는 정확한 Crop 픽셀을 검증했습니다.
+`comparisons/full-v2-vs-crop-reference-v2-gpu2200/`에 CSV/JSON/Markdown,
+정확도/응답 시간 PNG/SVG와 정답을 표시한 사람 검토용 0.3MP Crop 그림이 있습니다.
+각 run의 `crop_labels.csv/json`은 사람이 입력한 원본 정답을 상속한 라벨입니다.
+참조 아이콘은 11종이지만 이 평가 카드에는 네 타입만 있어 나머지 타입은 미평가입니다.
+
+새 **16 experiments / 64 items / 704 scores**를 기존 Langfuse 프로젝트에
+업로드하고 모든 score ID/name/value를 read-back 검증했습니다. 최종 영수증은
+`validation/reference-roi-langfuse-receipt.json`, 개별 run은 `langfuse-receipt.json`입니다.
+이전 업로드 이력은 `langfuse-upload-request.json`에 보존했습니다.
+실행 방법은 위의 `run`/`refine` 명령을 사용하세요. 새 카드/다른 구도는 Crop 위치를
+먼저 확인해야 합니다.

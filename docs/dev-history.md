@@ -3,6 +3,36 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.52.0 — 2026-10-11 (minor: improve card symbols with labeled references)
+
+- Clarify the bottom-left collector-number prompt, preserving leading zeros
+  while excluding separate set codes/rarity. Constrain new number/type outputs
+  with a JSON schema pattern/enum; reject invalid outputs without stripping raw
+  responses or changing historical scoring.
+- Add standalone `pokemon_type_references.py` to extract eleven independent
+  labeled symbol images from the official SWSH11 rulebook. Keep the PDF, chart,
+  CSV and hashed provenance in the ignored workspace. No model downloads,
+  training or evaluation-label prompt leakage.
+- Add guided `refine`: crop type/number regions after downsampling and compare
+  against the official chart through the existing sequential API. Reuse parent
+  name/HP, preserve every stage's raw evidence, label summed historical/new HTTP
+  time honestly, and record shared ROI geometry and human-derived Crop labels.
+- Retain reference/ROI/stage metadata in private Langfuse exports and include
+  those inputs in dataset/output identity. This remains an internal manual
+  evaluation helper; no profile, service, schedule or Observatory room is added.
+  Validation: **945 tests pass**, including 18 new output, Crop, reference,
+  stage-provenance, timing and privacy checks.
+- Complete two sequential guided Crop/reference batches (28 requests each)
+  and an eight-request full-photo v3 smoke test. Final guided type scores are
+  28/28; collector numbers are 24/24 at 2MP and above, 2/4 at 0.3MP, with two
+  genuine digit errors retained. No API/parse errors or host reboot occurred.
+  Verify original hashes, exact unscaled Crop pixels and parent name/HP reuse.
+  These are four-card development results, not held-out camera guarantees.
+- Publish **16 experiments / 64 items / 704 scores** to the existing Langfuse
+  project and read back every score ID, name and value. Save separate local
+  receipts and retain prior publication history. Add comparison CSV/JSON,
+  Markdown, accuracy/latency plots and a human-review native-Crop contact sheet.
+
 ## v1.51.0 — 2026-10-11 (minor: evaluate TCG symbols with human labels)
 
 - Discover the card workspace after its move into the repository, ignore its

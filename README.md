@@ -382,12 +382,24 @@ long-term stability guarantee. The initial unlabeled run left accuracies N/A. Se
 Langfuse resolution experiments and 196 measured scores are uploaded and
 read back successfully. The relocated workspace is ignored by Git. Human
 labels now enable rescoring without inference; historical prompts and raw
-responses remain intact. The `tcg-symbol-v2` prompt explicitly classifies the
+responses remain intact. The `tcg-symbol-number-v3` prompt explicitly classifies the
 type symbol beside HP, excluding species knowledge and attack symbols.
 Reports, failure details and accuracy charts include **TCG Type Accuracy**;
 Langfuse uses `tcg_type_accuracy` and records prompt versions separately from
 the shared dataset ID. Prompt changes are separate experiments, not controlled
 fine-tuning comparisons. See the benchmark guide for relocated run commands.
+The number request specifies the card's bottom-left collector number and excludes
+rarity/set-code text; its JSON schema constrains the output format.
+`scripts/pokemon_type_references.py` downloads the official rulebook and creates
+eleven labeled symbol crops and a reference chart. Optional `refine` re-reads
+type/number crops **after resolution downsampling**, using that independent
+chart while retaining saved name/HP evidence. It requires guided upright framing
+and does not detect cards automatically. Crop labels, coordinates, hashes, raw
+stage responses and separate/summed HTTP times remain local. These improvements
+are development experiments on the four known cards, not held-out camera accuracy.
+The final Crop/reference trial scores 28/28 for type and 24/24 for numbers at
+2MP and above; two number errors remain at 0.3MP. Sixteen new Langfuse
+experiments, 64 items and 704 scores have been published and read back.
 Completed runs can be imported with `experiment_tracker.py import-pokemon` and
 published to the configured Langfuse project as seven resolution experiments.
 Missing human labels produce no accuracy scores; photos and raw responses stay

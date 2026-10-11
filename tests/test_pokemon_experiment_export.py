@@ -130,6 +130,29 @@ def test_changed_labels_define_a_new_dataset_without_exporting_labels(tmp_path):
     assert "PRIVATE" not in json.dumps(tracker.langfuse_payload(after))
 
 
+def test_roi_reference_identity_and_stage_provenance_survive_private_export(tmp_path):
+    metadata, rows = fixture_run(tmp_path)
+    metadata.update(evaluation_mode="guided_roi_with_reference", reference_sha256="first-guide",
+        reference_path="PRIVATE REFERENCE PATH", parent_prompt_sha256="parent-prompt-hash",
+        roi_policy={"type": [.7, .05, .9, .2], "number": [.05, .8, .5, .95]},
+        latency_scope="Sum of saved parent HTTP and ROI HTTP, not live wall-clock",
+        label_scope="Development set, not holdout")
+    rows[0]["parent_raw_model_response"] = "PRIVATE PARENT RESPONSE"
+    rewrite(tmp_path, "metadata.json", metadata)
+    rewrite(tmp_path, "results.json", rows)
+    before = tracker.import_pokemon(tmp_path)
+    exported = json.dumps(tracker.langfuse_payload(before))
+    assert "PRIVATE" not in exported
+    assert "latency_scope" in exported and "reference_sha256" in exported
+    metadata["reference_sha256"] = "second-guide"
+    rewrite(tmp_path, "metadata.json", metadata)
+    after = tracker.import_pokemon(tmp_path)
+    assert before[0]["dataset_digest"] != after[0]["dataset_digest"]
+    rows[0]["parent_raw_model_response"] = "CHANGED PARENT RESPONSE"
+    rewrite(tmp_path, "results.json", rows)
+    assert tracker.import_pokemon(tmp_path)[0]["records"][0]["output_sha256"] != after[0]["records"][0]["output_sha256"]
+
+
 def test_missing_labels_cannot_become_scores_from_stale_correctness_flags(tmp_path):
     _, rows = fixture_run(tmp_path)
     rows[0]["pokemon_name_correct"] = True

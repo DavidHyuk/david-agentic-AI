@@ -94,6 +94,12 @@ labels; prompt version/hash are recorded separately so prompt variants share
 photo items. Rescore a historical run before importing updated labels; its
 stored prompt remains the historical version. Fine-tuning comparisons still
 require identical prompts.
+Guided Crop/reference runs also include the reference digest and shared ROI
+geometry in dataset identity. Export the evaluation mode, development-set
+scope, parent prompt digest and latency scope so these runs cannot be mistaken
+for unchanged-input fine-tuning comparisons. Their name/HP scores reuse the
+parent responses; `wall_s` sums saved parent HTTP time and new Crop HTTP time,
+not a measured live pipeline duration. Human Crop-label files remain local.
 Photos, filenames, predictions and raw model/API responses stay local. Host
 extrema are labeled run-wide, and reported clock settings are metadata. Card
 requests lack individual wall-clock timestamps and streaming TTFT, so imported

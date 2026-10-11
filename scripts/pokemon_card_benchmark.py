@@ -35,10 +35,17 @@ RESOLUTIONS = {"0.3MP": 300_000, "2MP": 2_000_000, "3MP": 3_000_000,
 EXTENSIONS = {".jpg", ".jpeg", ".png", ".heic", ".heif"}
 DEFAULT_MODEL = "Qwen3.8-Flash-Next-UD-IQ4_XS"
 DEFAULT_URL = "http://127.0.0.1:8004/v1"
-PROMPT_VERSION = "tcg-symbol-v2"
+PROMPT_VERSION = "tcg-symbol-number-v3"
 PROMPT = ('Read only the visible Pokemon trading card in this full photograph. '
           'Extract the printed Pokemon name, HP, and collector '
-          'card number including the set total or prefix if visible. Never identify '
+          'card number. Locate the collector number near the BOTTOM-LEFT OF THE CARD, '
+          'using the card orientation rather than the photograph orientation. '
+          'Return ONLY the collector number and printed set total separated by a slash '
+          '(for example 017/101); preserve leading zeros and any letters that are part '
+          'of the collector number itself. EXCLUDE separate set codes such as sv9 or sv3a, '
+          'rarity labels such as R, RR, AR or SAR, regulation marks and other nearby text. '
+          'Read both sides of the slash independently; if either is unreadable, return '
+          '"unknown" rather than guessing a familiar card number. Never identify '
           'a field from artwork, memory, or guesses. If a field is unreadable or '
           'absent, return "unknown". Preserve the printed name language and suffixes '
           '(such as ex, GX, or V). '
@@ -55,13 +62,47 @@ PROMPT = ('Read only the visible Pokemon trading card in this full photograph. '
           'Return only a JSON object with exactly four string '
           'keys: "pokemon_name", "pokemon_type", "hp", "card_number". HP must be '
           'digits without HP.')
+CARD_NUMBER_PATTERN = r"^(unknown|[A-Za-z]*[0-9]+/[A-Za-z]*[0-9]+)$"
+TYPE_LABELS = ("Grass", "Fire", "Water", "Lightning", "Psychic", "Fighting",
+               "Darkness", "Metal", "Dragon", "Colorless", "Fairy")
 SCHEMA = {"type": "object", "properties": {k: {"type": "string"} for k in FIELDS},
           "required": list(FIELDS), "additionalProperties": False}
+SCHEMA["properties"]["card_number"]["pattern"] = CARD_NUMBER_PATTERN
+SCHEMA["properties"]["pokemon_type"]["enum"] = [*TYPE_LABELS, "unknown"]
 PARAMETERS = {"temperature": 0, "seed": 42, "top_p": 1, "top_k": 0, "min_p": 0,
               "repeat_penalty": 1, "presence_penalty": 0, "frequency_penalty": 0,
               "max_tokens": 256, "stream": False, "cache_prompt": False,
               "chat_template_kwargs": {"enable_thinking": False},
               "response_format": {"type": "json_object", "schema": SCHEMA}}
+
+FOCUS_FIELDS = ("pokemon_type", "card_number")
+FOCUS_VERSION = "tcg-reference-roi-v2"
+FOCUS_PROMPT = (
+    'You are reading two cropped regions from ONE Pokemon TCG card photograph. '
+    'IMAGE 1 is the top-right HP-adjacent TYPE SYMBOL region. IMAGE 2 is the '
+    'bottom-left COLLECTOR NUMBER region. IMAGE 3 is a labeled reference chart '
+    'of the eleven official TCG type symbols; it is a guide, NOT the target card. '
+    'For pokemon_type, compare the symbol shape in IMAGE 1 with IMAGE 3 and '
+    'return its English label. Ignore background/card color and the HP digits. '
+    'Metal has three angular lobes around a central opening; Fighting has '
+    'a clenched fist. Dragon has a curved dragon-head silhouette; Colorless '
+    'has a pointed star. Darkness has a dark orb/crescent. Match the actual '
+    'shape, not just the color. Never infer from Pokemon identity or card number. '
+    'Allowed labels: Grass, Fire, Water, Lightning, Psychic, Fighting, Darkness, '
+    'Metal, Dragon, Colorless, Fairy. Return "unknown" if the target symbol '
+    'cannot be distinguished; do not use symbols from the number region. '
+    'For card_number, read ONLY the collector number/set-total in IMAGE 2 '
+    '(format example 017/101). Preserve leading zeros and letters belonging '
+    'to the collector number. EXCLUDE separate set codes, regulation marks, '
+    'rarity labels R/RR/AR/SAR and all other text. Read both sides of the slash '
+    'independently. If either side is unreadable, return "unknown". '
+    'Return ONLY a JSON object with exactly two string keys: '
+    '"pokemon_type" and "card_number".')
+FOCUS_PARAMETERS = {**PARAMETERS, "response_format": {"type": "json_object", "schema": {
+    "type": "object", "properties": {k: SCHEMA["properties"][k] for k in FOCUS_FIELDS},
+    "required": list(FOCUS_FIELDS), "additionalProperties": False}}}
+TYPE_ROI = (.77, .045, .94, .19)
+NUMBER_ROI = (.055, .825, .46, .955)
 
 
 def write_json(path, value):
@@ -302,21 +343,28 @@ def load_saved_results(path):
     return rows, warning
 
 
-def parse_prediction(raw):
+def parse_prediction(raw, fields=FIELDS):
     result = json.loads(raw)
-    if not isinstance(result, dict) or set(result) != set(FIELDS):
-        raise ValueError("Prediction must contain exactly the four required fields")
-    if any(not isinstance(result[k], str) or not result[k].strip() for k in FIELDS):
+    if not isinstance(result, dict) or set(result) != set(fields):
+        raise ValueError("Prediction must contain exactly the required fields")
+    if any(not isinstance(result[k], str) or not result[k].strip() for k in fields):
         raise ValueError("All prediction fields must be non-empty strings or 'unknown'")
+    if "card_number" in fields and not re.fullmatch(CARD_NUMBER_PATTERN, result["card_number"]):
+        raise ValueError("Card number must contain only collector number/set total or unknown")
+    if "pokemon_type" in fields and result["pokemon_type"] not in (*TYPE_LABELS, "unknown"):
+        raise ValueError("Type must be a supported TCG label or unknown")
     return {k: v.strip() for k, v in result.items()}
 
 
-def infer(session, base_url, model, image_path, timeout):
-    url = "data:image/png;base64," + base64.b64encode(Path(image_path).read_bytes()).decode("ascii")
-    payload = {"model": model, **PARAMETERS,
-               "messages": [{"role": "user", "content": [{"type": "text", "text": PROMPT},
-                             {"type": "image_url", "image_url": {"url": url}}]}]}
-    record = {**dict.fromkeys(FIELDS, "unknown"), "api_error": False, "parse_error": False,
+def infer(session, base_url, model, image_path, timeout, *, prompt=None,
+          parameters=None, extra_images=(), fields=FIELDS):
+    content = [{"type": "text", "text": PROMPT if prompt is None else prompt}]
+    for path in (image_path, *extra_images):
+        url = "data:image/png;base64," + base64.b64encode(Path(path).read_bytes()).decode("ascii")
+        content.append({"type": "image_url", "image_url": {"url": url}})
+    payload = {"model": model, **(PARAMETERS if parameters is None else parameters),
+               "messages": [{"role": "user", "content": content}]}
+    record = {**dict.fromkeys(fields, "unknown"), "api_error": False, "parse_error": False,
               "image_error": False, "error": "", "http_status": None,
               "raw_model_response": "", "raw_api_response": "", "latency_seconds": None,
               "usage": {}, "timings": {}, "finish_reason": None}
@@ -336,7 +384,7 @@ def infer(session, base_url, model, image_path, timeout):
         record.update(raw_model_response=choice["message"]["content"],
                       finish_reason=choice.get("finish_reason"), usage=body.get("usage", {}),
                       timings=body.get("timings", {}))
-        record.update(parse_prediction(record["raw_model_response"]))
+        record.update(parse_prediction(record["raw_model_response"], fields))
         if record["finish_reason"] == "length":
             raise ValueError("Model output reached the token limit")
     except (ValueError, KeyError, IndexError, TypeError) as exc:
@@ -552,6 +600,8 @@ def generate_report(run_dir, truth_path, threshold=.95):
                "capped_by_original", *FIELDS, "latency_seconds", "api_error", "parse_error",
                "image_error", "http_status", "error", "raw_model_response", "raw_api_response",
                "image_path", "image_path_recorded", "source_sha256", "image_sha256", "finish_reason", "usage", "timings",
+               "focus_regions", "focus_latency_seconds", "parent_latency_seconds", "additional_input_pixels",
+               "parent_raw_model_response", "parent_raw_api_response",
                *("expected_" + f for f in FIELDS), *(f + "_correct" for f in FIELDS))
     write_csv(run_dir / "results.csv", scored, columns)
     summary_columns = [k for k in summary[0] if not k.endswith("_ci95")] if summary else ["resolution"]
@@ -560,12 +610,28 @@ def generate_report(run_dir, truth_path, threshold=.95):
                 or any(r[f + "_correct"] is False or normalize(f, r[f]) == "unknown" for f in FIELDS)]
     write_csv(run_dir / "failures.csv", failures, columns)
     write_json(run_dir / "failures.json", failures)
+    if metadata.get("evaluation_mode") == "guided_roi_with_reference":
+        labels = [{"filename": row["filename"], "resolution": row["resolution"],
+            "field": region["field"], "label": truth.get(row["filename"], {}).get(region["field"], ""),
+            "label_source": "Human source-card ground truth; verify crop visibility before training",
+            "label_role": "development_evaluation", **region}
+            for row in scored for region in row.get("focus_regions", [])]
+        write_json(run_dir / "crop_labels.json", labels)
+        write_csv(run_dir / "crop_labels.csv", labels, ("filename", "resolution", "field", "label",
+            "label_source", "label_role", "image_path", "image_sha256", "box", "width", "height",
+            "normalized_rectangle", "source_image_sha256", "upscaled"))
     def pct(value):
         return "N/A" if value is None else f"{value:.1%}"
     lines = ["# 포켓몬 카드 해상도 벤치마크", "", f"Run: `{run_dir.name}`; 상태: {metadata.get('status')}",
              "", metadata.get('recovery_warning', ''),
              "", "전체 사진, EXIF 회전, Lanczos, 업스케일 없음. 실제 픽셀 크기는 results.csv 참고.",
              "", f"Prompt version: {metadata.get('prompt_version', 'legacy-v1')} (실행 당시 metadata.json 보존)",
+             "", "평가 범위: " + metadata.get("label_scope", "해상도별 전체 이미지 평가"),
+             "", "지연 범위: " + metadata.get("latency_scope", "단일 전체 이미지 HTTP 요청"),
+             "", ("타입/번호는 Crop+공식 범례로 재인식했습니다. 이름/HP는 parent run 응답을 재사용했습니다. "
+                   "focus_regions에 좌표·실제 Crop 크기·해시가 있고, 원문 모델 응답은 새 ROI 요청의 응답입니다. "
+                   "parent_raw_*에는 이전 전체 이미지 응답을 보존합니다. 카드 자동 검출/회전 보정은 수행하지 않습니다."
+                   if metadata.get("evaluation_mode") == "guided_roi_with_reference" else ""),
              "", "|조건|응답/계획|Name Accuracy (n)|TCG Type Accuracy (n)|HP Accuracy (n)|Card Number Accuracy (n)|평균 초|Unknown|크기 제한|",
              "|---|---:|---:|---:|---:|---:|---:|---:|---:|"]
     for s in summary:
@@ -602,6 +668,134 @@ def new_directory(parent, label):
     path = parent / (stamp + ("-" + label if label else ""))
     path.mkdir(parents=True, exist_ok=False)
     return path
+
+
+def roi_box(size, rectangle):
+    """Convert a normalized guided-frame rectangle to pixels, never enlarging it."""
+    if len(rectangle) != 4 or any(not math.isfinite(v) for v in rectangle):
+        raise ValueError("ROI must contain four finite coordinates")
+    left, top, right, bottom = rectangle
+    if not (0 <= left < right <= 1 and 0 <= top < bottom <= 1):
+        raise ValueError("ROI must lie inside the image and have positive area")
+    width, height = size
+    return (math.floor(left * width), math.floor(top * height),
+            math.ceil(right * width), math.ceil(bottom * height))
+
+
+def crop_regions(image_path, destination, type_roi=TYPE_ROI, number_roi=NUMBER_ROI):
+    """Crop AFTER resolution downsampling; coordinates contain no card labels."""
+    original_hash = sha256(image_path)
+    regions = []
+    with Image.open(image_path) as image:
+        for field, rectangle in zip(FOCUS_FIELDS, (type_roi, number_roi)):
+            box = roi_box(image.size, rectangle)
+            path = destination / (field + ".png")
+            path.parent.mkdir(parents=True, exist_ok=True)
+            image.crop(box).save(path, format="PNG")
+            regions.append({"field": field, "normalized_rectangle": list(rectangle),
+                "box": list(box), "width": box[2] - box[0], "height": box[3] - box[1],
+                "image_path": str(path), "image_sha256": sha256(path),
+                "source_image_sha256": original_hash, "upscaled": False})
+    if sha256(image_path) != original_hash:
+        raise RuntimeError("Source image changed while cropping")
+    return regions
+
+
+def refine_benchmark(args):
+    """Re-read two ROIs with an independent symbol guide; retain prior name/HP."""
+    parent = args.parent_run.expanduser().resolve()
+    metadata = json.loads((parent / "metadata.json").read_text())
+    rows = json.loads((parent / "results.json").read_text())
+    if metadata.get("status") != "completed" or metadata.get("input_errors"):
+        raise ValueError("Refinement requires a complete parent without input errors")
+    if metadata["model"] != args.model:
+        raise ValueError("Refinement must use the same existing model as its parent")
+    expected = {(entry["filename"], resolution) for entry in metadata["inputs"]
+                for resolution in metadata["resolutions"]}
+    actual = [(row["filename"], row["resolution"]) for row in rows]
+    if len(actual) != len(set(actual)) or set(actual) != expected:
+        raise ValueError("Parent coverage is incomplete or duplicated")
+    if any(not valid_prediction(row) for row in rows):
+        raise ValueError("Refinement requires valid parent responses")
+    reference = args.type_reference.expanduser().resolve()
+    with Image.open(reference) as image:
+        if image.format != "PNG":
+            raise ValueError("Type reference must be a labeled PNG image")
+        reference_pixels = image.width * image.height
+    reference_hash = sha256(reference)
+    truth_path = args.truth or default_truth_path(args.root)
+    if read_truth(truth_path) != json.loads((parent / "ground_truth.snapshot.json").read_text()):
+        raise ValueError("Parent and refinement must use identical human labels")
+    # Verify submitted images before any request; never locate ROIs from ground truth.
+    for row in rows:
+        if sha256(Path(row["image_path"])) != row["image_sha256"]:
+            raise ValueError("Parent submitted image hash mismatch")
+    check_memory(args.min_available_gib, args.min_free_gib)
+    with requests.Session() as session:
+        session.trust_env = False
+        server = inspect_server(session, args.base_url, args.model)
+        run_dir = new_directory(args.root / "runs", args.label)
+        metadata.update(created_utc=datetime.now(timezone.utc).isoformat(), status="running",
+            finished_utc=None, parent_run=str(parent), server=server, base_url=args.base_url,
+            prompt=FOCUS_PROMPT, prompt_version=FOCUS_VERSION, parameters=FOCUS_PARAMETERS,
+            parent_prompt_sha256=hashlib.sha256(metadata["prompt"].encode()).hexdigest(),
+            evaluation_mode="guided_roi_with_reference", reference_sha256=reference_hash,
+            reference_path=str(reference), reference_pixels=reference_pixels,
+            roi_policy={"type": list(args.type_roi), "number": list(args.number_roi),
+                "scope": "Shared coordinates for upright, tightly framed cards; no automatic detection"},
+            preprocessing=metadata["preprocessing"] + "; crop AFTER resizing; no upscale; guided frame; type reference",
+            latency_scope="Sum of saved parent full-photo HTTP and new ROI HTTP; not live pipeline wall-clock",
+            label_scope="Development set: prompt/ROI adjusted on these four cards; not a holdout",
+            request_gap_seconds=args.gap, idle_guard=not args.allow_busy,
+            script_sha256=sha256(Path(__file__)),
+            memory_admission={"min_available_gib": args.min_available_gib,
+                "min_free_gib": args.min_free_gib, "max_full_psi_avg10": .1})
+        # Make the exact immutable reference part of this run's local evidence.
+        (run_dir / "type-reference.png").write_bytes(reference.read_bytes())
+        write_json(run_dir / "metadata.json", metadata)
+        write_csv(run_dir / "input_errors.csv", [], ("filename", "error"))
+        print(f"Run directory: {run_dir}", flush=True)
+        try:
+            with (run_dir / "results.jsonl").open("a", encoding="utf-8", buffering=1) as out:
+                for saved in rows:
+                    regions = crop_regions(Path(saved["image_path"]),
+                        run_dir / "crops" / saved["resolution"] / saved["filename"],
+                        args.type_roi, args.number_roi)
+                    if sha256(reference) != reference_hash:
+                        raise RuntimeError("Type reference changed during refinement")
+                    if not args.allow_busy:
+                        wait_for_idle(session, args.base_url, args.idle_timeout)
+                    memory = check_memory(args.min_available_gib, args.min_free_gib)
+                    focused = infer(session, args.base_url, args.model, regions[0]["image_path"],
+                        args.timeout, prompt=FOCUS_PROMPT, parameters=FOCUS_PARAMETERS,
+                        extra_images=(regions[1]["image_path"], run_dir / "type-reference.png"),
+                        fields=FOCUS_FIELDS)
+                    row = {**saved, **focused, "focus_regions": regions, "memory_before": memory,
+                        "parent_raw_model_response": saved["raw_model_response"],
+                        "parent_raw_api_response": saved["raw_api_response"],
+                        "parent_latency_seconds": saved["latency_seconds"],
+                        "focus_latency_seconds": focused["latency_seconds"],
+                        "latency_seconds": saved["latency_seconds"] + focused["latency_seconds"],
+                        "additional_input_pixels": reference_pixels + sum(r["width"] * r["height"] for r in regions)}
+                    if focused["parse_error"] or focused["api_error"]:
+                        row.update(dict.fromkeys(FOCUS_FIELDS, "unknown"))
+                    out.write(json.dumps(row, ensure_ascii=False) + "\n")
+                    out.flush()
+                    os.fsync(out.fileno())
+                    print(f"{row['filename']} {row['resolution']} type={row['pokemon_type']} "
+                          f"number={row['card_number']} focus={row['focus_latency_seconds']:.3f}s", flush=True)
+                    if focused["api_error"]:
+                        raise RuntimeError("Focused API failed; stopped without retry")
+                    time.sleep(args.gap)
+            metadata["status"] = "completed"
+        except (RuntimeError, ValueError, requests.RequestException, KeyboardInterrupt) as exc:
+            metadata.update(status="interrupted", stop_reason=str(exc) or "KeyboardInterrupt")
+            raise
+        finally:
+            metadata["finished_utc"] = datetime.now(timezone.utc).isoformat()
+            write_json(run_dir / "metadata.json", metadata)
+            generate_report(run_dir, truth_path, args.name_target)
+        return run_dir
 
 
 def run_benchmark(args):
@@ -770,6 +964,14 @@ def main(argv=None):
                            help="Foreground opt-in polling; evaluate when input files settle")
     watch.add_argument("--poll", type=float, default=5)
     watch.add_argument("--settle", type=float, default=10)
+    refine = sub.add_parser("refine", parents=[run], add_help=False,
+        help="Re-read type/number ROIs with an independent reference; reuse name/HP")
+    refine.add_argument("parent_run", type=Path)
+    refine.add_argument("--type-reference", type=Path, required=True)
+    refine.add_argument("--guided-card", action="store_true",
+        help="Acknowledge upright, tightly framed input requirement")
+    refine.add_argument("--type-roi", nargs=4, type=float, default=TYPE_ROI)
+    refine.add_argument("--number-roi", nargs=4, type=float, default=NUMBER_ROI)
     report = sub.add_parser("report", help="Re-score saved outputs with current labels; no inference")
     report.add_argument("run_dir", type=Path)
     report.add_argument("--truth", type=Path)
@@ -784,7 +986,7 @@ def main(argv=None):
         parser.error("--name-target must be in (0, 1]")
     if getattr(args, "limit", None) is not None and args.limit <= 0:
         parser.error("--limit must be positive")
-    if args.command in {"run", "watch"}:
+    if args.command in {"run", "watch", "refine"}:
         if not re.fullmatch(r"[A-Za-z0-9._-]+", args.label):
             parser.error("--label must use letters, digits, dots, underscores or hyphens")
         if args.timeout <= 0 or args.gap < 0 or args.idle_timeout < 0:
@@ -796,6 +998,16 @@ def main(argv=None):
         args.base_url = args.base_url.rstrip("/")
         if args.command == "watch" and (args.poll <= 0 or args.settle < 0):
             parser.error("--poll must be positive and --settle nonnegative")
+        if args.command == "refine":
+            if not args.guided_card:
+                parser.error("refine requires --guided-card: ROIs do not automatically detect a card")
+            try:
+                roi_box((1, 1), args.type_roi)
+                roi_box((1, 1), args.number_roi)
+            except ValueError as exc:
+                parser.error(str(exc))
+            if args.limit is not None or args.resolutions != list(RESOLUTIONS):
+                parser.error("refine uses the parent's exact coverage; limit/resolutions cannot override it")
     try:
         with workspace_lock(args.root):
             if args.command == "init":
@@ -810,6 +1022,8 @@ def main(argv=None):
                 print(run_benchmark(args))
             elif args.command == "watch":
                 watch_inputs(args)
+            elif args.command == "refine":
+                print(refine_benchmark(args))
             elif args.command == "report":
                 generate_report(args.run_dir.resolve(), args.truth or default_truth_path(args.root), args.name_target)
                 print(args.run_dir / "report.md")

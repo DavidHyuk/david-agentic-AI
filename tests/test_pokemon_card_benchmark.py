@@ -169,6 +169,120 @@ def test_direct_api_payload_and_raw_response_preserved(tmp_path):
     assert len(session.calls) == 1
 
 
+@pytest.mark.parametrize("box", [(0, 0, 0, 1), (-.1, 0, 1, 1), (0, 0, 1.1, 1),
+                                 (0, float("nan"), 1, 1)])
+def test_invalid_roi_cannot_silently_crop_a_different_region(box):
+    with pytest.raises(ValueError, match="ROI"):
+        b.roi_box((480, 640), box)
+
+
+def test_crops_retain_only_pixels_of_the_resized_input(tmp_path):
+    original = Image.new("RGB", (480, 640))
+    original.putpixel((400, 65), (255, 0, 0))
+    source = tmp_path / "resized.png"
+    original.save(source)
+    before = source.read_bytes()
+    regions = b.crop_regions(source, tmp_path / "crops")
+    assert source.read_bytes() == before
+    for region in regions:
+        assert not region["upscaled"]
+        crop = Image.open(region["image_path"])
+        assert crop.tobytes() == original.crop(region["box"]).tobytes()
+        assert crop.size == (region["width"], region["height"])
+        assert region["source_image_sha256"] == b.sha256(source)
+
+
+def test_focus_request_has_only_regions_and_independent_reference(tmp_path):
+    images = []
+    for name, color in [("type", "gray"), ("number", "white"), ("reference", "green")]:
+        path = tmp_path / (name + ".png")
+        Image.new("RGB", (32, 32), color).save(path)
+        images.append(path)
+    raw = json.dumps({"pokemon_type": "Metal", "card_number": "017/101"})
+    session = FakeSession(response({"choices": [{"finish_reason": "stop", "message": {"content": raw}}]}))
+    result = b.infer(session, b.DEFAULT_URL, b.DEFAULT_MODEL, images[0], 30,
+        prompt=b.FOCUS_PROMPT, parameters=b.FOCUS_PARAMETERS, extra_images=images[1:], fields=b.FOCUS_FIELDS)
+    assert result["pokemon_type"] == "Metal" and result["card_number"] == "017/101"
+    payload = session.calls[0][1]["json"]
+    assert len(payload["messages"][0]["content"]) == 4
+    assert payload["response_format"]["schema"]["required"] == list(b.FOCUS_FIELDS)
+    assert "pokemon_name" not in result
+    assert payload["temperature"] == 0 and len(session.calls) == 1
+
+
+def test_focus_rejects_full_photo_schema_instead_of_guessing_fields(tmp_path):
+    path = tmp_path / "type.png"
+    Image.new("RGB", (32, 32)).save(path)
+    raw = json.dumps({k: prediction()[k] for k in b.FIELDS})
+    session = FakeSession(response({"choices": [{"finish_reason": "stop", "message": {"content": raw}}]}))
+    result = b.infer(session, b.DEFAULT_URL, b.DEFAULT_MODEL, path, 30,
+        prompt=b.FOCUS_PROMPT, parameters=b.FOCUS_PARAMETERS, fields=b.FOCUS_FIELDS)
+    assert result["parse_error"] and result["raw_model_response"] == raw
+
+
+@pytest.mark.parametrize("number", ["069/100 RR", "sv9 069/100", "69", "069/100RR"])
+def test_number_output_contract_rejects_extra_text_without_stripping_it(number):
+    raw = json.dumps({"pokemon_type": "Metal", "card_number": number})
+    with pytest.raises(ValueError, match="Card number"):
+        b.parse_prediction(raw, b.FOCUS_FIELDS)
+
+
+@pytest.mark.parametrize("number", ["069/100", "TG05/TG30", "unknown"])
+def test_collector_number_preserves_prefixes_zeros_and_unknown(number):
+    raw = json.dumps({"pokemon_type": "Metal", "card_number": number})
+    assert b.parse_prediction(raw, b.FOCUS_FIELDS)["card_number"] == number
+
+
+@pytest.mark.parametrize("focused_type", ["Metal", "unknown"])
+def test_refinement_preserves_parent_evidence_and_reports_honest_latency(tmp_path, monkeypatch, focused_type):
+    from types import SimpleNamespace
+    parent = tmp_path / "runs" / "parent"
+    parent.mkdir(parents=True)
+    image = parent / "image.png"
+    Image.new("RGB", (480, 640)).save(image)
+    truth_path = tmp_path / "ground_truth.csv"
+    b.write_csv(truth_path, [{"filename": "card.jpg", "pokemon_type": "Metal"}], ("filename", *b.FIELDS))
+    saved = prediction(pokemon_type="Fighting", image_path=str(image), image_sha256=b.sha256(image),
+        source_sha256="source", raw_model_response="historical response", raw_api_response="historical API")
+    b.write_json(parent / "results.json", [saved])
+    b.write_json(parent / "ground_truth.snapshot.json", b.read_truth(truth_path))
+    b.write_json(parent / "metadata.json", {"status": "completed", "model": b.DEFAULT_MODEL,
+        "inputs": [{"filename": "card.jpg"}], "input_errors": [], "resolutions": ["2MP"],
+        "prompt": "historical prompt", "preprocessing": "full photo", "parameters": b.PARAMETERS})
+    original_metadata = (parent / "metadata.json").read_bytes()
+    reference = tmp_path / "reference.png"
+    Image.new("RGB", (32, 32)).save(reference)
+    class Session:
+        trust_env = True
+        def __enter__(self): return self
+        def __exit__(self, *args): pass
+    monkeypatch.setattr(b.requests, "Session", Session)
+    monkeypatch.setattr(b, "check_memory", lambda *args: {})
+    monkeypatch.setattr(b, "inspect_server", lambda *args: {})
+    monkeypatch.setattr(b, "wait_for_idle", lambda *args: None)
+    monkeypatch.setattr(b, "make_plots", lambda *args: None)
+    focused = {"pokemon_type": focused_type, "card_number": "017/101", "latency_seconds": 1.5,
+        "raw_model_response": "focus response", "raw_api_response": "focus API", "api_error": False,
+        "parse_error": False, "image_error": False, "http_status": 200}
+    monkeypatch.setattr(b, "infer", lambda *args, **kwargs: focused)
+    args = SimpleNamespace(root=tmp_path, parent_run=parent, type_reference=reference,
+        model=b.DEFAULT_MODEL, base_url=b.DEFAULT_URL, truth=truth_path, label="focus",
+        type_roi=b.TYPE_ROI, number_roi=b.NUMBER_ROI, min_available_gib=0, min_free_gib=0,
+        allow_busy=False, idle_timeout=1, timeout=30, gap=0, name_target=.95)
+    result = b.refine_benchmark(args)
+    row = json.loads((result / "results.json").read_text())[0]
+    assert row["pokemon_type"] == focused_type
+    assert row["pokemon_name"] == saved["pokemon_name"] and row["hp"] == saved["hp"]
+    assert row["latency_seconds"] == 4 and row["focus_latency_seconds"] == 1.5
+    assert row["parent_raw_model_response"] == "historical response"
+    assert row["raw_model_response"] == "focus response"
+    assert (parent / "metadata.json").read_bytes() == original_metadata
+    assert "not live pipeline wall-clock" in (result / "report.md").read_text()
+    labels = json.loads((result / "crop_labels.json").read_text())
+    assert labels[0]["label"] == "Metal" and labels[1]["label"] == ""
+    assert all(label["label_role"] == "development_evaluation" for label in labels)
+
+
 @pytest.mark.parametrize("failure", ["http", "timeout", "parse"])
 def test_api_failures_recorded_without_retry(tmp_path, failure):
     image = tmp_path / "image.png"
