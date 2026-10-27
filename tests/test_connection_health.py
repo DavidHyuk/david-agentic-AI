@@ -90,15 +90,102 @@ def test_kakao_checks_collector_and_public_probe_without_secret_arguments(tmp_pa
     assert len(calls) == (2 if unit_active else 1)
 
 
-def test_public_network_failure_requires_two_consecutive_checks():
+def test_public_network_failure_requires_fifteen_minutes_of_consecutive_checks():
     state = {}
     failed = [observed('kakao', reason='public_unreachable')]
-    assert health.update_incidents(state, failed, NOW) == []
-    assert health.update_incidents(state, [observed('kakao', 'unknown')], NOW) == []
-    assert health.update_incidents(state, failed, NOW) == []
-    assert len(health.update_incidents(state, failed, NOW)) == 1
-    health.update_incidents(state, failed, NOW)
+    for minute in (0, 5, 10):
+        assert health.update_incidents(state, failed, NOW + timedelta(minutes=minute)) == []
+    assert len(health.update_incidents(state, failed, NOW + timedelta(minutes=15))) == 1
+    health.update_incidents(state, failed, NOW + timedelta(minutes=20))
     assert len(state['events']) == 1
+
+
+def kakao_tick(state, minute, status='failed', reason='public_unreachable'):
+    health.update_incidents(state, [observed('kakao', status, reason)], NOW + timedelta(minutes=minute))
+
+
+def test_kakao_repeated_checks_cannot_replace_elapsed_time():
+    state = {}
+    for _ in range(10):
+        kakao_tick(state, 0)
+    assert state['events'] == []
+
+
+@pytest.mark.parametrize('interruption', ['healthy', 'unknown', 'gap'])
+def test_kakao_failure_window_resets_after_success_unknown_or_missing_checks(interruption):
+    state = {}
+    for minute in (0, 5, 10):
+        kakao_tick(state, minute)
+    if interruption != 'gap':
+        kakao_tick(state, 15, interruption)
+    for minute in (30, 35, 40):
+        kakao_tick(state, minute)
+    assert state['events'] == []
+    kakao_tick(state, 45)
+    assert [event['kind'] for event in state['events']] == ['failed']
+
+
+def test_kakao_recovery_needs_ten_minutes_and_failure_keeps_same_incident():
+    state = {}
+    for minute in (0, 5, 10, 15):
+        kakao_tick(state, minute)
+    kakao_tick(state, 20, 'healthy')
+    kakao_tick(state, 25, 'healthy')
+    assert state['services']['kakao']['incident_open']
+    kakao_tick(state, 30)
+    for minute in (35, 40):
+        kakao_tick(state, minute, 'healthy')
+    assert len(state['events']) == 1
+    kakao_tick(state, 45, 'healthy')
+    assert not state['services']['kakao']['incident_open']
+    assert [event['kind'] for event in state['events']] == ['failed', 'recovered']
+
+
+def test_kakao_legacy_open_incident_does_not_recover_on_one_success():
+    state = {'services': {'kakao': {'incident_open': True, 'failure_count': 2,
+                                  'failed_at': (NOW - timedelta(hours=1)).isoformat()}}}
+    for minute in (0, 5):
+        kakao_tick(state, minute, 'healthy')
+    assert state['events'] == []
+    kakao_tick(state, 10, 'healthy')
+    assert [event['kind'] for event in state['events']] == ['recovered']
+
+
+def test_kakao_flapping_is_rate_limited_but_sustained_failure_after_cooldown_alerts():
+    state = {}
+    for minute in (0, 5, 10, 15):
+        kakao_tick(state, minute)
+    for minute in (20, 25, 30):
+        kakao_tick(state, minute, 'healthy')
+    for minute in range(35, 375, 5):
+        kakao_tick(state, minute)
+    assert len(state['events']) == 2
+    assert not state['services']['kakao']['incident_open']
+    kakao_tick(state, 375)
+    assert [event['kind'] for event in state['events']] == ['failed', 'recovered', 'failed']
+
+
+def test_kakao_local_collector_failure_bypasses_network_cooldown():
+    state = {'services': {'kakao': {'incident_open': False, 'failure_count': 0,
+                                  'failed_at': (NOW - timedelta(minutes=30)).isoformat()}}}
+    kakao_tick(state, 0, reason='collector_down')
+    assert state['events'][0]['reason'] == 'collector_down'
+    kakao_tick(state, 5, reason='collector_down')
+    assert len(state['events']) == 1
+
+
+@pytest.mark.parametrize('interruption', ['unknown', 'gap'])
+def test_kakao_recovery_window_requires_fresh_verified_evidence(interruption):
+    state = {}
+    kakao_tick(state, 0, reason='collector_down')
+    kakao_tick(state, 5, 'healthy')
+    if interruption == 'unknown':
+        kakao_tick(state, 10, 'unknown')
+    for minute in (25, 30):
+        kakao_tick(state, minute, 'healthy')
+    assert len(state['events']) == 1
+    kakao_tick(state, 35, 'healthy')
+    assert state['events'][-1]['kind'] == 'recovered'
 
 
 def test_unknown_state_never_claims_recovery():

@@ -1561,10 +1561,17 @@ Their evidence timestamps decide the current state, so an older failed cron
 result cannot reopen an incident after a newer verified sync. Existing duplicate
 incident keys are merged while retaining queued delivery and historical events.
 Unconfigured or unverified services do not produce a false recovery. Kakao
-public-network failures require two consecutive checks (about 5–10 minutes);
-other recorded failures normally notify within five minutes.
-The Kakao probe sends an empty body and verifies public ingress without saving
-feedback; it cannot verify Open Builder deployment or real message delivery.
+public-network failures require at least four consecutive checks spanning 15
+minutes. Recovery requires at least three successful checks spanning 10 minutes;
+another public-network outage notice waits six hours after the previous outage
+notice. A continuing outage still alerts when that interval expires. Unknown
+results or gaps longer than 10 minutes reset the confirmation window. A stopped
+local collector still alerts immediately; other recorded failures normally notify
+within five minutes.
+The Kakao probe checks the public Funnel IPs in parallel, so DNS ordering or a
+single slow ingress does not mark the whole service unavailable. It sends an
+empty body without saving feedback and cannot verify Open Builder deployment or
+real message delivery. Partial ingress failures can still delay real messages.
 
 **Hermes HQ → 외부 연결 상태와 알림** displays current observations, ten recent
 incident/recovery events and pending delivery. Safe monitor state lives in

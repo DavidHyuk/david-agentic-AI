@@ -5,6 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from urllib.error import HTTPError, URLError
 import io
+from threading import Event
 from urllib.parse import urlsplit
 
 import pytest
@@ -179,6 +180,55 @@ def test_funnel_public_probe_handles_dns_failure_without_secret(monkeypatch):
     def failure(host): raise URLError('DNS unavailable')
     monkeypatch.setattr(tunnel, 'public_addresses', failure)
     assert not tunnel.endpoint_ready('https://spark.tail-example.ts.net:10000/kakao/private-path')
+
+
+@pytest.mark.parametrize('addresses', [
+    ['8.8.8.8', '1.1.1.1'], ['1.1.1.1', '8.8.8.8'],
+])
+def test_funnel_public_probe_accepts_reachable_ip_in_either_dns_order(monkeypatch, addresses):
+    monkeypatch.setattr(tunnel, 'public_addresses', lambda host: addresses)
+    calls = []
+    def probe(parsed, address):
+        calls.append(address)
+        return address == '1.1.1.1'
+    monkeypatch.setattr(tunnel, 'funnel_address_ready', probe)
+    assert tunnel.endpoint_ready('https://spark.tail-example.ts.net:10000/kakao/private-path')
+    assert sorted(calls) == sorted(addresses)
+
+
+@pytest.mark.parametrize('addresses', [[], ['8.8.8.8', '1.1.1.1']])
+def test_funnel_public_probe_fails_when_no_ingress_responds(monkeypatch, addresses):
+    monkeypatch.setattr(tunnel, 'public_addresses', lambda host: addresses)
+    monkeypatch.setattr(tunnel, 'funnel_address_ready', lambda parsed, address: False)
+    assert not tunnel.endpoint_ready('https://spark.tail-example.ts.net:10000/kakao/private-path')
+
+
+def test_funnel_stalled_tls_closes_socket_and_tries_other_ingress(monkeypatch):
+    closed = []
+    other_ingress_started = Event()
+    class Socket:
+        def __init__(self, address): self.address = address
+        def close(self): closed.append(self.address)
+    class Connection:
+        def __init__(self, *args, **kwargs): self.sock = None
+        def request(self, method, path, body, headers): assert body == b'{}'
+        def getresponse(self):
+            return SimpleNamespace(status=400, read=lambda limit: b'{"version":"2.0","template":{"outputs":[{}]}}')
+        def close(self):
+            if self.sock: self.sock.close()
+    def wrap(raw, server_hostname):
+        assert server_hostname == 'spark.tail-example.ts.net'
+        if raw.address == '8.8.8.8':
+            assert other_ingress_started.wait(timeout=1), 'The other ingress must be checked concurrently.'
+            raise TimeoutError('private TLS error')
+        other_ingress_started.set()
+        return raw
+    monkeypatch.setattr(tunnel, 'public_addresses', lambda host: ['8.8.8.8', '1.1.1.1'])
+    monkeypatch.setattr(tunnel.socket, 'create_connection', lambda address, timeout: Socket(address[0]))
+    monkeypatch.setattr(tunnel.ssl, 'create_default_context', lambda: SimpleNamespace(wrap_socket=wrap))
+    monkeypatch.setattr(tunnel.http.client, 'HTTPSConnection', Connection)
+    assert tunnel.endpoint_ready('https://spark.tail-example.ts.net:10000/kakao/private-path')
+    assert sorted(closed) == ['1.1.1.1', '8.8.8.8']
 
 
 def test_public_dns_rechecks_bypass_cached_http_nxdomain(monkeypatch):

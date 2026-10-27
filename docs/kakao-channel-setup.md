@@ -98,7 +98,15 @@ access alone is not accepted as proof that Kakao can reach the endpoint.
 Fresh DNS queries also avoid retaining an HTTP-cached NXDOMAIN response after
 the new record appears. Both public Funnel ingress IPs on the current DGX were
 verified with valid Kakao responses in approximately 160 ms; the Quick Tunnel
-is now disabled. After the Kakao URL update and deployment, two real messages
+is now disabled. This was installation-time evidence: on October 26, one public
+ingress exceeded the four-second TLS probe limit while the other responded.
+The verifier now checks public ingress IPs in parallel and accepts a valid
+response from either, independent of DNS order. The HQ watchdog requires 15
+minutes of consecutive failures and 10 minutes of consecutive successes before
+outage/recovery notices, with a six-hour interval between public-network outage
+notices; a stopped local collector still alerts immediately. This reduces noisy
+alerts without proving that every ingress or real message is healthy.
+After the Kakao URL update and deployment, two real messages
 at 23:06:36 and 23:06:53 PDT on October 7 returned HTTP 200 and were saved as
 separate lesson files, confirming the deployed Kakao-to-collector route.
 Test the fixed URL in Open Builder and from the real Kakao app before declaring

@@ -3,6 +3,27 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.53.1 — 2026-10-26 (patch: stop repeated Kakao connection notices)
+
+- Reproduce asymmetric Funnel ingress: one public IP responds in 1.4–2.1s,
+  while the other exceeds the 4s TLS probe timeout and connects in about 9.9s
+  with a longer timeout. Tailscale records ingress packet drops/TLS failures;
+  checking only the first DNS address alternates failure and recovery notices.
+- Probe public ingress IPs in parallel with hostname TLS and the same empty,
+  non-ingesting Kakao body. One responding ingress establishes reachability;
+  this does not prove all ingress paths or real Kakao delivery are healthy.
+- Require four consecutive public-network failures spanning 15 minutes and
+  three recovery checks spanning 10 minutes. Keep flapping inside the same
+  incident and limit new public-network outage notices to one per six hours.
+  Persistent failures become eligible after that interval; local collector
+  outages still alert immediately. Unknown results and long inspection gaps
+  reset confirmation windows. Preserve historical events and delivery retries.
+- Reuse the existing HQ monitor, state, Telegram bot, profile and Observatory
+  room; this is an internal monitoring correction with no new workflow or room.
+- Validation: **991 tests pass**, including 15 additional regression cases for
+  public-IP ordering, concurrent fallback and socket cleanup, sustained outage
+  and recovery, missing/unknown evidence, cooldown expiry and local failures.
+
 ## v1.53.0 — 2026-10-11 (minor: add labeled camera stress experiments)
 
 - Preserve historical full-photo/Crop runs and the human four-card label file.

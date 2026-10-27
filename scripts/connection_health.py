@@ -37,6 +37,10 @@ REASONS = {
     'sync_stalled': '자료 갱신이 2시간 이상 실행 중인 상태로 남아 있습니다.',
 }
 SERVICE_ALIASES = {'job:david:chatgpt-project-sync': 'chatgpt_sync'}
+KAKAO_FAILURE_SECONDS = 15 * 60
+KAKAO_RECOVERY_SECONDS = 10 * 60
+KAKAO_NOTICE_COOLDOWN_SECONDS = 6 * 60 * 60
+KAKAO_CHECK_GAP_SECONDS = 10 * 60
 
 
 def read_json(path: Path) -> dict:
@@ -232,6 +236,43 @@ def migrate_incident_aliases(state: dict) -> None:
     state['pending'] = pending
 
 
+def kakao_transition_ready(record: dict, observed: dict, now: datetime) -> bool:
+    """Keep flapping public probes in one incident until recovery is sustained."""
+    timestamp = now.isoformat(timespec='seconds')
+    previous_check = stamp(record.get('checked_at'))
+    if not previous_check or now.timestamp() - previous_check > KAKAO_CHECK_GAP_SECONDS:
+        record.pop('failure_started_at', None)
+        record.pop('recovery_started_at', None)
+        record['failure_count'] = 0
+        record['recovery_count'] = 0
+    status = observed['status']
+    if status == 'unknown':
+        record.pop('failure_started_at', None)
+        record.pop('recovery_started_at', None)
+        record['failure_count'] = 0
+        record['recovery_count'] = 0
+        return False
+    if status == 'healthy':
+        record.pop('failure_started_at', None)
+        record['failure_count'] = 0
+        record['recovery_count'] = record.get('recovery_count', 0) + 1
+        record.setdefault('recovery_started_at', timestamp)
+        return (record.get('incident_open', False) and record['recovery_count'] >= 3
+                and now.timestamp() - stamp(record['recovery_started_at']) >= KAKAO_RECOVERY_SECONDS)
+    record.pop('recovery_started_at', None)
+    record['recovery_count'] = 0
+    record.setdefault('failure_started_at', timestamp)
+    record['failure_count'] = record.get('failure_count', 0) + 1
+    if record.get('incident_open'):
+        return False
+    if observed['reason'] not in ('public_unreachable', 'probe_failed'):
+        return True  # A stopped local collector still warrants immediate action.
+    last_notice = stamp(record.get('failed_at'))
+    return (record['failure_count'] >= 4
+            and now.timestamp() - stamp(record['failure_started_at']) >= KAKAO_FAILURE_SECONDS
+            and (not last_notice or now.timestamp() - last_notice >= KAKAO_NOTICE_COOLDOWN_SECONDS))
+
+
 def update_incidents(state: dict, observations: list, now: datetime) -> list:
     """Queue one notice per incident/recovery and retain failed deliveries."""
     state.setdefault('services', {})
@@ -242,23 +283,31 @@ def update_incidents(state: dict, observations: list, now: datetime) -> list:
     for observed in observations:
         service = observed['service']
         record = state['services'].setdefault(service, {'incident_open': False, 'failure_count': 0})
-        record.update(observed, checked_at=timestamp)
-        if observed['status'] == 'unknown':
-            record['failure_count'] = 0
-            continue  # Missing/unverified evidence cannot close an incident.
-        if observed['status'] == 'failed':
-            record['failure_count'] += 1
-            threshold = 2 if observed['reason'] in ('public_unreachable', 'probe_failed') else 1
-            if record['incident_open'] or record['failure_count'] < threshold:
+        if service == 'kakao':
+            ready = kakao_transition_ready(record, observed, now)
+            record.update(observed, checked_at=timestamp)
+            if not ready:
                 continue
-            record.update(incident_open=True, failed_at=timestamp)
-            kind = 'failed'
+            kind = 'failed' if observed['status'] == 'failed' else 'recovered'
+            record.update(incident_open=kind == 'failed')
+            record['failed_at' if kind == 'failed' else 'recovered_at'] = timestamp
         else:
-            record['failure_count'] = 0
-            if not record['incident_open']:
-                continue
-            record.update(incident_open=False, recovered_at=timestamp)
-            kind = 'recovered'
+            record.update(observed, checked_at=timestamp)
+            if observed['status'] == 'unknown':
+                record['failure_count'] = 0
+                continue  # Missing/unverified evidence cannot close an incident.
+            if observed['status'] == 'failed':
+                record['failure_count'] += 1
+                if record['incident_open']:
+                    continue
+                record.update(incident_open=True, failed_at=timestamp)
+                kind = 'failed'
+            else:
+                record['failure_count'] = 0
+                if not record['incident_open']:
+                    continue
+                record.update(incident_open=False, recovered_at=timestamp)
+                kind = 'recovered'
         event = {'service': service, 'label': observed.get('label') or SERVICES[service][0],
                  'kind': kind, 'reason': observed['reason'], 'time': timestamp}
         state['events'].append(event)

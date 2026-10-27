@@ -9,6 +9,7 @@ This updates the local URL file, not Kakao's deployed skill configuration.
 from __future__ import annotations
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 import http.client
 import ipaddress
 import json
@@ -78,15 +79,25 @@ def public_addresses(host: str) -> list[str]:
 
 
 def funnel_endpoint_ready(parsed) -> bool:
-    """Verify public Funnel ingress rather than the same machine's private IP."""
+    """Accept a responding public ingress, independent of DNS address order."""
+    try:
+        addresses = list(dict.fromkeys(public_addresses(parsed.hostname)))
+    except (OSError, ValueError, AttributeError, KeyError, http.client.HTTPException):
+        return False
+    if not addresses:
+        return False
+    # A slow ingress must not delay starting the other public address's check.
+    with ThreadPoolExecutor(max_workers=min(4, len(addresses))) as executor:
+        return any(list(executor.map(lambda address: funnel_address_ready(parsed, address), addresses)))
+
+
+def funnel_address_ready(parsed, address: str) -> bool:
+    """Check one public IP with hostname TLS and a non-ingesting skill body."""
     connection = None
     try:
-        addresses = public_addresses(parsed.hostname)
-        if not addresses:
-            return False
         port = parsed.port or 443
         connection = http.client.HTTPSConnection(parsed.hostname, port, timeout=4)
-        raw = socket.create_connection((addresses[0], port), timeout=4)
+        raw = socket.create_connection((address, port), timeout=4)
         try:
             connection.sock = ssl.create_default_context().wrap_socket(raw, server_hostname=parsed.hostname)
         except Exception:
