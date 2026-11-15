@@ -189,6 +189,9 @@ def test_expired_browser_cookie_does_not_abort_a_fresh_form_login(monkeypatch):
             self.selector, self.first = selector, self
 
         def count(self):
+            if 'submit' in self.selector:
+                # Current LeetCode uses type="button" with id="signin_btn".
+                return int('#signin_btn' in self.selector)
             return 1
 
         def fill(self, value, **kwargs):

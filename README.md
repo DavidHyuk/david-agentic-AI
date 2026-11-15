@@ -1204,6 +1204,13 @@ credentials and perform all login clicks themselves. The helper attaches only
 on loopback to read the issued LeetCode cookies and verifies the linked account.
 It does not alter the user agent or browser automation properties. This changes
 the launch mode but does not guarantee that Google will accept every account.
+The temporary DGX Chromium uses `--password-store=basic` inside its disposable
+profile so a locked or unavailable desktop keyring cannot block cookie access
+and browser attachment. Without this setting, attachment timed out after 15
+seconds and closed the noVNC desktop. The temporary profile is still deleted
+afterward; reopen the login window after a failed or expired attempt.
+Password login recognizes the current LeetCode **Sign In** button as well as
+older submit controls.
 
 If Google still rejects the remote window, expand **Google 로그인 거부 시 · PC
 브라우저 세션 연결** in Jun. Sign in to LeetCode using your normal Windows/Mac

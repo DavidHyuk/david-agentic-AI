@@ -1039,7 +1039,15 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   로그인 Chromium은 자동화 launcher 대신 일반 native process로 실행하고,
   loopback CDP로 발급된 LeetCode cookie만 읽습니다. 로그인 조작은 사용자에게
   맡기며 User-Agent나 automation property를 바꾸지 않습니다. Google의 승인 여부는
-  별개입니다. Google이 거부하면 PC의 평소 Chrome에서 로그인한 LeetCode의
+  별개입니다. 임시 수동 로그인 Chromium에는 `--password-store=basic`을 적용하여
+  DGX desktop keyring 대기로 쿠키 조회와 Playwright attach가 막히고 15초 후
+  noVNC까지 종료되는 문제를 해결합니다. 설정은 삭제되는 임시 profile에만 적용하며
+  기존 Playwright 쿠키 확인·동일 계정 검증·종료 처리를 유지합니다. 로그인 창이
+  실패하거나 만료되면 Jun에서 다시 열어야 합니다. 현재 LeetCode의 `signin_btn`
+  버튼과 이전 submit 버튼을 모두 인식합니다. 실제 noVNC 화면 연결과 20초 이상
+  유지, 설정된 비밀번호의 동일 계정 로그인 및 제출 코드 동기화 `ok`를 확인했습니다.
+  Google이 거부하면 PC의 평소
+  Chrome에서 로그인한 LeetCode의
   LEETCODE_SESSION을 Jun의 마스킹 입력으로 연결할 수 있습니다. 값은 stdin으로
   검증 CLI에 전달하고 브라우저 저장소나 명령 인자에 남기지 않습니다. 입력은
   제출 즉시 비우며 같은 계정 검증 후에만 저장하고 background 코드·요약 갱신을

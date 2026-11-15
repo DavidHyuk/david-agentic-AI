@@ -10,6 +10,13 @@ import pytest
 import leetcode_sync as ls
 
 
+@pytest.fixture(autouse=True)
+def isolated_login_configuration(tmp_path, monkeypatch):
+    monkeypatch.setattr(ls, 'default_home', lambda: tmp_path)
+    monkeypatch.delenv('LEETCODE_LOGIN', raising=False)
+    monkeypatch.delenv('LEETCODE_PASSWORD', raising=False)
+
+
 def connection():
     return {'version': 1, 'username': 'david_choi', 'session': 'a' * 32,
             'csrf_token': '', 'linked_at': '2026-09-14T12:00:00+00:00'}
@@ -477,6 +484,7 @@ def test_native_browser_keeps_manual_ui_and_cleans_up_on_reader_failure(tmp_path
     else:
         read()
     assert cleanup == ['disconnect', 'terminate', 'wait']
+    assert '--password-store=basic' in calls[0]
     assert '--remote-debugging-address=127.0.0.1' in calls[0]
     assert any(a.startswith('--user-data-dir=') for a in calls[0])
     assert calls[0][-1] == 'https://leetcode.com/accounts/login/'

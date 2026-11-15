@@ -515,7 +515,7 @@ def login_in_context(context, username: str, login: str, password: str) -> dict:
             raise LeetCodeSyncError(reason or 'LeetCode login form was not available; complete login manually.')
         login_field.fill(login, timeout=10_000)
         password_field.fill(password, timeout=10_000)
-        submit = page.locator('button[type="submit"], input[type="submit"]').first
+        submit = page.locator('#signin_btn, button[type="submit"], input[type="submit"]').first
         if submit.count() != 1:
             raise LeetCodeSyncError('LeetCode login submit control was not found; complete login manually.')
         submit.click(timeout=10_000)
@@ -596,6 +596,7 @@ def manual_browser_command(executable, profile, port):
     """Open the regular browser UI; login clicks and credentials belong to the user."""
     return [str(executable), '--no-first-run', '--no-default-browser-check',
             '--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu',
+            '--password-store=basic',
             '--user-data-dir=' + str(profile), '--remote-debugging-address=127.0.0.1',
             '--remote-debugging-port=' + str(port), '--window-size=1366,900',
             '--window-position=0,0', 'https://leetcode.com/accounts/login/']

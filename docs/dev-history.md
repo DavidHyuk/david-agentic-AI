@@ -3,6 +3,27 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.54.1 — 2026-11-15 (patch: keep the manual LeetCode desktop connected)
+
+- Reproduce noVNC disconnection: the native Chromium window starts, but cookie
+  access and Playwright attachment block, then the 15-second attach timeout
+  tears down the desktop. Use `--password-store=basic` only in the disposable
+  manual-login profile to avoid waiting on the DGX desktop keyring. Verify that
+  the original Playwright attachment and cookie reads now complete.
+- Keep the existing manual browser, cookie reader, same-account verification,
+  cleanup and bounded login service. No new dependency, agent, profile, bot,
+  schedule or Observatory room is needed for this connection repair.
+- Isolate sync tests from machine-local password configuration, so testing an
+  expired fixture session cannot trigger a real credential recovery attempt.
+- Recognize the current LeetCode `signin_btn` control (`type="button"`) as well
+  as older submit buttons. Validate with the real login form: the configured
+  password authenticates the linked account and source sync returns `ok` with
+  14 saved Accepted solutions. The existing helper closes the desktop after
+  successful verification and completes source/review refresh.
+- Validation: **1,015 tests pass**. Real noVNC connects over the dashboard's
+  WebSocket proxy and keeps its visible canvas for over 20 seconds; original
+  Playwright attachment and cookie reads complete without their former timeout.
+
 ## v1.54.0 — 2026-11-15 (minor: add opt-in LeetCode credential recovery)
 
 - Let full source sync recover a rejected session using locally configured
