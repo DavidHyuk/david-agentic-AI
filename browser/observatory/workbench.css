@@ -690,7 +690,7 @@
   }
 }
 
-/* Give the conversation its own full-height column below a shared room heading. */
+/* Use the full workspace width until the user opens the conversation column. */
 .bench-heading { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 20px; padding: 16px 22px; border: 1px solid var(--line); border-radius: 12px; background: linear-gradient(100deg, var(--accent-soft), var(--bg)); }
 .bench-heading-copy { min-width: 0; }
 .bench-heading h1 { font-size: 27px; margin: 0; }
@@ -702,7 +702,8 @@
 #bench-summary .bench-progress { margin: 10px 0 0; gap: 8px 20px; }
 #bench-summary .bench-progress b { font-size: 20px; }
 #bench-summary .bench-progress span { font-size: 9px; }
-.bench-workspace { display: grid; grid-template-columns: minmax(360px, 1.12fr) minmax(0, 1.28fr); gap: 22px; align-items: start; }
+.bench-workspace { display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; align-items: start; }
+.bench-chat-open .bench-workspace { grid-template-columns: minmax(360px, 1.12fr) minmax(0, 1.28fr); }
 #bench-character { position: sticky; top: 20px; min-width: 0; }
 #bench-content { min-width: 0; }
 .bench-workspace .workbench-grid { grid-template-columns: minmax(0, 1fr); }
@@ -717,7 +718,7 @@
 @media (max-width: 1000px) {
   .bench-heading { grid-template-columns: auto minmax(0, 1fr); }
   #bench-summary { grid-column: 2; }
-  .bench-workspace { grid-template-columns: minmax(0, 1fr); }
+  .bench-chat-open .bench-workspace { grid-template-columns: minmax(0, 1fr); }
   #bench-character { position: static; }
   #bench-character .office-conversation { height: clamp(480px, calc(100svh - 180px), 720px); }
 }

@@ -3,6 +3,19 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.53.2 — 2026-11-15 (patch: hide workbench LLM chat until requested)
+
+- Start every character workbench with its left LLM conversation hidden so
+  assignments, progress and notes use the full workspace width.
+- Add **LLM 채팅 열기 / LLM 채팅 숨기기** in the shared heading, with an accessible
+  expanded state and composer focus when opened. Folding preserves chat history
+  and drafts; re-entering a room resets visibility to hidden. Open chat retains
+  the existing desktop columns and mobile vertical layout.
+- Reuse existing rooms, sessions and profiles; no routing or service changes.
+- Validation: **992 tests pass**. Live Chromium checks cover all seven rooms at
+  1440px, 820px and 390px: full-width entry, chat toggling, responsive layout,
+  focus and draft preservation, with no browser errors or message submissions.
+
 ## v1.53.1 — 2026-10-26 (patch: stop repeated Kakao connection notices)
 
 - Reproduce asymmetric Funnel ingress: one public IP responds in 1.4–2.1s,

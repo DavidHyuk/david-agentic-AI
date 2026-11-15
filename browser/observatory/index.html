@@ -9,8 +9,8 @@
     <title>Hermes HQ · Agent Observatory</title>
     <link rel="stylesheet" href="style.css?v=1.48.2" />
     <script src="app.js?v=1.46.0" defer></script>
-    <script src="workbench.js?v=1.46.1" defer></script>
-    <link rel="stylesheet" href="workbench.css?v=1.48.2" />
+    <script src="workbench.js?v=1.53.2" defer></script>
+    <link rel="stylesheet" href="workbench.css?v=1.53.2" />
     <link rel="stylesheet" href="office.css?v=1.48.2" />
     <script src="office.js" defer></script>
   </head>
@@ -131,7 +131,8 @@
               <h1 id="bench-title">작업실</h1>
               <p id="bench-subtitle" hidden></p>
               <div class="bench-toolbar">
-                <button class="outline" id="bench-history">대화 & 작업 기록</button
+                <button class="outline" id="bench-chat-toggle" aria-expanded="false" aria-controls="bench-character">LLM 채팅 열기</button
+                ><button class="outline" id="bench-history">대화 & 작업 기록</button
                 ><button class="outline" id="bench-reload">↻ 다시 불러오기</button
                 ><button class="outline" id="bench-home">← 캠퍼스</button
                 ><span id="bench-status" role="status" aria-live="polite"></span>
@@ -140,7 +141,7 @@
             <div id="bench-summary" aria-label="학습 현황" hidden></div>
           </div>
           <div class="bench-workspace">
-            <aside id="bench-character" aria-label="작업실 대화"></aside>
+            <aside id="bench-character" aria-label="작업실 대화" hidden></aside>
             <div id="bench-content" aria-label="작업실 현황"></div>
           </div>
         </section>

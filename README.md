@@ -1075,10 +1075,11 @@ counts move out of the lower account card and update whenever the workbench
 refreshes; source-sync status and recent accepted problems remain below.
 All workbenches use one compact heading such as **Jun과 함께하는 LeetCode Gym**,
 with history/refresh controls and existing learning metrics in the same frame.
-Below it, a wider conversation column uses the former introduction space and
-fills the available height, with independent history scrolling and a persistent
-composer. Current work remains alongside it; smaller screens stack conversation
-and work vertically. Escape keeps workbench conversations open.
+Entering any workbench hides the LLM conversation so current work uses the full
+workspace width. Click **LLM 채팅 열기** in the heading to show the conversation
+alongside the work, or **LLM 채팅 숨기기** to reclaim the space. Smaller screens
+stack the open conversation and work vertically. Chat history and drafts survive
+folding the panel; entering a workbench again starts with it hidden.
 Graded attempts and imported ChatGPT learning appear in one chronological
 **학습 완료 기록** list, with available metrics, actual hints/lessons and original
 conversation links. Same-problem/same-date evidence merges into one entry.
@@ -1914,9 +1915,10 @@ sudo tailscale serve --bg --https=8443 http://127.0.0.1:8788
 The first screen refreshes every ten seconds while preserving character positions.
 Specialists remain at their meaningful workstations while idle; Hermes periodically
 visits a teammate for a short, decorative check-in. Click a character to open their
-workbench directly. The persistent character conversation sits beside current
-assignments, progress and notes; on narrow screens they stack vertically.
-**대화 이어가기** focuses the composer, and entering a room does not send a message.
+workbench directly. Assignments, progress and notes initially fill the workspace.
+Use **LLM 채팅 열기** to reveal the character conversation and focus its composer;
+**LLM 채팅 숨기기** folds it again. On narrow screens the open conversation and
+work stack vertically. Entering a room does not send a message.
 The workbench companion is rendered as a complete, uncropped figure. Workbench
 navigation is part of browser history, so Back returns to the prior Observatory
 screen instead of leaving the site.

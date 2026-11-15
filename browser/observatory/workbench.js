@@ -48,6 +48,7 @@ async function openWorkbench(room, historyMode = "push") {
   bench.room = room;
   bench.data = null;
   bench.focusAssignment = null;
+  setWorkbenchChatOpen(false);
   view("workbench", historyMode, { room });
   $("bench-title").textContent = deskTitles[room] || roomName(room);
   $("bench-subtitle").textContent =
@@ -57,6 +58,16 @@ async function openWorkbench(room, historyMode = "push") {
   $("bench-content").innerHTML =
     '<div class="empty">작업실을 준비하는 중…</div>';
   await loadWorkbench();
+}
+function setWorkbenchChatOpen(open) {
+  const panel = $("bench-character"), button = $("bench-chat-toggle");
+  const restoreFocus = !open && panel.contains(document.activeElement);
+  panel.hidden = !open;
+  $("workbench-view").classList.toggle("bench-chat-open", open);
+  button.setAttribute("aria-expanded", String(open));
+  button.textContent = open ? "LLM 채팅 숨기기" : "LLM 채팅 열기";
+  if (open) $("office-message")?.focus({ preventScroll: true });
+  else if (restoreFocus) button.focus({ preventScroll: true });
 }
 async function loadWorkbench() {
   const room = bench.room,
@@ -775,6 +786,7 @@ function wireTimer(id) {
   window.hermesStudyClock = setInterval(paintTimer, 1000);
 }
 $("bench-home").onclick = () => view("office");
+$("bench-chat-toggle").onclick = () => setWorkbenchChatOpen($("bench-character").hidden);
 $("bench-reload").onclick = () => window.location.reload();
 $("bench-history").onclick = () => {
   clearFilters();
