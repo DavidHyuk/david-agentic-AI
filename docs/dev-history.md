@@ -3,6 +3,30 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.54.0 — 2026-11-15 (minor: add opt-in LeetCode credential recovery)
+
+- Let full source sync recover a rejected session using locally configured
+  `LEETCODE_LOGIN` / `LEETCODE_PASSWORD`, including an owner-only runtime env file.
+  Use the existing browser runtime and an isolated headless worker, enforce a
+  90-second process-group timeout and hourly attempt limit, verify the same
+  account before replacing credentials, and retain saved code on failure.
+  Statistics-only refresh never logs in; no password enters arguments or output.
+- Correct Jun's stale “above”/terminal-only recovery guidance and link directly
+  to the existing account card. Continue polling while its login link has focus
+  and refresh the workbench when login completes to remove outdated warnings.
+- The live DGX browser check encountered Cloudflare's **Just a moment…** page
+  before the login form. Credential recovery does not bypass CAPTCHA, MFA,
+  OAuth or browser verification; those still require user completion.
+- This is internal maintenance of the existing Coding workflow and its source
+  state, not a new user-facing agent: reuse the existing coding Observatory room,
+  profile, bot, cron and background refresh; no empty room or new service.
+- Validation: **1,015 tests pass**, including credential parsing, owner/file
+  boundaries, recovery and source preservation, cooldown, timeout cleanup,
+  challenge/redirect stops and sanitized diagnostics. Live Chromium verifies
+  settings navigation and, with simulated successful reconnection, automatic
+  warning removal even while the login link has focus. No real credentialed
+  login success is claimed without user-configured credentials.
+
 ## v1.53.2 — 2026-11-15 (patch: hide workbench LLM chat until requested)
 
 - Start every character workbench with its left LLM conversation hidden so

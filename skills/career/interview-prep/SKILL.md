@@ -129,8 +129,15 @@ print, transmit, or place `LEETCODE_SESSION` in a command line, Telegram message
 memory, source file, or Observatory response. The helper is read-only: no code
 submission, profile edit, or account setting change is allowed. The optional
 `login --username <handle>` command uses the local headless browser and hidden
-terminal prompts only; it never stores a password. CAPTCHA, MFA, and OAuth
-confirmation are not bypassed and require the cookie-link fallback.
+terminal prompts. David can opt into automatic recovery by configuring
+`LEETCODE_LOGIN` and `LEETCODE_PASSWORD` in the process environment or the
+machine-local `~/.hermes/leetcode-login.env` (0600). Full source sync attempts
+relogin at most hourly after an authentication failure, using the existing
+browser runtime, a bounded isolated worker and same-account verification.
+Never read or copy the password into a conversation, memory, command argument
+or tool output. CAPTCHA, MFA, OAuth and browser verification require direct
+user completion through Jun's existing account settings or session-link fallback.
+This is internal source maintenance; it adds no agent, room, bot or schedule.
 
 For company-specific preparation questions and the planned transition from
 LeetCode foundations to weekly 60-minute implementation exercises, read

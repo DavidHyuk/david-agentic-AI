@@ -28,6 +28,8 @@ import json
 import os
 from pathlib import Path
 import re
+import shlex
+import signal
 import socket
 import subprocess
 import sys
@@ -35,6 +37,7 @@ import tempfile
 import time
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
+from urllib.parse import urlsplit
 
 API_URL = 'https://leetcode.com/graphql/'
 USER_AGENT = 'david-agentic-ai/leetcode-sync (personal read-only coach)'
@@ -44,6 +47,7 @@ MAX_SOLUTION_SNAPSHOTS = 20
 MAX_SOLUTION_CODE_CHARS = 200_000
 DEFAULT_CDP_URL = 'http://127.0.0.1:19222'
 DEFAULT_CHROMIUM_EXECUTABLE = '/snap/bin/chromium'
+AUTO_LOGIN_RETRY_SECONDS = 3600
 
 USER_STATUS_QUERY = '''query userStatus { userStatus { username } }'''
 HISTORY_QUERY = '''query history($username: String!, $limit: Int!) {
@@ -145,6 +149,78 @@ def load_connection(path: Path) -> dict:
         'csrf_token': str(data.get('csrf_token', '')).strip(),
         'linked_at': str(data.get('linked_at', '')),
     }
+
+
+def login_environment(home: Path) -> dict:
+    """Read only opt-in login variables; never evaluate shell expressions."""
+    values = {key: os.environ[key] for key in ('LEETCODE_LOGIN', 'LEETCODE_PASSWORD')
+              if key in os.environ}
+    path = home / 'leetcode-login.env'
+    if path.is_file():
+        if path.stat().st_mode & 0o077:
+            raise LeetCodeSyncError('Set leetcode-login.env permissions to 600 before using automatic login.')
+        for line in path.read_text().splitlines():
+            key, separator, value = line.partition('=')
+            key = key.strip().removeprefix('export ')
+            if not separator or key not in ('LEETCODE_LOGIN', 'LEETCODE_PASSWORD') or key in values:
+                continue
+            try:
+                parts = shlex.split(value, comments=True)
+            except ValueError:
+                raise LeetCodeSyncError('Invalid quoting in leetcode-login.env.') from None
+            if len(parts) > 1:
+                raise LeetCodeSyncError('Quote values containing spaces in leetcode-login.env.')
+            values[key] = parts[0] if parts else ''
+    return values
+
+
+def recover_connection(connection_path: Path, connection: dict) -> bool:
+    """Attempt one bounded login per hour using the existing browser runtime."""
+    home = default_home()
+    credentials = login_environment(home)
+    if not all(credentials.get(key) for key in ('LEETCODE_LOGIN', 'LEETCODE_PASSWORD')):
+        return False
+    status_path = connection_path.parent / 'leetcode-auto-login.json'
+    previous = read_json(status_path, {}) or {}
+    try:
+        elapsed = (datetime.now(timezone.utc) - datetime.fromisoformat(previous['last_attempt_at'])).total_seconds()
+    except (KeyError, TypeError, ValueError):
+        elapsed = AUTO_LOGIN_RETRY_SECONDS
+    if elapsed < AUTO_LOGIN_RETRY_SECONDS:
+        return False
+    status = {'last_attempt_at': utc_now(), 'status': 'running'}
+    save_private_json(status_path, status)
+    runtime = home / 'venvs/youtube-history/bin/python'
+    try:
+        with tempfile.TemporaryDirectory(prefix='leetcode-auto-', dir=connection_path.parent) as directory:
+            temporary = Path(directory)
+            session_path = temporary / 'session.json'
+            # A separate lock path prevents deadlock with the parent's source sync.
+            command = [str(runtime) if runtime.is_file() else sys.executable, str(Path(__file__).resolve()),
+                       '--session-file', str(session_path), '--snapshot-file', str(temporary / 'history.json'),
+                       'login', '--environment', '--username', connection['username']]
+            with subprocess.Popen(command, env={**os.environ, **credentials, 'HERMES_HOME': str(home)},
+                                  stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                  stderr=subprocess.DEVNULL, start_new_session=True) as process:
+                try:
+                    returncode = process.wait(timeout=90)
+                except subprocess.TimeoutExpired:
+                    os.killpg(process.pid, signal.SIGKILL)
+                    process.wait(timeout=5)
+                    raise LeetCodeSyncError('Automatic LeetCode login timed out.') from None
+            if returncode:
+                raise LeetCodeSyncError('Automatic LeetCode login failed; complete login in the Jun workbench.')
+            candidate = load_connection(session_path)
+            if candidate['username'].lower() != connection['username'].lower():
+                raise LeetCodeAuthError('Automatic login returned a different LeetCode account.')
+            verify_connection(candidate)
+            save_private_json(connection_path, {'version': 1, **candidate})
+            connection.update(candidate)
+    except (LeetCodeSyncError, OSError, subprocess.SubprocessError):
+        save_private_json(status_path, {**status, 'status': 'failed'})
+        raise LeetCodeAuthError('Automatic LeetCode login failed; complete login in the Jun workbench.') from None
+    save_private_json(status_path, {**status, 'status': 'ok'})
+    return True
 
 
 def response_cookie_updates(headers: list[str]) -> dict:
@@ -322,7 +398,11 @@ def sync(connection_path: Path, snapshot_path: Path, limit: int = MAX_HISTORY,
     save_private_json(snapshot_path, snapshot)
     if not stats_only:
         try:
-            verify_connection(connection)
+            try:
+                verify_connection(connection)
+            except LeetCodeAuthError:
+                if not recover_connection(connection_path, connection):
+                    raise
             recent_submissions = graphql(
                 RECENT_SUBMISSIONS_QUERY,
                 {'username': connection['username'], 'limit': limit},
@@ -411,74 +491,105 @@ def login_failure_reason(page_text: str) -> str | None:
     return None
 
 
-def login_with_browser(cdp_url: str, username: str, login: str, password: str) -> dict:
-    """Use the existing local headless Chromium only to obtain a fresh session.
+def login_in_context(context, username: str, login: str, password: str) -> dict:
+    """Submit the normal LeetCode form; stop for challenges or rejected credentials."""
+    existing = _cookie_value(context.cookies('https://leetcode.com'), 'LEETCODE_SESSION')
+    if existing:
+        candidate = {'username': username, 'session': existing, 'csrf_token': _cookie_value(
+            context.cookies('https://leetcode.com'), 'csrftoken'), 'linked_at': ''}
+        try:
+            verify_connection(candidate)
+        except LeetCodeAuthError:
+            pass  # An expired browser cookie must not prevent a fresh login.
+        else:
+            return {'session': candidate['session'], 'csrf_token': candidate['csrf_token']}
+    page = context.new_page()
+    try:
+        page.goto('https://leetcode.com/accounts/login/', wait_until='domcontentloaded', timeout=20_000)
+        if urlsplit(page.url).hostname != 'leetcode.com':
+            raise LeetCodeSyncError('LeetCode redirected login to another site; complete login manually.')
+        login_field = page.locator('input[name="login"], #id_login, input[type="email"]').first
+        password_field = page.locator('input[name="password"], #id_password, input[type="password"]').first
+        if login_field.count() != 1 or password_field.count() != 1:
+            reason = login_failure_reason(page.title() + ' ' + page.locator('body').inner_text(timeout=1_000))
+            raise LeetCodeSyncError(reason or 'LeetCode login form was not available; complete login manually.')
+        login_field.fill(login, timeout=10_000)
+        password_field.fill(password, timeout=10_000)
+        submit = page.locator('button[type="submit"], input[type="submit"]').first
+        if submit.count() != 1:
+            raise LeetCodeSyncError('LeetCode login submit control was not found; complete login manually.')
+        submit.click(timeout=10_000)
+        deadline = time.monotonic() + 25
+        last_checked_session = None
+        last_checked_at = 0
+        while time.monotonic() < deadline:
+            cookies = context.cookies('https://leetcode.com')
+            session = _cookie_value(cookies, 'LEETCODE_SESSION')
+            now = time.monotonic()
+            if session and (session != last_checked_session or now - last_checked_at >= 5):
+                last_checked_session = session
+                last_checked_at = now
+                candidate = {'username': username, 'session': session,
+                             'csrf_token': _cookie_value(cookies, 'csrftoken'), 'linked_at': ''}
+                try:
+                    verify_connection(candidate)
+                except LeetCodeAuthError:
+                    pass  # LeetCode may issue an anonymous cookie before login completes.
+                else:
+                    return {'session': candidate['session'], 'csrf_token': candidate['csrf_token']}
+            reason = login_failure_reason(page.title() + ' ' + page.locator('body').inner_text(timeout=1_000))
+            if reason:
+                raise LeetCodeSyncError(reason)
+            page.wait_for_timeout(250)
+        raise LeetCodeSyncError('LeetCode did not issue an authenticated session; complete login manually.')
+    finally:
+        page.close()
 
-    Credentials remain in memory for this function's lifetime. CAPTCHA, MFA, and
-    changed login forms deliberately fail closed rather than attempting a bypass.
-    """
+
+def login_with_browser(cdp_url: str, username: str, login: str, password: str) -> dict:
+    """Use the existing local headless Chromium to obtain a verified session."""
     try:
         from playwright.sync_api import Error as PlaywrightError, sync_playwright
     except ImportError as exc:
-        raise LeetCodeSyncError(
-            'Playwright is not installed. Run python3 -m pip install -r requirements.txt.'
-        ) from exc
+        raise LeetCodeSyncError('Playwright is not installed in this Python environment.') from exc
     try:
         with sync_playwright() as playwright:
             browser = playwright.chromium.connect_over_cdp(cdp_url, timeout=15_000)
             try:
                 if not browser.contexts:
                     raise LeetCodeSyncError('The local Chromium browser has no usable context.')
-                context = browser.contexts[0]
-                existing = _cookie_value(context.cookies('https://leetcode.com'), 'LEETCODE_SESSION')
-                if existing:
-                    candidate = {'username': username, 'session': existing, 'csrf_token': _cookie_value(
-                        context.cookies('https://leetcode.com'), 'csrftoken'), 'linked_at': ''}
-                    verify_connection(candidate)
-                    return {'session': existing, 'csrf_token': _cookie_value(
-                        context.cookies('https://leetcode.com'), 'csrftoken')}
-                page = context.new_page()
-                try:
-                    page.goto('https://leetcode.com/accounts/login/', wait_until='domcontentloaded', timeout=20_000)
-                    login_field = page.locator('input[name="login"], #id_login, input[type="email"]').first
-                    password_field = page.locator('input[name="password"], #id_password, input[type="password"]').first
-                    if login_field.count() != 1 or password_field.count() != 1:
-                        reason = login_failure_reason(page.locator('body').inner_text(timeout=1_000))
-                        if reason:
-                            raise LeetCodeSyncError(reason)
-                        raise LeetCodeSyncError(
-                            'LeetCode login form was not available. Complete browser verification, then use connect.'
-                        )
-                    login_field.fill(login)
-                    password_field.fill(password)
-                    submit = page.locator('button[type="submit"], input[type="submit"]').first
-                    if submit.count() != 1:
-                        raise LeetCodeSyncError('LeetCode login submit control was not found; use connect instead.')
-                    submit.click()
-                    deadline = time.monotonic() + 25
-                    while time.monotonic() < deadline:
-                        cookies = context.cookies('https://leetcode.com')
-                        session = _cookie_value(cookies, 'LEETCODE_SESSION')
-                        if session:
-                            candidate = {'username': username, 'session': session,
-                                         'csrf_token': _cookie_value(cookies, 'csrftoken'), 'linked_at': ''}
-                            verify_connection(candidate)
-                            return {'session': session, 'csrf_token': _cookie_value(cookies, 'csrftoken')}
-                        reason = login_failure_reason(page.locator('body').inner_text(timeout=1_000))
-                        if reason:
-                            raise LeetCodeSyncError(reason)
-                        page.wait_for_timeout(250)
-                    raise LeetCodeSyncError(
-                        'LeetCode did not issue a session. The login form may have changed or require browser verification; use connect.'
-                    )
-                finally:
-                    page.close()
+                return login_in_context(browser.contexts[0], username, login, password)
             finally:
                 browser.close()
-    except LeetCodeSyncError:
-        raise
-    except PlaywrightError as exc:
-        raise LeetCodeSyncError('Could not use the local headless Chromium; run browser/setup_browser.sh --check.') from exc
+    except PlaywrightError:
+        raise LeetCodeSyncError('Could not use the local Chromium browser; complete login manually.') from None
+
+
+def login_automatically(username: str, login: str, password: str) -> dict:
+    """Use an isolated, short-lived headless browser without a display or CDP service."""
+    try:
+        from playwright.sync_api import Error as PlaywrightError, sync_playwright
+    except ImportError as exc:
+        raise LeetCodeSyncError('Playwright is not installed in the browser runtime.') from exc
+    browsers = sorted((default_home() / 'venvs/youtube-history/browsers').glob('chromium-*/chrome-linux*/chrome'))
+    executable = os.environ.get('HERMES_CHROMIUM_EXECUTABLE') or (str(browsers[-1]) if browsers else None)
+    try:
+        with sync_playwright() as playwright:
+            options = {'headless': True}
+            if executable:
+                options['executable_path'] = executable
+            browser = playwright.chromium.launch(**options)
+            try:
+                context = browser.new_context()
+                try:
+                    return login_in_context(context, username, login, password)
+                finally:
+                    context.close()
+            finally:
+                browser.close()
+    except PlaywrightError:
+        # Browser diagnostics can include form values. Keep them out of logs.
+        raise LeetCodeSyncError('Automatic LeetCode browser login failed; complete login manually.') from None
 
 
 def manual_browser_command(executable, profile, port):
@@ -599,7 +710,10 @@ def parse_args(argv=None) -> argparse.Namespace:
     login = sub.add_parser('login', help='sign in through local headless Chromium; passwords are never stored')
     login.add_argument('--username', required=True)
     login.add_argument('--cdp-url', default=os.environ.get('HERMES_BROWSER_CDP_URL', DEFAULT_CDP_URL))
-    login.add_argument('--headed', action='store_true',
+    login_mode = login.add_mutually_exclusive_group()
+    login_mode.add_argument('--environment', action='store_true',
+                           help='use LEETCODE_LOGIN and LEETCODE_PASSWORD in an isolated headless browser')
+    login_mode.add_argument('--headed', action='store_true',
                        help='open a temporary local GUI Chromium for manual Cloudflare/MFA completion')
     login.add_argument('--browser-executable', default=os.environ.get(
         'HERMES_CHROMIUM_EXECUTABLE', DEFAULT_CHROMIUM_EXECUTABLE))
@@ -637,7 +751,13 @@ def main(argv=None) -> int:
                 username = validate_username(args.username)
                 # Manual login may take minutes; source reads must remain available.
                 fcntl.flock(lock, fcntl.LOCK_UN)
-                if args.headed:
+                if args.environment:
+                    values = login_environment(default_home())
+                    login, password = values.get('LEETCODE_LOGIN'), values.get('LEETCODE_PASSWORD')
+                    if not login or not password:
+                        raise LeetCodeSyncError('Set LEETCODE_LOGIN and LEETCODE_PASSWORD before automatic login.')
+                    credentials = login_automatically(username, login, password)
+                elif args.headed:
                     credentials = login_in_headed_browser(
                         username, args.browser_executable, args.timeout_seconds, session_path.parent)
                 else:

@@ -1167,7 +1167,8 @@ context. This lets it answer questions such as “How did I solve Anagram?” fr
 your submitted code rather than a generic solution. It never treats that
 history as graded coach feedback. An explicit learning import can record a
 verified external completion as described above. It never submits code, edits
-your LeetCode profile, or stores a password.
+your LeetCode profile. Password-based recovery is optional and uses only credentials
+you explicitly configure locally as described below.
 In the LeetCode workbench chat, the referenced problem (including a follow-up
 that refers to the immediately preceding problem) automatically provides only
 that matching local submission to the coach; the reply and its Telegram mirror
@@ -1189,9 +1190,9 @@ The token is entered through a hidden prompt and is stored only at
 separate owner-only snapshot (including submitted source code) is
 `~/.hermes/data/interview/leetcode_history.json`.
 
-For a DGX without a monitor, open **Jun → 풀이 기록 → LeetCode 로그인 창
-준비하기** in your private Observatory dashboard. After a few seconds, follow
-**LeetCode 로그인 창 열기** from Chrome/Chromium on Windows or Mac. The temporary
+For a DGX without a monitor, use **Jun → 풀이 기록 → 계정 연결 설정으로 이동**,
+then **LeetCode 다시 연결** in the account settings at the bottom of the workbench.
+After a few seconds, follow **로그인 창 열기** from Chrome/Chromium on Windows or Mac. The temporary
 Chromium runs on DGX and its screen/input use the dashboard's existing address;
 no HDMI connection or extra SSH port forwarding is needed. Complete LeetCode
 login, Cloudflare verification and any MFA yourself. The browser profile is
@@ -1221,7 +1222,9 @@ HTTP request completion, SSH disconnection and agent turns. Repeated requests
 reuse an active window. The login window expires after 15 minutes. Only a
 session verified against the linked handle is saved; the desktop then closes
 and actual Accepted-code sync and review preparation run automatically. Jun
-shows readiness and sync status. The existing daily source sync stays at 06:35.
+shows readiness and sync status, keeps polling when the login link has focus,
+and refreshes the workbench when reconnection completes so old login warnings
+disappear. The existing daily source sync stays at 06:35.
 No new room, bot, profile or persistent desktop service is added.
 
 To start the same window from a DGX terminal:
@@ -1248,7 +1251,8 @@ bash ~/.hermes/scripts/leetcode_refresh.sh
 Alternatively, sign in in a normal personal browser and use
 `leetcode_sync.py connect --username HANDLE` to paste the issued
 `LEETCODE_SESSION` cookie into its hidden terminal prompt. The plain `login`
-command remains headless; LeetCode currently blocks that route with Cloudflare.
+command remains headless; on the November 15 DGX check, Cloudflare showed
+**Just a moment…** before exposing the login form.
 Session lifetime is controlled by LeetCode. The previously linked cookie's
 metadata specified 14 days from its September 14 refresh; it was past that
 period when source access failed. This does not establish a service-wide
@@ -1257,8 +1261,43 @@ Successful sync now retains nondeleted session/CSRF cookies reissued by LeetCode
 after verifying they still authenticate the linked account. It follows server
 rotation rather than extending signed cookie contents locally. Deleted or
 anonymous sessions never replace the saved credential. This can preserve normal
-server renewals; logout, revocation or a required fresh login still need user
-interaction, and indefinite access is not guaranteed.
+server renewals. Optional credential-based recovery can attempt a fresh login;
+CAPTCHA, MFA, OAuth and browser verification still require user interaction.
+
+For automatic recovery, configure `LEETCODE_LOGIN` (LeetCode login ID or email)
+and `LEETCODE_PASSWORD` in the process environment, or edit the machine-local
+`~/.hermes/leetcode-login.env` with mode `0600`. The helper reads that file on
+each attempt, so existing cron and Observatory processes need no restart:
+
+```dotenv
+LEETCODE_LOGIN='your-leetcode-login-id-or-email'
+LEETCODE_PASSWORD='your-leetcode-password'
+```
+
+Quote values as literals; shell commands and variable expansion are never
+evaluated. Process environment values take precedence, including an empty value
+to disable recovery. Keep this file outside the repository. No password is put
+in command arguments, snapshots, logs, Telegram, or dashboard API responses.
+
+On an authentication failure during a full source sync, the helper makes at
+most one automatic login attempt per hour using the existing local browser
+runtime and an isolated headless browser. It verifies the returned session
+against the linked handle before saving it, then resumes Accepted-code sync.
+The worker is limited to 90 seconds and its process group is stopped on timeout.
+Failed attempts preserve saved sessions, code and reviews; statistics-only
+refreshes never log in. This uses the existing room and daily/background sync,
+with no additional service or schedule. An explicit attempt is also available:
+
+```bash
+~/.hermes/venvs/youtube-history/bin/python ~/.hermes/scripts/leetcode_sync.py \
+  login --environment --username YOUR_LINKED_LEETCODE_HANDLE
+bash ~/.hermes/scripts/leetcode_refresh.sh
+```
+
+Automatic login needs the direct LeetCode password. A Google-only login requires
+manual Google sign-in or session linking. On the current DGX, headless access is
+challenged by Cloudflare; configuring credentials enables attempts but does not
+bypass that challenge or guarantee unattended recovery.
 The background sync remains available in the session archive but is omitted from
 Observatory recent-activity lists so maintenance does not bury study history.
 Opening or reloading LeetCode Gym refreshes account counts and recent accepts
@@ -1641,9 +1680,10 @@ hf download unsloth/Qwen3.8-Flash-Next-GGUF \
 
 Hermes's own browser tool uses pinned `agent-browser` and a Chromium service
 bound only to `127.0.0.1:19222`. The opt-in LeetCode helper additionally uses
-Playwright only to attach to that same local CDP browser for an interactive,
-headless password login; it neither launches a cloud browser nor saves a
-password. The explicit CDP service avoids a Snap Chromium auto-launch hang
+Playwright to attach to that local CDP browser for interactive headless login,
+or to start an isolated local headless browser for optional environment-based
+recovery. Password configuration stays in the machine-local environment file.
+The explicit CDP service avoids a Snap Chromium auto-launch hang
 observed on the DGX Spark's ARM64 environment.
 
 ### ChatGPT conversation archive (optional)

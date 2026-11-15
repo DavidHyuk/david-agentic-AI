@@ -398,7 +398,7 @@ history/search·알림 제어의 이점이 있으면 같은 bot을 별도 Telegr
 | `papers_ingest.py` | arXiv 4개 카테고리 + HF Daily Papers 메타데이터 수집, source/run provenance 저장 |
 | `papers_digest.py` | SQLite 카탈로그 읽기 전용 조회 → 추천/최신/인기 digest |
 | `interview_progress.py` | 코딩 커리큘럼 + 적응형 설계 인터뷰 선택/단계 gate/답변·평가 저장/주간 통계 |
-| `leetcode_sync.py` | 로컬 headless Chromium 로그인 또는 숨김 세션 입력·검증, owner-only 저장, LeetCode solved/최근 정답·최근 문제별 실제 Accepted 코드 snapshot 갱신 |
+| `leetcode_sync.py` | 로컬 브라우저 로그인·숨김 세션 입력·검증, 선택적 환경변수 기반 세션 만료 자동 로그인(시간당 1회·90초 제한·동일 계정 검증), owner-only 저장, solved/최근 정답·실제 Accepted 코드 snapshot 갱신 |
 | `leetcode_review.py` | Accepted 코드와 기록된 배움으로 접근법·정답·복잡도·복습 힌트·경계 조건 및 그대로 말할 영어 면접 스크립트·한글 뜻을 붙인 암기 표현을 사전 요약. loopback 모델 background admission 사용, 근거 fingerprint로 변경 감지, owner-only 원자 저장, `list`는 cache만 조회 |
 | `leetcode_refresh.sh` | 기존 06:35 LeetCode 유지보수 cron에서 증분 source sync 후 요약 준비. outer agent·Telegram 전달 없이 기존 coding room·소유 profile 유지 |
 | `account_login.py` | Jun/HQ ChatGPT·Rina Google/YouTube 계정 재연결을 기존 helper와 bounded transient unit으로 시작·재사용·종료. 서비스별 준비 상태만 노출하고 Ellie의 카카오 스킬 URL은 명시적 복사 요청에만 반환 |
@@ -1052,6 +1052,19 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   재검증한 뒤 저장합니다. 삭제 cookie나 익명 세션으로 기존 자격을 덮어쓰지
   않으며, signed cookie의 기간을 로컬에서 바꾸지 않습니다. 서버 갱신은 따르지만
   로그아웃·강제 만료·추가 인증을 무기한 피할 수 있다는 보장은 없습니다.
+  선택적으로 `LEETCODE_LOGIN` / `LEETCODE_PASSWORD`를 process 환경이나
+  `~/.hermes/leetcode-login.env`(0600)에 설정하면 전체 source sync의 인증 실패 시
+  기존 browser runtime으로 자동 재로그인을 시간당 최대 1회 시도합니다.
+  격리된 headless worker는 90초 제한과 process-group 종료를 적용하며,
+  동일 계정 인증 후에만 세션을 저장하고 코드 수집을 이어갑니다. 실패 시 기존
+  세션·코드를 보존합니다. 통계 전용 갱신은 로그인하지 않고, 비밀번호는 명령
+  인자·로그·snapshot·Telegram·Observatory 응답에 넣지 않습니다.
+  11월 15일 실제 DGX 확인에서는 로그인 폼 전에 Cloudflare 확인 화면이 나와,
+  환경변수 설정만으로 무인 복구가 보장되지는 않습니다. CAPTCHA·MFA·OAuth는
+  사용자가 완료합니다. 기존 Coding 방·profile·cron의 내부 자료 복구이며 새
+  agent·방·서비스는 추가하지 않습니다. 풀이 기록의 연결 설정 이동 버튼과 실제
+  맨 아래 계정 카드 안내를 맞췄고, 로그인 링크에 포커스가 있어도 상태를 계속
+  확인하여 연결 완료 후 작업실을 갱신하고 오래된 재로그인 문구를 없앱니다.
   `data/interview/leetcode_reviews.json`에 owner-only cache를 저장하며 코드·학습
   근거·계정 변경 시 요약을 갱신합니다. 클릭은 cache 조회이며, 기존 06:35
   유지보수 cron과 작업실 background refresh가 요약을 미리 준비합니다. 새 profile,
@@ -1220,11 +1233,15 @@ ZIP 경로 격리·credential 오류 출력 방지 및 HQ source 상태 검증�
 Jun 사전 풀이 요약의 근거 변경·Accepted 코드 freshness·실패 보존·동시 실행
 잠금·background provider 경계 및 재인증 상태·실제 코드 필수 조건을 포함한
 원격 계정 재연결·CSRF 전달·동일 계정의 서버 cookie 갱신 검증까지 포함한
-현재 전체 테스트는 992 passed입니다. 카카오 연결 알림의 부분 경로 지연·지속
+현재 전체 테스트는 1,015 passed입니다. 카카오 연결 알림의 부분 경로 지연·지속
 장애/복구 확인·알림 간격 제한을 검증하는 15개 회귀 사례와 작업실 채팅의
 기본 숨김·열기/접기·초안 보존·방 이동 시 초기화를 검증하는 사례를 포함합니다.
 실행 중인 UI도 Chromium에서 1440px·820px·390px의 7개 작업실 전체를
 확인하여 기본 전체 너비와 대화 열기/접기, 배치·포커스·초안 보존을 검증했습니다.
+LeetCode 환경변수 자동 로그인·동일 계정 검증·실패 보존·시간당 시도 제한·worker
+시간 초과 종료·보안 확인/외부 redirect 중단·비밀번호 출력 방지 및 재연결 UI의
+추가 23개 사례를 포함합니다. 실제 Chromium에서 연결 설정 이동과 로그인 링크
+포커스 중 상태 갱신, 성공 상태 모의 응답 후 오래된 경고 제거도 확인했습니다.
 기존 카드 실험 export 12개 테스트는
 완료 조합·해시·개인 정보·정답 분모·unknown·시각·안정적 ID를 검증합니다.
 추가 8개는 이동한 폴더 검색, 사용자 정답 CSV 보존/새 행 추가, 도감 타입과 TCG
