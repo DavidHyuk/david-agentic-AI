@@ -318,7 +318,7 @@ function coachDesk(d) {
   return `<article class="desk-card mission"><span class="tag">이어하기 · ${esc(a.date)} 배정 · ${coding ? (a.session_type === "review" ? "복습" : "새 과제") : esc(a.phase || "problem")}</span><h2>${esc(item.name || a.item_id)}</h2><p>${esc(coding ? item.goal : item.prompt)}</p><div class="desk-tags"><span>${esc(item.pattern || item.track || "System design")}</span><span>목표 ${coding ? 35 : item.target_minutes}분</span><span>결과 미입력</span>${coding ? `<span>기록된 힌트 ${a.hint_level} / 3</span>` : `<span>난이도 ${Number(a.difficulty_level || 2)} / 4</span>`}</div>
     <div class="desk-actions">${coding ? safeLink(item.leetcode_url, "LeetCode 문제") + safeLink(item.neetcode_url, "NeetCode 문제") : ""}${coding && a.session_type !== "review" ? '<button id="desk-skip" class="outline">잠시 스킵 · 다음 문제</button>' : ""}${coding && a.session_type === "review" ? '<button id="desk-current" class="primary">최신 문제로 돌아가기</button>' : coding && d.completed?.length ? '<button id="desk-review" class="outline">복습하기</button>' : ""}</div>
     ${coding ? '<p class="muted">먼저 20분 동안 스스로 시도하고, 경계 조건과 시간·공간 복잡도를 설명해 보세요.</p>' : `<h3>먼저 생각할 명확화 질문</h3><ul class="desk-focus">${(item.clarification_questions || []).map((q) => `<li>${esc(q)}</li>`).join("")}</ul><p class="muted">솔루션은 피드백 저장 후에만 열립니다.</p>`}
-    <div class="study-timer"><span id="study-time">00:00</span><div><button class="outline" id="timer-toggle">타이머 시작</button><button class="text-button" id="timer-reset">초기화</button></div><small>이 브라우저에서 이어집니다 · 타이머 종료는 완료 처리되지 않습니다</small></div>
+    <div class="study-timer"><span id="study-time">00:00:00</span><div><button class="outline" id="timer-toggle">타이머 시작</button><button class="text-button" id="timer-reset">초기화</button></div><small>이 브라우저에서 이어집니다 · 타이머 종료는 완료 처리되지 않습니다</small></div>
   </article>${d.room === "coding" ? "" : telegramComposer(d, `현재 ${item.name || a.item_id} 과제를 공부 중이야. 과제 ID는 ${a.id}야. ${coding ? "내 접근 방법을 먼저 물어보고, 요청하면 현재 힌트 단계 다음의 힌트 하나만 줘. 정답부터 보여주지 마." : "명확화 질문부터 시작할게. 내 설계를 /answer로 보내면 면접관 추가 질문을 하나씩 줘. /feedback 전에는 솔루션을 보여주지 마."}`)}
   ${coding ? codingNavigationCard(d) : ""}
   ${coding ? `<article class="desk-card"><h2>실제 학습 결과 남기기</h2><p class="muted">본인이 보고한 결과만 저장합니다. 저장하면 다음 복습과 주간 리뷰에 반영됩니다.</p><form id="coach-feedback"><div class="feedback-grid">
@@ -788,7 +788,8 @@ function wireTimer(id) {
         (t.elapsed + (t.started ? Date.now() - t.started : 0)) / 1000,
       );
     $("study-time").textContent =
-      `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+      [Math.floor(seconds / 3600), Math.floor(seconds / 60) % 60, seconds % 60]
+        .map((part) => String(part).padStart(2, "0")).join(":");
     $("timer-toggle").textContent = t.started ? "일시정지" : "타이머 이어가기";
   }
   paintTimer();

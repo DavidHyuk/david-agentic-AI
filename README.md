@@ -2042,7 +2042,9 @@ hanging indefinitely; an active local-model turn may run for up to ten minutes.
   The new-problem path follows the 35-minute Tue/Thu/Sat progression from Two
   Sum/HashMap through Two Pointers, Sliding Window, Stack, Binary Search,
   Tree/BFS/DFS, Heap, and Graph. Use a
-  timer and submit actual practice results. Coding feedback records duration,
+  timer in `HH:MM:SS` format (for example, `02:58:33`) and submit actual practice
+  results. The timer preserves saved progress and accumulates hours beyond 24.
+  Coding feedback records duration,
   confidence, hints and solution use. Design chat persists the answer, follow-ups,
   complete rubric, evidence-backed feedback, and the gated solution state. These update the existing coach
   state and review schedule. Opening a room alone does not assign or complete work.

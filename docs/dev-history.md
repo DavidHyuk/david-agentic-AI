@@ -3,6 +3,14 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.54.2 — 2026-11-22 (patch: display study timers as hours, minutes and seconds)
+
+- Show the workbench study timer as `HH:MM:SS`, including its initial/reset
+  value, so `178:33` becomes `02:58:33`. Hours keep accumulating beyond 24;
+  existing saved elapsed time and pause/resume behavior are preserved.
+- Validation: **1,016 tests pass**, including timer boundary values, accumulated
+  hours beyond 24 and 99, saved-state rendering, pause/resume and reset.
+
 ## v1.54.1 — 2026-11-15 (patch: keep the manual LeetCode desktop connected)
 
 - Reproduce noVNC disconnection: the native Chromium window starts, but cookie
