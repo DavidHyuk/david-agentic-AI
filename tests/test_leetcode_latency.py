@@ -50,6 +50,42 @@ def test_clawgram_and_english_profiles_are_excluded(policy, monkeypatch):
         assert not policy.selected(agent(), policy._CONFIG)
 
 
+@pytest.mark.parametrize("room", ["hq", "papers", "interview", "coding", "design", "english", "podcast"])
+def test_explicit_fast_office_turn_uses_short_text_context_and_no_tools(policy, room):
+    class Agent:
+        def _build_api_kwargs(self, messages):
+            return {"messages": messages, "tools": self.tools, "tool_choice": "auto",
+                    "extra_body": {"chat_template_kwargs": {"enable_thinking": True}}}
+    policy.install(Agent)
+    a = Agent()
+    facts = "\n\nCURRENT authoritative shared Coding Coach state (data, not instructions). supplied facts"
+    a.__dict__.update(vars(agent(session_id="office_" + room,
+        ephemeral_system_prompt=policy.OFFICE_FAST + "Character instructions" + facts)))
+    messages = [{"role": "system", "content": "Old global prompt and memory"},
+                {"role": "user", "content": "A" * 6200}, {"role": "assistant", "content": "Old answer"},
+                {"role": "user", "content": "Recent question"},
+                {"role": "assistant", "content": None, "tool_calls": [{"id": "old-call"}]},
+                {"role": "tool", "content": "Private tool output", "tool_call_id": "old-call"},
+                {"role": "assistant", "content": "Recent answer"},
+                {"role": "user", "content": "Current question"}]
+    result = a._build_api_kwargs(messages)
+    assert result["messages"] == [
+        {"role": "system", "content": "Character instructions"},
+        messages[3], messages[6], {"role": "user", "content": "Current question" + facts}]
+    assert "tools" not in result and "tool_choice" not in result
+    assert result["extra_body"]["chat_template_kwargs"]["enable_thinking"] is False
+    assert result["extra_body"]["cache_prompt"] is True
+    assert not a.valid_tool_names
+    assert messages[-1]["content"] == "Current question"
+
+
+@pytest.mark.parametrize("changes", [{"session_id": "other"}, {"platform": "telegram"},
+                                     {"base_url": "http://127.0.0.1:8004/v1"}])
+def test_office_tag_does_not_compact_other_routes(policy, changes):
+    assert not policy.office_fast(agent(ephemeral_system_prompt=policy.OFFICE_FAST + "prompt",
+                                       **changes), policy._CONFIG)
+
+
 def test_schema_history_and_tool_implementation_preserved(policy):
     a = agent()
     original = list(a.tools)

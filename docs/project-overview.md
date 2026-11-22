@@ -64,16 +64,24 @@ SDK background export를 사용하며, 실제 전달을 관측한 streaming 요�
 기록합니다. tool 본문·이미지·system prompt는 제외하고 native prefill/TPS를 추정하지 않습니다.
 `bootstrap/stage_conversation_tracing.py`는 지정된 owning profile 하나만 변경합니다.
 
-Jun 웹 코딩 대화의 기본 `빠른 답변`은 optional `leetcode-latency` plugin으로
-thinking을 끄고 tool schema를 줄입니다. `깊이 생각`은 기존 reasoning/도구를
-사용합니다. `bootstrap/stage_leetcode_latency.py`는 default `office_coding`만
-활성화하며 cron/Telegram/다른 profile에는 적용하지 않습니다. 큰 과거 검색은
-private `data/jun-context` 원문을 참조하고, 현재 learning/source 자료는 안정된
-system prefix 뒤에 붙입니다. `local-model/eval/leetcode_latency.py`로 동일
-workload의 schema 비교를 측정합니다. 추가 4 experiments / 26 distinct traces /
+작업실 웹 대화는 기본 `빠른 답변`에서 캐릭터 지시, 현재 질문과 최근 3개
+왕복(최대 6,000자)을 모델에 보내고 thinking과 도구를 끕니다. Jun의 질문별
+제출 코드와 학습 근거는 최근 대화 뒤에 붙여 앞부분의 캐시를 재사용할 수 있습니다.
+`전체 문맥 · 도구`를 선택하면 기존 추론·도구·HQ 프로젝트 검색을 쓸 수 있으며
+Hermes는 전체 대화 기록을 계속 보관합니다. 기존 `leetcode-latency` plugin을
+default profile에 설치하는 `bootstrap/stage_leetcode_latency.py`를 사용합니다.
+적용 범위는 공유 로컬 Flash-Next를 사용하는 7개 작업실 웹 세션입니다.
+같은 모델의 캐시 없는 비교에서 Jun의 첫 응답은 43.1초에서 3.0초,
+Ellie의 첫 응답은 48.9초에서 1.5초로 줄었습니다. 각 작업실의 예제 질문
+한 쌍씩 측정했습니다. [작업실 prefill 측정](benchmarks/office-chat-prefill-2026-11-22.md)
+이전 Jun schema 축소 측정은 `local-model/eval/leetcode_latency.py`에 있습니다.
+추가 4 experiments / 26 distinct traces /
 154 scores의 Cloud read-back과 복제 Jun의 native TTFT 첫 질문 25.35초 / 후속
 1.27초를 확인했습니다. 이 수치는 MTP OFF일 때의 과거 검증입니다.
-현재는20GiB host-cache cap/MTP ON/128K×2의 임시 운영 구성입니다.
+현재 공유 운영 모델은 MTP ON, 128K 슬롯 두 개, host prompt-cache 상한 12GiB입니다.
+20GiB 설정에서는 가용 메모리 5.9GiB가 admission 기준 6.45GiB 아래로 떨어졌습니다.
+캐시 상한을 `--cache-ram 12288`로 낮춘 뒤 모델과 gateway를 복구하고 가용 메모리
+35.7GiB를 관측했습니다. 상한을 낮추면 오래된 prefix가 더 일찍 제거될 수 있습니다.
 공유 proxy가 memory/2슬롯/온도 대기를 관리하고85°C부터 CPUQuota200%,
 90°C 이후1%로 실행량을 줄여 진행 중 연결/문맥을 보존합니다.92°C 중단은
 제거했고 메모리/GPU 위험도 강제 종료 대신 새 요청 대기와 실행량 제한으로
@@ -519,10 +527,11 @@ English profile에서는 background skill creation과 curator를 비활성화합
 
 
 ### 6. `local-model/` — LLM 백엔드
-`run_flash_next.sh`가 현재 운영 모델인 Qwen3.8 Flash-Next 4비트
-`UD-IQ4_XS` GGUF를 llama.cpp로 `127.0.0.1:8003`에서 서빙합니다. 세 GGUF
-샤드는 약 93.7GB이며 64K 컨텍스트 슬롯 둘(총 128K)을 사용합니다. 메인·English
-게이트웨이의 동시 요청을 받되 각 요청의 64K 한도를 유지합니다. 약 27GiB n-gram
+`hermes-vllm.service`는 ClawGram과 공유하는 llama.cpp로 Qwen3.8 Flash-Next
+`UD-IQ4_XS` GGUF를 loopback 8004에서 서빙합니다. 메인·English gateway는
+8003 admission proxy를 사용합니다. 세 GGUF 샤드는 약 93.7GB이며 모델은 128K
+컨텍스트 슬롯 둘, Hermes agent는 64K 설정을 사용합니다. `run_flash_next.sh`는
+독립 실행 기본 런처입니다. 약 27GiB n-gram
 임베딩은 CPU RAM에 상주시키고, 나머지 transformer/expert 층은 GPU에 배치합니다.
 128GB 통합 메모리의 여유에 맞춰 GPU layer 수를 자동 조정하며 8GiB fit target을
 유지합니다. `nvidia-smi`의 GPU 프로세스 사용량은 별도 VRAM 풀이 아니므로
@@ -1242,7 +1251,9 @@ ZIP 경로 격리·credential 오류 출력 방지 및 HQ source 상태 검증�
 Jun 사전 풀이 요약의 근거 변경·Accepted 코드 freshness·실패 보존·동시 실행
 잠금·background provider 경계 및 재인증 상태·실제 코드 필수 조건을 포함한
 원격 계정 재연결·CSRF 전달·동일 계정의 서버 cookie 갱신 검증까지 포함한
-현재 전체 테스트는 1,016 passed입니다. 작업실 타이머의 시:분:초 표시와
+현재 전체 테스트는 1,027 passed입니다. 7개 작업실의 빠른 답변 요청 범위,
+현재 질문·근거 보존과 HQ 전체 문맥 검색 지시를 검증합니다.
+작업실 타이머의 시:분:초 표시와
 시간 경계·24시간 이상 누적·일시정지/재개·초기화 검증을 포함합니다.
 카카오 연결 알림의 부분 경로 지연·지속
 장애/복구 확인·알림 간격 제한을 검증하는 15개 회귀 사례와 작업실 채팅의

@@ -3,6 +3,22 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.55.0 — 2026-11-22 (minor: speed up Observatory character chat)
+
+- Default all seven character chats to a compact prompt with recent text and
+  explicitly supplied evidence. Disable tools and hidden thinking for these
+  turns. Add a per-room **전체 문맥 · 도구** selector for full Hermes requests.
+- Retain the existing local Flash-Next model and two 128K slots. Lower the
+  installed shared host prompt-cache cap from 20 GiB to 12 GiB after observing
+  idle memory below the proxy's request budget. The shared service may evict
+  old prefixes sooner at the lower cap.
+- Matched uncached single-request checks shortened the first visible token
+  from 43.1 to 3.0 seconds for Jun and 48.9 to 1.5 seconds for Ellie. The
+  measurements, research and limits are in
+  [the Observatory prefill report](benchmarks/office-chat-prefill-2026-11-22.md).
+- Validation includes 1,027 passing tests, Chromium mode selection, and a real
+  streamed Hermes reply saved in an isolated SQLite conversation.
+
 ## v1.54.2 — 2026-11-22 (patch: display study timers as hours, minutes and seconds)
 
 - Show the workbench study timer as `HH:MM:SS`, including its initial/reset

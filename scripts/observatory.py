@@ -670,7 +670,7 @@ class Observatory:
             raise ValueError('알 수 없는 캐릭터입니다.')
         message = self.text_field(body, 'message', maximum=4000)
         response_mode = body.get('response_mode', 'fast')
-        if room == 'coding' and response_mode not in ('fast', 'deep'):
+        if response_mode not in ('fast', 'deep'):
             raise ValueError('알 수 없는 답변 방식입니다.')
         if not self.office_locks[room].acquire(blocking=False):
             raise ValueError('이 캐릭터가 답변 중입니다. 잠시 후 대화 기록을 확인하세요.')
@@ -695,8 +695,16 @@ class Observatory:
                 'when necessary. For execution or saved study actions, direct the user to '
                 'the existing workbench. Give coding hints before revealing solutions.'
             )
+            if response_mode == 'fast':
+                instructions = (
+                    '[office-dialogue-mode:fast]\n' + instructions +
+                    ' In this mode, answer from the supplied text and recent conversation. '
+                    'For tools, older history, or a search of private sources, ask the user '
+                    'to choose the full-context mode.'
+                )
             if room == 'coding':
-                instructions = f'[jun-dialogue-mode:{response_mode}]\n' + instructions
+                if response_mode == 'deep':
+                    instructions = '[jun-dialogue-mode:deep]\n' + instructions
                 instructions += (
                     ' This is discussion of supplied code or algorithm concepts, not an assignment '
                     'or saved-feedback action. When the supplied code and question are sufficient, '
@@ -706,7 +714,7 @@ class Observatory:
                 )
                 recent = self.office_conversation(room)['history'][-6:]
                 instructions += self.coding_source_context(message, recent=recent)
-            if room == 'hq':
+            if room == 'hq' and response_mode == 'deep':
                 instructions += (
                     ' David limits current ChatGPT references to the selected Silicon Valley Career 2027 '
                     'project. Prefer ~/.hermes/venvs/chatgpt-rag/bin/python ~/.hermes/scripts/chatgpt_rag.py '

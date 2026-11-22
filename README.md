@@ -307,13 +307,15 @@ system prompts, tool bodies and images are omitted. See the
 Graph/Sessions navigation, isolated ClawGram Studio state inspection, and
 `bootstrap/stage_conversation_tracing.py` installation/disable commands.
 
-Jun's **코딩** web conversation defaults to **빠른 답변** and offers **깊이 생각**
-for normal reasoning/full tools. Fast mode disables hidden thinking, narrows
-tool schemas, and references oversized past `session_search` results through
-private immutable originals in `~/.hermes/data/jun-context/`. Jun can read those
-originals when needed. Durable history and code are preserved. Changing learning
-facts and retrieved code follow the stable system prefix for cached followups.
-Other rooms and Telegram conversations retain their existing request policy.
+Office character chats default to **빠른 답변**. This mode sends the character
+instructions, the current question and up to three recent text turns within a
+6,000-character history budget. It disables tools and hidden thinking. Jun can
+still explain matching submitted code and supplied progress evidence. Select
+**전체 문맥 · 도구** beneath the composer when you need older context, tool
+access, hidden reasoning or HQ's private project search. The browser remembers
+the mode per room, and Hermes retains the complete conversation transcript.
+The local cache-off comparisons and alternative engine research are recorded in
+[the Observatory prefill report](docs/benchmarks/office-chat-prefill-2026-11-22.md).
 
 Install the optional policy from this repository, then restart the idle owning
 gateway; use normal Observatory staging for the corresponding web controls:
@@ -330,16 +332,20 @@ gateway when idle. Restore the helper's private backup for rollback. Keep
 two 128K slots and the agent's separate 64K setting. See the
 [Jun measurements and limits](docs/benchmarks/jun-latency-2026-10-04.md).
 
-**Current provisional deployment (2026-10-04):**20GiB host-cache cap, MTP ON,
-128K per request×2 and shared memory/cooling queue at8003. At85°C limit model
+The shared deployment uses a 12 GiB host prompt-cache cap, MTP, two 128K slots
+and the memory and cooling queue on port 8003. In November the full 20 GiB cache
+left less memory than the request admission budget. The lower cap makes room
+for inference while retaining prefix reuse. A smaller cache can evict older
+prefixes sooner. The installed shared service drop-in sets `--cache-ram 12288`
+in MiB. Preserve that setting when restaging the ClawGram-managed model unit.
+At85°C limit model
 CPU execution to200% of one core; at90°C and above use1% and queue new requests
 while preserving active answers. There is no92°C board-triggered kill.
 Memory/GPU protection also queues and paces instead of killing the model.
 Recovery uses10s hysteresis; background work starts only at≤75°C. Watchdog
 recovery defers while inference is active, queued or protected. Real OOM,
-hardware faults and client timeouts can still interrupt answers. Filled20GiB
-cache and sustained cooling remain untested;24GiB has never run. See
-[current policy and bounded evidence](docs/benchmarks/jun-cache20-cooperative-2026-10-04.md).
+hardware faults and client timeouts can still interrupt answers. See
+[the original cooperative protection measurements](docs/benchmarks/jun-cache20-cooperative-2026-10-04.md).
 
 Earlier on 2026-10-04 the shared provider enabled MTP with the compatible feature
 runtime, shared Q8_0 head and two draft tokens. It retains 128K per request

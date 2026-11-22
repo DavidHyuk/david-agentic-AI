@@ -442,17 +442,12 @@ def test_office_chat_persists_separate_session_without_delivery(store, monkeypat
     assert calls[1][2]['id'] == 'office_' + room
     assert calls[2][1] == '/api/sessions/office_' + room + '/chat'
     assert 'Do not modify' in calls[2][2]['instructions']
+    assert calls[2][2]['instructions'].startswith('[office-dialogue-mode:fast]\n')
     if room == 'english':
         assert 'You are Ellie, a friendly female English conversation tutor' in calls[2][2]['instructions']
         assert calls[1][2]['title'] == 'Ellie · Office conversation'
-    if room == 'coding':
-        assert calls[2][2]['instructions'].startswith('[jun-dialogue-mode:fast]\n')
     if room == 'hq':
-        policy = calls[2][2]['instructions']
-        assert 'chatgpt_rag.py' in policy
-        assert 'Silicon Valley Career 2027' in policy
-        assert 'read <chunk-id>' in policy and 'three rounds' in policy
-        assert 'without an explicit scope expansion' in policy
+        assert 'chatgpt_rag.py' not in calls[2][2]['instructions']
     assert room_for('david', 'office_' + room, '', []) == room
     assert not store.office_locks[room].locked()
 
@@ -469,6 +464,19 @@ def test_jun_deep_mode_keeps_study_boundaries(store, monkeypatch):
     with pytest.raises(ValueError, match='답변 방식'):
         store.office_chat({'room': 'coding', 'message': '힌트', 'response_mode': 'unknown'})
     assert not store.office_locks['coding'].locked()
+
+
+def test_hq_full_context_retains_private_rag_instructions(store, monkeypatch):
+    calls = []
+    def api(method, path, payload=None, **kwargs):
+        calls.append(payload)
+        return {'message': {'content': '답변'}}
+    monkeypatch.setattr(store, 'agent_api', api)
+    store.office_chat({'room': 'hq', 'message': '이전 대화 검색', 'response_mode': 'deep'})
+    policy = calls[-1]['instructions']
+    assert 'chatgpt_rag.py' in policy and 'Silicon Valley Career 2027' in policy
+    assert 'read <chunk-id>' in policy and 'three rounds' in policy
+    assert 'without an explicit scope expansion' in policy
 
 
 def test_office_read_is_inert_and_room_validation_is_closed(store, monkeypatch):

@@ -1,10 +1,10 @@
 # __author__ = 'David Choi (bestshoot21@gmail.com)'
-"""Send a focused tool catalog for explicitly selected local coding conversations.
+"""Reduce prefill for local Observatory chat and legacy fast Jun requests.
 
-Keep Hermes history, system prompt, tool implementations and model unchanged.
-Fast Jun dialogues disable optional hidden thinking; deep mode keeps the
-original catalog and reasoning. Installation uses Hermes's pre_llm_call because
-plugin discovery can happen during run_agent's import.
+Explicit fast office turns use character instructions, recent text turns and
+supplied evidence. The durable transcript stays in Hermes. Full-context turns
+keep the original prompt and tools. The legacy Jun policy remains available to
+older clients. Installation uses Hermes's pre_llm_call for import ordering.
 """
 from __future__ import annotations
 
@@ -20,6 +20,10 @@ LOG = logging.getLogger(__name__)
 COACH_TOOLS = frozenset({"terminal", "process", "read_file", "search_files",
     "skill_view", "skills_list", "session_search", "web_search", "web_extract"})
 _CONFIG = None
+OFFICE_SESSIONS = frozenset("office_" + room for room in
+    ("hq", "papers", "interview", "coding", "design", "english", "podcast"))
+OFFICE_FAST = "[office-dialogue-mode:fast]\n"
+OFFICE_HISTORY_CHARS = 6000
 
 
 def settings():
@@ -37,10 +41,8 @@ def settings():
     return _CONFIG
 
 
-def selected(agent, config):
+def local_agent(agent, config):
     if config.get("enabled") is not True:
-        return False
-    if str(getattr(agent, "ephemeral_system_prompt", "") or "").startswith("[jun-dialogue-mode:deep]\n"):
         return False
     home = Path(os.environ.get("HERMES_HOME", str(Path.home() / ".hermes")))
     if home.name not in {".hermes", "coding"}:
@@ -52,9 +54,49 @@ def selected(agent, config):
         return False
     if getattr(agent, "api_mode", "") != "chat_completions":
         return False
-    if getattr(agent, "platform", "") == "api_server":
-        return getattr(agent, "session_id", None) in config.get("sessions", [])
-    return False
+    return getattr(agent, "platform", "") == "api_server"
+
+
+def selected(agent, config):
+    prompt = str(getattr(agent, "ephemeral_system_prompt", "") or "")
+    return (local_agent(agent, config)
+            and not prompt.startswith(("[jun-dialogue-mode:deep]\n", OFFICE_FAST))
+            and getattr(agent, "session_id", None) in config.get("sessions", []))
+
+
+def office_fast(agent, config):
+    return (local_agent(agent, config)
+            and getattr(agent, "session_id", None) in OFFICE_SESSIONS
+            and str(getattr(agent, "ephemeral_system_prompt", "") or "").startswith(OFFICE_FAST))
+
+
+def compact_office_messages(messages, instructions):
+    """Keep the current request and up to three complete recent text turns."""
+    if not messages or messages[-1].get("role") != "user":
+        return None
+    current = messages[-1].get("content")
+    if not isinstance(current, str):
+        return None
+    turns, latest = [], []
+    for message in messages[:-1]:
+        role, content = message.get("role"), message.get("content")
+        if role == "user":
+            latest = [{"role": role, "content": content}] if isinstance(content, str) else []
+        elif (role == "assistant" and latest and not message.get("tool_calls")
+              and isinstance(content, str) and content.strip()):
+            turns.append([*latest, {"role": role, "content": content}])
+            latest = []
+    selected_turns, remaining = [], OFFICE_HISTORY_CHARS
+    for turn in reversed(turns[-3:]):
+        remaining -= sum(len(message["content"]) for message in turn)
+        if remaining < 0:
+            break
+        selected_turns.append(turn)
+    compact = [{"role": "system", "content": instructions}]
+    for turn in reversed(selected_turns):
+        compact.extend(turn)
+    compact.append({"role": "user", "content": current})
+    return move_problem_evidence(compact, instructions)
 
 
 def focus_tools(agent, messages):
@@ -157,8 +199,18 @@ def install(agent_class):
     def wrapped(agent, messages):
         previous = None
         request_messages = messages
+        compact = False
         try:
-            if selected(agent, settings()):
+            config = settings()
+            if office_fast(agent, config):
+                prompt = agent.ephemeral_system_prompt.removeprefix(OFFICE_FAST)
+                short_messages = compact_office_messages(messages, prompt)
+                if short_messages is not None:
+                    previous = (agent.tools, agent.valid_tool_names)
+                    agent.tools, agent.valid_tool_names = [], set()
+                    request_messages = short_messages
+                    compact = True
+            elif selected(agent, config):
                 focused = focus_tools(agent, messages)
                 if focused is not None:
                     previous = (agent.tools, agent.valid_tool_names)
@@ -178,6 +230,9 @@ def install(agent_class):
                 # Copy nested overrides: never mutate provider-wide settings.
                 result = dict(result)
                 result["temperature"] = 0.3
+                if compact:
+                    result.pop("tools", None)
+                    result.pop("tool_choice", None)
                 extra = dict(result.get("extra_body") or {})
                 template = dict(extra.get("chat_template_kwargs") or {})
                 template["enable_thinking"] = False

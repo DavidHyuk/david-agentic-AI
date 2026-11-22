@@ -199,7 +199,7 @@ window.sharedOffice = (() => {
           <div class="conversation-history" id="conversation-history" role="log" aria-label="대화 기록"></div>
           <div id="conversation-suggestions"></div>
           <form id="office-chat-form"><label class="sr-only" for="office-message">캐릭터에게 할 말</label><textarea id="office-message" maxlength="4000" rows="2" required placeholder="편하게 이야기해 보세요…"></textarea><button class="primary" id="office-send">보내기</button></form>
-          <div class="conversation-footer"><label id="jun-response-mode-label" hidden>답변 방식 <select id="jun-response-mode"><option value="fast">빠른 답변</option><option value="deep">깊이 생각</option></select></label><span id="office-chat-status" role="status"></span><button class="text-button" id="conversation-reload">기록 새로고침</button><button class="text-button" id="conversation-workbench">작업실 열기 ↗</button></div>
+          <div class="conversation-footer"><label id="office-response-mode-label">답변 방식 <select id="office-response-mode"><option value="fast">빠른 답변</option><option value="deep">전체 문맥 · 도구</option></select></label><span id="office-chat-status" role="status"></span><button class="text-button" id="conversation-reload">기록 새로고침</button><button class="text-button" id="conversation-workbench">작업실 열기 ↗</button></div>
           <small class="conversation-note">사무실 대화는 웹에 저장됩니다 · Telegram 전송 없음</small>
         </div>
       </section>
@@ -654,9 +654,9 @@ window.sharedOffice = (() => {
     $("office-conversation").hidden = false;
     $("office-message").value = localRead("office-draft:" + room, "");
     $("office-message").placeholder = cast.name + "에게 이야기해 보세요…";
-    $("jun-response-mode-label").hidden = room !== "coding";
-    $("jun-response-mode").value = localRead("jun-response-mode", "fast") === "deep" ? "deep" : "fast";
-    $("jun-response-mode").onchange = () => localWrite("jun-response-mode", $("jun-response-mode").value);
+    const modeKey = room === "coding" ? "jun-response-mode" : "office-response-mode:" + room;
+    $("office-response-mode").value = localRead(modeKey, "fast") === "deep" ? "deep" : "fast";
+    $("office-response-mode").onchange = () => localWrite(modeKey, $("office-response-mode").value);
     $("conversation-suggestions").innerHTML = ["어떤 일을 도와줄 수 있어?", "오늘 같이 뭘 해볼까?"].map(text =>
       `<button class="outline">${text}</button>`).join("");
     $("conversation-suggestions").querySelectorAll("button").forEach(button => {
@@ -675,7 +675,7 @@ window.sharedOffice = (() => {
     $("office-chat-status").textContent = chat.busy ? (chat.receiving ? "답변을 쓰고 있어요…" : "첫 답변을 기다리고 있어요…") :
       chat.error || (!chat.loaded ? "대화를 불러오는 중…" : !chat.available ? "대화 연결을 준비하지 못했습니다." : "");
     $("office-send").disabled = chat.busy || !chat.loaded || !chat.available;
-    $("jun-response-mode").disabled = chat.busy;
+    $("office-response-mode").disabled = chat.busy;
     $("conversation-portrait").classList.toggle("thinking", chat.busy);
     $("conversation-history").scrollTop = $("conversation-history").scrollHeight;
   }
@@ -707,7 +707,7 @@ window.sharedOffice = (() => {
     try {
       const response = await fetch("api/office-chat/stream", {
         method: "POST", headers: {"Content-Type": "application/json", "X-Hermes-Action": "1"},
-        body: JSON.stringify({action: "office_chat", room, message, response_mode: room === "coding" ? $("jun-response-mode").value : undefined}),
+        body: JSON.stringify({action: "office_chat", room, message, response_mode: $("office-response-mode").value}),
       });
       if (!response.ok) {
         const result = await response.json();
