@@ -1,10 +1,11 @@
 # Non-secret Hermes config merged into ~/.hermes/config.yaml by stage.py.
 # Secrets (the local endpoint API key) go in ~/.hermes/.env instead.
 
-# --- Named provider: Qwen3.8 Flash-Next 4-bit via llama.cpp on DGX Spark -----
+# --- Named provider: Qwen3.8 Flash-Next on DGX Spark ------------------------
 # model.provider points to the named provider below (base_url + served model id).
 #
-# The local llama-server binds loopback port 8003 and exposes an OpenAI API.
+# The shared Spark exposes an OpenAI API through its loopback admission proxy.
+# The FP4-Local deployment and the GGUF rollback both accept this model ID.
 providers:
   qwen38-flash-next-hermes:
     base_url: http://localhost:8003/v1

@@ -97,7 +97,7 @@ agent, scheduled content workflow, profile, Telegram bot or Observatory room.
 ## Architecture
 
 ```
-Local DGX Spark (llama.cpp @ :8003, Qwen3.8 Flash-Next IQ4_XS, 2 × 64K slots)
+Local DGX Spark (Strata behind :8003, Qwen3.8 Flash-Next FP4-Local, 2 × 128K slots)
         │  OpenAI-compatible API
         ▼
    David Hermes profile ───────────────────────────────────────► David Telegram bot
@@ -230,8 +230,9 @@ Then complete the **interactive, one-time** steps `install.sh` prints:
 `hermes-vllm.service`. It also installs a gateway systemd drop-in that requires
 the model service and runs `wait_for_vllm.py` before Hermes starts. This prevents
 fresh cron jobs from racing the several-minute model load after a reboot.
-The service name is retained for compatibility; it now runs the Qwen3.8
-Flash-Next 4-bit GGUF through llama.cpp. Manage it with:
+The shared DGX Spark uses the FP4-Local drop-ins below. The base service
+definition launches the GGUF backend for rollback and standalone installs.
+Manage the service with:
 
 ```bash
 # Start, stop, and inspect the service
@@ -248,7 +249,8 @@ To restart and wait for the correct model to appear:
 ```bash
 systemctl --user restart hermes-vllm.service
 python3 scripts/wait_for_vllm.py --url http://127.0.0.1:8003/v1/models \
-  --expected-model Qwen3.8-Flash-Next-UD-IQ4_XS --timeout 900
+  --expected-model Qwen3.8-Flash-Next-FP4-Local --timeout 900
+systemctl --user start hermes-gateway.service hermes-gateway-english.service
 ```
 
 `run_flash_next.sh` uses two 64K request slots and lets llama.cpp fit layers to the
@@ -261,6 +263,52 @@ The Flash-Next launcher now refuses to start without a working NVIDIA GPU;
 an `active` CPU-only fallback is not a healthy agent endpoint. The user service
 does not repeatedly restart on this missing-GPU exit; restore driver access
 before starting the model and gateways again.
+
+#### Flash-Next FP4-Local on DGX Spark
+
+`local-model/run_flash_next_nvfp4.py` serves NVIDIA's FP4-Local checkpoint through
+Strata over loopback port 8004. Use the Strata v0.2.21 release's signed ARM64
+engine 0.1.67 (CUDA 13.0) and control package 0.1.68. Extract them into
+`~/.local/share/hermes-nvfp4/engine-0.1.67` and
+`~/.local/share/hermes-nvfp4/strata-0.1.68`. In a Python environment at
+`~/.local/share/hermes-nvfp4/venv`, install the control package's
+`requirements.txt` and `requirements-nvfp4-local.txt` using the CPU PyTorch
+wheel. Prepare the one-time Strata conversion with the existing model still
+serving:
+
+```bash
+fp4_root="$HOME/.local/share/hermes-nvfp4"
+fp4_models="$HOME/workspace/models/nvidia"
+hf download nvidia/Qwen3.8-Flash-Next-FP4-Local \
+  --revision b9ce18a6887e18c089fdea8509a33e63429a3300 \
+  --local-dir "$fp4_models/Qwen3.8-Flash-Next-FP4-Local"
+"$fp4_root/venv/bin/python" "$fp4_root/strata-0.1.68/tools/nvfp4_local_pack.py" prepare \
+  --model "$fp4_models/Qwen3.8-Flash-Next-FP4-Local" \
+  --out "$fp4_models/Qwen3.8-Flash-Next-FP4-Local-Strata"
+```
+
+For the shared Spark installation, wait for idle requests and stop
+`hermes-vllm.service` before applying the two drop-ins:
+
+```bash
+install -D -m 0644 local-model/flash-next-nvfp4.conf \
+  ~/.config/systemd/user/hermes-vllm.service.d/95-flash-next-nvfp4.conf
+install -D -m 0644 local-model/flash-next-nvfp4-admission.conf \
+  ~/.config/systemd/user/clawgram-model-admission.service.d/95-flash-next-nvfp4.conf
+systemctl --user daemon-reload
+systemctl --user start hermes-vllm.service
+python3 scripts/wait_for_vllm.py --expected-model Qwen3.8-Flash-Next-FP4-Local
+systemctl --user start hermes-gateway.service hermes-gateway-english.service
+```
+
+The existing ClawGram admission proxy needs support for
+`LOCAL_MODEL_METRICS_PATH`. Clients keep port 8003 and may use the legacy
+`Qwen3.8-Flash-Next-UD-IQ4_XS` alias during migration. The launcher requests
+two 128K slots with MTP and uses the existing Flash-Next image projector.
+Hermes profiles use their existing 64K context setting. To return to GGUF,
+stop the model service, remove the two `95-flash-next-nvfp4.conf` drop-ins,
+reload the user units, and start the model and gateways again. The earlier
+llama.cpp override and weight files provide the rollback deployment.
 
 For a temporary local test of the separately downloaded official Qwen3.8 27B
 FP8 checkpoint, stop the shared model and both gateways first, then run:
@@ -1665,20 +1713,17 @@ hermes -p english cron run <ENGLISH_JOB_ID_FROM_LIST>
 the isolated tutor-English jobs plus the weekday 18:00 watched-link practice and weekend review jobs. Run each
 profile's E2E message only after its Telegram bot has completed pairing.
 
-The gateway only starts after `/v1/models` contains
-`Qwen3.8-Flash-Next-UD-IQ4_XS`. Calendar is not part of the active agent runtime.
+The gateway only starts after `/v1/models` contains the configured model ID.
+Strata lists `Qwen3.8-Flash-Next-FP4-Local` and the configured
+`Qwen3.8-Flash-Next-UD-IQ4_XS` compatibility alias.
 
 ## Local model note
-Hermes requires a model with **≥64K context**. The Qwen3.8 Flash-Next
-`UD-IQ4_XS` checkpoint is served on `:8003` with two 64K slots (128K total),
-so the main and English gateways can overlap without shrinking either context.
-The transformer/expert layers remain GPU-offloaded; the roughly 27GiB n-gram
-embedding stays in CPU RAM. This Spark's CPU and GPU share one 128GB memory pool,
-so `nvidia-smi` process usage is not an independent VRAM-free figure. The launcher
-keeps an 8GiB fit target and avoids SSD-backed lazy n-gram reads for lower
-prompt/decode latency. Override `HERMES_MODEL_CONTEXT` and
-`HERMES_MODEL_PARALLEL` together if changing the per-slot context; keep their
-ratio at least 65536. Its three GGUF shards total about 93.7GB. Paper metadata
+Hermes profiles use **64K context**. The Spark's shared
+`Qwen3.8-Flash-Next-FP4-Local` endpoint on `:8003` has two 128K request
+slots. Strata caches all 24,576 routed NVFP4 experts on the GPU. The launch
+configuration leaves an 8GiB GPU reserve on the Spark's shared CPU/GPU memory
+pool. See [the paired latency and compatibility checks](docs/benchmarks/office-chat-prefill-2026-11-22.md).
+Paper metadata
 ingestion itself is zero-LLM and does not
 require a second model server. The model stays outside this configuration repo
 under `/home/david/workspace/models`:

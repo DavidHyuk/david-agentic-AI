@@ -46,9 +46,9 @@ Codex 도구의 파일 생성을 검증했고, writer 충돌 경로에서도 ses
 
 ## 전체 아키텍처
 
-2026-10-03 실행 중인 공유 llama.cpp provider는 요청당 128K × 2 슬롯입니다.
-Hermes profile 설정의 context length는 별도로 64K이므로 아래 구성도의
-64K 표기는 agent 설정을 뜻합니다. `local-model/eval/interactive_latency.py`와
+공유 DGX Spark provider는 Strata에서 NVIDIA Flash-Next FP4-Local을
+요청당 128K × 2 슬롯으로 서빙합니다. Hermes profile은 별도로 64K를
+사용합니다. `local-model/eval/interactive_latency.py`와
 `experiment_tracker.py`는 이 provider를 변경하지 않고 대화형 지연을 측정하고,
 기존 MTP 결과를 통합한 로컬 HTML 및 선택적 Langfuse/LangSmith export를 만듭니다.
 실제 도구 실행·메시지 전달까지 포함하는 측정은 아닙니다.
@@ -78,7 +78,7 @@ Ellie의 첫 응답은 48.9초에서 1.5초로 줄었습니다. 각 작업실의
 추가 4 experiments / 26 distinct traces /
 154 scores의 Cloud read-back과 복제 Jun의 native TTFT 첫 질문 25.35초 / 후속
 1.27초를 확인했습니다. 이 수치는 MTP OFF일 때의 과거 검증입니다.
-현재 공유 운영 모델은 MTP ON, 128K 슬롯 두 개, host prompt-cache 상한 12GiB입니다.
+전환 전 llama.cpp 구성은 MTP ON, 128K 슬롯 두 개, host prompt-cache 상한 12GiB였습니다.
 20GiB 설정에서는 가용 메모리 5.9GiB가 admission 기준 6.45GiB 아래로 떨어졌습니다.
 캐시 상한을 `--cache-ram 12288`로 낮춘 뒤 모델과 gateway를 복구하고 가용 메모리
 35.7GiB를 관측했습니다. 상한을 낮추면 오래된 prefix가 더 일찍 제거될 수 있습니다.
@@ -112,8 +112,8 @@ Studio snapshot 경로와 Graph/Sessions 조회는 `docs/agent-observability.md`
 
 ```
 DGX Spark (128GB 통합 메모리)
-  └── llama.cpp 서버 :8003
-        └── Qwen3.8-Flash-Next-UD-IQ4_XS (provider 128K × 2, agent 64K, MTP ON)
+  └── admission proxy :8003 → Strata :8004
+        └── Qwen3.8-Flash-Next-FP4-Local (provider 128K × 2, agent 64K, MTP ON)
                 │
                 ├── David Hermes gateway ── David Telegram bot
                 │     ├── dedicated paper group: Tue/Fri top-three papers digest
@@ -303,7 +303,9 @@ David-Agent/
 │   │   └── requirements-pokemon.txt # 격리된 카드 Vision 평가 의존성
 │   ├── setup_vllm.sh          # 격리된 CUDA 호환 vLLM 환경 생성
 │   ├── model_preflight.py     # 체크포인트 양자화·컨텍스트 사전검사
-│   ├── run_flash_next.sh      # 현재 4비트 GGUF llama.cpp 서버 실행
+│   ├── run_flash_next_nvfp4.py # 공유 FP4-Local Strata 서버 실행
+│   ├── flash-next-nvfp4*.conf # 모델·admission 호환용 systemd drop-in
+│   ├── run_flash_next.sh      # 4비트 GGUF llama.cpp 실행 및 복구
 │   ├── run_model.sh           # 레거시 vLLM 서버 실행 (qwen/qwen-hybrid/qwen36/minimax)
 │   ├── install_service.sh     # 현재 모델 user systemd 서비스 설치
 │   ├── hermes-gateway-vllm.conf # gateway → vLLM 의존성/readiness drop-in
@@ -527,16 +529,18 @@ English profile에서는 background skill creation과 curator를 비활성화합
 
 
 ### 6. `local-model/` — LLM 백엔드
-`hermes-vllm.service`는 ClawGram과 공유하는 llama.cpp로 Qwen3.8 Flash-Next
-`UD-IQ4_XS` GGUF를 loopback 8004에서 서빙합니다. 메인·English gateway는
-8003 admission proxy를 사용합니다. 세 GGUF 샤드는 약 93.7GB이며 모델은 128K
-컨텍스트 슬롯 둘, Hermes agent는 64K 설정을 사용합니다. `run_flash_next.sh`는
-독립 실행 기본 런처입니다. 약 27GiB n-gram
-임베딩은 CPU RAM에 상주시키고, 나머지 transformer/expert 층은 GPU에 배치합니다.
-128GB 통합 메모리의 여유에 맞춰 GPU layer 수를 자동 조정하며 8GiB fit target을
-유지합니다. `nvidia-smi`의 GPU 프로세스 사용량은 별도 VRAM 풀이 아니므로
-`free -h`의 실제 메모리 여유와 함께 확인해야 합니다. `install_service.sh`는 이를 로그인·재부팅
-후에도 유지하는 기존 이름의 `hermes-vllm.service` user service를 설치합니다.
+`hermes-vllm.service`는 2026-11-24부터 NVIDIA
+`Qwen3.8-Flash-Next-FP4-Local`을 Strata 0.1.67/CUDA에서 서빙합니다.
+메인·English gateway와 ClawGram은 8003 admission proxy를 사용하고,
+Strata는 loopback 8004에서 응답합니다. API는 FP4-Local과 기존
+`UD-IQ4_XS` 호환 이름을 함께 노출합니다. 128K 컨텍스트 슬롯 둘,
+Hermes 64K, MTP 초안, 이미지 입력에 기존 OpenAI 호환 경로를 씁니다.
+NVFP4 expert 24,576개가 GPU에 들어가고 약 27GiB의 PLE 임베딩은
+회수 가능한 호스트 메모리로 로드됩니다. admission proxy는 Strata의
+Prometheus scheduler 메트릭을 읽어 메모리·슬롯·온도 기준을 적용합니다.
+서비스 전환과 GGUF 복구용 drop-in 사용법은 [README](../README.md)에 있습니다.
+`install_service.sh`는 기존 이름의 user service를 설치하며,
+`run_flash_next.sh`는 93.7GB GGUF 기반 복구 구성의 런처입니다.
 `run_model.sh`는 Qwen3.6 FP8 등 5가지 vLLM 대안용으로 유지합니다.
 Qwen3.8 27B FP8도 `qwen38-27b` 선택지로 실행할 수 있으나, 2026-09-29
 시험은 도구·이미지 smoke 후 호스트 장애로 중단돼 운영 대안으로 검증되지 않았습니다.
@@ -731,11 +735,11 @@ Hermes가 고정된 `agent-browser 0.33.0`을 통해 연결합니다. 외부 클
 | v0.1.1 | Qwen3.5-122B-A10B-AWQ | vLLM | ~14 tok/s | 64K | 레거시 (`qwen`) |
 | v0.1.1 | Qwen3.5-122B AutoRound INT4 | vLLM | ~51 tok/s | 64K | 다운로드 완료 (`qwen-hybrid`) |
 | v0.4.0 | Qwen3.6-35B-A3B-FP8 | vLLM | 진단 평가 중앙값 51.22 decode tok/s | 운영 128K, 비교는 64K | 레거시 대안 (`qwen36`) |
-| v1.22.1 | Qwen3.8-Flash-Next-UD-IQ4_XS | llama.cpp | 진단 평가 중앙값 28.84 decode tok/s | 64K × 2 | 현재 기본 서비스 |
+| v1.22.1 | Qwen3.8-Flash-Next-UD-IQ4_XS | llama.cpp | 진단 평가 중앙값 28.84 decode tok/s | 공유 128K × 2 | 복구용 |
 | v1.24.0 | Qwen3.8-27B-FP8 | vLLM | 부분 실행 약 7.9 decode tok/s; 호스트 장애로 미완료 | 비교 설정 64K | 실험용 (`qwen38-27b`), 운영 미검증 |
+| v1.56.0 | Qwen3.8-Flash-Next-FP4-Local | Strata | 11.4K 토큰 첫 응답 5.5초 | 공유 128K × 2 | 현재 공유 서비스 |
 | — | MiniMax-M2.7-AWQ-4bit | vLLM | 대안 MoE | 64K | 옵션 (`minimax`) |
 
-현재 모델은 4비트 GGUF 지원과 메모리 적합성을 위해 llama.cpp를 사용합니다.
 레거시 모델은 `bash local-model/run_model.sh <모델명>`으로 실행할 수 있습니다.
 
 ### 방향 2 — 기억(Memory) 품질 향상
@@ -893,11 +897,18 @@ v0.1.0에서 4개의 핵심 스킬로 시작해, 더 많은 도메인을 커버�
   기록을 사용하고, HQ orchestration은 Kanban DB에 task graph, comment, run,
   outcome을 별도로 보존합니다.
 
-### vLLM (고성능 LLM 서빙 엔진)
+### Strata (공유 Flash-Next 서빙 엔진)
+
+- **NVFP4**: GB10에서 routed expert를 4비트로 읽고 프롬프트 prefill을 실행합니다.
+- **INT8 KV, MTP**: 128K 슬롯 두 개와 각 슬롯의 2토큰 초안 생성을 지원합니다.
+- **OpenAI 호환 API**: 스트리밍, 도구 호출·결과, 이미지 입력과 JSON 출력을 서빙합니다.
+  [비교 측정](benchmarks/office-chat-prefill-2026-11-22.md)
+
+### vLLM (대안 LLM 서빙 엔진)
 - **PagedAttention**: KV 캐시를 페이지 단위로 관리 → 긴 컨텍스트에서 메모리 낭비 최소화
 - **Prefix Caching**: 반복되는 프롬프트 앞부분을 캐싱 → 스킬의 시스템 프롬프트 재계산 없음
 - **Continuous Batching**: 여러 요청을 동시에 처리 → 처리량 향상
-- **Multi-Token Prediction (MTP)**: 공유 llama.cpp에 Q8_0 head/draft 2 활성화.
+- **Multi-Token Prediction (MTP)**: 이전 공유 llama.cpp에 Q8_0 head/draft 2를 적용했습니다.
   실제 Jun workload에서 생성 속도 개선을 측정했으며 TTFT 개선과는 구분합니다.
 - **FP8 KV Cache**: KV 캐시를 FP8로 저장 → 같은 VRAM으로 더 긴 시퀀스 처리
 
@@ -1251,7 +1262,7 @@ ZIP 경로 격리·credential 오류 출력 방지 및 HQ source 상태 검증�
 Jun 사전 풀이 요약의 근거 변경·Accepted 코드 freshness·실패 보존·동시 실행
 잠금·background provider 경계 및 재인증 상태·실제 코드 필수 조건을 포함한
 원격 계정 재연결·CSRF 전달·동일 계정의 서버 cookie 갱신 검증까지 포함한
-현재 전체 테스트는 1,027 passed입니다. 7개 작업실의 빠른 답변 요청 범위,
+현재 전체 테스트는 1,028 passed입니다. 7개 작업실의 빠른 답변 요청 범위,
 현재 질문·근거 보존과 HQ 전체 문맥 검색 지시를 검증합니다.
 작업실 타이머의 시:분:초 표시와
 시간 경계·24시간 이상 누적·일시정지/재개·초기화 검증을 포함합니다.

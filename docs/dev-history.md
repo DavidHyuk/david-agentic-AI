@@ -3,6 +3,18 @@
 All notable changes to `david-agentic-ai` are documented here. Versions follow
 semantic versioning (major.minor.patch).
 
+## v1.56.0 — 2026-11-24 (minor: serve Flash-Next FP4-Local on the shared Spark)
+
+- Deploy NVIDIA FP4-Local with Strata CUDA on the existing DGX Spark service.
+  Serve two 128K slots with MTP behind the same admission queue, retain the
+  legacy client model ID as an alias, and document the GGUF rollback.
+- Reduce first visible text from 15.00 to 5.47 seconds on the 11.4K-token
+  synthetic comparison. Verify automatic tool calls and results, image input
+  with JSON output, simultaneous requests, and 65,848-token history recall.
+  Verify streamed and saved output through the live Hermes gateway.
+- Validation includes 1,028 David-Agent tests and 360 ClawGram tests with
+  two skips. [Measurements and thermal observations](benchmarks/office-chat-prefill-2026-11-22.md)
+
 ## v1.55.0 — 2026-11-22 (minor: speed up Observatory character chat)
 
 - Default all seven character chats to a compact prompt with recent text and
